@@ -138,21 +138,70 @@ actually generated, so the backdrop stays out of the bloom while windows,
 coins, sparks and the sun still catch it. The palette also caps peak sky
 brightness below 1.0, deliberately leaving headroom for things that emit.
 
-### Texels: texturing quads pygame cannot texture
+### Texture mapping, which pygame does not have
 
-pygame has no texture mapping, and voxel faces are arbitrary projected quads.
-So each material carries a small set of UV-space rectangles which are mapped
-onto a face's four corners by bilinear interpolation at draw time. It is affine
-rather than perspective-correct, which across a single block is well under a
-pixel, and it gives blocks real surface detail instead of a flat fill. Each
-block offsets the shared pattern by its own position so a wall does not look
-like one tile stamped repeatedly.
+pygame fills polygons with a flat colour and nothing else. An earlier version
+approximated texture by scattering small "texel" polygons over each face; that
+gave surfaces *detail* but never actual texture, and you could not put a legible
+16x16 cobblestone pattern on a cube and have it read as cobblestone.
 
-Surface detail is capped to a **fixed budget of the nearest blocks** rather
-than applied to everything in view. Texturing every face of every block cost
-around 9,600 polygon draws per frame and dominated the entire process; the far
-ones are a few pixels across and nobody can tell they are flat. The `quality`
-setting scales that budget and drops the cheapest-to-lose effects first.
+`warp.py` does the real thing: each face is treated as a parallelogram, the
+pixels inside it are inverse-mapped back into texture space with numpy, and the
+texture is sampled nearest-neighbour so pixel art stays hard-edged.
+
+Doing that per face per frame would be far too slow -- numpy's per-call overhead
+dominates on arrays this small. What makes it affordable is that a face's
+*shape* depends only on the camera angle and the distance, not on where the
+block is, so at any moment nearly every visible face of a given orientation is
+the same parallelogram at one of a handful of sizes. Quantising the two edge
+vectors into buckets turns that into a cache key, and the warp then runs a few
+dozen times a frame instead of a few hundred; everything else is a plain blit.
+Three details that turned out to matter:
+
+* **Evict a fraction, not everything.** Clearing the cache when it filled
+  dropped the hit rate to about 30% -- each eviction threw away the entire
+  working set mid-frame. Dropping the oldest quarter took it to ~72%.
+* **Coarser buckets for longer edges.** Whole-pixel buckets on a large face
+  mint an entry for almost every depth the orbiting camera passes through.
+* **Grow each edge before quantising.** Rounding the origin and the edges
+  independently leaves sub-pixel gaps, and a one-pixel seam showing sky between
+  every pair of blocks is far more visible than a one-pixel overlap -- which,
+  drawn in painter's order, is invisible. The size guard has to run *before*
+  that inflation, or genuinely sub-pixel faces get floored at three pixels and
+  distant geometry renders several times too large.
+
+The mapping is affine, not perspective-correct: a cube face in perspective is
+really a trapezoid. Across a block a few dozen pixels wide the difference is
+under a pixel. Long faces -- a train carriage running away from the camera --
+are subdivided by the caller into ~2-unit segments so each stays small enough
+for the approximation to hold.
+
+### Models
+
+`model.py` is the only thing that knows how to turn a box into pixels:
+transform eight corners, drop the faces whose screen-space winding points away
+from the camera, draw the rest as textured quads. Back-face removal by winding
+rather than by reasoning about camera position means it works unchanged for the
+runner's fixed forward camera and the tower's orbiting one.
+
+Figures follow the standard voxel-game proportions, in texture pixels where one
+block is 16: 8x8x8 head, 8x12x4 torso, 4x12x4 limbs, exactly two blocks tall.
+Those numbers matter more than they look -- a slightly-too-small head stops the
+figure reading as the thing it is imitating however good the textures are.
+Limbs rotate about a pivot at the shoulder or hip, not their own centre, which
+is the difference between a joint and a box sliding back and forth.
+
+### Terrain palettes are fixed
+
+Block colours do **not** follow the run palette. Grass is grass-coloured and
+stone is stone-coloured in every run; only the sky, the lighting, and the
+character's shirt pick up the generated hue. Terrain that changes colour every
+run reads as a bug rather than as variety -- and the same applies to the
+characters, whose hair was briefly derived from `palette.ink` and consequently
+turned white on every dark palette.
+
+Surface detail is still capped to a **budget of the nearest blocks**, and the
+`quality` setting scales it.
 
 ## Projection
 
@@ -222,7 +271,10 @@ src/brainrot/
 │   ├── projection.py perspective maths
 │   ├── scene.py      Scene contract and registry
 │   ├── noise.py      value noise / fbm, for generated textures
-│   ├── texture.py    spheres, glows, facades, texel patterns, AO
+│   ├── pixelart.py   16x16 block textures and character skins
+│   ├── warp.py       cached affine textured-quad rasteriser
+│   ├── model.py      textured boxes and the box-humanoid rig
+│   ├── texture.py    spheres, glows, facades
 │   ├── sky.py        gradient, sun/moon, stars, parallax clouds
 │   ├── postfx.py     bloom, grade, aberration, vignette
 │   ├── draw.py       text, particles, cached gradients

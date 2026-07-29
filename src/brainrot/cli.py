@@ -159,7 +159,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 def cmd_scenes(args: argparse.Namespace) -> int:
     from .engine import scene as scene_api
-    from . import scenes  # noqa: F401
 
     cfg = Config.load()
     counter = RunCounter()

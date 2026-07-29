@@ -10,7 +10,6 @@ from __future__ import annotations
 import pygame
 
 try:
-    import win32api
     import win32con
     import win32gui
 except ImportError as exc:  # pragma: no cover - platform specific

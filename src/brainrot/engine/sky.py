@@ -17,7 +17,7 @@ import random
 import numpy as np
 import pygame
 
-from ..palette import RGB, Palette, lerp_rgb
+from ..palette import Palette, lerp_rgb
 from .noise import fbm
 
 #: Sun tint and glow radius (as a fraction of height) per time of day.

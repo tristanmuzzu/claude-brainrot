@@ -19,16 +19,17 @@ from __future__ import annotations
 
 import math
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import pygame
 
-from ..engine import postfx
+from ..engine import model, pixelart, postfx
 from ..engine.draw import Particles, text
 from ..engine.projection import Camera, fog_amount, fogged, jump_height, project
 from ..engine.scene import Scene, SceneContext, register
 from ..engine.sky import Sky
-from ..engine.texture import apply_texels, facade, soft_glow, sphere, texel_pattern
+from ..engine.model import Humanoid
+from ..engine.texture import facade, soft_glow, sphere
 from ..palette import RGB, lerp_rgb, shade
 
 LANE_X = (-2.3, 0.0, 2.3)
@@ -189,10 +190,6 @@ class RunnerScene(Scene):
             base = facade(48, 192, wall, lit, dark, rng, lit_chance=lit_chance)
             self.facades.append(self._fog_variants(base))
 
-        self.texels_metal = texel_pattern("metal", rng)
-        self.texels_stone = texel_pattern("stone", rng)
-        self.texels_brick = texel_pattern("brick", rng)
-
         self.coin_sprite = sphere(14, (255, 206, 74), rim=(255, 246, 190))
         self.coin_glow = soft_glow(22, (255, 190, 60))
         self.spark_glow = soft_glow(16, lerp_rgb(pal.accent, (255, 255, 255), 0.5))
@@ -211,7 +208,54 @@ class RunnerScene(Scene):
         self.jacket = lerp_rgb(pal.accent, (255, 255, 255), 0.18)
         self.pack = lerp_rgb(pal.hazard, (255, 240, 220), 0.25)
 
+        self._build_atlas(rng)
         self._ground_plane = self._build_ground_plane()
+
+    def _build_atlas(self, rng) -> None:
+        """Block, carriage and character textures for the model renderer."""
+        pal = self.palette
+        self.atlas: dict = {}
+
+        # Three carriage liveries so a train of several segments and successive
+        # trains do not all look identical.
+        liveries = (
+            lerp_rgb(pal.accent, (255, 255, 255), 0.30),
+            (196, 74, 74),
+            (72, 122, 190),
+        )
+        for i, base in enumerate(liveries):
+            self.atlas[f"carriage{i}_side"] = pixelart.carriage_side(rng, base)
+            self.atlas[f"carriage{i}_front"] = pixelart.carriage_front(rng, base)
+            self.atlas[f"carriage{i}_roof"] = pixelart.carriage_roof(rng, base)
+
+        self.atlas["hazard"] = pixelart.hazard_stripe(rng, pal.hazard)
+        self.atlas["cone"] = pixelart.concrete(rng, lerp_rgb(pal.accent, (255, 160, 60), 0.6))
+        self.atlas["pack"] = pixelart.concrete(rng, lerp_rgb(pal.hazard, (255, 240, 220), 0.25))
+
+        self.atlas.update(
+            pixelart.humanoid_skin(
+                rng,
+                skin=(236, 183, 142),
+                hair=(44, 34, 40),
+                shirt=lerp_rgb(pal.accent, (255, 255, 255), 0.18),
+                trousers=(46, 54, 78),
+                shoes=(232, 238, 245),
+                # A cap rather than hair: it reads at a glance and it is the
+                # genre's most recognisable headwear.
+                cap=lerp_rgb(pal.hazard, (255, 255, 255), 0.15),
+            )
+        )
+        self.figure = Humanoid()
+
+    def _projector(self, ox: int):
+        """A model.Projector bound to this frame's camera shake offset."""
+        cam, w, h = self.cam, self.width, self.height
+
+        def project_point(x: float, y: float, z: float):
+            p = project(cam, x, y, z, w, h)
+            return None if p is None else (p.x + ox, p.y, p.depth)
+
+        return project_point
 
     def _fog_variants(self, base: pygame.Surface) -> list[pygame.Surface]:
         """Pre-tint a facade at every fog depth we will ask for."""
@@ -558,7 +602,12 @@ class RunnerScene(Scene):
 
         # Painter's algorithm: everything in the world sorted far to near.
         drawables: list[tuple[float, object]] = []
-        drawables += [(o.z, o) for o in self.obstacles]
+        # Anything the runner has already gone past is between the camera and
+        # the player, where perspective blows it up to fill the strip. It is
+        # gone within a tenth of a second at track speed, so dropping it costs
+        # nothing and stops a passed barrier wiping out the whole frame.
+        draw_from = self.cam.z + 3.5
+        drawables += [(o.z, o) for o in self.obstacles if o.z_end > draw_from]
         drawables += [(c.z, c) for c in self.coins if not c.taken]
         drawables += [(e.z, e) for e in self.effects]
         drawables.append((self.player.z, self.player))
@@ -745,187 +794,86 @@ class RunnerScene(Scene):
                 pygame.draw.lines(surface, curb_top, False, top_pts, 2)
 
     def _draw_obstacle(self, surface: pygame.Surface, obs: Obstacle, ox: int) -> None:
-        pal = self.palette
+        """Obstacles are real textured boxes now, not flat-shaded polygons."""
+        projector = self._projector(ox)
         x = LANE_X[obs.lane]
-        half_w = 0.95
 
         if obs.kind == "train":
-            self._draw_train(surface, obs, x, half_w, ox)
+            self._draw_train(surface, obs, x, ox)
             return
+
         if obs.kind == "overhead":
             # Hangs from above with a gap underneath to slide through.
-            self._draw_box(
+            model.draw_box(
                 surface,
-                x,
-                1.35,
-                obs.z,
-                half_w,
-                obs.height - 1.35,
-                obs.length,
-                pal.hazard,
-                ox,
-                texels=self.texels_metal,
-                stripes=True,
+                projector,
+                model.Box(
+                    x=x, y=1.35 + (obs.height - 1.35) * 0.5, z=obs.z + obs.length * 0.5,
+                    w=1.9, h=obs.height - 1.35, d=obs.length,
+                    default="hazard",
+                ),
+                self.atlas,
             )
             return
 
-        color = pal.hazard if obs.kind == "barrier" else pal.accent
-        self._draw_box(
+        texture = "hazard" if obs.kind == "barrier" else "cone"
+        model.draw_box(
             surface,
-            x,
-            0.0,
-            obs.z,
-            half_w,
-            obs.height,
-            obs.length,
-            color,
-            ox,
-            texels=self.texels_stone,
-            stripes=obs.kind == "barrier",
+            projector,
+            model.Box(
+                x=x, y=obs.height * 0.5, z=obs.z + obs.length * 0.5,
+                w=1.9, h=obs.height, d=obs.length,
+                default=texture,
+            ),
+            self.atlas,
         )
 
-    def _draw_train(self, surface: pygame.Surface, obs: Obstacle, x: float, half_w: float, ox: int) -> None:
-        """A train carriage: body, window band and a headlamp."""
-        pal = self.palette
-        body = shade(pal.structure, 1.05 + 0.12 * (obs.style % 3))
-        self._draw_box(
-            surface,
-            x,
-            0.0,
-            obs.z,
-            half_w,
-            obs.height,
-            obs.length,
-            body,
-            ox,
-            texels=self.texels_metal,
-        )
+    def _draw_train(self, surface: pygame.Surface, obs: Obstacle, x: float, ox: int) -> None:
+        """A carriage, drawn as a row of short segments.
 
-        # Window strip along the visible side, drawn as a run of small quads.
-        cam = self.cam
-        y0, y1 = obs.height * 0.55, obs.height * 0.82
-        side_x = x + (half_w if x > self.cam.x else -half_w)
-        glass = lerp_rgb(pal.sky_bottom, (255, 255, 255), 0.45)
-        if pal.time_of_day == "night":
-            glass = lerp_rgb((255, 226, 150), pal.accent, 0.3)
+        One long box would break the affine texture approximation badly -- a
+        carriage running from just ahead of the camera to the horizon is the
+        worst case for treating a trapezoid as a parallelogram. Splitting it
+        into ~2-unit segments keeps every face small enough that the error is
+        sub-pixel, and it repeats the window texture along the flank the way a
+        real carriage does.
+        """
+        projector = self._projector(ox)
+        body = f"carriage{obs.style % 3}"
+        segment = 2.2
+        z = obs.z
+        first = True
+        while z < obs.z_end - 0.05:
+            length = min(segment, obs.z_end - z)
+            model.draw_box(
+                surface,
+                projector,
+                model.Box(
+                    x=x, y=obs.height * 0.5, z=z + length * 0.5,
+                    w=1.95, h=obs.height, d=length,
+                    default=f"{body}_side",
+                    textures={
+                        "top": f"{body}_roof",
+                        "bottom": f"{body}_roof",
+                        # Only the leading segment gets the cab face.
+                        "north": f"{body}_front" if first else f"{body}_side",
+                    },
+                ),
+                self.atlas,
+            )
+            z += length
+            first = False
 
-        step = 1.6
-        z = obs.z + 0.6
-        while z < obs.z_end - 0.9:
-            a = project(cam, side_x, y1, z, self.width, self.height)
-            b = project(cam, side_x, y1, z + step * 0.62, self.width, self.height)
-            c = project(cam, side_x, y0, z + step * 0.62, self.width, self.height)
-            d = project(cam, side_x, y0, z, self.width, self.height)
-            if None not in (a, b, c, d) and abs(b.x - a.x) > 1.5:
-                pygame.draw.polygon(
-                    surface,
-                    fogged(cam, glass, a.depth, pal.fog),
-                    [(a.x + ox, a.y), (b.x + ox, b.y), (c.x + ox, c.y), (d.x + ox, d.y)],
-                )
-            z += step
-
-        # Headlamp on the near face, with an additive glow.
-        lamp = project(cam, x, obs.height * 0.35, obs.z, self.width, self.height)
+        # Headlamp glow on the near end.
+        lamp = project(self.cam, x, obs.height * 0.30, obs.z, self.width, self.height)
         if lamp is not None and lamp.scale > 6:
-            radius = max(2, int(0.28 * lamp.scale))
+            radius = max(2, int(0.3 * lamp.scale))
             glow = pygame.transform.smoothscale(self.coin_glow, (radius * 6, radius * 6))
             surface.blit(
                 glow,
                 glow.get_rect(center=(int(lamp.x + ox), int(lamp.y))),
                 special_flags=pygame.BLEND_RGB_ADD,
             )
-
-    def _draw_box(
-        self,
-        surface: pygame.Surface,
-        x: float,
-        y0: float,
-        z: float,
-        half_w: float,
-        height: float,
-        length: float,
-        color: RGB,
-        ox: int,
-        texels: list | None = None,
-        stripes: bool = False,
-    ) -> None:
-        """A depth-correct box: front face plus a visible side and top."""
-        cam = self.cam
-        near_bl = project(cam, x - half_w, y0, z, self.width, self.height)
-        near_tr = project(cam, x + half_w, y0 + height, z, self.width, self.height)
-        far_bl = project(cam, x - half_w, y0, z + length, self.width, self.height)
-        far_tr = project(cam, x + half_w, y0 + height, z + length, self.width, self.height)
-        if near_bl is None or near_tr is None or far_bl is None or far_tr is None:
-            return
-
-        front = fogged(cam, color, near_bl.depth, self.palette.fog)
-        side = fogged(cam, shade(color, 0.66), near_bl.depth, self.palette.fog)
-        top = fogged(cam, shade(color, 1.2), near_bl.depth, self.palette.fog)
-
-        # Which side face is visible depends on which way the box sits relative
-        # to the camera's x.
-        if near_bl.x + ox > self.width * 0.5:
-            side_quad = [
-                (near_bl.x + ox, near_bl.y),
-                (far_bl.x + ox, far_bl.y),
-                (far_bl.x + ox, far_tr.y),
-                (near_bl.x + ox, near_tr.y),
-            ]
-        else:
-            side_quad = [
-                (near_tr.x + ox, near_bl.y),
-                (far_tr.x + ox, far_bl.y),
-                (far_tr.x + ox, far_tr.y),
-                (near_tr.x + ox, near_tr.y),
-            ]
-        pygame.draw.polygon(surface, side, side_quad)
-        if texels:
-            apply_texels(surface, side_quad, texels, side, offset=(z * 0.07, 0.0))
-
-        top_quad = [
-            (near_bl.x + ox, near_tr.y),
-            (near_tr.x + ox, near_tr.y),
-            (far_tr.x + ox, far_tr.y),
-            (far_bl.x + ox, far_tr.y),
-        ]
-        pygame.draw.polygon(surface, top, top_quad)
-
-        front_quad = [
-            (near_bl.x + ox, near_bl.y),
-            (near_tr.x + ox, near_bl.y),
-            (near_tr.x + ox, near_tr.y),
-            (near_bl.x + ox, near_tr.y),
-        ]
-        pygame.draw.polygon(surface, front, front_quad)
-
-        if stripes and near_bl.scale > 10:
-            # Hazard chevrons: the visual language for "do not run into this".
-            warn = lerp_rgb(front, (255, 244, 210), 0.75)
-            for i in range(3):
-                t0 = i / 3 + 0.06
-                t1 = t0 + 0.18
-                ax = near_bl.x + (near_tr.x - near_bl.x) * t0 + ox
-                bx = near_bl.x + (near_tr.x - near_bl.x) * t1 + ox
-                pygame.draw.polygon(
-                    surface,
-                    warn,
-                    [
-                        (ax, near_bl.y),
-                        (bx, near_bl.y),
-                        (bx, near_tr.y),
-                        (ax, near_tr.y),
-                    ],
-                )
-
-        # Rim highlight along the top edge catches the eye and separates the
-        # box from whatever is behind it.
-        pygame.draw.line(
-            surface,
-            lerp_rgb(top, (255, 255, 255), 0.4),
-            (near_bl.x + ox, near_tr.y),
-            (near_tr.x + ox, near_tr.y),
-            max(1, int(near_bl.scale * 0.02)),
-        )
 
     def _draw_coin(self, surface: pygame.Surface, coin: Coin, ox: int) -> None:
         p = project(self.cam, LANE_X[coin.lane], coin.y, coin.z, self.width, self.height)
@@ -941,7 +889,9 @@ class RunnerScene(Scene):
         height = radius * 2
 
         if radius > 3:
-            glow = pygame.transform.smoothscale(self.coin_glow, (int(width * 2.6), int(height * 2.6)))
+            # A tight halo. At 2.6x the glow swamped the coin itself and the
+            # pickups read as glowing blobs rather than as coins.
+            glow = pygame.transform.smoothscale(self.coin_glow, (int(width * 1.7), int(height * 1.7)))
             surface.blit(
                 glow,
                 glow.get_rect(center=(int(p.x + ox), int(p.y))),
@@ -1006,186 +956,64 @@ class RunnerScene(Scene):
     # -- character --------------------------------------------------------
 
     def _draw_player(self, surface: pygame.Surface, ox: int) -> None:
-        """An articulated runner seen from behind.
+        """The runner, as a rigged box figure.
 
-        Two-segment limbs with real joints, a run cycle driven by one phase
-        value, and distinct poses for jumping, sliding and crashing. A capsule
-        with two lines reads as a placeholder; this reads as a character.
+        Same model and rig as the voxel scene, with an exaggerated head -- the
+        oversized-head proportion is the defining silhouette cue of the mobile
+        endless-runner look, and it also keeps the face readable at the size
+        this strip renders it.
         """
         player = self.player
-        p = project(self.cam, player.x, player.y, player.z, self.width, self.height)
-        if p is None:
-            return
+        projector = self._projector(ox)
 
-        s = p.scale
-        if s < 4:
-            return
-        cx = p.x + ox
-        ground_y = p.y
-        phase = player.run_cycle
-
-        # Contact shadow first, so everything else sits on top of it.
+        # Contact shadow first, so the figure sits on the track.
         ground = project(self.cam, player.x, 0.0, player.z, self.width, self.height)
-        if ground is not None:
+        if ground is not None and ground.scale > 3:
             lift = 1.0 - min(1.0, player.y / (JUMP_PEAK + 0.6))
-            shadow_w = max(3, int(0.85 * s * (0.4 + 0.6 * lift)))
+            shadow_w = max(3, int(0.9 * ground.scale * (0.4 + 0.6 * lift)))
             shadow = pygame.Surface((shadow_w * 2, max(3, shadow_w)), pygame.SRCALPHA)
-            pygame.draw.ellipse(shadow, (0, 0, 0, int(110 * lift)), shadow.get_rect())
+            pygame.draw.ellipse(shadow, (0, 0, 0, int(115 * lift)), shadow.get_rect())
             surface.blit(shadow, shadow.get_rect(center=(int(ground.x + ox), int(ground.y))))
 
-        crashed = player.crashed
-        sliding = player.sliding
-        airborne = player.airborne
-
-        # Pose parameters. Everything below is expressed relative to `s`, so the
-        # character scales correctly with distance.
-        if crashed:
-            tumble = player.crash_t * 9.0
-            lean = math.sin(tumble) * 0.9
-            crouch = 0.55
-        elif sliding:
-            lean = 1.25
-            crouch = 0.42
-        elif airborne:
-            lean = 0.18
-            crouch = 0.86
+        if player.crashed:
+            lean, amplitude, tuck, arms = 1.15, 0.2, 0.9, -1.3
+        elif player.sliding:
+            lean, amplitude, tuck, arms = 1.35, 0.15, 1.25, 1.2
+        elif player.airborne:
+            lean, amplitude, tuck, arms = 0.25, 0.3, -0.55, -1.0
         else:
-            lean = 0.10 + math.sin(phase * 2) * 0.05
-            crouch = 1.0
+            lean, amplitude, tuck, arms = 0.22, 0.95, 0.0, None
 
-        hip_y = ground_y - 0.78 * s * crouch
-        shoulder_y = hip_y - 0.52 * s * crouch
-        lean_px = lean * 0.32 * s
-
-        # -- legs
-        if sliding:
-            leg_angles = (-1.25, -1.05)
-        elif airborne:
-            leg_angles = (-0.42, 0.55)
-        else:
-            # +/- 0.52 rad is about 30 degrees of swing. The 0.95 this started
-            # at is 54 degrees, which is not a run -- it is doing the splits.
-            leg_angles = (math.sin(phase) * 0.52, math.sin(phase + math.pi) * 0.52)
-
-        for i, angle in enumerate(leg_angles):
-            knee_bend = 0.30 + 0.34 * max(0.0, math.cos(phase + i * math.pi))
-            self._limb(
-                surface,
-                cx + lean_px * 0.3 + (i - 0.5) * 0.16 * s,
-                hip_y,
-                angle,
-                0.42 * s * crouch,
-                angle + knee_bend,
-                0.40 * s * crouch,
-                max(2, int(0.15 * s)),
-                self.trousers,
-                foot_color=self.shoes,
-                foot_size=max(2, int(0.13 * s)),
-            )
-
-        # -- torso: a tapered quad, wider at the shoulders
-        hip_w = 0.24 * s
-        shoulder_w = 0.32 * s
-        torso = [
-            (cx - hip_w + lean_px * 0.25, hip_y),
-            (cx + hip_w + lean_px * 0.25, hip_y),
-            (cx + shoulder_w + lean_px, shoulder_y),
-            (cx - shoulder_w + lean_px, shoulder_y),
-        ]
-        pygame.draw.polygon(surface, self.jacket, torso)
-        # Centre seam gives the flat jacket some form.
-        pygame.draw.line(
-            surface,
-            shade(self.jacket, 0.82),
-            (cx + lean_px * 0.25, hip_y),
-            (cx + lean_px, shoulder_y),
-            max(1, int(0.04 * s)),
+        boxes = self.figure.parts(
+            player.x,
+            player.y,
+            player.z,
+            swing=player.run_cycle,
+            lean=lean,
+            amplitude=amplitude,
+            tuck=tuck,
+            arms_up=arms,
+            head_scale=1.25,
         )
+        for box in boxes:
+            model.draw_box(surface, projector, box, self.atlas)
 
-        # -- backpack, the single most recognisable runner silhouette cue
-        if s > 12:
-            pack_w = int(0.34 * s)
-            pack_h = int(0.40 * s)
-            pack_rect = pygame.Rect(0, 0, pack_w, pack_h)
-            pack_rect.center = (
-                int(cx + lean_px * 0.8),
-                int(shoulder_y + 0.16 * s),
-            )
-            pygame.draw.rect(surface, self.pack, pack_rect, border_radius=max(2, pack_w // 4))
-            pygame.draw.rect(
-                surface, shade(self.pack, 0.7), pack_rect, width=max(1, int(0.03 * s)),
-                border_radius=max(2, pack_w // 4),
-            )
-
-        # -- arms, swinging opposite the legs
-        if sliding:
-            arm_angles = (1.35, 1.15)
-        elif airborne:
-            arm_angles = (-1.05, -0.75)
-        else:
-            arm_angles = (math.sin(phase + math.pi) * 0.62, math.sin(phase) * 0.62)
-
-        for i, angle in enumerate(arm_angles):
-            self._limb(
-                surface,
-                cx + lean_px + (i - 0.5) * 0.56 * s,
-                shoulder_y + 0.06 * s,
-                angle,
-                0.30 * s * crouch,
-                angle + 0.6,
-                0.26 * s * crouch,
-                max(2, int(0.11 * s)),
-                self.jacket,
-                foot_color=self.skin,
-                foot_size=max(1, int(0.09 * s)),
-            )
-
-        # -- head. Seen from behind, so it is mostly hair with a sliver of neck;
-        # layering skin over hair the other way round just looked like a mask.
-        head_r = max(2, int(0.22 * s))
-        head_cx = int(cx + lean_px * 1.25)
-        head_cy = int(shoulder_y - head_r * 0.80)
-        pygame.draw.circle(surface, self.skin, (head_cx, head_cy + head_r // 2), int(head_r * 0.72))
-        pygame.draw.circle(surface, self.hair, (head_cx, head_cy), head_r)
-        if head_r > 4:
-            # Off-centre highlight suggests a light source and rounds the head.
-            pygame.draw.circle(
-                surface,
-                lerp_rgb(self.hair, (255, 255, 255), 0.28),
-                (head_cx - head_r // 3, head_cy - head_r // 3),
-                max(1, head_r // 3),
-            )
-
-    def _limb(
-        self,
-        surface: pygame.Surface,
-        x: float,
-        y: float,
-        angle_a: float,
-        len_a: float,
-        angle_b: float,
-        len_b: float,
-        width: int,
-        color: RGB,
-        foot_color: RGB | None = None,
-        foot_size: int = 0,
-    ) -> None:
-        """Two-segment limb with a rounded joint.
-
-        Drawing the joint as a circle at the knee/elbow is what stops the two
-        segments reading as a broken stick.
-        """
-        joint_x = x + math.sin(angle_a) * len_a
-        joint_y = y + math.cos(angle_a) * len_a
-        end_x = joint_x + math.sin(angle_b) * len_b
-        end_y = joint_y + math.cos(angle_b) * len_b
-
-        pygame.draw.line(surface, color, (x, y), (joint_x, joint_y), width)
-        pygame.draw.circle(surface, color, (int(joint_x), int(joint_y)), max(1, width // 2))
-        pygame.draw.line(surface, shade(color, 0.9), (joint_x, joint_y), (end_x, end_y), width)
-
-        if foot_color is not None and foot_size > 0:
-            pygame.draw.circle(surface, foot_color, (int(end_x), int(end_y)), foot_size)
+        # Backpack, behind the torso -- the other signature silhouette cue.
+        pack_z = player.z + 0.22
+        model.draw_box(
+            surface,
+            projector,
+            model.Box(
+                x=player.x,
+                y=player.y + model.HIP_Y + 7 * model.PX,
+                z=pack_z,
+                w=7 * model.PX,
+                h=9 * model.PX,
+                d=4 * model.PX,
+                default="pack",
+            ),
+            self.atlas,
+        )
 
     def _draw_hud(self, surface: pygame.Surface) -> None:
         pal = self.palette

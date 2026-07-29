@@ -24,14 +24,20 @@ Three scenes, chosen per run from the run's seed.
 
 | Scene | What it is |
 |---|---|
-| `runner` | Three-lane endless runner. Generated skyline of textured facades with lit windows, an articulated character with a real run cycle, coins, dust and sparks. Played by an autopilot that mostly does not crash. |
-| `tower` | Voxel parkour spire. Textured blocks with ambient occlusion and grass fringing, a blocky figure hopping down a route generated before the tower is built around it. |
+| `runner` | Three-lane endless runner. Textured train carriages with window bands and headlamps, hazard-striped barriers, a generated skyline, coins and sparks. Played by an autopilot that mostly does not crash. |
+| `tower` | Voxel parkour spire on a strict integer grid: grass, dirt, cobblestone, planks, logs and leaves, all drawn with real 16x16 textures. A figure hops down a route generated before the tower is built around it. |
 | `marbles` | Seven lit spheres with specular highlights and motion trails, a generated zigzag course, real collision physics and no predetermined winner. |
 
 Every run also generates its own palette, time of day, weather and sky — with a
 sun or moon that sits somewhere specific, layered parallax clouds, and a
 starfield that thins out toward the horizon. The same scene twice in a row does
 not look the same.
+
+Blocks and characters are real textured 3D boxes — 16x16 pixel-art faces,
+sampled nearest-neighbour so they stay crisp, mapped onto projected quads with a
+cached affine warp (pygame has no texture mapping of its own). The figures use
+the standard voxel proportions: 8x8x8 head, 8x12x4 torso, 4x12x4 limbs, exactly
+two blocks tall, with limbs swinging from real shoulder and hip pivots.
 
 Everything is drawn through a post-processing chain: bloom, a split-tone colour
 grade, chromatic aberration at the frame edges, and a radial vignette.
@@ -103,9 +109,9 @@ these:
 
 | scene | high | balanced | low |
 |---|---|---|---|
-| `runner` | 6.0 ms | 3.5 ms | 3.5 ms |
-| `tower` | 12.2 ms | 8.0 ms | 5.6 ms |
-| `marbles` | 4.2 ms | 2.0 ms | 1.9 ms |
+| `runner` | 8.2 ms | 4.9 ms | 4.8 ms |
+| `tower` | 19.5 ms | 14.9 ms | 8.4 ms |
+| `marbles` | 4.4 ms | 2.1 ms | 1.9 ms |
 
 At 30fps a 10 ms frame is roughly 30% of one core. If that is more than you
 want to spend, drop the quality or the frame rate:
@@ -118,10 +124,10 @@ quality = "balanced"   # high (default) | balanced | low
 fps = 24
 ```
 
-`balanced` halves the voxel detail budget and drops chromatic aberration;
-`low` also turns off per-block texturing and ambient occlusion. All three keep
-the generated geometry, lighting and post-processing identical — only surface
-detail changes.
+`balanced` halves the voxel texture budget and drops chromatic aberration;
+`low` draws blocks as flat-shaded faces instead of textured ones. All three keep
+the generated geometry, models and lighting identical — only surface detail
+changes.
 
 `brainrot doctor` reports what your machine will actually do, including whether
 the click-through overlay is available.
@@ -175,7 +181,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-160 tests covering the show/hide state machine, the seeding guarantees, the
+206 tests covering the show/hide state machine, the seeding guarantees, the
 projection maths, hook install/uninstall, the real shim end to end, a full
 daemon driven over UDP, and the generation invariants — including a test that
 drives the runner's autopilot for two simulated minutes and asserts it
