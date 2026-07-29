@@ -1,0 +1,42 @@
+# claude-brainrot configuration.
+#
+# Copy to the state directory to activate:
+#   Linux/macOS  ~/.local/state/claude-brainrot/config.toml
+#   Windows      %APPDATA%\claude-brainrot\config.toml
+#
+# Every field can also be set as an environment variable, e.g. BRAINROT_WIDTH.
+# Section names are cosmetic -- the file is flattened one level on load.
+
+[ipc]
+# Must match what `brainrot install` baked into the hook shim. Change this and
+# re-run `brainrot install`.
+port = 47821
+host = "127.0.0.1"
+
+[window]
+width = 360
+height = 640
+margin_x = 12       # gap from the left screen edge, pixels
+anchor_y = 0.5      # 0.0 = top, 0.5 = centred, 1.0 = bottom
+monitor = 0         # 0 = primary
+opacity = 0.88
+fps = 30
+
+[behaviour]
+# Ignore thinking bursts shorter than this, so quick turns do not strobe.
+grace_seconds = 1.5
+# Once shown, stay up at least this long even if Claude finishes immediately.
+min_visible_seconds = 3.0
+fade_seconds = 0.35
+# Hide when Claude asks for permission -- you need the terminal then.
+hide_on_notification = true
+
+[content]
+scenes = ["runner", "tower", "marbles"]
+# Force one scene instead of picking per run. Empty = pick from the seed.
+force_scene = ""
+# Replay a specific run number instead of advancing the counter. 0 = off.
+force_seed = 0
+# Show the active tool name along the bottom edge. Requires the tool hooks
+# (`brainrot install --with-tool-events`) to display anything.
+show_caption = true

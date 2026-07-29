@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "claude-brainrot"
+version = "0.1.0"
+description = "Procedurally generated brainrot overlay for Claude Code's thinking time"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "pygame-ce>=2.5",
+]
+
+[project.optional-dependencies]
+windows = ["pywin32>=306"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+brainrot = "brainrot.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The offscreen video driver is set in tests/conftest.py, which runs before
+# pygame is imported.
