@@ -11,6 +11,9 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
     "pygame-ce>=2.5",
+    # Used to bake textures, clouds and sphere sprites at scene construction.
+    # Never on the per-frame path.
+    "numpy>=1.24",
 ]
 
 [project.optional-dependencies]

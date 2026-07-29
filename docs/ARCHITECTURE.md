@@ -91,7 +91,70 @@ sequence guarantees they never do.
 counter — bump it when generation logic changes enough that old seeds would look
 stale.
 
-## Rendering
+## The rendering pipeline
+
+Everything visible is synthesised. There are no image files in this repository
+and nothing is fetched at runtime, so surface detail has to come from somewhere
+else — and the geometry pygame can draw is limited to flat-filled polygons.
+
+**Baked at scene construction** (`noise.py`, `texture.py`, `sky.py`), where a
+few milliseconds once is free:
+
+- value noise and fbm, used for cloud layers, facade grime and stone veining;
+- the sky: a three-anchor gradient with a warm horizon band, a sun or moon disc
+  with an exponential glow, a starfield whose density thins toward the horizon,
+  and two wrapping cloud bands that scroll at different speeds for parallax;
+- lit sphere sprites with diffuse, Blinn-Phong specular and rim terms — this is
+  what makes a marble a ball rather than a circle;
+- building facades with real window grids, pre-tinted at seven fog depths so
+  distance fogging is a plain blit rather than a per-frame alpha composite.
+
+**Per frame**, using only pygame's C-side blend operations:
+
+- *bloom*, blurred with a downscale/upscale ladder — `smoothscale` is bilinear
+  in C, so shrinking and regrowing a surface approximates a wide blur for
+  almost nothing;
+- *grade*, a split-tone: multiply toward warm (which affects highlights
+  proportionally more than shadows) then a small additive cool lift;
+- *chromatic aberration*, reconstructing the frame from three channel-shifted
+  copies, masked to the edges by a radial ramp;
+- *vignette*, a cached radial multiply.
+
+The deliberate boundary: numpy is used at construction and **never** per frame.
+An `array3d` round trip costs about 3 ms on this surface size; the blend-op
+equivalents cost about 0.05 ms combined.
+
+### Bloom without HDR
+
+Real engines bloom in HDR, where the sky sits near 1.0 and a lamp sits at 10.0,
+so a fixed threshold separates them. In 8-bit sRGB there is no such headroom: a
+bright daytime sky is numerically as bright as a light source. A fixed
+threshold therefore bloomed the *entire sky* and smeared its colour across
+every frame — which is exactly what happened, and it looked like the whole
+scene had been dipped in the sky's hue.
+
+`postfx.auto_threshold` derives the cut from the luminance of the sky the run
+actually generated, so the backdrop stays out of the bloom while windows,
+coins, sparks and the sun still catch it. The palette also caps peak sky
+brightness below 1.0, deliberately leaving headroom for things that emit.
+
+### Texels: texturing quads pygame cannot texture
+
+pygame has no texture mapping, and voxel faces are arbitrary projected quads.
+So each material carries a small set of UV-space rectangles which are mapped
+onto a face's four corners by bilinear interpolation at draw time. It is affine
+rather than perspective-correct, which across a single block is well under a
+pixel, and it gives blocks real surface detail instead of a flat fill. Each
+block offsets the shared pattern by its own position so a wall does not look
+like one tile stamped repeatedly.
+
+Surface detail is capped to a **fixed budget of the nearest blocks** rather
+than applied to everything in view. Texturing every face of every block cost
+around 9,600 polygon draws per frame and dominated the entire process; the far
+ones are a few pixels across and nobody can tell they are flat. The `quality`
+setting scales that budget and drops the cheapest-to-lose effects first.
+
+## Projection
 
 One projection module serves the two 3D scenes: a pinhole camera looking down
 +Z, `scale = focal / depth`. The entire illusion of motion is that world
@@ -125,6 +188,14 @@ an unbounded time inside a render loop.
 Both invariants are asserted directly in `tests/test_generation.py` across many
 runs, rather than being left as comments.
 
+## Quality tiers
+
+Rendering has a real cost and the overlay runs while you are building, so the
+trade is exposed rather than chosen silently. `quality` reaches scenes through
+`SceneContext` and scales the voxel detail budget, bloom blur passes, and
+whether chromatic aberration runs at all. Generated geometry, lighting and
+palette are identical across all three tiers — only surface detail changes.
+
 ## Cost while idle
 
 The daemon spends almost all of its life hidden. In that state it holds no
@@ -146,10 +217,15 @@ src/brainrot/
 ├── ipc.py            UDP listener and sender
 ├── state.py          thinking -> visibility state machine
 ├── hookinstall.py    shim generation and settings.json merging
+├── doctor.py         self-diagnosis, incl. the untestable win32 path
 ├── engine/
 │   ├── projection.py perspective maths
 │   ├── scene.py      Scene contract and registry
-│   ├── draw.py       gradients, text, particles, vignette
+│   ├── noise.py      value noise / fbm, for generated textures
+│   ├── texture.py    spheres, glows, facades, texel patterns, AO
+│   ├── sky.py        gradient, sun/moon, stars, parallax clouds
+│   ├── postfx.py     bloom, grade, aberration, vignette
+│   ├── draw.py       text, particles, cached gradients
 │   └── loop.py       frame loop, fades, scene lifecycle
 ├── overlay/
 │   ├── base.py       backend interface, monitor placement

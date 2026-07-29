@@ -22,10 +22,16 @@ from dataclasses import dataclass, field
 
 import pygame
 
-from ..engine.draw import Particles, text, vertical_gradient, vignette
+from ..engine import postfx
+from ..engine.draw import Particles, text
 from ..engine.scene import Scene, SceneContext, register
+from ..engine.sky import Sky
+from ..engine.texture import soft_glow, sphere
 from ..palette import RGB, hsv, lerp_rgb, shade
 from ..rng import golden_sequence
+
+#: How many past positions each marble remembers, for its motion trail.
+TRAIL_LENGTH = 9
 
 #: Course width in world units. Screen width maps onto exactly this.
 WORLD_W = 12.0
@@ -88,6 +94,15 @@ class MarbleScene(Scene):
             self._generate_ramp()
 
         self.particles = Particles(self.palette, self.width, self.height, ctx.stream("weather"))
+
+        art = ctx.stream("marble-art")
+        self.sky = Sky(self.palette, self.width, self.height, art, horizon=0.0)
+        # One lit sphere sprite per racer, rendered once. Shading a ball with
+        # nested pygame ellipses every frame would cost far more and look worse.
+        sprite_r = max(6, int(MARBLE_R * self.scale * 1.6))
+        self.sprites = [sphere(sprite_r, m.color) for m in self.marbles]
+        self.glow = soft_glow(sprite_r * 2, (255, 255, 255))
+        self.sparks: list[list[float]] = []
 
     # -- geometry ---------------------------------------------------------
 
@@ -172,8 +187,25 @@ class MarbleScene(Scene):
         target = pacer.y - (self.height / self.scale) * 0.45
         self.cam_y += (target - self.cam_y) * min(1.0, dt * 3.0)
 
+        for m in self.marbles:
+            m.trail.append((m.x, m.y))
+            if len(m.trail) > TRAIL_LENGTH:
+                del m.trail[0]
+
+        alive = []
+        for spark in self.sparks:
+            spark[4] -= dt
+            if spark[4] <= 0:
+                continue
+            spark[0] += spark[2] * dt
+            spark[1] += spark[3] * dt
+            spark[3] += GRAVITY * 0.5 * dt
+            alive.append(spark)
+        self.sparks = alive[-90:]
+
         self._stream_course()
         self.particles.update(dt)
+        self.sky.update(dt, wind=0.35)
 
     def _step(self, dt: float) -> None:
         for m in self.marbles:
@@ -238,6 +270,14 @@ class MarbleScene(Scene):
         if normal_v < 0:
             m.vx -= (1.0 + RESTITUTION * 1.2) * normal_v * nx
             m.vy -= (1.0 + RESTITUTION * 1.2) * normal_v * ny
+            # Peg strikes throw sparks. They are the moment a lead changes, so
+            # they are worth drawing attention to.
+            if -normal_v > 6.0:
+                for i in range(3):
+                    angle = math.atan2(ny, nx) + (i - 1) * 0.5
+                    self.sparks.append(
+                        [cx, cy, math.cos(angle) * 5.0, math.sin(angle) * 5.0, 0.28]
+                    )
 
     def _stream_course(self) -> None:
         horizon = self._world_bottom() + RAMP_SPACING * 2
@@ -260,22 +300,24 @@ class MarbleScene(Scene):
 
     def draw(self, surface: pygame.Surface) -> None:
         pal = self.palette
-        surface.blit(vertical_gradient(self.width, self.height, pal.sky_top, pal.sky_bottom), (0, 0))
-        if "stars" in pal.particles:
-            self.particles.draw(surface)
+        self.sky.draw(surface, parallax=self.cam_y * 6.0)
 
+        # Ramps are drawn as filled quads with a lit upper edge rather than as
+        # plain lines, which gives the course a thickness the marbles can look
+        # like they are resting on.
+        rail = pal.structure
+        rail_lit = lerp_rgb(rail, (255, 255, 255), 0.45)
         for seg in self.segments:
             y_top = min(self._sy(seg.y1), self._sy(seg.y2))
             y_bot = max(self._sy(seg.y1), self._sy(seg.y2))
             if y_bot < -20 or y_top > self.height + 20:
                 continue
-            pygame.draw.line(
-                surface,
-                pal.structure,
-                (self._sx(seg.x1), self._sy(seg.y1)),
-                (self._sx(seg.x2), self._sy(seg.y2)),
-                max(2, int(seg.thickness * self.scale)),
-            )
+            thickness = max(2, int(seg.thickness * self.scale))
+            a = (self._sx(seg.x1), self._sy(seg.y1))
+            b = (self._sx(seg.x2), self._sy(seg.y2))
+            pygame.draw.line(surface, shade(rail, 0.6), a, (b[0], b[1] + thickness), thickness)
+            pygame.draw.line(surface, rail, a, b, thickness)
+            pygame.draw.line(surface, rail_lit, a, b, max(1, thickness // 3))
 
         for peg in self.pegs:
             y = self._sy(peg.y)
@@ -283,33 +325,54 @@ class MarbleScene(Scene):
                 continue
             # Course furniture shares one colour family with the ramps, so the
             # only saturated things on screen are the marbles themselves.
-            pygame.draw.circle(
-                surface,
-                shade(pal.structure, 0.8),
-                (int(self._sx(peg.x)), int(y)),
-                max(2, int(peg.r * self.scale)),
-            )
+            r = max(2, int(peg.r * self.scale))
+            x = int(self._sx(peg.x))
+            pygame.draw.circle(surface, shade(pal.structure, 0.62), (x, int(y) + 1), r)
+            pygame.draw.circle(surface, shade(pal.structure, 0.95), (x, int(y)), r)
+            if r > 3:
+                pygame.draw.circle(surface, rail_lit, (x - r // 3, int(y) - r // 3), max(1, r // 3))
 
         radius = max(3, int(MARBLE_R * self.scale))
-        for m in self.marbles:
+        for index, m in enumerate(self.marbles):
             y = self._sy(m.y)
-            if y < -30 or y > self.height + 30:
+            if y < -40 or y > self.height + 40:
                 continue
             x = self._sx(m.x)
-            pygame.draw.circle(surface, m.color, (int(x), int(y)), radius)
-            # Specular dot: one pixel cluster that turns a flat disc into a ball.
-            pygame.draw.circle(
-                surface,
-                lerp_rgb(m.color, (255, 255, 255), 0.65),
-                (int(x - radius * 0.3), int(y - radius * 0.35)),
-                max(1, radius // 3),
+
+            # Motion trail: past positions, shrinking and fading. Cheap, and it
+            # is what conveys speed on a ball that has no other animation.
+            for i, (tx, ty) in enumerate(m.trail):
+                t = (i + 1) / len(m.trail)
+                tr = max(1, int(radius * t * 0.8))
+                pygame.draw.circle(
+                    surface,
+                    lerp_rgb(pal.sky_bottom, m.color, t * 0.75),
+                    (int(self._sx(tx)), int(self._sy(ty))),
+                    tr,
+                )
+
+            sprite = self.sprites[index]
+            scaled = pygame.transform.smoothscale(sprite, (radius * 2, radius * 2))
+            surface.blit(scaled, scaled.get_rect(center=(int(x), int(y))))
+
+        for sx, sy, _vx, _vy, life in self.sparks:
+            size = max(2, int(life * 26))
+            glow = pygame.transform.smoothscale(self.glow, (size, size))
+            surface.blit(
+                glow,
+                glow.get_rect(center=(int(self._sx(sx)), int(self._sy(sy)))),
+                special_flags=pygame.BLEND_RGB_ADD,
             )
-            pygame.draw.circle(surface, shade(m.color, 0.55), (int(x), int(y)), radius, 1)
 
-        if "stars" not in pal.particles:
-            self.particles.draw(surface)
+        self.particles.draw(surface)
 
-        vignette(surface, 0.4)
+        postfx.apply_all(
+            surface,
+            bloom_threshold=postfx.auto_threshold(pal.sky_bottom),
+            bloom_intensity=0.8 if pal.time_of_day == "night" else 0.45,
+            vignette_strength=0.32,
+            quality=self.ctx.quality,
+        )
         self._draw_hud(surface)
 
     def _draw_hud(self, surface: pygame.Surface) -> None:

@@ -22,9 +22,12 @@ from dataclasses import dataclass
 
 import pygame
 
-from ..engine.draw import Particles, text, vertical_gradient, vignette
+from ..engine import postfx
+from ..engine.draw import Particles, text
 from ..engine.projection import Camera, ease_in_out, fogged, project
 from ..engine.scene import Scene, SceneContext, register
+from ..engine.sky import Sky
+from ..engine.texture import ambient_occlusion, apply_texels, edge_shade, texel_pattern
 from ..palette import RGB, lerp_rgb, shade
 
 BLOCK = 1.0
@@ -33,7 +36,16 @@ DROP_MIN, DROP_MAX = 1.0, 2.0
 #: Horizontal reach per step, in blocks. Beyond ~3 the jump stops reading.
 REACH_MIN, REACH_MAX = 1.6, 3.0
 HOP_TIME = 0.46
-CAMERA_RADIUS = 12.0
+#: Orbit distance. Close enough that blocks have readable surface detail, far
+#: enough that the whole spire and the route spiralling down it are in frame --
+#: at 12 the tower filled the strip and the descent was invisible.
+CAMERA_RADIUS = 21.0
+
+#: How many of the nearest blocks get texels, ambient occlusion and fringing.
+#: A hard cap keeps the frame cost flat regardless of how large a tower the
+#: generator produced -- texturing every face of every block cost roughly 9,600
+#: polygon draws a frame and dominated the whole process.
+DETAIL_BUDGET = {"high": 60, "balanced": 32, "low": 0}
 
 
 @dataclass
@@ -43,6 +55,11 @@ class Block:
     z: float
     color: RGB
     size: float = BLOCK
+    #: Which texel pattern to draw on this block's faces.
+    material: str = "stone"
+    #: Grass blocks get a fringe of top colour bleeding down their sides -- the
+    #: single most recognisable detail in the whole voxel idiom.
+    fringe: bool = False
 
 
 @dataclass
@@ -59,7 +76,7 @@ class TowerScene(Scene):
         self.rng = ctx.stream("tower-shape")
         self.rng_decor = ctx.stream("tower-decor")
 
-        self.cam = Camera(y=0.0, horizon=0.45, far=70.0, focal=self.height * 0.7)
+        self.cam = Camera(y=0.0, horizon=0.42, far=78.0, focal=self.height * 0.82)
         self.yaw = 0.0
         self.blocks: list[Block] = []
         self.path: list[Node] = []
@@ -70,6 +87,24 @@ class TowerScene(Scene):
         self.height_climbed = 0.0
 
         self.particles = Particles(self.palette, self.width, self.height, ctx.stream("weather"))
+
+        art = ctx.stream("tower-art")
+        self.sky = Sky(self.palette, self.width, self.height, art, horizon=self.cam.horizon)
+        self.texels = {
+            name: texel_pattern(name, art) for name in ("stone", "grass", "wood", "generic")
+        }
+        # Grass and foliage do not inherit the run's hue: a purple lawn reads as
+        # a bug, however consistent it is with the palette.
+        self.grass = lerp_rgb((104, 168, 74), self.palette.accent, 0.18)
+        self.soil = (108, 82, 58)
+        # Fixed character colours, for the same reason the runner has them: the
+        # figure has to stay legible against every palette this can generate.
+        self.skin_tone = (232, 178, 136)
+        self.shirt = lerp_rgb(self.palette.accent, (255, 255, 255), 0.25)
+        self.legs = (52, 62, 92)
+
+        self._detail_budget = DETAIL_BUDGET.get(ctx.quality, 60)
+
         self._generate()
 
     # -- generation -------------------------------------------------------
@@ -80,7 +115,7 @@ class TowerScene(Scene):
         self.path.clear()
 
         rng = self.rng
-        steps = rng.randint(26, 44)
+        steps = rng.randint(24, 34)
         radius = rng.uniform(4.0, 7.0)
         angle = rng.uniform(0.0, math.tau)
         # Consistent spin direction per tower reads as a deliberate spiral
@@ -109,8 +144,13 @@ class TowerScene(Scene):
         rng = self.rng_decor
         pal = self.palette
 
-        # Platforms alternate tint so successive hops are visually countable.
-        base = pal.accent if index % 4 == 0 else pal.structure
+        # Platforms alternate material so successive hops are visually countable
+        # and the tower is not one texture from top to bottom.
+        checkpoint = index % 4 == 0
+        if checkpoint:
+            base, material, fringe = pal.accent, "generic", False
+        else:
+            base, material, fringe = self.grass, "grass", True
         width = rng.choice((1, 1, 2, 2, 3))
 
         for dx in range(-(width // 2), width // 2 + 1):
@@ -122,6 +162,8 @@ class TowerScene(Scene):
                         y=node.y,
                         z=node.z + dz * BLOCK,
                         color=shade(base, tint),
+                        material=material,
+                        fringe=fringe,
                     )
                 )
 
@@ -133,6 +175,7 @@ class TowerScene(Scene):
                     y=node.y + 2 * BLOCK,
                     z=node.z,
                     color=shade(pal.structure, 0.8),
+                    material="wood",
                 )
             )
 
@@ -144,6 +187,11 @@ class TowerScene(Scene):
         while y <= top:
             for dx in (-1, 0, 1):
                 for dz in (-1, 0, 1):
+                    # The centre column is enclosed on all four sides and by the
+                    # levels above and below, so it can never be seen. Not
+                    # generating it is free geometry removed from every frame.
+                    if dx == 0 and dz == 0:
+                        continue
                     # Corners are chipped away for silhouette variety, but the
                     # cross-shaped remainder is unbroken: a pillar with gaps in
                     # it reads as floating debris, not as a tower.
@@ -210,21 +258,31 @@ class TowerScene(Scene):
         target_yaw = math.atan2(x, z)
         delta = (target_yaw - self.yaw + math.pi) % math.tau - math.pi
         self.yaw += delta * min(1.0, dt * 2.2)
-        self.cam.y = y + 4.5
+        self.cam.y = y + 5.5
 
         self.particles.update(dt)
+        self.sky.update(dt, wind=0.5)
 
     # -- rendering --------------------------------------------------------
 
     def draw(self, surface: pygame.Surface) -> None:
         pal = self.palette
-        surface.blit(vertical_gradient(self.width, self.height, pal.sky_top, pal.sky_bottom), (0, 0))
-        if "stars" in pal.particles:
-            self.particles.draw(surface)
+        self.sky.draw(surface, parallax=self.yaw * 40.0)
 
         # Depth-sort every cube once per frame, far to near. At a few hundred
         # blocks this is cheaper than any spatial structure would be to maintain.
         visible: list[tuple[float, Block]] = []
+        # Depth of the tower's own axis. Core blocks further away than this are
+        # on the far side of a solid pillar and cannot be seen through it, so
+        # they are dropped before projection rather than drawn and then painted
+        # over -- roughly half the core, every frame.
+        self._view_basis = (
+            math.sin(self.yaw),
+            math.cos(self.yaw),
+            math.sin(self.yaw) * CAMERA_RADIUS,
+            math.cos(self.yaw) * CAMERA_RADIUS,
+        )
+        axis_depth = self._to_view(0.0, 0.0, 0.0)[2]
         for block in self.blocks:
             _r, _u, depth = self._to_view(block.x, block.y, block.z)
             if depth <= 1.0 or depth > self.cam.far:
@@ -232,84 +290,154 @@ class TowerScene(Scene):
             # Cull anything far above or below the camera before projecting.
             if abs(block.y - self.cam.y) > 40:
                 continue
+            if abs(block.x) <= 1.05 and abs(block.z) <= 1.05 and depth > axis_depth + 0.25:
+                continue
             visible.append((depth, block))
 
         visible.sort(key=lambda item: -item[0])
-        for depth, block in visible:
-            self._draw_cube(surface, block, depth)
+
+        # Surface detail is capped to a fixed budget of the *nearest* blocks
+        # rather than applied to everything in view. Texturing every face of
+        # every block cost around 9,600 polygon draws per frame and dominated
+        # the whole process; the far ones are a handful of pixels across and
+        # nobody can tell they are flat.
+        detail_from = max(0, len(visible) - self._detail_budget)
+        for index, (depth, block) in enumerate(visible):
+            self._draw_cube(surface, block, depth, detailed=index >= detail_from)
 
         self._draw_player(surface)
+        self.particles.draw(surface)
 
-        if "stars" not in pal.particles:
-            self.particles.draw(surface)
-
-        vignette(surface, 0.42)
+        postfx.apply_all(
+            surface,
+            bloom_threshold=postfx.auto_threshold(pal.sky_bottom),
+            bloom_intensity=0.85 if pal.time_of_day == "night" else 0.45,
+            vignette_strength=0.32,
+            quality=self.ctx.quality,
+        )
         self._draw_hud(surface)
 
-    def _draw_cube(self, surface: pygame.Surface, block: Block, depth: float) -> None:
-        """Three faces, three brightness levels."""
+    def _draw_cube(
+        self, surface: pygame.Surface, block: Block, depth: float, detailed: bool = True
+    ) -> None:
+        """Three faces, three brightness levels.
+
+        The corner transform is written out inline rather than going through
+        :meth:`_project`. Eight corners per cube across hundreds of cubes was
+        thousands of function calls and thousands of ``Projected`` allocations
+        every frame, and it was the largest single cost in the scene. The maths
+        is identical -- yaw rotation about the tower axis, then perspective
+        divide -- it just does not build an object per corner.
+        """
         pal = self.palette
         s = block.size
         x, y, z = block.x, block.y, block.z
 
-        # Corners named by (dx, dz) in world space; y0 bottom, y1 top.
-        def corner(dx: float, dz: float, dy: float):
-            return self._project(x + dx * s * 0.5, y + dy * s, z + dz * s * 0.5)
+        cam = self.cam
+        sin_y, cos_y, cam_x, cam_z = self._view_basis
+        half_w = self.width * 0.5
+        horizon_px = self.height * cam.horizon
+        focal = cam.focal
+        cam_y = cam.y
 
-        top_pts = [corner(-1, -1, 0.5), corner(1, -1, 0.5), corner(1, 1, 0.5), corner(-1, 1, 0.5)]
-        if any(p is None for p in top_pts):
-            return
+        half = s * 0.5
+        top_y = y + s * 0.5
+        bottom_y = y - s * 0.5
 
-        colour_top = fogged(self.cam, pal.face(block.color, "top"), depth, pal.fog)
-        colour_side = fogged(self.cam, pal.face(block.color, "side"), depth, pal.fog)
-        colour_front = fogged(self.cam, pal.face(block.color, "front"), depth, pal.fog)
+        top_pts: list[tuple[float, float]] = []
+        bottom_pts: list[tuple[float, float]] = []
+        for dx, dz in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+            wx = x + dx * half
+            wz = z + dz * half
+            ox, oz = wx - cam_x, wz - cam_z
+            corner_depth = ox * -sin_y + oz * -cos_y
+            if corner_depth <= 0.4:
+                return
+            scale = focal / corner_depth
+            sx = half_w + (ox * cos_y + oz * -sin_y) * scale
+            top_pts.append((sx, horizon_px + (cam_y - top_y) * scale))
+            bottom_pts.append((sx, horizon_px + (cam_y - bottom_y) * scale))
+
+        colour_top = fogged(cam, pal.face(block.color, "top"), depth, pal.fog)
+        colour_side = fogged(cam, pal.face(block.color, "side"), depth, pal.fog)
+        colour_front = fogged(cam, pal.face(block.color, "front"), depth, pal.fog)
 
         # Only the two vertical faces pointing at the camera are drawn; which
         # ones those are falls out of the sign of the block's view-space offset.
-        right, _up, _d = self._to_view(x, y, z)
+        right = (x - cam_x) * cos_y + (z - cam_z) * -sin_y
         sign_x = 1 if right < 0 else -1
 
-        bottom_pts = [corner(-1, -1, -0.5), corner(1, -1, -0.5), corner(1, 1, -0.5), corner(-1, 1, -0.5)]
-        if any(p is None for p in bottom_pts):
-            return
+        texels = self.texels.get(block.material, self.texels["stone"])
+        # Offsetting the shared pattern by the block's own position stops a wall
+        # of one material looking like the same tile stamped over and over.
+        uv_offset = ((block.x * 0.37 + block.y * 0.11) % 1.0, (block.z * 0.29) % 1.0)
 
-        def poly(indices, colour):
-            pts = [(top_pts[i].x, top_pts[i].y) if kind == "t" else (bottom_pts[i].x, bottom_pts[i].y)
-                   for i, kind in indices]
-            pygame.draw.polygon(surface, colour, pts)
+        def quad(indices) -> list[tuple[float, float]]:
+            return [top_pts[i] if kind == "t" else bottom_pts[i] for i, kind in indices]
 
         # Near vertical face (the one closest to the camera in depth).
         near_idx = 0 if sign_x > 0 else 2
-        poly(
-            [(near_idx, "t"), (near_idx + 1, "t"), (near_idx + 1, "b"), (near_idx, "b")],
-            colour_front,
-        )
-        # The adjacent visible face.
         side_a = (near_idx + 1) % 4
         side_b = (near_idx + 2) % 4
-        poly([(side_a, "t"), (side_b, "t"), (side_b, "b"), (side_a, "b")], colour_side)
+
+        faces = (
+            (quad([(near_idx, "t"), (near_idx + 1, "t"), (near_idx + 1, "b"), (near_idx, "b")]), colour_front),
+            (quad([(side_a, "t"), (side_b, "t"), (side_b, "b"), (side_a, "b")]), colour_side),
+        )
+
+        for corners, colour in faces:
+            pygame.draw.polygon(surface, colour, corners)
+            if detailed:
+                apply_texels(surface, corners, texels, colour, offset=uv_offset)
+                if block.fringe:
+                    # Top quarter of each side face takes the top colour, which
+                    # is what makes a grass block read as grass rather than as a
+                    # green cube.
+                    a, b, c, d = corners
+                    band = [
+                        a,
+                        b,
+                        (b[0] + (c[0] - b[0]) * 0.28, b[1] + (c[1] - b[1]) * 0.28),
+                        (a[0] + (d[0] - a[0]) * 0.28, a[1] + (d[1] - a[1]) * 0.28),
+                    ]
+                    pygame.draw.polygon(surface, colour_top, band)
+                ambient_occlusion(surface, corners, colour)
+                edge_shade(surface, corners, shade(colour, 0.55), 1)
 
         # Top last: the camera always sits above the blocks it can see.
-        pygame.draw.polygon(surface, colour_top, [(p.x, p.y) for p in top_pts])
+        top_quad = top_pts
+        pygame.draw.polygon(surface, colour_top, top_quad)
+        if detailed:
+            apply_texels(surface, top_quad, texels, colour_top, offset=uv_offset)
+            ambient_occlusion(surface, top_quad, colour_top)
+            edge_shade(surface, top_quad, shade(colour_top, 0.6), 1)
 
     def _draw_player(self, surface: pygame.Surface) -> None:
+        """A blocky figure built from the same cubes as the tower.
+
+        Drawing it as flat screen-space rectangles made it the one thing in the
+        scene with no perspective, so it read as a UI element pasted over the
+        world rather than as something standing in it.
+        """
         x, y, z = self.player_pos
-        p = self._project(x, y, z)
-        if p is None:
+        _r, _u, depth = self._to_view(x, y, z)
+        if depth <= 1.0:
             return
-        pal = self.palette
-        s = p.scale
 
-        body = pygame.Rect(0, 0, max(2, int(0.55 * s)), max(3, int(0.85 * s)))
-        body.midbottom = (int(p.x), int(p.y))
-        pygame.draw.rect(surface, lerp_rgb(pal.accent, (255, 255, 255), 0.15), body)
-
-        head = max(2, int(0.3 * s))
-        pygame.draw.rect(
-            surface,
-            lerp_rgb(pal.accent, pal.ink, 0.3),
-            pygame.Rect(int(p.x - head), int(body.top - head * 2), head * 2, head * 2),
+        # Legs swing through the hop so the figure is not a rigid statue.
+        swing = math.sin(self.hop_t / HOP_TIME * math.pi) * 0.20
+        parts = (
+            (-0.17, 0.10 + swing, 0.0, 0.30, self.legs),
+            (0.17, 0.10 - swing, 0.0, 0.30, self.legs),
+            (0.0, 0.48, 0.0, 0.46, self.shirt),
+            (0.0, 0.90, 0.0, 0.40, self.skin_tone),
         )
+        for dx, dy, dz, size, colour in parts:
+            self._draw_cube(
+                surface,
+                Block(x=x + dx, y=y + dy, z=z + dz, color=colour, size=size, material="generic"),
+                depth,
+            )
 
     def _draw_hud(self, surface: pygame.Surface) -> None:
         pal = self.palette

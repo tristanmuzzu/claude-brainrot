@@ -52,6 +52,10 @@ class Config:
     #: Replay a specific run number instead of advancing the counter.
     force_seed: int = 0
     show_caption: bool = True
+    #: Visual quality: "high", "balanced" or "low". Trades detail against CPU.
+    #: The overlay runs while Claude is working, so this is the knob to reach
+    #: for if it ever competes with a build.
+    quality: str = "high"
 
     @classmethod
     def load(cls, path: Path | None = None) -> "Config":
@@ -111,3 +115,5 @@ class Config:
         self.fade_seconds = max(0.0, float(self.fade_seconds))
         if not self.scenes:
             self.scenes = ["runner"]
+        if self.quality not in ("high", "balanced", "low"):
+            self.quality = "high"

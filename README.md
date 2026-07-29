@@ -24,12 +24,17 @@ Three scenes, chosen per run from the run's seed.
 
 | Scene | What it is |
 |---|---|
-| `runner` | Three-lane endless runner. Generated track, generated obstacles, played by an autopilot that mostly does not crash. |
-| `tower` | Voxel parkour spire. A figure hops its way down a route that is generated before the tower is built around it. |
-| `marbles` | Seven marbles, a generated zigzag course, real collision physics and no predetermined winner. |
+| `runner` | Three-lane endless runner. Generated skyline of textured facades with lit windows, an articulated character with a real run cycle, coins, dust and sparks. Played by an autopilot that mostly does not crash. |
+| `tower` | Voxel parkour spire. Textured blocks with ambient occlusion and grass fringing, a blocky figure hopping down a route generated before the tower is built around it. |
+| `marbles` | Seven lit spheres with specular highlights and motion trails, a generated zigzag course, real collision physics and no predetermined winner. |
 
-Every run also generates its own palette, time of day and weather, so the same
-scene twice in a row still does not look the same.
+Every run also generates its own palette, time of day, weather and sky — with a
+sun or moon that sits somewhere specific, layered parallax clouds, and a
+starfield that thins out toward the horizon. The same scene twice in a row does
+not look the same.
+
+Everything is drawn through a post-processing chain: bloom, a split-tone colour
+grade, chromatic aberration at the frame edges, and a radial vignette.
 
 ## Install
 
@@ -40,6 +45,12 @@ pip install -e .
 
 # Windows, for the click-through overlay:
 pip install pywin32
+```
+
+Check the install at any point with:
+
+```bash
+brainrot doctor
 ```
 
 Register the hooks, then start the daemon:
@@ -60,6 +71,7 @@ brainrot demo --scene runner        # a normal window, always on
 brainrot demo --scene tower --seed 4712   # replay one specific run
 brainrot shoot --scene marbles --frames 300 --out shots/   # frames to PNG
 brainrot scenes                     # what is registered, and your run count
+brainrot doctor                     # diagnose install, backend and hooks
 ```
 
 `brainrot ping UserPromptSubmit` and `brainrot ping Stop` drive the real daemon
@@ -81,17 +93,38 @@ work is:
 - **It hides when Claude needs you.** A permission prompt means your attention
   belongs on the terminal.
 - **It costs nothing while hidden.** No scene is held, nothing renders, and the
-  loop parks on a long sleep.
+  loop parks on a long sleep — **0.25% of one core**.
 
-Measured on the daemon itself, 360×640 at 30fps:
+## Performance and the quality knob
 
-| | CPU |
-|---|---|
-| hidden | 0.08% of one core |
-| rendering | 3.9% of one core |
+Rendering is not free, and this thing runs while you are building. Measured at
+360×640, 30fps, on a (slow) cloud container — a desktop CPU will be well under
+these:
 
-Your hardware will differ, but the shape is the point: while it is not on
-screen it is doing nothing, so it is not competing with your build.
+| scene | high | balanced | low |
+|---|---|---|---|
+| `runner` | 6.0 ms | 3.5 ms | 3.5 ms |
+| `tower` | 12.2 ms | 8.0 ms | 5.6 ms |
+| `marbles` | 4.2 ms | 2.0 ms | 1.9 ms |
+
+At 30fps a 10 ms frame is roughly 30% of one core. If that is more than you
+want to spend, drop the quality or the frame rate:
+
+```toml
+[content]
+quality = "balanced"   # high (default) | balanced | low
+
+[window]
+fps = 24
+```
+
+`balanced` halves the voxel detail budget and drops chromatic aberration;
+`low` also turns off per-block texturing and ambient occlusion. All three keep
+the generated geometry, lighting and post-processing identical — only surface
+detail changes.
+
+`brainrot doctor` reports what your machine will actually do, including whether
+the click-through overlay is available.
 
 ## Configuration
 
@@ -117,6 +150,7 @@ hide_on_notification = true
 
 [content]
 scenes = ["runner", "tower", "marbles"]
+quality = "high"
 ```
 
 Any field can also be set with an environment variable:
@@ -141,10 +175,12 @@ pip install -e ".[dev]"
 pytest
 ```
 
-The suite covers the show/hide state machine, the seeding guarantees, the
-projection maths, and the generation invariants — including a test that drives
-the runner's autopilot for two simulated minutes and asserts it survives, and
-one that checks no generated track can ever wall off all three lanes.
+160 tests covering the show/hide state machine, the seeding guarantees, the
+projection maths, hook install/uninstall, the real shim end to end, a full
+daemon driven over UDP, and the generation invariants — including a test that
+drives the runner's autopilot for two simulated minutes and asserts it
+survives, and one that sweeps every point of 300 generated rows to prove no
+track can ever wall off all three lanes.
 
 Docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how the pieces fit and
 why, [`docs/HOOKS.md`](docs/HOOKS.md) for the hook layer specifically.

@@ -76,6 +76,7 @@ class Overlay:
             height=self.cfg.height,
             palette=palette,
             seed=seed,
+            quality=self.cfg.quality,
         )
         self._end_scene()
         self.scene = scene_api.build(name, ctx)

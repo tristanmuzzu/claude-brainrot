@@ -18,6 +18,9 @@ def _add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--height", type=int, help="overlay height in pixels")
     parser.add_argument("--scene", help="force a single scene")
     parser.add_argument("--seed", type=int, help="replay a specific run number")
+    parser.add_argument(
+        "--quality", choices=("high", "balanced", "low"), help="detail level (CPU trade-off)"
+    )
 
 
 def _config_from(args: argparse.Namespace) -> Config:
@@ -30,6 +33,8 @@ def _config_from(args: argparse.Namespace) -> Config:
         cfg.force_scene = args.scene
     if getattr(args, "seed", None):
         cfg.force_seed = args.seed
+    if getattr(args, "quality", None):
+        cfg.quality = args.quality
     cfg._validate()
     return cfg
 
@@ -92,7 +97,7 @@ def cmd_shoot(args: argparse.Namespace) -> int:
     seed = Seed.for_run(run)
     palette = generate_palette(seed)
     name = cfg.force_scene or scene_api.choose(cfg.scenes, seed)
-    ctx = scene_api.SceneContext(cfg.width, cfg.height, palette, seed)
+    ctx = scene_api.SceneContext(cfg.width, cfg.height, palette, seed, cfg.quality)
     scene = scene_api.build(name, ctx)
 
     surface = pygame.Surface((cfg.width, cfg.height))
@@ -144,6 +149,12 @@ def cmd_ping(args: argparse.Namespace) -> int:
     send(cfg.host, cfg.port, args.event, session=args.session, tool=args.tool)
     print(f"sent {args.event} to {cfg.host}:{cfg.port}")
     return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    from . import doctor
+
+    return doctor.run(_config_from(args))
 
 
 def cmd_scenes(args: argparse.Namespace) -> int:
@@ -204,6 +215,10 @@ def build_parser() -> argparse.ArgumentParser:
     ping.add_argument("--session", default="manual")
     ping.add_argument("--tool", default="")
     ping.set_defaults(func=cmd_ping)
+
+    check = sub.add_parser("doctor", help="diagnose the install and the overlay backend")
+    _add_common(check)
+    check.set_defaults(func=cmd_doctor)
 
     listing = sub.add_parser("scenes", help="list registered scenes")
     listing.set_defaults(func=cmd_scenes)

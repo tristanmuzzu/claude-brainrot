@@ -25,6 +25,8 @@ class SceneContext:
     height: int
     palette: Palette
     seed: Seed
+    #: "high", "balanced" or "low". Scenes scale their detail against this.
+    quality: str = "high"
 
     def stream(self, label: str):
         return self.seed.stream(label)
@@ -68,6 +70,15 @@ def register(name: str):
 
 
 def available() -> list[str]:
+    """Every registered scene name.
+
+    The import matters: the registry is populated by the ``@register``
+    decorators as a side effect of importing the scenes package, so calling
+    this before anything else has imported it would report an empty roster
+    rather than the real one.
+    """
+    from .. import scenes  # noqa: F401
+
     return sorted(_REGISTRY)
 
 

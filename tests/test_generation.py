@@ -59,19 +59,45 @@ def test_runner_corridor_is_always_reachable(run: int) -> None:
         assert 0 <= lanes[i] <= 2
 
 
-@pytest.mark.parametrize("run", range(1, 15))
+@pytest.mark.parametrize("run", range(1, 40))
 def test_runner_never_blocks_every_lane_with_trains(run: int) -> None:
-    """At least one lane is always passable without a lane change of >1."""
+    """No point on the track may have all three lanes walled off.
+
+    This is the invariant the per-row corridor is *supposed* to imply, but it
+    only holds if obstacles stay inside their own row. A train longer than the
+    gap to the next row reaches into a row whose safe lane is somewhere else,
+    and three of those in three lanes close the track completely. Swept densely
+    over many runs because the failure depends on three independent lengths
+    lining up.
+    """
     scene = RunnerScene(context(run))
-    for _ in range(200):
+    for _ in range(300):
         scene._generate_row()
 
-    # Group trains by the rows they occupy and check no z-slice is fully walled.
     trains = [o for o in scene.obstacles if o.kind == "train"]
-    for probe in range(0, 3000, 2):
+    for probe in range(0, 4500):
         z = float(probe)
         blocked = {t.lane for t in trains if t.z <= z <= t.z_end}
-        assert len(blocked) < 3, f"all lanes blocked at z={z}"
+        assert len(blocked) < 3, f"all lanes blocked at z={z} on run {run}"
+
+
+@pytest.mark.parametrize("run", range(1, 20))
+def test_runner_obstacles_stay_within_their_row(run: int) -> None:
+    """No obstacle may extend past the start of the next row."""
+    scene = RunnerScene(context(run))
+    rows = []
+    for _ in range(200):
+        rows.append(scene._next_row_z)
+        scene._generate_row()
+
+    for obstacle in scene.obstacles:
+        following = [r for r in rows if r > obstacle.z]
+        if not following:
+            continue
+        assert obstacle.z_end <= min(following) + 1e-6, (
+            f"{obstacle.kind} at z={obstacle.z:.1f} runs to {obstacle.z_end:.1f}, "
+            f"past the next row at {min(following):.1f}"
+        )
 
 
 def test_runner_autopilot_survives_a_long_session() -> None:
@@ -212,6 +238,28 @@ def test_scene_choice_is_stable_per_run() -> None:
     for run in range(1, 50):
         seed = Seed.for_run(run)
         assert scene_api.choose(names, seed) == scene_api.choose(names, seed)
+
+
+def test_available_populates_the_registry_on_its_own() -> None:
+    """It must not depend on someone else having imported the scenes first."""
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from brainrot.engine.scene import available; print('SCENES=' + ','.join(available()))",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        # pygame prints a version banner to stdout on import unless told not to.
+        env={**os.environ, "PYGAME_HIDE_SUPPORT_PROMPT": "1", "SDL_VIDEODRIVER": "dummy"},
+    )
+    assert result.returncode == 0, result.stderr
+    line = next(l for l in result.stdout.splitlines() if l.startswith("SCENES="))
+    assert set(line.removeprefix("SCENES=").split(",")) == {"runner", "tower", "marbles"}
 
 
 def test_scene_choice_uses_the_whole_roster() -> None:

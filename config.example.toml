@@ -33,6 +33,11 @@ hide_on_notification = true
 
 [content]
 scenes = ["runner", "tower", "marbles"]
+# Visual detail vs CPU: "high" (default), "balanced" or "low".
+# `balanced` halves the voxel detail budget and drops chromatic aberration;
+# `low` also turns off per-block texturing and ambient occlusion.
+# Run `brainrot doctor` to see what your machine does.
+quality = "high"
 # Force one scene instead of picking per run. Empty = pick from the seed.
 force_scene = ""
 # Replay a specific run number instead of advancing the counter. 0 = off.

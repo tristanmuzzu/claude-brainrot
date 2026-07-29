@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import colorsys
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 from .rng import Seed, golden_sequence
 
@@ -31,8 +32,14 @@ def lerp_rgb(a: RGB, b: RGB, t: float) -> RGB:
     )
 
 
+@lru_cache(maxsize=16384)
 def shade(color: RGB, factor: float) -> RGB:
-    """Scale brightness, clamped. ``factor`` above 1 lightens."""
+    """Scale brightness, clamped. ``factor`` above 1 lightens.
+
+    Cached because the voxel renderer calls this for every texel on every face
+    of every block, every frame -- profiling showed it as the single hottest
+    line in the scene, almost entirely on repeat arguments.
+    """
     return tuple(max(0, min(255, int(c * factor))) for c in color)  # type: ignore[return-value]
 
 
@@ -115,11 +122,14 @@ def generate(seed: Seed) -> Palette:
     weather = _weighted(rng, _WEATHER)
 
     # Value/saturation envelopes per time of day: (sky_v, sky_s, ambient).
+    # Peak sky value is held below 1.0 on purpose: a sky at full brightness
+    # leaves no headroom above it, so nothing in the scene can read as actually
+    # emitting light.
     envelope = {
-        "day": (0.95, 0.35, 0.95),
-        "dawn": (0.80, 0.55, 0.70),
-        "dusk": (0.70, 0.65, 0.60),
-        "night": (0.28, 0.55, 0.30),
+        "day": (0.86, 0.38, 0.95),
+        "dawn": (0.76, 0.55, 0.70),
+        "dusk": (0.68, 0.65, 0.60),
+        "night": (0.26, 0.55, 0.30),
     }[time_of_day]
     sky_v, sky_s, ambient = envelope
 
@@ -134,9 +144,14 @@ def generate(seed: Seed) -> Palette:
     # red-orange band regardless of the run's hue.
     hazard = hsv(rng.uniform(-0.02, 0.06), 0.85, 0.95)
 
-    ground = hsv(base_hue + rng.uniform(-0.05, 0.05), 0.25, sky_v * 0.45)
-    ground_alt = shade(ground, 1.25)
-    structure = hsv(base_hue + rng.uniform(0.1, 0.2), 0.30, sky_v * 0.6)
+    # Ground and structures deliberately do NOT share the sky's hue. Deriving
+    # everything from one hue makes the whole frame collapse into a single
+    # colour wash -- real scenes have a tinted sky over near-neutral ground, and
+    # the contrast between them is most of what reads as depth.
+    ground_hue = base_hue + 0.5 + rng.uniform(-0.06, 0.06)
+    ground = hsv(ground_hue, 0.14, 0.20 + sky_v * 0.16)
+    ground_alt = shade(ground, 1.35)
+    structure = hsv(base_hue + rng.uniform(0.12, 0.22), 0.20, 0.30 + sky_v * 0.34)
 
     # Ink is chosen against the sky it will sit on, not fixed white/black.
     ink = (245, 245, 250) if luminance(sky_bottom) < 0.55 else (18, 18, 24)

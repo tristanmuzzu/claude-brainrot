@@ -138,7 +138,7 @@ class Particles:
         self._spawn()
 
     def _spawn(self) -> None:
-        counts = {"rain": 90, "snow": 70, "stars": 60}
+        counts = {"rain": 55, "snow": 60, "stars": 60}
         for kind in self.kinds:
             for _ in range(counts.get(kind, 40)):
                 self.items.append(
@@ -170,12 +170,15 @@ class Particles:
             kind = self.kinds[int(item[0])]
             x, y, depth = item[1], item[2], item[3]
             if kind == "rain":
-                length = 9.0 * depth
+                length = 7.0 * depth
+                # Near-neutral rather than fog-tinted: rain that inherits the
+                # sky's hue reads as coloured streaks over the whole frame
+                # instead of as weather.
                 pygame.draw.line(
                     surface,
-                    lerp_rgb(self.palette.fog, (255, 255, 255), 0.4),
+                    lerp_rgb(self.palette.fog, (255, 255, 255), 0.72),
                     (x, y),
-                    (x - 1.5, y + length),
+                    (x - 1.2, y + length),
                     1,
                 )
             elif kind == "snow":
