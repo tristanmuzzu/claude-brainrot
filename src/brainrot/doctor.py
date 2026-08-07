@@ -215,18 +215,28 @@ def _check_config() -> Check:
 
     copies = _packaged_copies()
     mine = [p for p in copies if p.parent.parent.parent.name in sys.executable]
-    others = [p / "config.toml" for p in copies if p not in mine
-              and (p / "config.toml").exists()]
     real = str(mine[0] / "config.toml") if mine else "(could not locate it)"
-    if not others:
-        return Check("config", OK, f"{detail}\n            on disk: {real}")
+    where = f"{detail}\n            on disk: {real}"
+
+    # Other copies only matter when they *disagree*. Identical ones are just
+    # the same settings sitting in more than one place, which is what happens
+    # the moment a second packaged app runs this code.
+    live = path.read_bytes() if path.exists() else b""
+    stale = []
+    for other in (p / "config.toml" for p in copies if p not in mine):
+        try:
+            if other.read_bytes() != live:
+                stale.append(other)
+        except OSError:
+            continue
+    if not stale:
+        return Check("config", OK, where)
     return Check(
-        "config", WARN,
-        f"{detail}\n            on disk: {real}",
+        "config", WARN, where,
         "This interpreter is a Store build: %APPDATA% is redirected and the "
-        "plain AppData\\Roaming copy is invisible to it. Edit the 'on disk' "
-        "path above; these other copies are being ignored: "
-        + ", ".join(str(p) for p in others),
+        "plain AppData\\Roaming copy is invisible to it. These copies say "
+        "something different and are being ignored -- edit the 'on disk' path "
+        "above instead: " + ", ".join(str(p) for p in stale),
     )
 
 
