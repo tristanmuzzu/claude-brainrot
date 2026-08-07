@@ -25,24 +25,28 @@ across 60 seeds × 180 s of simulated running, at every speed. If you change
 anything in the runner, re-run that sweep — `tests/test_collision.py` covers
 the same ground in a form that fits in the suite.
 
-## If you are a local Claude session on the owner's Windows machine
+The overlay is **installed and verified end to end** on the owner's machine:
+hooks registered, daemon running, `brainrot doctor` 10/10. Measured live —
+appears 2.0 s after `UserPromptSubmit`, click-through, never focused, off
+alt-tab, hides 3.0 s after `Stop`.
 
-Still outstanding, in order:
+Either scene can also be **driven by hand** (`engine/input.py`): arrows or
+WASD, up/space to jump, down to duck, eight idle seconds to hand back. The
+overlay never reads a key until `Ctrl+Alt+B` deliberately gives it focus —
+there is no global key hook, on purpose. `brainrot demo` needs no chord.
+`Scene.playable` gates this; the runner opts in, parkour does not yet.
 
-1. **The overlay end to end.** `brainrot install && brainrot run`, then use
-   Claude Code normally. Verify: appears ~1.5 s after a prompt, fades, never
-   steals focus, clicks pass through, hides on permission prompts. *Not yet
-   done* — `brainrot install` writes hooks into `~/.claude/settings.json`,
-   which needs the owner's explicit go-ahead.
-2. **Window attachment in anger.** The ctypes was written blind and had real
-   bugs (now fixed and tested against the live API), but only the mechanism
-   is proven, not the feel. Watch whether the strip sits one z-level above
-   the terminal and is covered by anything else you focus.
+## Still outstanding
+
+1. **Parkour needs the depth the runner got** — see
+   `docs/HANDOFF-parkour.md`, which has the job and a prompt to start it.
+2. **Window attachment in anger.** The mechanism is proven and tested against
+   the live API; the *feel* is not. Watch whether the strip sits one z-level
+   above the terminal and is covered by anything else you focus.
 3. **DPI**: on a scaled display check the strip's size and placement; raylib
    windows are not DPI-aware by default.
-4. `brainrot demo --scene runner` / `--scene parkour` for a visual read.
-   Measured cost per frame at sustained top speed, vsync off: runner 6.1 ms,
-   parkour 1.3 ms, against a 16.7 ms budget.
+4. Per-frame cost at sustained top speed, vsync off: runner 6.1 ms, parkour
+   1.3 ms, against a 16.7 ms budget.
 
 ## Tried and reverted: running along train roofs
 
