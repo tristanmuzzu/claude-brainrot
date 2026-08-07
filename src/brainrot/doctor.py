@@ -80,7 +80,7 @@ def _check_assets() -> Check:
     return Check("assets", OK, f"{len(names)} models")
 
 
-def _check_backend() -> list[Check]:
+def _check_backend(cfg: Config) -> list[Check]:
     """The important one: can we actually make a click-through overlay?"""
     checks: list[Check] = []
     if os.name != "nt":
@@ -98,8 +98,21 @@ def _check_backend() -> list[Check]:
     checks.append(
         Check("overlay", OK,
               "click-through, never focused, layered above the Claude Code "
-              "window (attach = host)")
+              f"window (attach = {cfg.attach})")
     )
+    if cfg.follow_focus:
+        checks.append(
+            Check("focus", OK,
+                  "hidden unless a working Claude Code window is in front")
+        )
+    else:
+        checks.append(
+            Check("focus", WARN,
+                  "follow_focus is off -- visible whenever Claude is busy",
+                  "The overlay will stay on screen over other applications. "
+                  "Set follow_focus = true in config.toml to have it appear "
+                  "only while you are looking at Claude Code."),
+        )
     return checks
 
 
@@ -172,6 +185,51 @@ def _check_daemon(cfg: Config) -> Check:
         probe.close()
 
 
+def _count_overlay_windows() -> int:
+    """How many overlay windows exist right now, across every process."""
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+    user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    seen = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def visit(hwnd, _lparam):
+        text = ctypes.create_unicode_buffer(64)
+        user32.GetWindowTextW(hwnd, text, 64)
+        if text.value == "claude-brainrot":
+            seen.append(int(hwnd))
+        return True
+
+    user32.EnumWindows(visit, 0)
+    return len(seen)
+
+
+def _check_one_daemon() -> Check | None:
+    """More than one daemon is not an idle curiosity.
+
+    UDP with ``SO_REUSEADDR`` lets a second daemon bind the same port quite
+    happily, and then the hook events are split between them: each gets a
+    fraction of the turn, both fight over the screen, and every symptom looks
+    like a bug in the overlay rather than a spare process. Cost an hour here.
+    """
+    if os.name != "nt":
+        return None
+    try:
+        count = _count_overlay_windows()
+    except Exception:  # noqa: BLE001 - diagnostic only
+        return None
+    if count <= 1:
+        return Check("instances", OK, f"{count} overlay window")
+    return Check(
+        "instances", WARN, f"{count} overlay windows -- more than one daemon",
+        "Hook events are split between them and they fight over the screen. "
+        "Close the extras: Get-Process python | Stop-Process, then start one "
+        "with: brainrot run",
+    )
+
+
 def _check_render(cfg: Config) -> Check:
     """Actually build and draw a frame of every scene, offscreen.
 
@@ -215,10 +273,13 @@ def run(cfg: Config | None = None) -> int:
     checks: list[Check] = [_check_python()]
     checks += _check_deps()
     checks.append(_check_assets())
-    checks += _check_backend()
+    checks += _check_backend(cfg)
     checks.append(_check_pythonw())
     checks += _check_hooks(cfg)
     checks.append(_check_daemon(cfg))
+    instances = _check_one_daemon()
+    if instances is not None:
+        checks.append(instances)
     checks.append(_check_render(cfg))
 
     symbols = {OK: "PASS", WARN: "WARN", FAIL: "FAIL"}

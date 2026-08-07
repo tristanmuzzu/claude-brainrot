@@ -38,6 +38,13 @@ class Config:
     #: window running Claude Code (discovered by the hook shim), so any other
     #: window you focus covers it. "topmost" floats above everything, always.
     attach: str = "host"
+    #: Show only while a Claude Code window that is actually working is the
+    #: window you are looking at. Z-order alone is not enough for that: it
+    #: decides what covers what, not whether the overlay is on screen, so a
+    #: window that happens not to overlap the strip leaves it visible over
+    #: whatever you switched to. Off restores "visible whenever Claude is
+    #: busy", which is what demos and screen recordings want.
+    follow_focus: bool = True
 
     # --- Behaviour -------------------------------------------------------
     #: Ignore thinking bursts shorter than this, so quick turns do not strobe.
@@ -111,7 +118,7 @@ class Config:
                                 "min_visible_seconds", "fade_seconds",
                                 "handback_seconds"):
                     setattr(self, f.name, float(env))
-                elif f.name in ("hide_on_notification", "show_caption"):
+                elif f.name in ("hide_on_notification", "show_caption", "follow_focus"):
                     setattr(self, f.name, env.strip().lower() in ("1", "true", "yes", "on"))
                 elif f.name == "scenes":
                     setattr(self, f.name, [s.strip() for s in env.split(",") if s.strip()])
@@ -143,3 +150,4 @@ class Config:
             self.quality = "high"
         if self.attach not in ("host", "topmost"):
             self.attach = "host"
+        self.follow_focus = bool(self.follow_focus)

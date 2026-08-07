@@ -122,6 +122,14 @@ class _BaseWindow:
     def detach_host(self) -> None:
         """Release any host attachment. Only meaningful on Windows."""
 
+    def focus_allows(self, hosts, foreground: int | None = None) -> bool:
+        """May the overlay be on screen, given who is in front right now?
+
+        An ordinary window is being looked at by definition -- it is a window
+        the user opened. Only the overlay has to earn its place.
+        """
+        return True
+
     def destroy(self) -> None:
         rl.CloseWindow()
 
@@ -176,7 +184,13 @@ class OverlayWindow(_BaseWindow):
             return
         if self._cfg is not None and self._cfg.attach != "host":
             return
-        self._host_hwnd = hwnd
+        if hwnd != self._host_hwnd:
+            # A different window announced itself -- a second Claude Code
+            # session, or the same one restarted. Without this the "already
+            # attached" guard below pins the overlay to the first host it ever
+            # saw, for the life of the daemon.
+            self._host_hwnd = hwnd
+            self._attached = False
         self._reattach()
 
     def _reattach(self) -> None:
@@ -186,6 +200,11 @@ class OverlayWindow(_BaseWindow):
             from ..overlay.win32 import attach_to_host
 
             self._attached = attach_to_host(self._hwnd(), self._host_hwnd)
+            if not self._attached:
+                # The handle no longer names a window. Forgetting it is the
+                # point: a remembered dead host is a host that can never be
+                # matched against the foreground and never be replaced.
+                self._host_hwnd = 0
         except Exception:
             pass
 
@@ -197,16 +216,71 @@ class OverlayWindow(_BaseWindow):
         daemon's window dies the moment the user closes the terminal it was
         attached to. Being owned only while visible keeps that risk to the
         seconds a scene is actually on screen.
+
+        Deliberately not guarded on ``self._attached``: the flag records what
+        we believe, and the whole class of bug here is the belief drifting
+        away from what Windows actually has recorded against the window.
         """
-        if os.name != "nt" or not self._attached:
+        if os.name != "nt":
             return
         try:
             from ..overlay.win32 import detach
 
-            detach(self._hwnd())
+            detach(self._hwnd(), topmost=self._topmost_mode())
         except Exception:
             pass
         self._attached = False
+
+    # -- focus ------------------------------------------------------------
+
+    def focus_allows(self, hosts, foreground: int | None = None) -> bool:
+        """Is the user looking at something this overlay belongs in front of?
+
+        Two ways to qualify:
+
+        * the window in front is the host of a session that is working, or
+        * the window in front is *this overlay*. Our own window being in front
+          is never evidence that the user has left. The takeover chord puts it
+          there on purpose (``engine/input.py:_grab`` calls
+          ``SetForegroundWindow``), so a plain "hide unless the host is in
+          front" rule hides the strip at the exact moment someone asks to play
+          with it. Stated this way rather than as "unless the takeover is
+          active" because it needs no coordination with the takeover's state.
+
+        ``foreground`` overrides the live query, for tests that cannot move
+        the foreground window of somebody's actual desktop around.
+        """
+        if os.name != "nt":
+            return True
+        from ..overlay.win32 import foreground_root, is_window, root_of
+
+        # Every frame, because the host can be closed at any point in one.
+        if self._host_hwnd and not is_window(self._host_hwnd):
+            self._forget_host()
+
+        front = foreground_root() if foreground is None else root_of(foreground)
+        if not front:
+            return False
+        if front == root_of(self._hwnd()):
+            return True
+        return any(is_window(host) and root_of(host) == front for host in hosts)
+
+    def _forget_host(self) -> None:
+        """The host window is gone: drop it, and the ownership recorded
+        against it, rather than staying latched to a handle that can no longer
+        match anything."""
+        self._host_hwnd = 0
+        if self._attached:
+            try:
+                from ..overlay.win32 import detach
+
+                detach(self._hwnd(), topmost=self._topmost_mode())
+            except Exception:
+                pass
+        self._attached = False
+
+    def _topmost_mode(self) -> bool:
+        return self._cfg is not None and self._cfg.attach == "topmost"
 
 
 class DesktopWindow(_BaseWindow):

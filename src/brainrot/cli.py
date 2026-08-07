@@ -63,9 +63,12 @@ def cmd_demo(args: argparse.Namespace) -> int:
     from .engine.window import select_backend
 
     cfg = _config_from(args)
-    # Force it on screen immediately and keep it there.
+    # Force it on screen immediately and keep it there -- including through
+    # the focus rule, which has no host to match against here and would
+    # otherwise keep the demo permanently hidden.
     cfg.grace_seconds = 0.0
     cfg.min_visible_seconds = 1e9
+    cfg.follow_focus = False
     backend = select_backend(args.backend or "desktop")
     overlay = Overlay(cfg, backend, verbose=args.verbose)
     overlay.state.handle("UserPromptSubmit", "demo")
@@ -159,7 +162,21 @@ def cmd_ping(args: argparse.Namespace) -> int:
     from .ipc import send
 
     cfg = _config_from(args)
-    send(cfg.host, cfg.port, args.event, session=args.session, tool=args.tool)
+    # Stand in for the hook shim completely, window handle included: the
+    # daemon shows nothing for a session whose window it does not know, so a
+    # ping without one would look like a broken daemon. This makes the
+    # terminal you ping from the host, which is also what you want when
+    # checking the focus behaviour by hand.
+    hwnd = 0
+    if os.name == "nt":
+        try:
+            from .overlay.win32 import foreground_window
+
+            hwnd = foreground_window()
+        except Exception:
+            hwnd = 0
+    send(cfg.host, cfg.port, args.event, session=args.session, tool=args.tool,
+         hwnd=hwnd)
     print(f"sent {args.event} to {cfg.host}:{cfg.port}")
     return 0
 

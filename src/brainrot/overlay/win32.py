@@ -1,6 +1,6 @@
 """Win32 window treatment, on ctypes so there is no dependency to install.
 
-Two jobs:
+Three jobs:
 
 1. :func:`apply_overlay_styles` -- the classic overlay quartet on the raylib
    window: click-through, never-activate, no alt-tab entry, and z-order.
@@ -15,7 +15,10 @@ Two jobs:
 
    ``attach = "topmost"`` in the config restores the old always-on-top mode;
    ``attach = "host"`` (default) uses ownership when a host handle arrives and
-   falls back to topmost until one does.
+   stays out of the topmost band entirely until one does. It used to fall back
+   to topmost, which is precisely backwards: before any host has announced
+   itself the overlay knows nothing about where Claude Code is, and "show over
+   everything" is the worst possible reading of "we do not know yet".
 
    **Ownership binds lifetimes, not just z-order.** ``DestroyWindow`` destroys
    a window's owned windows along with it, so while the overlay is owned by
@@ -25,6 +28,13 @@ Two jobs:
    therefore only stays owned while it is actually on screen and detaches when
    it goes idle (see :meth:`OverlayWindow.detach_host`), which reduces the
    exposure to the few seconds an answer is being drawn.
+
+3. **Who is in front.** Ownership decides what covers what, not what is on
+   screen -- a window that does not happen to overlap the strip leaves it in
+   plain sight over whatever you switched to. :func:`foreground_root` answers
+   the other question, and the daemon hides the overlay outright whenever the
+   window in front is neither a Claude Code window that is currently working
+   nor the overlay itself.
 
 Every call here declares its argument and return types. Left to itself ctypes
 passes Python integers as C ``int`` and reads returns as ``int`` -- which
@@ -90,13 +100,23 @@ def apply_overlay_styles(hwnd: int, cfg: Config) -> None:
     ex |= WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW
     ex &= ~WS_EX_APPWINDOW  # keep it off the taskbar
     _set_long(hwnd, GWL_EXSTYLE, ex)
-    # Either way we start topmost: in host mode that is the fallback until a
-    # host window announces itself, and attach_to_host() drops out of the band.
-    _order_topmost(hwnd)
+    # raylib created the window with FLAG_WINDOW_TOPMOST, so this is a real
+    # change and not a formality: in host mode we come straight back out of
+    # the band and only ownership decides where the strip sits.
+    if getattr(cfg, "attach", "host") == "topmost":
+        _order_topmost(hwnd)
+    else:
+        _order_normal(hwnd)
 
 
 def _order_topmost(hwnd: int) -> None:
     user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+
+
+def _order_normal(hwnd: int) -> None:
+    """Out of the topmost band, into ordinary z-order."""
+    user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
 
 
@@ -132,10 +152,18 @@ def attach_to_host(hwnd: int, host_hwnd: int) -> bool:
     return True
 
 
-def detach(hwnd: int) -> None:
-    """Back to free-floating topmost (config attach = "topmost", or host gone)."""
+def detach(hwnd: int, topmost: bool = False) -> None:
+    """Give up ownership.
+
+    ``topmost`` is the old free-floating mode, and is only right when the
+    config asked for it. Defaulting it on is how a daemon that had merely gone
+    idle came back as a window floating above everything on the screen.
+    """
     _set_long(hwnd, GWLP_HWNDPARENT, 0)
-    _order_topmost(hwnd)
+    if topmost:
+        _order_topmost(hwnd)
+    else:
+        _order_normal(hwnd)
 
 
 def owner_of(hwnd: int) -> int:
@@ -152,3 +180,30 @@ def foreground_window() -> int:
     at event time: whatever is foreground when you submit a prompt to Claude
     Code *is* the Claude Code host window."""
     return int(user32.GetForegroundWindow() or 0)
+
+
+def is_window(hwnd: int) -> bool:
+    """Does this handle still name a live window?
+
+    Handles are reused, so this is not proof the window is the *same* one --
+    but a host that has been closed fails it, which is the case that used to
+    strand the overlay attached to nothing.
+    """
+    return bool(hwnd) and bool(user32.IsWindow(hwnd))
+
+
+def root_of(hwnd: int) -> int:
+    """The top-level window a handle belongs to.
+
+    ``GA_ROOT`` walks the *parent* chain, not the owner chain, so an overlay
+    that is owned by the host still reports itself -- which is what makes the
+    takeover case below distinguishable from the host case.
+    """
+    if not hwnd:
+        return 0
+    return int(user32.GetAncestor(hwnd, GA_ROOT) or hwnd)
+
+
+def foreground_root() -> int:
+    """Top-level window in front, or 0 if the desktop has no foreground."""
+    return root_of(foreground_window())

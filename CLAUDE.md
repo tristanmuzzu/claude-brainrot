@@ -14,7 +14,7 @@ system, ballistic parkour hops with ground beats).
 
 **Now verified on real Windows hardware with a GPU**, which turned up several
 things the software-rasteriser cloud sessions could not have seen — see
-"Landmines" below. 349 tests green, including a Win32 suite that exercises the
+"Landmines" below. 371 tests green, including a Win32 suite that exercises the
 real window API.
 
 The runner has a real collision model. Obstacles carry hitboxes derived from
@@ -26,9 +26,10 @@ anything in the runner, re-run that sweep — `tests/test_collision.py` covers
 the same ground in a form that fits in the suite.
 
 The overlay is **installed and verified end to end** on the owner's machine:
-hooks registered, daemon running, `brainrot doctor` 10/10. Measured live —
+hooks registered, daemon running, `brainrot doctor` 12/12. Measured live —
 appears 2.0 s after `UserPromptSubmit`, click-through, never focused, off
-alt-tab, hides 3.0 s after `Stop`.
+alt-tab, hides 3.0 s after `Stop`, and (2026-08-07) stays hidden while the
+window in front is not the one the prompt came from.
 
 The parkour scene has had the same depth pass. Its course is generated in
 **set-pieces** (`SEGMENT_TABLE`) rather than as a uniform stream of cubes, its
@@ -48,12 +49,22 @@ Both scenes now opt in via `Scene.playable`. Steering parkour bends the
 *course* rather than moving a body: there is no free movement to give a runner
 made of solved arcs between blocks that do not exist yet.
 
+The overlay is on screen **only while a Claude Code window that is actually
+working is the window in front** (`follow_focus`, default on). Ownership alone
+was never enough for that — it decides what covers what, not what is visible,
+so a strip that did not overlap whatever you switched to just sat there over
+it. Each frame the daemon compares the real foreground window against the
+hosts of the sessions currently thinking; `ThinkingState` tracks those per
+session id, from prompt events only. Not one of them, and not the overlay
+itself (the takeover chord makes the overlay the foreground window — a naive
+"hide unless the host is in front" hides the strip the instant you press it)
+→ fade out. Unknown host means hidden, never topmost.
+
 ## Still outstanding
 
-1. **Window attachment in anger.** See `docs/HANDOFF-overlay-focus.md`.
-2. **DPI**: on a scaled display check the strip's size and placement; raylib
+1. **DPI**: on a scaled display check the strip's size and placement; raylib
    windows are not DPI-aware by default.
-3. Per-frame cost at sustained top speed, vsync off, on an idle machine:
+2. Per-frame cost at sustained top speed, vsync off, on an idle machine:
    runner 2.6-3.0 ms, parkour 1.5-2.3 ms, against a 16.7 ms budget. Measure
    with `HeadlessWindow` + `SetTargetFPS(0)`; `DesktopWindow` has vsync on and
    will report a flat 16.6 ms that tells you nothing. Take the reading on a
@@ -147,6 +158,19 @@ long jumps you need a different motion model, not a bigger number.
   it owns. The daemon therefore detaches whenever it goes idle. In tests,
   destroy the fake host *after* detaching or it takes the shared raylib window
   with it.
+- **Two daemons bind the same port quite happily.** UDP with `SO_REUSEADDR`
+  does not refuse the second bind; the hook events are then split between the
+  processes, each gets a fraction of the turn, and their windows fight over
+  the screen. Every symptom looks like a bug in the overlay. Worse, a Store
+  Python's `CommandLine` is not readable through WMI, so
+  `Where-Object CommandLine -like '*brainrot*'` matches **nothing** and a kill
+  that reports no error can have killed no one. Count the windows instead:
+  `brainrot doctor` has an `instances` check that does exactly that.
+- **A leaked daemon can steal the foreground.** Chasing why the overlay hid
+  itself the instant it appeared cost an hour and produced a plausible,
+  entirely wrong theory about `glfwShowWindow` activating the window. It does
+  not: measured on a real `OverlayWindow`, raylib's own hide flag leaves the
+  foreground alone. It was three daemons. Check `instances` first.
 - **Numbers the gameplay depends on live in `metrics.json`.** Rebuild an asset
   and you must re-run `python assets/measure.py`; `tests/test_assets.py` fails
   if they drift apart. Moving a hoarding's beam moves whether a slide fits

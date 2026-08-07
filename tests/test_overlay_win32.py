@@ -54,6 +54,15 @@ def overlay_hwnd():
     win32._set_long(handle, win32.GWLP_HWNDPARENT, 0)
 
 
+def _make_host(name: str = "brainrot-test-host") -> int:
+    hwnd = user32.CreateWindowExW(
+        WS_EX_TOOLWINDOW, "STATIC", name, WS_POPUP,
+        10, 10, 200, 120, None, None, None, None)
+    if not hwnd:
+        pytest.skip("could not create a test host window")
+    return int(hwnd)
+
+
 @pytest.fixture
 def host(overlay_hwnd: int):
     """A real top-level window to play the part of the Claude Code host.
@@ -64,14 +73,37 @@ def host(overlay_hwnd: int):
     session shares -- which is how this fixture originally took out every test
     that ran after it.
     """
-    hwnd = user32.CreateWindowExW(
-        WS_EX_TOOLWINDOW, "STATIC", "brainrot-test-host", WS_POPUP,
-        10, 10, 200, 120, None, None, None, None)
-    if not hwnd:
-        pytest.skip("could not create a test host window")
-    yield int(hwnd)
+    hwnd = _make_host()
+    yield hwnd
     win32.detach(overlay_hwnd)          # break ownership before the owner dies
     user32.DestroyWindow(hwnd)
+
+
+@pytest.fixture
+def hosts(overlay_hwnd: int):
+    """Make as many stand-in host windows as a test needs."""
+    made: list[int] = []
+
+    def make(name: str = "brainrot-test-host") -> int:
+        made.append(_make_host(name))
+        return made[-1]
+
+    yield make
+    win32.detach(overlay_hwnd)          # never destroy an owner while it owns us
+    for hwnd in made:
+        if win32.is_window(hwnd):
+            user32.DestroyWindow(hwnd)
+
+
+@pytest.fixture
+def window(overlay_hwnd: int):
+    """An ``OverlayWindow`` driving the shared raylib window."""
+    from brainrot.engine.window import OverlayWindow
+
+    overlay = OverlayWindow()
+    overlay._cfg = Config()
+    yield overlay
+    overlay.detach_host()
 
 
 def test_overlay_styles_are_actually_set(overlay_hwnd: int) -> None:
@@ -97,29 +129,73 @@ def test_attaching_leaves_the_topmost_band(overlay_hwnd: int, host: int) -> None
     """An overlay still flagged topmost floats over everything regardless of
     its owner, which defeats the point of attaching it to anything."""
     win32.apply_overlay_styles(overlay_hwnd, Config())
-    assert win32.is_topmost(overlay_hwnd), "should start topmost as a fallback"
     win32.attach_to_host(overlay_hwnd, host)
     assert not win32.is_topmost(overlay_hwnd)
+
+
+def test_an_unknown_host_does_not_mean_over_everything(overlay_hwnd: int) -> None:
+    """The old fallback was backwards: between daemon start and the first
+    prompt nothing has said where Claude Code is, and that is the moment the
+    overlay used to spend floating above every window on the desktop.
+
+    raylib creates the window with FLAG_WINDOW_TOPMOST, so this is measuring a
+    bit that really is set beforehand.
+    """
+    win32._order_topmost(overlay_hwnd)
+    assert win32.is_topmost(overlay_hwnd), "precondition: the flag starts set"
+    win32.apply_overlay_styles(overlay_hwnd, Config())
+    assert not win32.is_topmost(overlay_hwnd)
+
+
+def test_topmost_mode_is_still_reachable(overlay_hwnd: int) -> None:
+    """Always-on-top stays available for demos and recordings."""
+    win32.apply_overlay_styles(overlay_hwnd, Config(attach="topmost"))
+    assert win32.is_topmost(overlay_hwnd)
+    win32.detach(overlay_hwnd, topmost=True)
+    assert win32.is_topmost(overlay_hwnd)
 
 
 def test_attaching_does_not_restack_the_host(overlay_hwnd: int, host: int) -> None:
     """Raising the user's terminal above whatever they put in front of it is
     not this program's business -- and the previous version did exactly that,
-    immediately after asking for the opposite ordering."""
+    immediately after asking for the opposite ordering.
+
+    Measured with the overlay itself excluded from the ordering: attaching is
+    *supposed* to move the overlay above the host, and counting that as the
+    host moving would make this test assert the opposite of what it means.
+    """
     win32.apply_overlay_styles(overlay_hwnd, Config())
-    before = _z_index(host)
+    before = _z_index(host, ignore=overlay_hwnd)
     win32.attach_to_host(overlay_hwnd, host)
-    after = _z_index(host)
+    after = _z_index(host, ignore=overlay_hwnd)
+    assert before >= 0, "the host window is not in the top-level z-order"
     assert before == after, "attaching moved the host window in the z-order"
 
 
-def test_detach_restores_free_floating_topmost(
+def test_attaching_does_not_need_the_topmost_flag(overlay_hwnd: int, host: int) -> None:
+    """Ownership, not the topmost bit, is what puts the strip above the host.
+
+    (Where the two end up relative to each other is deliberately *not*
+    asserted: Windows applies the one-level-above-owner rule when the owner is
+    activated, and a test cannot activate anything without stealing the
+    foreground from whoever is running it.)
+    """
+    win32.apply_overlay_styles(overlay_hwnd, Config())
+    win32.attach_to_host(overlay_hwnd, host)
+    assert win32.owner_of(overlay_hwnd) == host
+    assert not win32.is_topmost(overlay_hwnd)
+
+
+def test_detach_gives_up_ownership_without_going_topmost(
         overlay_hwnd: int, host: int) -> None:
+    """Detaching happens every time the overlay goes idle, which is the most
+    ordinary thing it does. Coming back from idle floating above everything is
+    how it ended up over a YouTube video."""
     win32.apply_overlay_styles(overlay_hwnd, Config())
     win32.attach_to_host(overlay_hwnd, host)
     win32.detach(overlay_hwnd)
     assert win32.owner_of(overlay_hwnd) == 0
-    assert win32.is_topmost(overlay_hwnd)
+    assert not win32.is_topmost(overlay_hwnd)
 
 
 def test_a_dead_host_handle_is_refused(overlay_hwnd: int) -> None:
@@ -164,8 +240,135 @@ def test_owned_only_while_visible(host: int) -> None:
     window.detach_host()
 
 
-def _z_index(hwnd: int) -> int:
-    """Position of a window in the top-level z-order, or -1 if not found."""
+# ---------------------------------------------------------------------------
+# Following the focus
+#
+# These cannot move the foreground window around: SetForegroundWindow is
+# refused to a process that is not already the one being used, and a test suite
+# that yanked focus off the person running it would be its own bug. So they
+# feed a *real* window handle in as the foreground and let every other step --
+# GA_ROOT resolution, IsWindow liveness, the handle round-trip -- run against
+# the live API. One test below uses no override at all and pins that seam to
+# what GetForegroundWindow actually reports.
+# ---------------------------------------------------------------------------
+
+
+def test_no_known_host_means_hidden(window) -> None:
+    assert window.focus_allows(frozenset()) is False
+
+
+def test_a_host_that_is_not_in_front_stays_hidden(window, hosts) -> None:
+    """The complaint, reduced to one assertion."""
+    claude, chrome = hosts("claude"), hosts("chrome")
+    assert window.focus_allows({claude}, foreground=chrome) is False
+
+
+def test_the_host_in_front_shows(window, hosts) -> None:
+    claude = hosts("claude")
+    assert window.focus_allows({claude}, foreground=claude) is True
+
+
+def test_only_the_sessions_that_are_working_count(window, hosts) -> None:
+    """Two Claude Code windows, one of them busy: the overlay belongs on the
+    busy one's screen, and the daemon only ever passes the busy ones in."""
+    busy, idle = hosts("busy"), hosts("idle")
+    assert window.focus_allows({busy}, foreground=idle) is False
+    assert window.focus_allows({busy, idle}, foreground=idle) is True
+
+
+def test_the_live_foreground_window_is_what_is_actually_consulted(window) -> None:
+    """No override: whatever is genuinely in front of this desktop right now."""
+    front = win32.foreground_root()
+    if not front:
+        pytest.skip("no foreground window on this desktop")
+    allowed = window.focus_allows({front})
+    if win32.foreground_root() != front:
+        pytest.skip("the foreground window changed mid-test")
+    assert allowed is True
+    assert window.focus_allows(frozenset()) is False
+
+
+def test_the_overlay_being_in_front_is_not_the_user_leaving(window, hosts) -> None:
+    """The trap. ``engine/input.py:_grab`` calls SetForegroundWindow on the
+    overlay itself, so "hide unless the host is in front" hides the strip at
+    the exact moment the user presses the chord to play with it.
+
+    Written as the broader rule -- our own window in front is never evidence
+    that the user left -- because that needs no coordination with whatever
+    state the takeover happens to be in.
+    """
+    claude = hosts("claude")
+    assert window.focus_allows({claude}, foreground=window._hwnd()) is True
+
+
+def test_an_owned_overlay_is_still_its_own_root(overlay_hwnd: int, host: int) -> None:
+    """The takeover check compares the foreground against the overlay's root,
+    and that only distinguishes anything because GA_ROOT walks the parent
+    chain and ownership is not parenthood. Worth measuring rather than
+    believing: if ownership did move the root, the two cases above would be
+    the same test."""
+    win32.attach_to_host(overlay_hwnd, host)
+    assert win32.owner_of(overlay_hwnd) == host
+    assert win32.root_of(overlay_hwnd) == overlay_hwnd
+
+
+def test_a_second_session_replaces_the_attachment(window, hosts) -> None:
+    """Two sessions on one daemon is normal here. The old guard latched the
+    overlay to the first host it ever saw."""
+    first, second = hosts("first"), hosts("second")
+    window.attach_host(first)
+    assert win32.owner_of(window._hwnd()) == first
+    window.attach_host(second)
+    assert win32.owner_of(window._hwnd()) == second
+    assert window._host_hwnd == second
+
+
+def test_a_dead_host_is_forgotten_rather_than_latched(window, hosts) -> None:
+    """The measured failure: an unowned, non-topmost window stranded on screen
+    with ``_attached`` still True and a host handle that names nothing.
+    """
+    claude = hosts("claude")
+    window.attach_host(claude)
+    assert window._attached is True
+
+    # Break the ownership before killing the owner -- Windows destroys owned
+    # windows along with their owner and this overlay is the one raylib window
+    # the whole test session shares. `_attached` is deliberately left True:
+    # that drift between what the daemon believes and what Windows has
+    # recorded is the thing being tested.
+    win32.detach(window._hwnd())
+    assert user32.DestroyWindow(claude)
+    assert not win32.is_window(claude)
+
+    assert window.focus_allows({claude}, foreground=claude) is False
+    assert window._host_hwnd == 0, "kept a handle that names nothing"
+    assert window._attached is False, "still believes it is attached"
+    assert win32.owner_of(window._hwnd()) == 0
+    assert not win32.is_topmost(window._hwnd()), "stranded above everything"
+
+
+def test_reattaching_to_a_dead_host_forgets_it(window, hosts) -> None:
+    """The idle path is where this bites: the daemon detaches when it goes
+    idle, the terminal closes, and the next show tries to re-take a window
+    that is gone. Failing to attach must not leave the overlay believing it
+    still has a host."""
+    claude = hosts("claude")
+    window.attach_host(claude)
+    window.detach_host()
+    assert user32.DestroyWindow(claude)
+
+    window.set_visible(True)            # what the daemon does on the way back up
+    assert window._attached is False
+    assert window._host_hwnd == 0
+    assert window.focus_allows(frozenset()) is False
+
+
+def _z_index(hwnd: int, ignore: int = 0) -> int:
+    """Position of a window in the top-level z-order, or -1 if not found.
+
+    ``ignore`` leaves one window out of the count, for comparing a window's
+    place against everything *except* the overlay being moved around it.
+    """
     GW_HWNDFIRST, GW_HWNDNEXT = 0, 2
     user32.GetWindow.restype = wintypes.HWND
     user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
@@ -175,6 +378,7 @@ def _z_index(hwnd: int) -> int:
     while cur:
         if int(cur) == hwnd:
             return index
+        if int(cur) != ignore:
+            index += 1
         cur = user32.GetWindow(cur, GW_HWNDNEXT)
-        index += 1
     return -1

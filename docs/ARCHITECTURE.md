@@ -71,16 +71,33 @@ could ever look. The current split:
 - **Worlds are generated, uniquely.** Which track, which palette, which sky,
   which trains where — all drawn from a seed that never repeats.
 
-### 5. Attached to Claude Code, not to the screen
+### 5. On screen only while you are looking at Claude Code
 
 An overlay that floats above *everything* is a universal window; this one
 should belong to Claude Code. The shim reads the foreground window at event
 time — the window you submitted a prompt from *is* the Claude Code host — and
-sends its handle with the datagram. The daemon then makes the overlay an
-**owned window** of that host (`GWLP_HWNDPARENT`): Windows keeps an owned
-window exactly one z-level above its owner, so the strip rides above the
-terminal, and any other window you focus covers both. `attach = "topmost"`
-restores the old behaviour. All of it is ctypes; there is no pywin32
+sends its handle with the datagram. Only a *prompt* is trusted for this: a
+Stop or a tool event fires whenever Claude gets there, which may well be while
+you are reading something else.
+
+Two mechanisms, answering two different questions:
+
+- **Where in the stack.** The daemon makes the overlay an **owned window** of
+  the host (`GWLP_HWNDPARENT`). Windows keeps an owned window exactly one
+  z-level above its owner, so the strip rides above the terminal. Ownership
+  binds lifetimes as well as z-order, which is why the daemon detaches
+  whenever it goes idle.
+- **On screen at all.** Ownership only decides what covers what — a window
+  that does not happen to overlap the strip leaves it in plain sight over
+  whatever you switched to. So each frame the daemon compares the real
+  foreground window against the hosts of the sessions that are currently
+  working (`follow_focus`, on by default) and fades out when it is neither
+  those nor the overlay itself. Nothing known about a session's window means
+  hidden; "show over everything until we learn better" is the wrong default in
+  both halves.
+
+`attach = "topmost"` and `follow_focus = false` restore the older, blunter
+behaviour for demos and recordings. All of it is ctypes; there is no pywin32
 dependency.
 
 ## Never repeating, and replayable anyway
@@ -287,7 +304,8 @@ src/brainrot/
 │   ├── hud.py        shadowed text and caption chips
 │   └── loop.py       frame loop, fades, scene lifecycle
 ├── overlay/
-│   └── win32.py      ctypes: click-through, no-activate, owned-window attach
+│   └── win32.py      ctypes: click-through, no-activate, owned-window attach,
+│                     and which window is in front
 └── scenes/
     ├── runner.py     three-lane chase-cam runner
     └── parkour.py    first-person infinite parkour

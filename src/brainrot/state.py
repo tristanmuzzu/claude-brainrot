@@ -18,6 +18,16 @@ straight passthrough, and the difference is the whole user experience:
   * **Suppression.** When Claude needs a permission decision, your attention
     belongs on the terminal, so the overlay gets out of the way.
 
+  * **Whose window.** Each session's prompt event carries the handle of the
+    window it was typed into, and the overlay only belongs on screen while you
+    are looking at one of them (see :meth:`hosts`). Only a *prompt* is trusted
+    for this: a Stop or a tool event fires whenever Claude gets there, which
+    may well be while you are reading something else, and taking the
+    foreground window at that moment would name your browser as the host.
+
+Nothing here touches a window API -- this is the bookkeeping, and
+``engine/window.py`` asks the OS which window is actually in front.
+
 The clock is injected so all of this is testable without sleeping.
 """
 
@@ -53,6 +63,11 @@ class ThinkingState:
     clock: Callable[[], float] = time.monotonic
 
     _thinking: set[str] = field(default_factory=set)
+    #: session id -> handle of the window that session was prompted from.
+    _hosts: dict[str, int] = field(default_factory=dict)
+    #: Hosts of the sessions working in the current turn. Held through the
+    #: linger so the tail of a turn stays on the window that produced it.
+    _turn_hosts: frozenset[int] = frozenset()
     _visibility: Visibility = Visibility.HIDDEN
     _busy_since: float | None = None
     _shown_at: float | None = None
@@ -74,13 +89,28 @@ class ThinkingState:
     def busy(self) -> bool:
         return bool(self._thinking)
 
+    @property
+    def hosts(self) -> frozenset[int]:
+        """Windows the overlay would be legitimate in front of right now.
+
+        Empty means "nobody told us where Claude Code is", which the overlay
+        reads as *stay hidden* -- appearing over whatever happens to be there
+        is the failure this exists to prevent.
+        """
+        return self._turn_hosts
+
     # -- input ------------------------------------------------------------
 
-    def handle(self, kind: str, session: str = "", tool: str = "") -> None:
+    def handle(self, kind: str, session: str = "", tool: str = "",
+               hwnd: int = 0) -> None:
         """Fold one hook event into the state."""
         session = session or "default"
 
         if kind in _START_EVENTS:
+            # Only a prompt says anything trustworthy about where you are
+            # looking; see the module docstring.
+            if hwnd:
+                self._hosts[session] = int(hwnd)
             # A new prompt means the user is done deciding things, so any
             # pending-permission suppression is stale.
             self._suppressed = False
@@ -100,6 +130,7 @@ class ThinkingState:
             if self.hide_on_notification:
                 self._suppressed = True
         elif kind in _TEARDOWN_EVENTS:
+            self._hosts.pop(session, None)
             self._end(session)
 
         self.tick()
@@ -123,6 +154,15 @@ class ThinkingState:
     def tick(self) -> Visibility:
         """Advance timers. Call every frame; returns the current visibility."""
         now = self.clock()
+
+        if self._thinking:
+            # Recomputed rather than accumulated so a session that finishes
+            # takes its window with it. Left alone while nothing is thinking,
+            # which is what keeps the linger pinned to the right window.
+            self._turn_hosts = frozenset(
+                hwnd for session in self._thinking
+                if (hwnd := self._hosts.get(session))
+            )
 
         if self._suppressed:
             self._visibility = Visibility.HIDDEN
@@ -173,10 +213,13 @@ class ThinkingState:
         self._shown_at = None
         self._busy_since = None
         self._released_at = None
+        self._turn_hosts = frozenset()
         self.caption = ""
 
     def reset(self) -> None:
         self._thinking.clear()
+        self._hosts.clear()
+        self._turn_hosts = frozenset()
         self._visibility = Visibility.HIDDEN
         self._busy_since = None
         self._shown_at = None

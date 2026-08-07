@@ -8,7 +8,11 @@ Responsibilities, in priority order:
    value.
 2. **Generate fresh content on every show.** A new seed and a brand new scene
    are built each time the overlay comes up, so nothing is ever a rerun.
-3. Fade in and out rather than popping.
+3. **Only be there while it is being watched.** Claude working is a necessary
+   condition for the overlay, not a sufficient one: it also has to be a Claude
+   Code window you are actually looking at (``follow_focus``). Otherwise the
+   thing turns up over your browser, which is the one behaviour nobody wants.
+4. Fade in and out rather than popping.
 """
 
 from __future__ import annotations
@@ -26,6 +30,14 @@ from .hud import chip
 #: How long to sleep per iteration while hidden. Long enough to be free, short
 #: enough that the overlay still appears promptly once the grace period passes.
 IDLE_SLEEP = 0.08
+
+#: How long the foreground has to be somewhere else before that counts as the
+#: user looking away. Windows that come and go in a few frames -- the alt-tab
+#: switcher, a hook's console, a notification -- are not somebody leaving, and
+#: without this every one of them takes a bite out of the fade. Only the
+#: leaving edge waits; coming back is immediate, because that is the half you
+#: can feel.
+FOCUS_GRACE = 0.4
 
 
 class Overlay:
@@ -46,6 +58,8 @@ class Overlay:
         self.alpha = 0.0
         self.running = False
         self._window_shown = False
+        self._focus_ok = True
+        self._focus_left_at = 0.0
 
         from .input import Controller, Takeover
 
@@ -60,7 +74,7 @@ class Overlay:
         # derived values, so no lock is warranted here.
         if self.verbose:
             print(f"[brainrot] {event.kind} session={event.session[:8]} tool={event.tool}")
-        self.state.handle(event.kind, event.session, event.tool)
+        self.state.handle(event.kind, event.session, event.tool, event.hwnd)
         # A prompt submission tells us which window hosts Claude Code; layer
         # the overlay one level above it (no-op off Windows / when attached).
         if event.kind == "UserPromptSubmit" and event.hwnd:
@@ -120,7 +134,10 @@ class Overlay:
                     self.running = False
 
                 visibility = self.state.tick()
-                wants_visible = visibility in (Visibility.VISIBLE, Visibility.LINGERING)
+                wants_visible = (
+                    visibility in (Visibility.VISIBLE, Visibility.LINGERING)
+                    and self._focus_allows()
+                )
 
                 if wants_visible and self.scene is None:
                     self._begin_scene()
@@ -163,6 +180,36 @@ class Overlay:
                     time.sleep(spare)
         finally:
             self.shutdown()
+
+    def _focus_allows(self) -> bool:
+        """Whether the window in front is one the overlay belongs over.
+
+        Falls through the ordinary fade, so losing focus eases the strip out
+        rather than blinking it away, and a bad answer from the window API
+        fails open: a brainrot overlay that appears when it should not is a
+        nuisance, one that can never appear again is broken.
+        """
+        if not self.cfg.follow_focus:
+            return True
+        try:
+            here = bool(self.window.focus_allows(self.state.hosts))
+        except Exception:
+            return True
+
+        now = time.monotonic()
+        if here:
+            self._focus_left_at = 0.0
+            allowed = True
+        else:
+            if not self._focus_left_at:
+                self._focus_left_at = now
+            allowed = now - self._focus_left_at < FOCUS_GRACE
+
+        if self.verbose and allowed != self._focus_ok:
+            print(f"[brainrot] focus: {'on Claude Code' if allowed else 'elsewhere'}"
+                  f" (hosts: {sorted(self.state.hosts)})")
+        self._focus_ok = allowed
+        return allowed
 
     def _drive(self, now: float) -> None:
         """Offer the keyboard to the scene, if anyone is asking for it."""
