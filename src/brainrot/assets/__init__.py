@@ -112,6 +112,12 @@ def load(name: str) -> ModelAsset:
 def unload_all() -> None:
     for asset in _CACHE.values():
         try:
+            # UnloadModel does not release embedded glTF textures; without
+            # this every load/unload cycle leaks texture slots.
+            for i in range(asset.model.materialCount):
+                tex = asset.model.materials[i].maps[rl.MATERIAL_MAP_ALBEDO].texture
+                if tex.id != 0 and (tex.width > 1 or tex.height > 1):
+                    rl.UnloadTexture(tex)
             rl.UnloadModel(asset.model)
         except Exception:
             pass

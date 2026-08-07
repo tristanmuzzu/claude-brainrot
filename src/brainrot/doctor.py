@@ -48,20 +48,36 @@ def _check_python() -> Check:
 def _check_deps() -> list[Check]:
     checks: list[Check] = []
     try:
-        import pygame
+        import raylib  # noqa: F401
 
-        checks.append(Check("pygame", OK, pygame.version.ver))
+        checks.append(Check("raylib", OK, "importable"))
     except ImportError:
-        checks.append(Check("pygame", FAIL, "not installed", "pip install pygame-ce"))
+        checks.append(Check("raylib", FAIL, "not installed", "pip install raylib"))
     try:
-        import numpy
+        import PIL
 
-        checks.append(Check("numpy", OK, numpy.__version__))
+        checks.append(Check("pillow", OK, PIL.__version__))
     except ImportError:
         checks.append(
-            Check("numpy", FAIL, "not installed", "pip install numpy (used to bake textures)")
+            Check("pillow", FAIL, "not installed",
+                  "pip install pillow (procedural textures and PNG output)")
         )
     return checks
+
+
+def _check_assets() -> Check:
+    """The committed .glb kit must actually be present in this install."""
+    from . import assets as asset_api
+
+    try:
+        names = asset_api.available()
+    except Exception as exc:  # noqa: BLE001 - diagnostic
+        return Check("assets", FAIL, f"{type(exc).__name__}: {exc}",
+                     "Reinstall the package; the data files did not ship.")
+    if len(names) < 10:
+        return Check("assets", FAIL, f"only {len(names)} models found",
+                     "Reinstall the package; the asset kit is incomplete.")
+    return Check("assets", OK, f"{len(names)} models")
 
 
 def _check_backend() -> list[Check]:
@@ -73,30 +89,17 @@ def _check_backend() -> list[Check]:
                 "overlay",
                 WARN,
                 f"{sys.platform}: plain window, no click-through",
-                "Click-through and always-on-top are Windows-only; SDL cannot "
-                "express them portably. Everything else works.",
+                "Click-through and host-window attachment are Windows-only. "
+                "Everything else works.",
             )
         )
         return checks
 
-    try:
-        import win32con  # noqa: F401
-        import win32gui  # noqa: F401
-
-        checks.append(Check("pywin32", OK, "available"))
-        checks.append(
-            Check("overlay", OK, "layered, click-through, always-on-top, never focused")
-        )
-    except ImportError:
-        checks.append(
-            Check(
-                "pywin32",
-                FAIL,
-                "not installed",
-                "pip install pywin32 -- without it the overlay falls back to an "
-                "ordinary window that steals focus and eats clicks.",
-            )
-        )
+    checks.append(
+        Check("overlay", OK,
+              "click-through, never focused, layered above the Claude Code "
+              "window (attach = host)")
+    )
     return checks
 
 
@@ -170,36 +173,48 @@ def _check_daemon(cfg: Config) -> Check:
 
 
 def _check_render(cfg: Config) -> Check:
-    """Actually build and draw a frame of every scene."""
-    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    """Actually build and draw a frame of every scene, offscreen.
+
+    Runs in a subprocess: the doctor may be invoked on a machine where a GPU
+    window would be attempted, and a render crash must not take the doctor
+    down with it.
+    """
+    import subprocess
+
+    code = (
+        "import os; os.environ['BRAINROT_HEADLESS']='1';"
+        "from brainrot.config import Config;"
+        "from brainrot.engine import scene as scene_api;"
+        "from brainrot.engine.window import HeadlessWindow;"
+        "from brainrot.palette import generate;"
+        "from brainrot.rng import Seed;"
+        "cfg=Config(); w=HeadlessWindow(); w.create(cfg);"
+        "seed=Seed.for_run(1); names=scene_api.available();\n"
+        "for n in names:\n"
+        "    s=scene_api.build(n, scene_api.SceneContext(cfg.width, cfg.height,"
+        " generate(seed), seed, cfg.quality));"
+        " s.update(1/60); w.begin(); s.draw(); w.end()\n"
+        "print('RENDERED='+','.join(names))"
+    )
     try:
-        import pygame
-
-        from .engine import scene as scene_api
-        from .palette import generate
-        from .rng import Seed
-
-        pygame.init()
-        pygame.display.set_mode((cfg.width, cfg.height))
-        surface = pygame.Surface((cfg.width, cfg.height))
-        seed = Seed.for_run(1)
-        names = scene_api.available()
-        for name in names:
-            built = scene_api.build(
-                name,
-                scene_api.SceneContext(cfg.width, cfg.height, generate(seed), seed, cfg.quality),
-            )
-            built.update(1 / 30)
-            built.draw(surface)
-        return Check("render", OK, f"{len(names)} scenes drew a frame: {', '.join(names)}")
-    except Exception as exc:  # noqa: BLE001 - this is the diagnostic
-        return Check("render", FAIL, f"{type(exc).__name__}: {exc}", "This is a bug; please report it.")
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                                text=True, timeout=180)
+    except subprocess.TimeoutExpired:
+        return Check("render", FAIL, "render probe timed out", "This is a bug; please report it.")
+    for line in result.stdout.splitlines():
+        if line.startswith("RENDERED="):
+            names = line.removeprefix("RENDERED=").split(",")
+            return Check("render", OK, f"{len(names)} scenes drew a frame: {', '.join(names)}")
+    tail = (result.stderr or result.stdout).strip().splitlines()
+    detail = tail[-1] if tail else "no output"
+    return Check("render", FAIL, detail, "This is a bug; please report it.")
 
 
 def run(cfg: Config | None = None) -> int:
     cfg = cfg or Config.load()
     checks: list[Check] = [_check_python()]
     checks += _check_deps()
+    checks.append(_check_assets())
     checks += _check_backend()
     checks.append(_check_pythonw())
     checks += _check_hooks(cfg)

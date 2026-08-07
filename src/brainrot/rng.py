@@ -34,7 +34,8 @@ from pathlib import Path
 # Bumping this re-rolls every generator without disturbing the run counter.
 # Useful when generation logic changes and old seeds would produce stale-looking
 # output that no longer matches the current art direction.
-GENERATION_EPOCH = 1
+# Epoch 2: the raylib/3D-asset rebuild.
+GENERATION_EPOCH = 2
 
 _STATE_FILENAME = "state.json"
 

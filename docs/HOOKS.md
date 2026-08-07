@@ -51,6 +51,12 @@ for the registered command and the event to drift apart.
 It also forwards `session_id` (for refcounting across concurrent Claude Code
 windows) and `tool_name` (for captions).
 
+On Windows it additionally reads the **foreground window handle** at event
+time and sends it as `hwnd`. The window you submitted a prompt from *is* the
+Claude Code host window, and the daemon uses that handle to layer the overlay
+exactly one z-level above it (see `attach` in the config). One `ctypes` call,
+still builtins-only, still wrapped in the same bare `except`.
+
 ## The three properties the shim must have
 
 **It must not block.** One UDP datagram, no connect, no response read. If the

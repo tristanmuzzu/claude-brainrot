@@ -343,15 +343,14 @@ class RunnerScene(Scene):
             if e["kind"] == "coin" and not e["taken"] and e["d"] < 30:
                 glow_billboard(self.camera, self._lane_x(e["lane"]),
                                RAIL_TOP + e["y"], -e["d"], 0.6, (255, 200, 60), 55)
+            elif e["kind"] == "train" and e["vel"] and pal.is_dark and e["d"] < 70:
+                # oncoming headlights punching through the dark
+                x_t = self._lane_x(e["lane"])
+                for side in (-1, 1):
+                    glow_billboard(self.camera, x_t + side * 0.6, 1.05,
+                                   -e["d"] - 2.9, 1.6, (255, 235, 170), 120)
         self.burst.draw(self.camera)
         rl.EndMode3D()
-
-        # horizon haze: 2D fog band that sells atmospheric depth for free
-        haze = rl.rgba(pal.fog, 150)
-        cy = int(self.height * 0.52)
-        for i in range(6):
-            a = int(150 * (1 - i / 6) ** 2)
-            rl.DrawRectangle(0, cy - i * 6, self.width, 6, rl.rgba(pal.fog, a))
 
         self.weather.draw(self.elapsed)
         self._draw_hud()

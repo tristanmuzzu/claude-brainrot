@@ -16,6 +16,7 @@ reset()
 run_script_banner("character")
 
 SKIN = zone("skin", (0.83, 0.58, 0.40))
+EYE = zone("eye", (0.07, 0.07, 0.09))
 HOODIE = zone("hoodie", (0.88, 0.26, 0.10))
 PANTS = zone("pants", (0.16, 0.22, 0.44))
 SHOE = zone("shoe", (0.93, 0.93, 0.93))
@@ -37,6 +38,12 @@ parts = [
     skinned_part("hood", "spine", (0.30, 0.16, 0.22), (-0.18, 0, HIP_Z + TORSO - 0.06), HOODIE, 0.04),
     skinned_part("pack", "spine", (0.20, 0.42, 0.5), (-0.36, 0, HIP_Z + TORSO * 0.55), PACK, 0.05),
     skinned_part("head", "head", (HEAD, HEAD, HEAD), (0.02, 0, HIP_Z + TORSO + HEAD / 2 + 0.02), SKIN, 0.06),
+    # eyes: two dark texels proud of the face -- the difference between "a
+    # character" and "a box wearing a cap"
+    skinned_part("eye_l", "head", (0.03, 0.09, 0.10),
+                 (0.02 + HEAD / 2 + 0.005, -0.115, HIP_Z + TORSO + HEAD * 0.58), EYE, 0.0),
+    skinned_part("eye_r", "head", (0.03, 0.09, 0.10),
+                 (0.02 + HEAD / 2 + 0.005, +0.115, HIP_Z + TORSO + HEAD * 0.58), EYE, 0.0),
     skinned_part("captop", "head", (HEAD * 1.08, HEAD * 1.08, HEAD * 0.36), (0.02, 0, HIP_Z + TORSO + HEAD * 0.86), CAP, 0.03),
     skinned_part("brim", "head", (0.30, HEAD * 0.92, 0.055), (HEAD / 2 + 0.12, 0, HIP_Z + TORSO + HEAD * 0.72), CAP, 0.01),
     skinned_part("arm_l", "arm.L", (0.16, 0.16, ARM_L), (0, -0.30, SHO_Z - ARM_L / 2), HOODIE),

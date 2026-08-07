@@ -7,17 +7,18 @@ Claude Code
     │  hook fires (UserPromptSubmit, Stop, Notification, SessionEnd)
     ▼
 brainrot_hook.py            ~30ms, one UDP datagram, cannot block or raise
-    │
+    │                       (on Windows: carries the foreground window handle)
     ▼  127.0.0.1:47821
 Overlay daemon (long-lived)
     ├── ipc.EventListener      UDP receive on a background thread
     ├── state.ThinkingState    events + time  ->  visibility
     ├── engine.loop.Overlay    frame loop, fade, scene lifecycle
+    ├── engine.window          raylib window: overlay / desktop / headless
     ├── scenes.*               generated worlds
-    └── overlay.*              win32 / desktop / headless window backends
+    └── overlay.win32          click-through + owned-window layering (ctypes)
 ```
 
-## The four decisions that shaped everything
+## The decisions that shaped everything
 
 ### 1. Hooks, not polling
 
@@ -57,237 +58,199 @@ The clock is injected, so all of it is tested without sleeping. The timing
 logic is also derived from timestamps rather than from tick history, so a burst
 that begins and ends between two frames is still judged correctly.
 
-### 4. Generated, never sourced
+### 4. Crafted assets, generated worlds
 
-There is no bundled media and no download step, so there is nothing to license,
-nothing to keep in git, and nothing to curate. It also means content genuinely
-cannot repeat.
+The first version generated every pixel in software, which capped how good it
+could ever look. The current split:
+
+- **Assets are crafted, reproducibly.** Every model is a glTF file built by a
+  Blender script committed to `assets/src/`, run under headless `bpy`. Nothing
+  is downloaded and nothing is hand-exported from an opaque tool; delete
+  `src/brainrot/assets/data` and `python assets/build.py` recreates it
+  byte-for-byte-equivalent.
+- **Worlds are generated, uniquely.** Which track, which palette, which sky,
+  which trains where — all drawn from a seed that never repeats.
+
+### 5. Attached to Claude Code, not to the screen
+
+An overlay that floats above *everything* is a universal window; this one
+should belong to Claude Code. The shim reads the foreground window at event
+time — the window you submitted a prompt from *is* the Claude Code host — and
+sends its handle with the datagram. The daemon then makes the overlay an
+**owned window** of that host (`GWLP_HWNDPARENT`): Windows keeps an owned
+window exactly one z-level above its owner, so the strip rides above the
+terminal, and any other window you focus covers both. `attach = "topmost"`
+restores the old behaviour. All of it is ctypes; there is no pywin32
+dependency.
 
 ## Never repeating, and replayable anyway
 
-Those two goals conflict unless you separate *which run is this* from *how is it
-generated*.
+Those two goals conflict unless you separate *which run is this* from *how is
+it generated*.
 
-**Uniqueness** comes from a monotonic counter persisted to disk. Two runs cannot
-share a seed because two runs cannot share a counter value — no randomness is
-involved, so there is no collision to reason about.
+**Uniqueness** comes from a monotonic counter persisted to disk. Two runs
+cannot share a seed because two runs cannot share a counter value — no
+randomness is involved, so there is no collision to reason about.
 
 **Independence** comes from substreams. Each generator draws from
-`seed.stream("palette")`, `seed.stream("runner-layout")` and so on, derived by
-hashing the root seed with a label. Changing how obstacles generate does not
-shift the palette, which is what makes generated content tunable at all.
+`seed.stream("palette")`, `seed.stream("row13")` and so on, derived by hashing
+the root seed with a label. Changing how obstacles generate does not shift the
+palette, which is what makes generated content tunable at all.
 
-**Replay** is then free: `--seed N` reconstructs run N exactly.
+**Replay** is then free: `--seed N` reconstructs run N exactly, and the test
+suite asserts this at the pixel level — the same seed renders byte-identical
+frames.
 
 Hashing is BLAKE2b rather than Python's `hash()`, which is salted per process
 and would silently break replay across daemon restarts.
 
-One more detail: hues come from the golden-ratio sequence indexed by run number,
-not from the RNG. Uniform random hues cluster, so consecutive runs would
-occasionally come out near-identical and read as a repeat. The low-discrepancy
-sequence guarantees they never do.
+Hues come from the golden-ratio sequence indexed by run number, not from the
+RNG: uniform random hues cluster, so consecutive runs would occasionally look
+near-identical. `GENERATION_EPOCH` in `rng.py` re-rolls every generator without
+disturbing the counter — epoch 2 is the raylib rebuild.
 
-`GENERATION_EPOCH` in `rng.py` re-rolls every generator without disturbing the
-counter — bump it when generation logic changes enough that old seeds would look
-stale.
+## The rendering contract
 
-## The rendering pipeline
+raylib's default shader computes `texture x material colour x tint` per pixel,
+identically on the GPU build (what users run) and the software rasteriser
+(what CI and `brainrot shoot` run). The whole art pipeline is built to need
+nothing else:
 
-Everything visible is synthesised. There are no image files in this repository
-and nothing is fetched at runtime, so surface detail has to come from somewhere
-else — and the geometry pygame can draw is limited to flat-filled polygons.
+- **Lighting is baked at asset build time.** Each Blender script unwraps its
+  model, bakes sun + sky + AO into a grayscale map (`DIFFUSE` with the colour
+  pass disabled, so the bake is independent of albedo), and wires it as the
+  base-colour texture. One shared sun direction across all bakes keeps mixed
+  assets consistent.
+- **Colour lives in named material zones** (`hoodie`, `body`, `wall`,
+  `window`...). The glTF material order is stable and raylib maps glTF
+  material *i* to slot *i + 1*, so the runtime reads zone names from the GLB's
+  JSON chunk and recolours by writing one material colour. Trains get per-run
+  liveries, buildings get night-lit windows, the runner gets an outfit — no
+  lighting maths anywhere.
+- **Fog is the draw tint.** Every entity is drawn with a tint interpolated
+  toward the palette's fog colour by distance. The parkour scene needs haze
+  *between* the world below and the course, so it draws the ocean and islands,
+  exits 3D, lays a smooth alpha gradient, and re-enters the same camera for
+  the course — the haze writes no depth, so the course still depth-tests
+  correctly.
+- **Vertex colours are banned.** The software rasteriser ignores material
+  colour and tint whenever a colour attribute is present, which would make CI
+  frames diverge from GPU frames. The exporter strips them.
 
-**Baked at scene construction** (`noise.py`, `texture.py`, `sky.py`), where a
-few milliseconds once is free:
+Two things the first version taught us are kept: the sky is a 2D backdrop
+(gradient, sun/moon disc with an additive glow, seeded stars, parallax cloud
+sprites) drawn before the 3D pass, and weather is screen-space streaks over
+it, exactly like the reference material.
 
-- value noise and fbm, used for cloud layers, facade grime and stone veining;
-- the sky: a three-anchor gradient with a warm horizon band, a sun or moon disc
-  with an exponential glow, a starfield whose density thins toward the horizon,
-  and two wrapping cloud bands that scroll at different speeds for parallax;
-- lit sphere sprites with diffuse, Blinn-Phong specular and rim terms — this is
-  what makes a marble a ball rather than a circle;
-- building facades with real window grids, pre-tinted at seven fog depths so
-  distance fogging is a plain blit rather than a per-frame alpha composite.
+### Voxel blocks
 
-**Per frame**, using only pygame's C-side blend operations:
+The parkour course does not use Blender assets at all. The entire Minecraft
+look is two cheap tricks, baked into 16x16 pixel-art atlas textures at scene
+construction: vanilla's face-shading constants (top 1.0, north/south 0.8,
+east/west 0.6, bottom 0.5) and per-texel noise with a darkened 1-px rim that
+separates adjacent blocks the way baked AO would. One shared unit-cube mesh
+carries per-face atlas UVs; each style is a material wrapping it.
 
-- *bloom*, blurred with a downscale/upscale ladder — `smoothscale` is bilinear
-  in C, so shrinking and regrowing a surface approximates a wide blur for
-  almost nothing;
-- *grade*, a split-tone: multiply toward warm (which affects highlights
-  proportionally more than shadows) then a small additive cool lift;
-- *chromatic aberration*, reconstructing the frame from three channel-shifted
-  copies, masked to the edges by a radial ramp;
-- *vignette*, a cached radial multiply.
+### Texture lifecycle
 
-The deliberate boundary: numpy is used at construction and **never** per frame.
-An `array3d` round trip costs about 3 ms on this surface size; the blend-op
-equivalents cost about 0.05 ms combined.
+Exactly one scene is ever alive, and every scene's textures (sky gradient,
+clouds, block atlases — all keyed by run number) are unloaded when the next
+scene is built. Without this a long-lived daemon leaks a scene's textures per
+run, and the software rasteriser — which has a finite texture pool — stops
+rendering entirely within a handful of runs. Glow sprites and discs are
+process-global; GLB assets stay resident and are shared across scenes.
 
-### Bloom without HDR
+### Skinned characters
 
-Real engines bloom in HDR, where the sky sits near 1.0 and a lamp sits at 10.0,
-so a fixed threshold separates them. In 8-bit sRGB there is no such headroom: a
-bright daytime sky is numerically as bright as a light source. A fixed
-threshold therefore bloomed the *entire sky* and smeared its colour across
-every frame — which is exactly what happened, and it looked like the whole
-scene had been dipped in the sky's hue.
+The runner is one mesh, rigid-skinned per part to a 7-bone armature (rigid on
+purpose: joints bend, boxes stay boxes). Run, jump and roll clips are sampled
+into glTF animations by the asset script and CPU-skinned at runtime
+(`UpdateModelAnimation`), which the software rasteriser supports — so CI sees
+the same poses the GPU does.
 
-`postfx.auto_threshold` derives the cut from the luminance of the sky the run
-actually generated, so the backdrop stays out of the bloom while windows,
-coins, sparks and the sun still catch it. The palette also caps peak sky
-brightness below 1.0, deliberately leaving headroom for things that emit.
+## Scene formats, from the reference material
 
-### Texture mapping, which pygame does not have
-
-pygame fills polygons with a flat colour and nothing else. An earlier version
-approximated texture by scattering small "texel" polygons over each face; that
-gave surfaces *detail* but never actual texture, and you could not put a legible
-16x16 cobblestone pattern on a cube and have it read as cobblestone.
-
-`warp.py` does the real thing: each face is treated as a parallelogram, the
-pixels inside it are inverse-mapped back into texture space with numpy, and the
-texture is sampled nearest-neighbour so pixel art stays hard-edged.
-
-Doing that per face per frame would be far too slow -- numpy's per-call overhead
-dominates on arrays this small. What makes it affordable is that a face's
-*shape* depends only on the camera angle and the distance, not on where the
-block is, so at any moment nearly every visible face of a given orientation is
-the same parallelogram at one of a handful of sizes. Quantising the two edge
-vectors into buckets turns that into a cache key, and the warp then runs a few
-dozen times a frame instead of a few hundred; everything else is a plain blit.
-Three details that turned out to matter:
-
-* **Evict a fraction, not everything.** Clearing the cache when it filled
-  dropped the hit rate to about 30% -- each eviction threw away the entire
-  working set mid-frame. Dropping the oldest quarter took it to ~72%.
-* **Coarser buckets for longer edges.** Whole-pixel buckets on a large face
-  mint an entry for almost every depth the orbiting camera passes through.
-* **Grow each edge before quantising.** Rounding the origin and the edges
-  independently leaves sub-pixel gaps, and a one-pixel seam showing sky between
-  every pair of blocks is far more visible than a one-pixel overlap -- which,
-  drawn in painter's order, is invisible. The size guard has to run *before*
-  that inflation, or genuinely sub-pixel faces get floored at three pixels and
-  distant geometry renders several times too large.
-
-The mapping is affine, not perspective-correct: a cube face in perspective is
-really a trapezoid. Across a block a few dozen pixels wide the difference is
-under a pixel. Long faces -- a train carriage running away from the camera --
-are subdivided by the caller into ~2-unit segments so each stays small enough
-for the approximation to hold.
-
-### Models
-
-`model.py` is the only thing that knows how to turn a box into pixels:
-transform eight corners, drop the faces whose screen-space winding points away
-from the camera, draw the rest as textured quads. Back-face removal by winding
-rather than by reasoning about camera position means it works unchanged for the
-runner's fixed forward camera and the tower's orbiting one.
-
-Figures follow the standard voxel-game proportions, in texture pixels where one
-block is 16: 8x8x8 head, 8x12x4 torso, 4x12x4 limbs, exactly two blocks tall.
-Those numbers matter more than they look -- a slightly-too-small head stops the
-figure reading as the thing it is imitating however good the textures are.
-Limbs rotate about a pivot at the shoulder or hip, not their own centre, which
-is the difference between a joint and a box sliding back and forth.
-
-### Terrain palettes are fixed
-
-Block colours do **not** follow the run palette. Grass is grass-coloured and
-stone is stone-coloured in every run; only the sky, the lighting, and the
-character's shirt pick up the generated hue. Terrain that changes colour every
-run reads as a bug rather than as variety -- and the same applies to the
-characters, whose hair was briefly derived from `palette.ink` and consequently
-turned white on every dark palette.
-
-Surface detail is still capped to a **budget of the nearest blocks**, and the
-`quality` setting scales it.
-
-## Projection
-
-One projection module serves the two 3D scenes: a pinhole camera looking down
-+Z, `scale = focal / depth`. The entire illusion of motion is that world
-features at *constant* Z spacing project to *shrinking* screen spacing.
-
-The projection deliberately has no yaw. `tower` needs an orbiting camera, so it
-rotates the world about the tower axis in `_to_view` before handing a plain
-forward-looking camera the result — keeping the rotation local to the one scene
-that wants it leaves `projection.py` small enough to reason about.
-
-`marbles` is honestly 2D and skips the projection entirely; a perspective camera
-would buy nothing but a smaller playfield in a strip a few hundred pixels wide.
-
-Depth ordering everywhere is painter's algorithm. At a few hundred blocks it is
-cheaper than maintaining any spatial structure.
+- **runner** is third-person chase cam over three locked lanes, because that
+  is what Subway Surfers footage is. World streaming follows the industry
+  pattern (segments spawned ahead, destroyed behind, content generated per
+  6 m row from a per-row substream).
+- **parkour** is **first-person**, because the real Minecraft-parkour reels
+  are recorded first-person on infinite-parkour servers. The generator mirrors
+  the plugin that produces most of that footage: weighted gap (1-4 blocks) and
+  rise (-2..+1) tables, Gaussian lateral drift steered back toward a spine,
+  refusal to overlap recent course, blocks despawning two behind. The camera
+  hops on a fixed beat with a landing dip, high over an ocean with voxel
+  islands — the drop supplies the vertigo.
 
 ## Solvability by construction
 
-Both game scenes could generate layouts that cannot be completed. Neither is
-allowed to, and neither checks afterwards — rejection sampling would stall for
-an unbounded time inside a render loop.
+Both scenes could generate layouts that fail. Neither is allowed to, and
+neither checks afterwards — rejection sampling would stall inside a render
+loop.
 
 - **runner**: each row is assigned a guaranteed-clear lane *before* obstacles
-  are placed, and that lane may only move by one between consecutive rows.
-  Obstacles are painted into the lanes the corridor does not occupy. A
-  reachable path therefore exists by construction. Coins are spawned along the
-  corridor, which makes the route read as deliberate.
-- **tower**: the descent route is generated first, with per-step drop and reach
-  clamped to what a hop covers. The tower is then built around it.
+  are placed, and that lane may move by at most one between consecutive rows.
+  Parked trains only occupy lanes the corridor does not. Oncoming trains sweep
+  across rows, which a static corridor cannot answer — so at most **one**
+  oncoming train exists at a time, and the autopilot dodges it live (lane
+  changes work mid-air, exactly like the game it imitates; with two oncoming
+  trains a dodge can be pinned with no legal answer, which is why the limit is
+  structural rather than probabilistic).
+- **parkour**: every hop is drawn from tables whose worst case is jumpable,
+  altitude is clamped to a band, and candidate headings fan out until one
+  clears the recent course.
 
-Both invariants are asserted directly in `tests/test_generation.py` across many
+All of these are asserted directly in `tests/test_generation.py` across many
 runs, rather than being left as comments.
-
-## Quality tiers
-
-Rendering has a real cost and the overlay runs while you are building, so the
-trade is exposed rather than chosen silently. `quality` reaches scenes through
-`SceneContext` and scales the voxel detail budget, bloom blur passes, and
-whether chromatic aberration runs at all. Generated geometry, lighting and
-palette are identical across all three tiers — only surface detail changes.
 
 ## Cost while idle
 
 The daemon spends almost all of its life hidden. In that state it holds no
-scene, renders nothing, and sleeps 80ms per iteration. Scenes are constructed on
-the transition to visible and destroyed on the transition to hidden — which is
-also what makes every appearance freshly generated.
-
-While visible it renders at 30fps and sleeps the remainder of each frame rather
-than spinning.
+scene, renders nothing, and sleeps 80ms per iteration (draining the window's
+event queue so the OS does not flag it unresponsive). Scenes are constructed
+on the transition to visible and destroyed on the transition to hidden — which
+is also what makes every appearance freshly generated.
 
 ## Layout
 
 ```
+assets/
+├── build.py          rebuild committed .glb files (one bpy subprocess each)
+├── preview.py        render any asset to PNG with the CI rasteriser
+└── src/              the Blender scripts that ARE the asset sources
+    ├── common.py     zones, boxes, bake pipeline, rigging, GLB export
+    ├── character.py  rigged runner: run / jump / roll
+    ├── train.py      cab + middle cars
+    ├── track.py      tileable 3-lane track segment
+    ├── city.py       three building archetypes with window zones
+    └── props.py      barrier, gantry, fence, pillar, coin
+
 src/brainrot/
 ├── cli.py            run / demo / shoot / install / uninstall / ping / scenes
 ├── config.py         TOML + BRAINROT_* env overrides
 ├── rng.py            run counter, seeds, substreams, golden sequence
-├── palette.py        generated theme: colour, time of day, weather
-├── ipc.py            UDP listener and sender
+├── palette.py        generated theme: banded skies, accents, block families
+├── ipc.py            UDP listener and sender (+ host window handle)
 ├── state.py          thinking -> visibility state machine
 ├── hookinstall.py    shim generation and settings.json merging
-├── doctor.py         self-diagnosis, incl. the untestable win32 path
+├── doctor.py         self-diagnosis, incl. an out-of-process render probe
+├── assets/           runtime loading: zones by name, clips by name, recolor
+│   └── data/         the committed .glb kit (built, never hand-made)
 ├── engine/
-│   ├── projection.py perspective maths
-│   ├── scene.py      Scene contract and registry
-│   ├── noise.py      value noise / fbm, for generated textures
-│   ├── pixelart.py   16x16 block textures and character skins
-│   ├── warp.py       cached affine textured-quad rasteriser
-│   ├── model.py      textured boxes and the box-humanoid rig
-│   ├── texture.py    spheres, glows, facades
+│   ├── rl.py         raylib access layer; colour-correct headless capture
+│   ├── window.py     overlay / desktop / headless windows, placement
+│   ├── scene.py      Scene contract, registry, per-scene texture eviction
+│   ├── textures.py   PIL -> texture cache with scene/global scopes
 │   ├── sky.py        gradient, sun/moon, stars, parallax clouds
-│   ├── postfx.py     bloom, grade, aberration, vignette
-│   ├── draw.py       text, particles, cached gradients
+│   ├── voxel.py      16x16 atlas cube models with vanilla face shading
+│   ├── fx.py         weather, blob shadows, glow billboards, bursts
+│   ├── hud.py        shadowed text and caption chips
 │   └── loop.py       frame loop, fades, scene lifecycle
 ├── overlay/
-│   ├── base.py       backend interface, monitor placement
-│   ├── win32.py      layered, click-through, always-on-top, no focus
-│   ├── desktop.py    plain window for development
-│   └── headless.py   offscreen, for tests and `shoot`
+│   └── win32.py      ctypes: click-through, no-activate, owned-window attach
 └── scenes/
-    ├── runner.py     endless runner + autopilot
-    ├── tower.py      voxel parkour descent
-    └── marbles.py    marble race with collision physics
+    ├── runner.py     three-lane chase-cam runner
+    └── parkour.py    first-person infinite parkour
 ```
 
 ## Adding a scene
@@ -302,7 +265,7 @@ class MyScene(Scene):
         self.rng = ctx.stream("mything-layout")   # own substream
 
     def update(self, dt: float) -> None: ...
-    def draw(self, surface) -> None: ...          # must fully cover the surface
+    def draw(self) -> None: ...   # raylib calls; must fully cover the frame
 ```
 
 Import it in `scenes/__init__.py` and add its name to `scenes` in config.
