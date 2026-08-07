@@ -1,1022 +1,397 @@
-"""Endless runner.
+"""The endless runner, rebuilt on real 3D assets.
 
-Three lanes, infinite track, generated forever and played by nobody.
+Layout follows the reference format exactly: three locked lanes, a chase
+camera behind and above, trains and barriers streaming toward the player,
+coin arcs along a guaranteed-clear corridor, city canyon either side.
 
-**Solvability by construction.** The generator does not create obstacles and
-then check whether the result can be survived -- rejection sampling would stall
-unpredictably, which is unacceptable in a render loop. Instead every row is
-assigned a guaranteed-clear lane *first*, and that clear lane is only ever
-allowed to move by one lane between consecutive rows. A reachable corridor
-therefore exists by construction, and obstacles are simply painted into the
-lanes the corridor does not occupy.
+World model: the runner stays at the origin; the world flows past. Every
+entity carries ``d`` -- its distance ahead of the runner along the track --
+which shrinks by the run speed each frame and maps to ``z = -d`` at draw
+time. Content is generated per 6 m *row* from a per-row substream, so a run
+number always replays the same world.
 
-**Coins mark the corridor.** They are spawned along the safe path, so the
-route reads as deliberate rather than lucky -- which is exactly the trick the
-real games use to teach you where to go.
+The solvability invariant is inherited from the first version: each row is
+assigned a clear lane before obstacles are placed, and that lane moves at
+most one lane between rows. Blocking obstacles only ever go in the lanes the
+corridor does not occupy; the corridor itself only carries things the runner
+can jump or roll through.
 """
 
 from __future__ import annotations
 
 import math
-import random
-from dataclasses import dataclass
 
-import pygame
-
-from ..engine import model, pixelart, postfx
-from ..engine.draw import Particles, text
-from ..engine.projection import Camera, fog_amount, fogged, jump_height, project
+from .. import assets
+from ..engine import rl
+from ..engine.fx import Burst, Weather, blob_shadow, glow_billboard
+from ..engine.hud import text
 from ..engine.scene import Scene, SceneContext, register
-from ..engine.sky import Sky
-from ..engine.model import Humanoid
-from ..engine.texture import facade, soft_glow, sphere
-from ..palette import RGB, lerp_rgb, shade
+from ..engine.sky import SkyDome
 
-LANE_X = (-2.3, 0.0, 2.3)
-TRACK_HALF = 3.5
-ROW_SPACING = 15.0
-TIE_SPACING = 3.0
-VIEW_DISTANCE = 95.0
+LANE_X = 2.4                  # must match assets/src/track.py LANE_SPACING
+ROW = 6.0                     # generation stride; also the track tile length
+VIEW_AHEAD = 96.0             # spawn horizon
+VIEW_BEHIND = 16.0
+FOG_FAR = 88.0
 
-JUMP_DURATION = 0.72
-JUMP_PEAK = 2.5
-SLIDE_DURATION = 0.6
+BASE_SPEED = 8.5
+TOP_SPEED = 15.5
+RAMP_SECONDS = 75.0
 
-#: How far ahead the autopilot commits to a lane change. Tuned so it moves
-#: early enough to look competent, late enough to look alive.
-LOOKAHEAD = 26.0
-
-#: Facades are pre-tinted at this many discrete fog depths. Blending a fog
-#: colour over a scaled bitmap per building per frame would need a per-pixel
-#: alpha surface every time; quantising lets it be a plain blit of a bitmap
-#: that was already tinted at construction.
-FOG_LEVELS = 7
-
-
-@dataclass
-class Obstacle:
-    lane: int
-    z: float
-    kind: str
-    length: float = 2.0
-    height: float = 1.0
-    style: int = 0
-
-    @property
-    def z_end(self) -> float:
-        return self.z + self.length
-
-
-@dataclass
-class Coin:
-    lane: int
-    z: float
-    y: float = 1.2
-    taken: bool = False
-
-
-@dataclass
-class Building:
-    x: float
-    z: float
-    width: float
-    height: float
-    depth: float
-    tint: float
-    style: int = 0
-
-
-@dataclass
-class Effect:
-    """A short-lived visual: dust, sparkle or debris."""
-
-    x: float
-    y: float
-    z: float
-    vx: float
-    vy: float
-    life: float
-    max_life: float
-    color: RGB
-    kind: str = "dust"
-    size: float = 0.2
-
-
-@dataclass
-class Player:
-    lane: int = 1
-    x: float = 0.0
-    z: float = 0.0
-    jump_t: float = -1.0
-    slide_t: float = -1.0
-    crash_t: float = -1.0
-    run_cycle: float = 0.0
-    coins: int = 0
-
-    @property
-    def airborne(self) -> bool:
-        return 0.0 <= self.jump_t <= JUMP_DURATION
-
-    @property
-    def sliding(self) -> bool:
-        return 0.0 <= self.slide_t <= SLIDE_DURATION
-
-    @property
-    def crashed(self) -> bool:
-        return self.crash_t >= 0.0
-
-    @property
-    def y(self) -> float:
-        return jump_height(self.jump_t, JUMP_PEAK, JUMP_DURATION) if self.airborne else 0.0
+JUMP_TIME = 0.62
+JUMP_HEIGHT = 1.5
+ROLL_TIME = 0.55
+RAIL_TOP = 0.30               # y of the railhead the runner runs on
 
 
 @register("runner")
 class RunnerScene(Scene):
     def __init__(self, ctx: SceneContext) -> None:
         super().__init__(ctx)
-        self.rng_layout = ctx.stream("runner-layout")
-        self.rng_city = ctx.stream("runner-city")
-        self.rng_flavour = ctx.stream("runner-flavour")
+        seed = ctx.seed
+        pal = ctx.palette
 
-        # Framed for a tall narrow strip: horizon high enough to leave room for
-        # the skyline, camera close enough that the character is a readable
-        # figure rather than a distant sprite, and the runner sitting around
-        # two-thirds down so the track ahead gets the space instead of empty
-        # asphalt behind.
-        self.cam = Camera(y=3.4, horizon=0.34, far=VIEW_DISTANCE, focal=self.height * 0.62)
-        self.player = Player()
+        self.sky = SkyDome(pal, seed, ctx.width, ctx.height)
+        self.weather = Weather(pal, ctx.width, ctx.height, seed.root & 0xFFFF)
+        self.burst = Burst()
+        self.camera = rl.make_camera(58.0)
 
-        self.speed = 19.0
-        self.max_speed = 38.0
-        self.obstacles: list[Obstacle] = []
-        self.coins: list[Coin] = []
-        self.buildings: list[Building] = []
-        self.effects: list[Effect] = []
+        # -- assets ------------------------------------------------------
+        self.track = assets.load("track")
+        self.character = assets.load("character")
+        self.train_cab = assets.load("train_cab")
+        self.train_car = assets.load("train_car")
+        self.barrier = assets.load("barrier")
+        self.gantry = assets.load("gantry")
+        self.fence = assets.load("fence")
+        self.pillar = assets.load("pillar")
+        self.coin = assets.load("coin")
+        self.buildings = [assets.load(f"building_{c}") for c in "abc"]
 
-        # Corridor state: the lane guaranteed clear at each generated row.
-        self._safe_lane = 1
-        self._next_row_z = 40.0
-        self._next_building_z = 0.0
+        style = seed.stream("wardrobe")
+        self.outfit = {
+            "hoodie": pal.accent,
+            "cap": pal.accent2,
+            "pants": (40, 48, 82) if not pal.is_dark else (58, 62, 96),
+            "pack": pal.hazard if style.random() < 0.5 else pal.accent2,
+        }
+        self.train_liveries = [pal.accent, pal.accent2, pal.train, pal.hazard]
+
+        # -- world state -------------------------------------------------
+        self.rng = ctx.stream("runner-layout")
+        self.travel = 0.0
+        self.speed = BASE_SPEED
+        self.next_row = 2          # rows 0-1 stay clear, like the original
+        self.corridor: dict[int, int] = {0: 1, 1: 1}
+        self.entities: list[dict] = []
         self.score = 0.0
-        self.shake = 0.0
+        self.coins = 0
 
-        self.particles = Particles(self.palette, self.width, self.height, ctx.stream("weather"))
+        # -- runner state ------------------------------------------------
+        self.lane = 1              # 0 left, 1 centre, 2 right
+        self.x = 0.0
+        self.jump_t = -1.0         # active while in [0, JUMP_TIME]
+        self.roll_t = -1.0
+        self.run_phase = 0.0
+        self.cam_shake = 0.0
 
-        # Each run gets its own density and sky, so two runner runs back to back
-        # do not feel like the same track.
-        self.density = self.rng_layout.uniform(0.45, 0.85)
-        self.city_density = self.rng_city.uniform(0.5, 1.0)
-
-        self._build_art(ctx)
-        self._warm_up()
-
-    # -- art construction -------------------------------------------------
-
-    def _build_art(self, ctx: SceneContext) -> None:
-        """Bake every bitmap this scene will need. Runs once."""
-        pal = self.palette
-        rng = ctx.stream("runner-art")
-
-        self.sky = Sky(pal, self.width, self.height, rng, horizon=self.cam.horizon)
-
-        lit = lerp_rgb(pal.accent, (255, 236, 170), 0.62)
-        dark = shade(pal.structure, 0.42)
-        lit_chance = 0.55 if pal.time_of_day == "night" else 0.14
-
-        # Several facade variants so the skyline is not one building repeated.
-        self.facades: list[list[pygame.Surface]] = []
-        for i in range(5):
-            wall = shade(pal.structure, 0.72 + i * 0.13)
-            base = facade(48, 192, wall, lit, dark, rng, lit_chance=lit_chance)
-            self.facades.append(self._fog_variants(base))
-
-        self.coin_sprite = sphere(14, (255, 206, 74), rim=(255, 246, 190))
-        self.coin_glow = soft_glow(22, (255, 190, 60))
-        self.spark_glow = soft_glow(16, lerp_rgb(pal.accent, (255, 255, 255), 0.5))
-
-        # Character colours are mostly *fixed* rather than derived from the run.
-        # Themed characters sounded good and looked terrible: a green runner on
-        # a green day and a pale-haired one at night, because `ink` flips to
-        # near-white on dark palettes. Real runners in this genre have a
-        # consistent design precisely so they read against any backdrop; only
-        # the jacket picks up the run's accent, and only at a guaranteed
-        # brightness.
-        self.skin = (236, 183, 142)
-        self.hair = (44, 34, 40)
-        self.trousers = (46, 54, 78)
-        self.shoes = (232, 238, 245)
-        self.jacket = lerp_rgb(pal.accent, (255, 255, 255), 0.18)
-        self.pack = lerp_rgb(pal.hazard, (255, 240, 220), 0.25)
-
-        self._build_atlas(rng)
-        self._ground_plane = self._build_ground_plane()
-
-    def _build_atlas(self, rng) -> None:
-        """Block, carriage and character textures for the model renderer."""
-        pal = self.palette
-        self.atlas: dict = {}
-
-        # Three carriage liveries so a train of several segments and successive
-        # trains do not all look identical.
-        liveries = (
-            lerp_rgb(pal.accent, (255, 255, 255), 0.30),
-            (196, 74, 74),
-            (72, 122, 190),
-        )
-        for i, base in enumerate(liveries):
-            self.atlas[f"carriage{i}_side"] = pixelart.carriage_side(rng, base)
-            self.atlas[f"carriage{i}_front"] = pixelart.carriage_front(rng, base)
-            self.atlas[f"carriage{i}_roof"] = pixelart.carriage_roof(rng, base)
-
-        self.atlas["hazard"] = pixelart.hazard_stripe(rng, pal.hazard)
-        self.atlas["cone"] = pixelart.concrete(rng, lerp_rgb(pal.accent, (255, 160, 60), 0.6))
-        self.atlas["pack"] = pixelart.concrete(rng, lerp_rgb(pal.hazard, (255, 240, 220), 0.25))
-
-        self.atlas.update(
-            pixelart.humanoid_skin(
-                rng,
-                skin=(236, 183, 142),
-                hair=(44, 34, 40),
-                shirt=lerp_rgb(pal.accent, (255, 255, 255), 0.18),
-                trousers=(46, 54, 78),
-                shoes=(232, 238, 245),
-                # A cap rather than hair: it reads at a glance and it is the
-                # genre's most recognisable headwear.
-                cap=lerp_rgb(pal.hazard, (255, 255, 255), 0.15),
-            )
-        )
-        self.figure = Humanoid()
-
-    def _projector(self, ox: int):
-        """A model.Projector bound to this frame's camera shake offset."""
-        cam, w, h = self.cam, self.width, self.height
-
-        def project_point(x: float, y: float, z: float):
-            p = project(cam, x, y, z, w, h)
-            return None if p is None else (p.x + ox, p.y, p.depth)
-
-        return project_point
-
-    def _fog_variants(self, base: pygame.Surface) -> list[pygame.Surface]:
-        """Pre-tint a facade at every fog depth we will ask for."""
-        variants = []
-        fog = self.palette.fog
-        for level in range(FOG_LEVELS):
-            amount = level / (FOG_LEVELS - 1)
-            copy = base.copy()
-            if amount > 0:
-                veil = pygame.Surface(base.get_size()).convert()
-                veil.fill(fog)
-                veil.set_alpha(int(amount * 255))
-                copy.blit(veil, (0, 0))
-            variants.append(copy.convert())
-        return variants
-
-    def _facade_for(self, style: int, depth: float) -> pygame.Surface:
-        level = int(fog_amount(self.cam, depth) * (FOG_LEVELS - 1) + 0.5)
-        return self.facades[style % len(self.facades)][max(0, min(FOG_LEVELS - 1, level))]
+        self._spawn_to_horizon()
 
     # -- generation -------------------------------------------------------
 
-    def _warm_up(self) -> None:
-        """Pre-populate the visible world so frame one is not empty track."""
-        while self._next_row_z < VIEW_DISTANCE:
-            self._generate_row()
-        while self._next_building_z < VIEW_DISTANCE:
-            self._generate_buildings()
+    def _lane_clear(self, row: int) -> int:
+        lane = self.corridor.get(row)
+        if lane is None:
+            prev = self._lane_clear(row - 1) if row > 0 else 1
+            step = self.rng.choice((-1, 0, 0, 1))
+            lane = max(0, min(2, prev + step))
+            self.corridor[row] = lane
+        return lane
 
-    def _generate_row(self) -> None:
-        rng = self.rng_layout
-        z = self._next_row_z
+    def _spawn_to_horizon(self) -> None:
+        while self.next_row * ROW < self.travel + VIEW_AHEAD:
+            self._spawn_row(self.next_row)
+            self.next_row += 1
 
-        # The gap to the next row is decided up front, because train length has
-        # to be clamped against it. A train longer than the gap reaches into the
-        # *next* row, where its lane may be that row's safe lane -- and three
-        # such overlaps in three lanes wall the track off completely. The
-        # per-row corridor guarantee is only a guarantee if obstacles stay
-        # inside their own row.
-        gap = ROW_SPACING * rng.uniform(0.85, 1.25)
-        max_train = max(4.0, gap - 2.5)
+    def _spawn_row(self, row: int) -> None:
+        d0 = row * ROW - self.travel
+        rng = self.ctx.seed.stream(f"row{row}")
+        clear = self._lane_clear(row)
+        blocked = [ln for ln in (0, 1, 2) if ln != clear]
 
-        # The corridor moves at most one lane per row, which is what makes the
-        # layout reachable no matter what the rest of the row contains.
-        step = rng.choice((-1, 0, 0, 1))
-        self._safe_lane = max(0, min(2, self._safe_lane + step))
-        safe = self._safe_lane
+        roll = rng.random()
+        if roll < 0.27 and row > 3:
+            # a train: 2-4 cars in a blocked lane, parked or oncoming. At most
+            # one oncoming train exists at a time: with two, the dodge search
+            # can find every lane swept at once and the runner has no answer.
+            lane = rng.choice(blocked)
+            cars = rng.randint(2, 4)
+            oncoming = rng.random() < 0.35 and not any(
+                e["kind"] == "train" and e["vel"] for e in self.entities)
+            livery = rng.choice(self.train_liveries)
+            self.entities.append({
+                "kind": "train", "lane": lane, "d": d0 + ROW * 0.5,
+                "cars": cars, "vel": (self.speed * 0.55 + 4.5) if oncoming else 0.0,
+                "color": livery,
+            })
+        elif roll < 0.55 and row > 2:
+            # barriers: all blocked lanes, sometimes the corridor too (jumpable)
+            for lane in blocked:
+                if rng.random() < 0.75:
+                    self.entities.append({"kind": "barrier", "lane": lane, "d": d0})
+            if rng.random() < 0.5:
+                self.entities.append({"kind": "barrier", "lane": clear, "d": d0})
+        elif roll < 0.68 and row > 2:
+            # low gantry across the whole track: everyone rolls
+            self.entities.append({"kind": "gantry", "lane": 1, "d": d0, "low": True})
+        elif roll < 0.78:
+            self.entities.append({"kind": "gantry", "lane": 1, "d": d0, "low": False})
 
-        for lane in range(3):
-            if lane == safe:
-                # Even the safe lane can hold something, but only obstacles the
-                # autopilot can clear without leaving the corridor.
-                if rng.random() < self.density * 0.45:
-                    kind = rng.choice(("barrier", "overhead", "cone"))
-                    self.obstacles.append(self._make(lane, z, kind, rng, max_train))
-                continue
+        # coins ride the corridor, arcing over any jumpable on it
+        if rng.random() < 0.6 and row > 1:
+            over = any(e["kind"] == "barrier" and e["lane"] == clear
+                       and abs(e["d"] - d0) < 1.0 for e in self.entities)
+            n = rng.randint(4, 7)
+            for i in range(n):
+                dd = d0 + (i - n / 2) * 0.9
+                y = 0.55 + (1.35 * math.sin(math.pi * i / (n - 1)) if over else 0.0)
+                self.entities.append({"kind": "coin", "lane": clear, "d": dd,
+                                      "y": y, "taken": False})
 
-            if rng.random() > self.density:
-                continue
-
-            kind = rng.choices(
-                ("barrier", "overhead", "cone", "train"),
-                weights=(3, 2, 2, 3),
-            )[0]
-            self.obstacles.append(self._make(lane, z, kind, rng, max_train))
-
-        # Coins trace the corridor between this row and the next.
-        if rng.random() < 0.75:
-            count = rng.randint(3, 7)
-            for i in range(count):
-                self.coins.append(Coin(lane=safe, z=z + 3.0 + i * 2.4, y=1.1))
-
-        self._next_row_z += gap
-
-    def _make(
-        self, lane: int, z: float, kind: str, rng: random.Random, max_train: float = 12.0
-    ) -> Obstacle:
-        style = rng.randint(0, 3)
-        if kind == "train":
-            length = min(rng.uniform(9.0, 18.0), max_train)
-            return Obstacle(lane, z, kind, length=length, height=3.2, style=style)
-        if kind == "overhead":
-            return Obstacle(lane, z, kind, length=1.2, height=2.6, style=style)
-        if kind == "barrier":
-            return Obstacle(lane, z, kind, length=1.0, height=1.15, style=style)
-        return Obstacle(lane, z, kind, length=0.9, height=0.8, style=style)
-
-    def _generate_buildings(self) -> None:
-        rng = self.rng_city
-        z = self._next_building_z
+        # city canyon: a building per side on an independent cadence
         for side in (-1, 1):
-            if rng.random() > self.city_density:
-                continue
-            width = rng.uniform(3.0, 7.0)
-            self.buildings.append(
-                Building(
-                    x=side * (TRACK_HALF + 2.0 + rng.uniform(0.0, 5.0) + width * 0.5),
-                    z=z,
-                    width=width,
-                    height=rng.uniform(6.0, 34.0),
-                    depth=rng.uniform(4.0, 9.0),
-                    tint=rng.uniform(0.75, 1.2),
-                    style=rng.randint(0, len(self.facades) - 1) if self.facades else 0,
-                )
-            )
-        self._next_building_z += rng.uniform(5.0, 11.0)
+            srng = self.ctx.seed.stream(f"city{side}{row}")
+            if srng.random() < 0.8:
+                idx = srng.randrange(3)
+                dist = srng.uniform(10.5, 16.0)
+                tone = 0.55 + srng.random() * 0.5
+                self.entities.append({
+                    "kind": "building", "x": side * dist, "d": d0 + srng.uniform(0, ROW),
+                    "idx": idx, "yaw": 90.0 if side < 0 else -90.0,
+                    "tone": tone,
+                })
+            if srng.random() < 0.22:
+                self.entities.append({"kind": "pillar",
+                                      "x": side * srng.uniform(6.8, 8.4),
+                                      "d": d0 + srng.uniform(0, ROW)})
 
     # -- simulation -------------------------------------------------------
 
     def update(self, dt: float) -> None:
-        player = self.player
-        was_airborne = player.airborne
+        self.speed = min(TOP_SPEED, BASE_SPEED
+                         + (TOP_SPEED - BASE_SPEED) * (self.elapsed / RAMP_SECONDS))
+        step = self.speed * dt
+        self.travel += step
+        self.score += self.speed * dt * 3.2
+        self.run_phase += dt * (2.6 + self.speed * 0.34)
+        self.cam_shake = max(0.0, self.cam_shake - dt * 3.0)
 
-        if player.crashed:
-            player.crash_t += dt
-            self.speed = max(9.0, self.speed - 34.0 * dt)
-            if player.crash_t > 1.1:
-                player.crash_t = -1.0
-                player.jump_t = -1.0
-                player.slide_t = -1.0
-                self._clear_ahead()
-        else:
-            self.speed = min(self.max_speed, self.speed + 0.55 * dt)
+        for e in self.entities:
+            e["d"] -= step
+            if e["kind"] == "train" and e["vel"]:
+                e["d"] -= e["vel"] * dt
+        self.entities = [e for e in self.entities if e["d"] > -VIEW_BEHIND]
+        self._spawn_to_horizon()
 
-        player.z += self.speed * dt
-        self.cam.z = player.z - 6.2
-        self.score += self.speed * dt * 0.1
+        # steer toward the corridor of the nearest upcoming row
+        row_ahead = int((self.travel + 7.0) / ROW)
+        target = self._lane_clear(row_ahead)
 
-        # Camera sway, scaled by speed so it reads as momentum.
-        self.cam.roll = math.sin(self.elapsed * 1.7) * 0.35 * (self.speed / self.max_speed)
-        self.cam.x += (player.x * 0.35 - self.cam.x) * min(1.0, dt * 4.0)
-
-        if not player.crashed:
-            self._autopilot(dt)
-
-        if player.airborne:
-            player.jump_t += dt
-            if player.jump_t > JUMP_DURATION:
-                player.jump_t = -1.0
-        if player.sliding:
-            player.slide_t += dt
-            if player.slide_t > SLIDE_DURATION:
-                player.slide_t = -1.0
-
-        if was_airborne and not player.airborne:
-            self._spawn_dust(6)
-
-        player.run_cycle += dt * (self.speed * 0.55)
-        player.x += (LANE_X[player.lane] - player.x) * min(1.0, dt * 9.0)
-
-        self._collide()
-        self._stream_world()
-        self._update_effects(dt)
-        self.particles.update(dt)
-        self.sky.update(dt, wind=0.6 + self.speed / self.max_speed)
-        self.shake = max(0.0, self.shake - dt * 3.0)
-
-    def _autopilot(self, dt: float) -> None:
-        """Play the game.
-
-        Two independent decisions: which lane to be in (follow the corridor),
-        and whether to jump or slide (clear whatever is in the current lane).
-        """
-        player = self.player
-        ahead_start = player.z + 4.0
-        ahead_end = player.z + LOOKAHEAD
-
-        # -- lane choice: score each lane by how far it stays clear.
-        best_lane, best_clearance = player.lane, -1.0
-        for lane in range(3):
-            # Only adjacent lanes are reachable in time.
-            if abs(lane - player.lane) > 1:
-                continue
-            clearance = LOOKAHEAD
-            for obs in self.obstacles:
-                if obs.lane != lane or obs.z_end < ahead_start or obs.z > ahead_end:
-                    continue
-                if obs.kind == "train":
-                    clearance = min(clearance, obs.z - player.z)
-            # Prefer the lane holding coins, all else equal -- it is the
-            # corridor, and it makes the autopilot look purposeful.
-            bonus = (
-                1.5
-                if any(
-                    c.lane == lane and not c.taken and ahead_start <= c.z <= ahead_end
-                    for c in self.coins
-                )
-                else 0.0
-            )
-            score = clearance + bonus + (0.6 if lane == player.lane else 0.0)
-            if score > best_clearance:
-                best_lane, best_clearance = lane, score
-        player.lane = best_lane
-
-        # -- vertical action: react to the nearest thing in the chosen lane.
-        if player.airborne or player.sliding:
-            return
-        for obs in sorted(self.obstacles, key=lambda o: o.z):
-            if obs.lane != player.lane or obs.z < player.z:
-                continue
-            gap = obs.z - player.z
-            if gap > self.speed * 0.55:
-                break
-            if obs.kind in ("barrier", "cone"):
-                player.jump_t = 0.0
-                self._spawn_dust(4)
-            elif obs.kind == "overhead":
-                player.slide_t = 0.0
-                self._spawn_dust(5)
-            break
-
-    def _collide(self) -> None:
-        player = self.player
-        if player.crashed:
-            return
-        for obs in self.obstacles:
-            if obs.lane != player.lane:
-                continue
-            if not (obs.z - 0.7 <= player.z <= obs.z_end + 0.4):
-                continue
-            if obs.kind in ("barrier", "cone") and player.airborne:
-                continue
-            if obs.kind == "overhead" and player.sliding:
-                continue
-            # A crash is a feature: the tumble-and-recover beat is half the
-            # charm of the genre, and a runner that never fails is hypnotic in
-            # the boring way.
-            player.crash_t = 0.0
-            self.shake = 1.0
-            self._spawn_debris()
-            return
-
-        for coin in self.coins:
-            if coin.taken or coin.lane != player.lane:
-                continue
-            if abs(coin.z - player.z) < 1.0:
-                coin.taken = True
-                player.coins += 1
-                self._spawn_sparkle(coin)
-
-    def _clear_ahead(self) -> None:
-        """After a crash, sweep the immediate path so recovery is not instant death."""
-        z = self.player.z
-        self.obstacles = [o for o in self.obstacles if o.z_end < z - 1 or o.z > z + 18]
-
-    def _stream_world(self) -> None:
-        z = self.player.z
-        while self._next_row_z < z + VIEW_DISTANCE:
-            self._generate_row()
-        while self._next_building_z < z + VIEW_DISTANCE:
-            self._generate_buildings()
-
-        behind = z - 12.0
-        self.obstacles = [o for o in self.obstacles if o.z_end > behind]
-        self.coins = [c for c in self.coins if c.z > behind and not c.taken]
-        self.buildings = [b for b in self.buildings if b.z + b.depth > behind]
-
-    # -- effects ----------------------------------------------------------
-
-    def _spawn_dust(self, count: int) -> None:
-        rng = self.rng_flavour
-        for _ in range(count):
-            self.effects.append(
-                Effect(
-                    x=self.player.x + rng.uniform(-0.3, 0.3),
-                    y=rng.uniform(0.0, 0.25),
-                    z=self.player.z - rng.uniform(0.0, 0.6),
-                    vx=rng.uniform(-1.2, 1.2),
-                    vy=rng.uniform(0.4, 1.8),
-                    life=rng.uniform(0.3, 0.6),
-                    max_life=0.6,
-                    color=lerp_rgb(self.palette.ground_alt, (255, 255, 255), 0.35),
-                    kind="dust",
-                    size=rng.uniform(0.14, 0.3),
-                )
-            )
-
-    def _spawn_sparkle(self, coin: Coin) -> None:
-        rng = self.rng_flavour
-        for _ in range(7):
-            self.effects.append(
-                Effect(
-                    x=LANE_X[coin.lane] + rng.uniform(-0.3, 0.3),
-                    y=coin.y + rng.uniform(-0.2, 0.3),
-                    z=coin.z,
-                    vx=rng.uniform(-2.0, 2.0),
-                    vy=rng.uniform(-0.6, 2.6),
-                    life=rng.uniform(0.25, 0.5),
-                    max_life=0.5,
-                    color=(255, 214, 96),
-                    kind="spark",
-                    size=rng.uniform(0.08, 0.16),
-                )
-            )
-
-    def _spawn_debris(self) -> None:
-        rng = self.rng_flavour
-        for _ in range(14):
-            self.effects.append(
-                Effect(
-                    x=self.player.x + rng.uniform(-0.4, 0.4),
-                    y=rng.uniform(0.2, 1.4),
-                    z=self.player.z + rng.uniform(-0.3, 0.3),
-                    vx=rng.uniform(-3.5, 3.5),
-                    vy=rng.uniform(1.0, 4.5),
-                    life=rng.uniform(0.4, 0.9),
-                    max_life=0.9,
-                    color=self.palette.hazard,
-                    kind="debris",
-                    size=rng.uniform(0.1, 0.24),
-                )
-            )
-
-    def _update_effects(self, dt: float) -> None:
-        alive: list[Effect] = []
-        for e in self.effects:
-            e.life -= dt
-            if e.life <= 0:
-                continue
-            e.x += e.vx * dt
-            e.y += e.vy * dt
-            e.vy -= 6.0 * dt  # gravity
-            if e.y < 0:
-                e.y = 0.0
-                e.vy *= -0.3
-            alive.append(e)
-        # Hard cap: a long crash streak should not accumulate unbounded work.
-        self.effects = alive[-160:]
-
-    # -- rendering --------------------------------------------------------
-
-    def draw(self, surface: pygame.Surface) -> None:
-        pal = self.palette
-
-        self.sky.draw(surface, parallax=self.player.z)
-
-        offset_x = 0
-        if self.shake > 0:
-            offset_x = int(math.sin(self.elapsed * 60) * self.shake * 5)
-
-        self._draw_ground(surface)
-        self._draw_buildings(surface, offset_x)
-        self._draw_track(surface, offset_x)
-
-        # Painter's algorithm: everything in the world sorted far to near.
-        drawables: list[tuple[float, object]] = []
-        # Anything the runner has already gone past is between the camera and
-        # the player, where perspective blows it up to fill the strip. It is
-        # gone within a tenth of a second at track speed, so dropping it costs
-        # nothing and stops a passed barrier wiping out the whole frame.
-        draw_from = self.cam.z + 3.5
-        drawables += [(o.z, o) for o in self.obstacles if o.z_end > draw_from]
-        drawables += [(c.z, c) for c in self.coins if not c.taken]
-        drawables += [(e.z, e) for e in self.effects]
-        drawables.append((self.player.z, self.player))
-        drawables.sort(key=lambda item: -item[0])
-
-        for _, item in drawables:
-            if isinstance(item, Obstacle):
-                self._draw_obstacle(surface, item, offset_x)
-            elif isinstance(item, Coin):
-                self._draw_coin(surface, item, offset_x)
-            elif isinstance(item, Effect):
-                self._draw_effect(surface, item, offset_x)
+        # The corridor only guarantees a path through *static* obstacles. An
+        # oncoming train sweeps across rows, so its lane is dangerous wherever
+        # the train currently is -- dodge it live, like the game it imitates.
+        danger: dict[int, float] = {}
+        for e in self.entities:
+            if e["kind"] == "train":
+                length = e["cars"] * 5.1
+                horizon = 34.0 if e["vel"] else 10.0
+                if -length < e["d"] < horizon:
+                    danger[e["lane"]] = min(danger.get(e["lane"], 1e9), e["d"])
+        if target in danger:
+            safe = [ln for ln in (0, 1, 2) if ln not in danger]
+            if safe:
+                target = min(safe, key=lambda ln: abs(ln - self.lane))
             else:
-                self._draw_player(surface, offset_x)
+                # every lane threatened: take the one whose train is furthest
+                target = max(danger, key=lambda ln: danger[ln])
+        if target != self.lane and self.jump_t < 0 and self.roll_t < 0:
+            self.lane = target
+        self.x += (self._lane_x(self.lane) - self.x) * min(1.0, dt * 7.5)
 
-        self._draw_speed_lines(surface)
-        self.particles.draw(surface)
+        # react to whatever is coming up in my lane
+        if self.jump_t < 0 and self.roll_t < 0:
+            for e in self.entities:
+                if e["kind"] == "barrier" and e["lane"] == self.lane and 1.8 < e["d"] < 2.9:
+                    self.jump_t = 0.0
+                    break
+                if e["kind"] == "gantry" and e.get("low") and 1.6 < e["d"] < 2.7:
+                    self.roll_t = 0.0
+                    break
+            else:
+                if self.rng.random() < dt * 0.06:   # style jump
+                    self.jump_t = 0.0
 
-        postfx.apply_all(
-            surface,
-            bloom_threshold=postfx.auto_threshold(pal.sky_bottom),
-            bloom_intensity=0.95 if pal.time_of_day == "night" else 0.5,
-            vignette_strength=0.30,
-            quality=self.ctx.quality,
-        )
-        self._draw_hud(surface)
+        if self.jump_t >= 0:
+            self.jump_t += dt
+            if self.jump_t >= JUMP_TIME:
+                self.jump_t = -1.0
+                self.cam_shake = 0.5
+        if self.roll_t >= 0:
+            self.roll_t += dt
+            if self.roll_t >= ROLL_TIME:
+                self.roll_t = -1.0
 
-    def _draw_ground(self, surface: pygame.Surface) -> None:
-        """The world below the horizon.
+        # coin pickup
+        y_me = self._jump_y()
+        for e in self.entities:
+            if e["kind"] == "coin" and not e["taken"] and abs(e["d"]) < 0.6:
+                if abs(self._lane_x(e["lane"]) - self.x) < 0.9 and abs(e["y"] - 0.4 - y_me) < 1.1:
+                    e["taken"] = True
+                    self.coins += 1
+                    self.score += 25
+                    self.burst.spawn(self.x, RAIL_TOP + e["y"], -e["d"], (255, 215, 80),
+                                     count=8, rng=self.rng)
+        self.burst.update(dt)
 
-        Without this the sky gradient shows through everywhere the track does
-        not cover, so buildings appear to float in mid-air and the strip either
-        side of the rails is the wrong colour entirely. Cached, because it never
-        changes: the camera's horizon is fixed.
-        """
-        surface.blit(self._ground_plane, (0, int(self.height * self.cam.horizon)))
+    def _lane_x(self, lane: int) -> float:
+        return (lane - 1) * LANE_X
 
-    def _build_ground_plane(self) -> pygame.Surface:
+    def _jump_y(self) -> float:
+        if self.jump_t < 0:
+            return 0.0
+        t = self.jump_t / JUMP_TIME
+        return JUMP_HEIGHT * 4.0 * t * (1.0 - t)
+
+    # -- drawing ----------------------------------------------------------
+
+    def _fog(self, d: float, alpha: int = 255):
+        f = max(0.0, min(1.0, d / FOG_FAR))
+        f = f * f * (3 - 2 * f)
+        return rl.rgba(rl.mix_rgb((255, 255, 255), self.palette.fog, f), alpha)
+
+    def draw(self) -> None:
         pal = self.palette
-        top = int(self.height * self.cam.horizon)
-        band = self.height - top
-        plane = pygame.Surface((self.width, band)).convert()
-        # Fogged at the horizon, resolving to true ground colour underfoot --
-        # the same aerial-perspective cue the geometry uses.
-        for y in range(band):
-            t = (y / max(1, band - 1)) ** 0.55
-            pygame.draw.line(
-                plane, lerp_rgb(pal.fog, shade(pal.ground, 0.82), t), (0, y), (self.width, y)
-            )
-        return plane
+        self.sky.draw(self.elapsed)
 
-    def _draw_buildings(self, surface: pygame.Surface, ox: int) -> None:
-        """Textured facades with a visible side face for volume."""
-        pal = self.palette
-        for b in sorted(self.buildings, key=lambda b: -b.z):
-            near_top = project(self.cam, b.x, b.height, b.z, self.width, self.height)
-            near_base = project(self.cam, b.x, 0.0, b.z, self.width, self.height)
-            if near_top is None or near_base is None:
+        cam = self.camera
+        bob = math.sin(self.run_phase * 2.0) * 0.05 * (self.speed / TOP_SPEED)
+        shake = (math.sin(self.elapsed * 43.0) * 0.05 + math.sin(self.elapsed * 61.0) * 0.03) * self.cam_shake
+        # Ride directly behind the runner: with the camera between lanes, a
+        # passing train in the next lane would wipe across the whole frame.
+        cam.position = (self.x * 0.92 + shake, 3.7 + bob, 7.4)
+        cam.target = (self.x, 1.45 + bob * 0.5 + shake * 0.6, -5.0)
+        cam.fovy = 56.0 + 6.0 * (self.speed - BASE_SPEED) / (TOP_SPEED - BASE_SPEED)
+
+        rl.BeginMode3D(cam[0])
+
+        # ground plane under everything; fog handled by the horizon haze
+        rl.DrawPlane((0, -0.05, -30), (240, 160), rl.rgba(pal.ground, 255))
+
+        # track tiles, snapped to the row grid
+        first = int((self.travel - 8) / ROW)
+        for k in range(first, first + int((VIEW_AHEAD + 16) / ROW)):
+            d = k * ROW - self.travel + ROW / 2
+            if d < -VIEW_BEHIND:
                 continue
+            rl.DrawModelEx(self.track.model, (0, 0, -d), (0, 1, 0), 0.0,
+                           (1, 1, 1), self._fog(d))
+            # lineside fences ride the same grid
+            for side in (-1, 1):
+                rl.DrawModelEx(self.fence.model, (side * 6.3, 0, -d), (0, 1, 0), 90.0,
+                               (1, 1, 1), self._fog(d))
+                rl.DrawModelEx(self.fence.model, (side * 6.3, 0, -d + 3.0), (0, 1, 0), 90.0,
+                               (1, 1, 1), self._fog(d))
 
-            half = b.width * 0.5 * near_top.scale
-            left, right = near_top.x - half + ox, near_top.x + half + ox
-            if right < -60 or left > self.width + 60:
+        # far-to-near keeps alpha'd glows honest without a sort pass
+        for e in sorted(self.entities, key=lambda e: -e["d"]):
+            d = e["d"]
+            if d > VIEW_AHEAD:
                 continue
+            fog = self._fog(d)
+            kind = e["kind"]
+            if kind == "building":
+                b = self.buildings[e["idx"]]
+                t = e["tone"]
+                b.recolor({"wall": rl.scale_rgb(pal.structure, t),
+                           "trim": rl.scale_rgb(pal.structure, t * 0.7),
+                           "window": pal.window_lit if pal.is_dark
+                           else rl.mix_rgb(pal.sky_bottom, (255, 255, 255), 0.35)})
+                rl.DrawModelEx(b.model, (e["x"], 0, -d), (0, 1, 0), e["yaw"], (1, 1, 1), fog)
+            elif kind == "pillar":
+                rl.DrawModelEx(self.pillar.model, (e["x"], 0, -d), (0, 1, 0), 0, (1, 1, 1), fog)
+            elif kind == "train":
+                self._draw_train(e, fog)
+            elif kind == "barrier":
+                self.barrier.recolor({"stripe": pal.hazard})
+                rl.DrawModelEx(self.barrier.model, (self._lane_x(e["lane"]), 0.28, -d),
+                               (0, 1, 0), 0, (1, 1, 1), fog)
+            elif kind == "gantry":
+                y = 0.0 if e.get("low") else 0.9
+                rl.DrawModelEx(self.gantry.model, (0, y + 0.28, -d), (0, 1, 0), 0,
+                               (1, 1, 1), fog)
+            elif kind == "coin" and not e["taken"]:
+                x = self._lane_x(e["lane"])
+                y = RAIL_TOP + e["y"] + math.sin(self.elapsed * 3 + d) * 0.06
+                rl.DrawModelEx(self.coin.model, (x, y, -d), (0, 1, 0),
+                               (self.elapsed * 220 + d * 40) % 360,
+                               (0.55, 0.55, 0.55), fog)
 
-            # Side face first, so the front overlaps it cleanly.
-            far_top = project(self.cam, b.x, b.height, b.z + b.depth, self.width, self.height)
-            far_base = project(self.cam, b.x, 0.0, b.z + b.depth, self.width, self.height)
-            if far_top is not None and far_base is not None:
-                far_half = b.width * 0.5 * far_top.scale
-                side_colour = fogged(
-                    self.cam, shade(pal.structure, b.tint * 0.62), near_top.depth, pal.fog
-                )
-                if near_top.x > self.width * 0.5:
-                    fx, nx = far_top.x - far_half + ox, left
-                else:
-                    fx, nx = far_top.x + far_half + ox, right
-                pygame.draw.polygon(
-                    surface,
-                    side_colour,
-                    [
-                        (nx, near_top.y),
-                        (fx, far_top.y),
-                        (fx, far_base.y),
-                        (nx, near_base.y),
-                    ],
-                )
+        self._draw_runner()
+        for e in self.entities:
+            if e["kind"] == "coin" and not e["taken"] and e["d"] < 30:
+                glow_billboard(self.camera, self._lane_x(e["lane"]),
+                               RAIL_TOP + e["y"], -e["d"], 0.6, (255, 200, 60), 55)
+        self.burst.draw(self.camera)
+        rl.EndMode3D()
 
-            rect = pygame.Rect(
-                int(left),
-                int(near_top.y),
-                max(1, int(right - left)),
-                max(1, int(near_base.y - near_top.y)),
-            )
-            if rect.width < 2 or rect.height < 2:
-                continue
-            art = self._facade_for(b.style, near_top.depth)
-            surface.blit(pygame.transform.scale(art, (rect.width, rect.height)), rect.topleft)
+        # horizon haze: 2D fog band that sells atmospheric depth for free
+        haze = rl.rgba(pal.fog, 150)
+        cy = int(self.height * 0.52)
+        for i in range(6):
+            a = int(150 * (1 - i / 6) ** 2)
+            rl.DrawRectangle(0, cy - i * 6, self.width, 6, rl.rgba(pal.fog, a))
 
-    def _draw_track(self, surface: pygame.Surface, ox: int) -> None:
-        """Ground bands, rails and sleepers.
+        self.weather.draw(self.elapsed)
+        self._draw_hud()
 
-        Constant Z spacing plus perspective division is the whole motion
-        illusion -- the bands bunch up toward the horizon on their own. Rails and
-        sleepers give the eye something with real structure to track against.
-        """
-        pal = self.palette
-        cam = self.cam
-        start = math.floor(self.player.z / TIE_SPACING) * TIE_SPACING - TIE_SPACING * 4
+    def _draw_train(self, e: dict, fog) -> None:
+        x = self._lane_x(e["lane"])
+        self.train_cab.recolor({"body": e["color"]})
+        self.train_car.recolor({"body": e["color"]})
+        yaw = 0.0 if e["vel"] else 180.0     # oncoming trains face the runner
+        d = e["d"]
+        rl.DrawModelEx(self.train_cab.model, (x, 0, -d), (0, 1, 0), 90.0 + yaw,
+                       (1, 1, 1), fog)
+        for i in range(1, e["cars"]):
+            rl.DrawModelEx(self.train_car.model, (x, 0, -(d + i * 5.1)), (0, 1, 0),
+                           90.0 + yaw, (1, 1, 1), self._fog(d + i * 5.1))
 
-        bands: list[tuple[float, float, float, float]] = []
-        z = start
-        while z < cam.z + cam.far:
-            left = project(cam, -TRACK_HALF, 0.0, z, self.width, self.height)
-            right = project(cam, TRACK_HALF, 0.0, z, self.width, self.height)
-            if left is not None and right is not None:
-                bands.append((z, left.x + ox, right.x + ox, left.y))
-            z += TIE_SPACING
+    def _draw_runner(self) -> None:
+        ch = self.character
+        ch.recolor(self.outfit)
+        y = self._jump_y()
 
-        for i in range(len(bands) - 1, 0, -1):
-            z_far, lf, rf, yf = bands[i]
-            _z_near, ln, rn, yn = bands[i - 1]
-            index = int(math.floor(z_far / TIE_SPACING))
-            base = pal.ground if index % 2 == 0 else pal.ground_alt
-            color = fogged(cam, base, z_far - cam.z, pal.fog)
-            pygame.draw.polygon(surface, color, [(lf, yf), (rf, yf), (rn, yn), (ln, yn)])
-
-        # Sleepers: short crossbars between the rails, one per band.
-        sleeper = shade(pal.ground, 0.62)
-        for i in range(len(bands) - 1, 0, -1):
-            z_far, _lf, _rf, _yf = bands[i]
-            if z_far - cam.z > cam.far * 0.55:
-                continue
-            a = project(cam, -TRACK_HALF * 0.62, 0.02, z_far, self.width, self.height)
-            b = project(cam, TRACK_HALF * 0.62, 0.02, z_far, self.width, self.height)
-            c = project(cam, TRACK_HALF * 0.62, 0.02, z_far + 0.8, self.width, self.height)
-            d = project(cam, -TRACK_HALF * 0.62, 0.02, z_far + 0.8, self.width, self.height)
-            if None in (a, b, c, d):
-                continue
-            pygame.draw.polygon(
-                surface,
-                fogged(cam, sleeper, z_far - cam.z, pal.fog),
-                [(a.x + ox, a.y), (b.x + ox, b.y), (c.x + ox, c.y), (d.x + ox, d.y)],
-            )
-
-        # Rails: two bright metal lines, the strongest depth cue on the track.
-        rail_colour = lerp_rgb(pal.ground_alt, (255, 255, 255), 0.55)
-        for rail_x in (-TRACK_HALF * 0.62, TRACK_HALF * 0.62):
-            points = []
-            for z, _l, _r, _y in bands:
-                p = project(cam, rail_x, 0.06, z, self.width, self.height)
-                if p is not None:
-                    points.append((p.x + ox, p.y))
-            if len(points) > 1:
-                pygame.draw.lines(surface, rail_colour, False, points, 2)
-
-        # Lane dividers, thinner and dimmer than the rails.
-        for divider in (-TRACK_HALF / 3, TRACK_HALF / 3):
-            points = []
-            for z, _l, _r, _y in bands:
-                p = project(cam, divider, 0.01, z, self.width, self.height)
-                if p is not None:
-                    points.append((p.x + ox, p.y))
-            if len(points) > 1:
-                pygame.draw.lines(surface, shade(pal.ground_alt, 1.2), False, points, 1)
-
-        # Raised curbs at the track boundary. Without them the asphalt and the
-        # ground plane are two similar greys meeting at an invisible seam, and
-        # the track stops reading as a track.
-        curb_top = lerp_rgb(pal.ground_alt, (255, 255, 255), 0.35)
-        curb_side = shade(pal.ground, 0.55)
-        for edge in (-TRACK_HALF, TRACK_HALF):
-            top_pts, side_pts = [], []
-            for z, _l, _r, _y in bands:
-                high = project(cam, edge, 0.34, z, self.width, self.height)
-                low = project(cam, edge, 0.0, z, self.width, self.height)
-                if high is None or low is None:
-                    continue
-                top_pts.append((high.x + ox, high.y))
-                side_pts.append((low.x + ox, low.y))
-            if len(top_pts) > 1:
-                # Fill between the curb's top and base as one long quad strip.
-                pygame.draw.polygon(surface, curb_side, top_pts + side_pts[::-1])
-                pygame.draw.lines(surface, curb_top, False, top_pts, 2)
-
-    def _draw_obstacle(self, surface: pygame.Surface, obs: Obstacle, ox: int) -> None:
-        """Obstacles are real textured boxes now, not flat-shaded polygons."""
-        projector = self._projector(ox)
-        x = LANE_X[obs.lane]
-
-        if obs.kind == "train":
-            self._draw_train(surface, obs, x, ox)
-            return
-
-        if obs.kind == "overhead":
-            # Hangs from above with a gap underneath to slide through.
-            model.draw_box(
-                surface,
-                projector,
-                model.Box(
-                    x=x, y=1.35 + (obs.height - 1.35) * 0.5, z=obs.z + obs.length * 0.5,
-                    w=1.9, h=obs.height - 1.35, d=obs.length,
-                    default="hazard",
-                ),
-                self.atlas,
-            )
-            return
-
-        texture = "hazard" if obs.kind == "barrier" else "cone"
-        model.draw_box(
-            surface,
-            projector,
-            model.Box(
-                x=x, y=obs.height * 0.5, z=obs.z + obs.length * 0.5,
-                w=1.9, h=obs.height, d=obs.length,
-                default=texture,
-            ),
-            self.atlas,
-        )
-
-    def _draw_train(self, surface: pygame.Surface, obs: Obstacle, x: float, ox: int) -> None:
-        """A carriage, drawn as a row of short segments.
-
-        One long box would break the affine texture approximation badly -- a
-        carriage running from just ahead of the camera to the horizon is the
-        worst case for treating a trapezoid as a parallelogram. Splitting it
-        into ~2-unit segments keeps every face small enough that the error is
-        sub-pixel, and it repeats the window texture along the flank the way a
-        real carriage does.
-        """
-        projector = self._projector(ox)
-        body = f"carriage{obs.style % 3}"
-        segment = 2.2
-        z = obs.z
-        first = True
-        while z < obs.z_end - 0.05:
-            length = min(segment, obs.z_end - z)
-            model.draw_box(
-                surface,
-                projector,
-                model.Box(
-                    x=x, y=obs.height * 0.5, z=z + length * 0.5,
-                    w=1.95, h=obs.height, d=length,
-                    default=f"{body}_side",
-                    textures={
-                        "top": f"{body}_roof",
-                        "bottom": f"{body}_roof",
-                        # Only the leading segment gets the cab face.
-                        "north": f"{body}_front" if first else f"{body}_side",
-                    },
-                ),
-                self.atlas,
-            )
-            z += length
-            first = False
-
-        # Headlamp glow on the near end.
-        lamp = project(self.cam, x, obs.height * 0.30, obs.z, self.width, self.height)
-        if lamp is not None and lamp.scale > 6:
-            radius = max(2, int(0.3 * lamp.scale))
-            glow = pygame.transform.smoothscale(self.coin_glow, (radius * 6, radius * 6))
-            surface.blit(
-                glow,
-                glow.get_rect(center=(int(lamp.x + ox), int(lamp.y))),
-                special_flags=pygame.BLEND_RGB_ADD,
-            )
-
-    def _draw_coin(self, surface: pygame.Surface, coin: Coin, ox: int) -> None:
-        p = project(self.cam, LANE_X[coin.lane], coin.y, coin.z, self.width, self.height)
-        if p is None:
-            return
-        radius = max(1, int(0.34 * p.scale))
-        if radius < 2:
-            return
-
-        # Spin: squash horizontally on a sine so it reads as a rotating disc.
-        squash = abs(math.sin(self.elapsed * 4.0 + coin.z * 0.5))
-        width = max(2, int(radius * 2 * (0.28 + squash * 0.72)))
-        height = radius * 2
-
-        if radius > 3:
-            # A tight halo. At 2.6x the glow swamped the coin itself and the
-            # pickups read as glowing blobs rather than as coins.
-            glow = pygame.transform.smoothscale(self.coin_glow, (int(width * 1.7), int(height * 1.7)))
-            surface.blit(
-                glow,
-                glow.get_rect(center=(int(p.x + ox), int(p.y))),
-                special_flags=pygame.BLEND_RGB_ADD,
-            )
-
-        sprite = pygame.transform.smoothscale(self.coin_sprite, (width, height))
-        surface.blit(sprite, sprite.get_rect(center=(int(p.x + ox), int(p.y))))
-
-    def _draw_effect(self, surface: pygame.Surface, e: Effect, ox: int) -> None:
-        p = project(self.cam, e.x, e.y, e.z, self.width, self.height)
-        if p is None:
-            return
-        fade = max(0.0, e.life / e.max_life)
-        radius = max(1, int(e.size * p.scale * (0.6 + fade)))
-        if radius < 1:
-            return
-
-        if e.kind == "spark":
-            size = radius * 5
-            glow = pygame.transform.smoothscale(self.spark_glow, (size, size))
-            glow.set_alpha(int(255 * fade))
-            surface.blit(
-                glow, glow.get_rect(center=(int(p.x + ox), int(p.y))), special_flags=pygame.BLEND_RGB_ADD
-            )
-            return
-
-        colour = lerp_rgb(self.palette.fog, e.color, fade)
-        pygame.draw.circle(surface, colour, (int(p.x + ox), int(p.y)), radius)
-
-    def _draw_speed_lines(self, surface: pygame.Surface) -> None:
-        """Radial streaks from the vanishing point at high speed.
-
-        Purely a velocity cue -- the track already moves correctly, but streaks
-        are what make it *feel* fast.
-        """
-        ratio = (self.speed - 26.0) / max(1.0, self.max_speed - 26.0)
-        if ratio <= 0.05:
-            return
-        cx, cy = self.width * 0.5, self.height * self.cam.horizon
-
-        # Streaks live only in the outer margin. Drawn across the whole frame
-        # they stop reading as motion and start reading as scratches on the
-        # lens, which is worse than having no speed cue at all.
-        streaks = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        colour = lerp_rgb(self.palette.fog, (255, 255, 255), 0.75)
-        count = int(9 * ratio)
-        for i in range(count):
-            angle = (i / max(1, count)) * math.tau + self.elapsed * 0.9
-            inner = self.width * (0.72 + 0.10 * math.sin(angle * 3.0 + self.elapsed * 2))
-            outer = inner + self.width * 0.16 * ratio
-            sin_a, cos_a = math.sin(angle), math.cos(angle)
-            pygame.draw.line(
-                streaks,
-                (*colour, int(90 * ratio)),
-                (cx + cos_a * inner, cy + sin_a * inner),
-                (cx + cos_a * outer, cy + sin_a * outer),
-                2,
-            )
-        surface.blit(streaks, (0, 0))
-
-    # -- character --------------------------------------------------------
-
-    def _draw_player(self, surface: pygame.Surface, ox: int) -> None:
-        """The runner, as a rigged box figure.
-
-        Same model and rig as the voxel scene, with an exaggerated head -- the
-        oversized-head proportion is the defining silhouette cue of the mobile
-        endless-runner look, and it also keeps the face readable at the size
-        this strip renders it.
-        """
-        player = self.player
-        projector = self._projector(ox)
-
-        # Contact shadow first, so the figure sits on the track.
-        ground = project(self.cam, player.x, 0.0, player.z, self.width, self.height)
-        if ground is not None and ground.scale > 3:
-            lift = 1.0 - min(1.0, player.y / (JUMP_PEAK + 0.6))
-            shadow_w = max(3, int(0.9 * ground.scale * (0.4 + 0.6 * lift)))
-            shadow = pygame.Surface((shadow_w * 2, max(3, shadow_w)), pygame.SRCALPHA)
-            pygame.draw.ellipse(shadow, (0, 0, 0, int(115 * lift)), shadow.get_rect())
-            surface.blit(shadow, shadow.get_rect(center=(int(ground.x + ox), int(ground.y))))
-
-        if player.crashed:
-            lean, amplitude, tuck, arms = 1.15, 0.2, 0.9, -1.3
-        elif player.sliding:
-            lean, amplitude, tuck, arms = 1.35, 0.15, 1.25, 1.2
-        elif player.airborne:
-            lean, amplitude, tuck, arms = 0.25, 0.3, -0.55, -1.0
+        if self.jump_t >= 0:
+            ch.pose("jump", self.jump_t / JUMP_TIME)
+        elif self.roll_t >= 0:
+            ch.pose("roll", self.roll_t / ROLL_TIME)
         else:
-            lean, amplitude, tuck, arms = 0.22, 0.95, 0.0, None
+            ch.pose("run", self.run_phase % 1.0)
 
-        boxes = self.figure.parts(
-            player.x,
-            player.y,
-            player.z,
-            swing=player.run_cycle,
-            lean=lean,
-            amplitude=amplitude,
-            tuck=tuck,
-            arms_up=arms,
-            head_scale=1.25,
+        lean = (self._lane_x(self.lane) - self.x) * -14.0
+        transform = rl.MatrixMultiply(
+            rl.MatrixRotateY(math.radians(90)),
+            rl.MatrixRotateZ(math.radians(lean)),
         )
-        for box in boxes:
-            model.draw_box(surface, projector, box, self.atlas)
+        ch.model.transform = transform
+        blob_shadow(self.x, RAIL_TOP + 0.04, 0.0, 0.62, alpha=int(110 * (1.0 - y / 3.0)))
+        rl.DrawModelEx(ch.model, (self.x, RAIL_TOP + y, 0), (0, 1, 0), 0.0,
+                       (0.86, 0.86, 0.86), rl.WHITE4)
 
-        # Backpack, behind the torso -- the other signature silhouette cue.
-        pack_z = player.z + 0.22
-        model.draw_box(
-            surface,
-            projector,
-            model.Box(
-                x=player.x,
-                y=player.y + model.HIP_Y + 7 * model.PX,
-                z=pack_z,
-                w=7 * model.PX,
-                h=9 * model.PX,
-                d=4 * model.PX,
-                default="pack",
-            ),
-            self.atlas,
-        )
-
-    def _draw_hud(self, surface: pygame.Surface) -> None:
+    def _draw_hud(self) -> None:
         pal = self.palette
-        text(surface, f"{int(self.score):,}", self.width - 10, 8, size=22, color=pal.ink, anchor="topright")
-        text(surface, f"{self.player.coins} coins", self.width - 10, 34, size=13, color=pal.ink, anchor="topright")
-        text(surface, f"{pal.time_of_day} · {pal.weather}", 10, 8, size=12, color=pal.ink)
+        text(f"{int(self.score):06d}", self.width - 14, 12, 26, pal.ink, anchor="topright")
+        # coin counter with a little gold disc
+        rl.DrawCircle(self.width - 66, 58, 7, (255, 205, 60, 255))
+        rl.DrawCircle(self.width - 66, 58, 4, (255, 235, 140, 255))
+        text(f"{self.coins}", self.width - 14, 48, 20, (255, 215, 90), anchor="topright")

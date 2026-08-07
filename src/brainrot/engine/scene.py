@@ -1,17 +1,19 @@
 """Scene interface and registry.
 
 A scene is a self-contained generated world with a fixed lifetime contract:
-built from a seed, updated with a delta time, drawn to a surface. Scenes never
-touch windowing, hooks or config -- which is what makes them cheap to write and
-possible to test offscreen.
+built from a seed, updated with a delta time, drawn through raylib. Scenes
+never touch windowing, hooks or config -- which is what makes them cheap to
+write and possible to render headlessly.
+
+The draw contract: ``draw()`` is called between ``BeginDrawing`` and
+``EndDrawing`` and must fully cover the frame (sky first, then world). The
+loop adds nothing but the caption.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-
-import pygame
 
 from ..palette import Palette
 from ..rng import Seed
@@ -48,8 +50,8 @@ class Scene(ABC):
         """Advance simulation by ``dt`` seconds."""
 
     @abstractmethod
-    def draw(self, surface: pygame.Surface) -> None:
-        """Render the current state. Must fully cover the surface."""
+    def draw(self) -> None:
+        """Render the current state. Must fully cover the frame."""
 
     def teardown(self) -> None:
         """Release anything expensive. Optional."""
@@ -70,21 +72,14 @@ def register(name: str):
 
 
 def available() -> list[str]:
-    """Every registered scene name.
-
-    The import matters: the registry is populated by the ``@register``
-    decorators as a side effect of importing the scenes package, so calling
-    this before anything else has imported it would report an empty roster
-    rather than the real one.
-    """
+    """Every registered scene name. Importing the scenes package populates the
+    registry as a side effect, so do that before reporting."""
     from .. import scenes  # noqa: F401
 
     return sorted(_REGISTRY)
 
 
 def build(name: str, ctx: SceneContext) -> Scene:
-    """Instantiate a registered scene by name."""
-    # Import for side effects; the registry is populated by decorators.
     from .. import scenes  # noqa: F401
 
     try:
@@ -95,10 +90,7 @@ def build(name: str, ctx: SceneContext) -> Scene:
 
 
 def choose(names: list[str], seed: Seed) -> str:
-    """Pick which scene plays for a run.
-
-    Seeded rather than random so a run number always replays the same scene.
-    """
+    """Seeded rather than random so a run number always replays its scene."""
     from .. import scenes  # noqa: F401
 
     eligible = [n for n in names if n in _REGISTRY] or available()

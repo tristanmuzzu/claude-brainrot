@@ -73,8 +73,8 @@ def run_pose(pose, t01):
     pose.bones["arm.R"].rotation_quaternion = euler_q(
         x=swing * 0.85 * math.sin(t), z=math.radians(8))
     pose.bones["spine"].rotation_quaternion = euler_q(
-        x=math.radians(12), z=math.radians(4) * math.sin(t))
-    pose.bones["head"].rotation_quaternion = euler_q(x=math.radians(-8))
+        x=math.radians(8), z=math.radians(4) * math.sin(t))
+    pose.bones["head"].rotation_quaternion = euler_q(x=math.radians(-5))
     # Bounce twice per cycle -- once per footfall.
     pose.bones["root"].location = (0, 0, 0.07 * abs(math.sin(t)))
 
@@ -91,15 +91,16 @@ def jump_pose(pose, t01):
 
 
 def roll_pose(pose, t01):
-    # A slide-roll: drop low, fold forward, knees up, arms trailing back.
+    # A crouch-slide: sink low over the front foot, chest folded, arms back.
+    # The root drop and the knee fold must agree or the feet leave the ground.
     c = math.sin(t01 * math.pi)
-    pose.bones["root"].location = (0, 0, -0.42 * c)
-    pose.bones["spine"].rotation_quaternion = euler_q(x=math.radians(52) * c)
-    pose.bones["head"].rotation_quaternion = euler_q(x=math.radians(-34) * c)
-    pose.bones["leg.L"].rotation_quaternion = euler_q(x=math.radians(88) * c)
-    pose.bones["leg.R"].rotation_quaternion = euler_q(x=math.radians(30) * c)
-    pose.bones["arm.L"].rotation_quaternion = euler_q(x=math.radians(60) * c, z=math.radians(-10) * c)
-    pose.bones["arm.R"].rotation_quaternion = euler_q(x=math.radians(60) * c, z=math.radians(10) * c)
+    pose.bones["root"].location = (0.10 * c, 0, -0.34 * c)
+    pose.bones["spine"].rotation_quaternion = euler_q(x=math.radians(38) * c)
+    pose.bones["head"].rotation_quaternion = euler_q(x=math.radians(-26) * c)
+    pose.bones["leg.L"].rotation_quaternion = euler_q(x=math.radians(62) * c)
+    pose.bones["leg.R"].rotation_quaternion = euler_q(x=math.radians(-18) * c)
+    pose.bones["arm.L"].rotation_quaternion = euler_q(x=math.radians(-46) * c, z=math.radians(-8) * c)
+    pose.bones["arm.R"].rotation_quaternion = euler_q(x=math.radians(-46) * c, z=math.radians(8) * c)
 
 
 record_action(rig, "run", 20, run_pose)

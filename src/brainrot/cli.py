@@ -41,7 +41,7 @@ def _config_from(args: argparse.Namespace) -> Config:
 
 def cmd_run(args: argparse.Namespace) -> int:
     from .engine.loop import Overlay
-    from .overlay import select_backend
+    from .engine.window import select_backend
 
     cfg = _config_from(args)
     backend = select_backend(args.backend or "")
@@ -60,7 +60,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 def cmd_demo(args: argparse.Namespace) -> int:
     """Watch a scene without any hooks -- the development loop."""
     from .engine.loop import Overlay
-    from .overlay import select_backend
+    from .engine.window import select_backend
 
     cfg = _config_from(args)
     # Force it on screen immediately and keep it there.
@@ -81,17 +81,18 @@ def cmd_shoot(args: argparse.Namespace) -> int:
     """Render frames to PNG offscreen.
 
     Generated content is far easier to tune when you can inspect an exact frame
-    of an exact run without waiting for it to occur naturally.
+    of an exact run without waiting for it to occur naturally. Uses the same
+    software rasteriser as CI, colour-corrected to match the GPU output.
     """
-    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-    import pygame
+    os.environ["BRAINROT_HEADLESS"] = "1"
 
-    from .engine import scene as scene_api
+    from .engine import rl, scene as scene_api
+    from .engine.window import HeadlessWindow
     from .palette import generate as generate_palette
 
     cfg = _config_from(args)
-    pygame.init()
-    pygame.display.set_mode((cfg.width, cfg.height))
+    window = HeadlessWindow()
+    window.create(cfg)
 
     run = args.seed or RunCounter().value + 1
     seed = Seed.for_run(run)
@@ -100,23 +101,29 @@ def cmd_shoot(args: argparse.Namespace) -> int:
     ctx = scene_api.SceneContext(cfg.width, cfg.height, palette, seed, cfg.quality)
     scene = scene_api.build(name, ctx)
 
-    surface = pygame.Surface((cfg.width, cfg.height))
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
 
     dt = 1.0 / cfg.fps
     saved = []
+    # One warmup frame: the first swap after window creation presents an
+    # empty back buffer, which would make frame 0 capture black.
+    window.begin()
+    scene.draw()
+    window.end()
     for frame in range(args.frames):
         scene.update(dt)
         scene.elapsed += dt
-        scene.draw(surface)
+        window.begin()
+        scene.draw()
+        window.end()
         if frame % max(1, args.every) == 0:
             path = out / f"{name}-run{run}-{frame:04d}.png"
-            pygame.image.save(surface, str(path))
+            rl.save_frame(str(path))
             saved.append(path)
 
     print(f"run {run}: {name} ({palette.time_of_day}/{palette.weather}) -> {len(saved)} frames in {out}")
-    pygame.quit()
+    window.destroy()
     return 0
 
 

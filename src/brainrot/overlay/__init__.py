@@ -1,5 +1,7 @@
-"""Window backends for the overlay strip."""
+"""Platform-specific window treatment for the overlay strip.
 
-from .base import Placement, WindowBackend, compute_placement, select_backend
-
-__all__ = ["Placement", "WindowBackend", "compute_placement", "select_backend"]
+The engine's :mod:`brainrot.engine.window` owns the window itself; this
+package holds the Win32 surgery that raylib has no API for -- alt-tab
+suppression, activation-proofing, and attaching the overlay just above the
+Claude Code host window instead of floating above everything.
+"""

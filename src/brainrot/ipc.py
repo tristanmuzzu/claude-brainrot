@@ -31,6 +31,9 @@ class Event:
     kind: str
     session: str = ""
     tool: str = ""
+    #: Native handle of the window hosting the Claude Code session, when the
+    #: shim could discover one (Windows only). 0 means unknown.
+    hwnd: int = 0
 
     @classmethod
     def parse(cls, payload: bytes) -> "Event | None":
@@ -43,10 +46,15 @@ class Event:
         kind = str(data.get("kind") or data.get("hook_event_name") or "").strip()
         if not kind:
             return None
+        try:
+            hwnd = int(data.get("hwnd") or 0)
+        except (TypeError, ValueError):
+            hwnd = 0
         return cls(
             kind=kind,
             session=str(data.get("session") or data.get("session_id") or ""),
             tool=str(data.get("tool") or data.get("tool_name") or ""),
+            hwnd=hwnd,
         )
 
 
@@ -103,9 +111,12 @@ class EventListener:
             self._sock = None
 
 
-def send(host: str, port: int, kind: str, session: str = "", tool: str = "") -> None:
+def send(host: str, port: int, kind: str, session: str = "", tool: str = "",
+         hwnd: int = 0) -> None:
     """Fire a single event. Never raises -- used by the CLI and tests."""
-    payload = json.dumps({"kind": kind, "session": session, "tool": tool}).encode("utf-8")
+    payload = json.dumps(
+        {"kind": kind, "session": session, "tool": tool, "hwnd": hwnd}
+    ).encode("utf-8")
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.sendto(payload, (host, port))

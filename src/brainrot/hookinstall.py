@@ -49,15 +49,30 @@ Sends one UDP datagram and exits. Never blocks, never raises.
 """
 try:
     import json
+    import os
     import socket
     import sys
 
     payload = json.load(sys.stdin)
+
+    # The window you are typing into when a hook fires IS the Claude Code
+    # host window; its handle lets the daemon layer the overlay just above
+    # that window instead of above everything.
+    hwnd = 0
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            hwnd = int(ctypes.windll.user32.GetForegroundWindow())
+        except Exception:
+            hwnd = 0
+
     message = json.dumps(
         {{
             "kind": payload.get("hook_event_name", ""),
             "session": payload.get("session_id", ""),
             "tool": payload.get("tool_name", ""),
+            "hwnd": hwnd,
         }}
     ).encode("utf-8")
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

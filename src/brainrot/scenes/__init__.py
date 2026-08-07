@@ -1,9 +1,10 @@
 """Generated scenes.
 
-Importing this package registers every scene. Each one is fully procedural --
-there is no bundled media anywhere in this project, by design.
+Importing this package registers every scene. Worlds are generated per seed;
+the models they are dressed with are built from the Blender scripts in
+``assets/src`` -- nothing is downloaded, nothing is sourced footage.
 """
 
-from . import marbles, runner, tower  # noqa: F401
+from . import parkour, runner  # noqa: F401
 
-__all__ = ["marbles", "runner", "tower"]
+__all__ = ["parkour", "runner"]

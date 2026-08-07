@@ -33,7 +33,11 @@ class Config:
     #: Which monitor to dock to (0 = primary).
     monitor: int = 0
     opacity: float = 0.88
-    fps: int = 30
+    fps: int = 60
+    #: Z-order mode (Windows): "host" layers the overlay one level above the
+    #: window running Claude Code (discovered by the hook shim), so any other
+    #: window you focus covers it. "topmost" floats above everything, always.
+    attach: str = "host"
 
     # --- Behaviour -------------------------------------------------------
     #: Ignore thinking bursts shorter than this, so quick turns do not strobe.
@@ -46,7 +50,7 @@ class Config:
 
     # --- Content ---------------------------------------------------------
     #: Scenes eligible to play. Order is irrelevant; selection is seeded.
-    scenes: list[str] = field(default_factory=lambda: ["runner", "tower", "marbles"])
+    scenes: list[str] = field(default_factory=lambda: ["runner", "parkour"])
     #: Force one scene (debugging). Empty means "pick per run".
     force_scene: str = ""
     #: Replay a specific run number instead of advancing the counter.
@@ -117,3 +121,5 @@ class Config:
             self.scenes = ["runner"]
         if self.quality not in ("high", "balanced", "low"):
             self.quality = "high"
+        if self.attach not in ("host", "topmost"):
+            self.attach = "host"

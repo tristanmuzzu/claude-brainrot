@@ -15,15 +15,13 @@ from __future__ import annotations
 
 import time
 
-import pygame
-
 from ..config import Config
-from ..engine import scene as scene_api
-from ..engine.draw import reset_caches, text
 from ..ipc import Event, EventListener
 from ..palette import generate as generate_palette
 from ..rng import RunCounter, Seed
 from ..state import ThinkingState, Visibility
+from . import rl, scene as scene_api
+from .hud import chip
 
 #: How long to sleep per iteration while hidden. Long enough to be free, short
 #: enough that the overlay still appears promptly once the grace period passes.
@@ -31,9 +29,9 @@ IDLE_SLEEP = 0.08
 
 
 class Overlay:
-    def __init__(self, cfg: Config, backend, verbose: bool = False) -> None:
+    def __init__(self, cfg: Config, window, verbose: bool = False) -> None:
         self.cfg = cfg
-        self.backend = backend
+        self.window = window
         self.verbose = verbose
 
         self.state = ThinkingState(
@@ -44,7 +42,6 @@ class Overlay:
         self.counter = RunCounter()
         self.listener = EventListener(cfg.host, cfg.port, self._on_event)
 
-        self.surface: pygame.Surface | None = None
         self.scene: scene_api.Scene | None = None
         self.alpha = 0.0
         self.running = False
@@ -59,6 +56,10 @@ class Overlay:
         if self.verbose:
             print(f"[brainrot] {event.kind} session={event.session[:8]} tool={event.tool}")
         self.state.handle(event.kind, event.session, event.tool)
+        # A prompt submission tells us which window hosts Claude Code; layer
+        # the overlay one level above it (no-op off Windows / when attached).
+        if event.kind == "UserPromptSubmit" and event.hwnd:
+            self.window.attach_host(event.hwnd)
 
     # -- scene lifecycle --------------------------------------------------
 
@@ -97,9 +98,7 @@ class Overlay:
     # -- main loop --------------------------------------------------------
 
     def run(self) -> None:
-        pygame.init()
-        reset_caches()
-        self.surface = self.backend.create(self.cfg)
+        self.window.create(self.cfg)
         self.listener.start()
         self.running = True
 
@@ -112,7 +111,9 @@ class Overlay:
                 dt = min(now - last, 0.1)  # clamp so a stall never teleports the world
                 last = now
 
-                self._pump_events()
+                if self.window.should_close() or rl.IsKeyPressed(rl.KEY_ESCAPE):
+                    self.running = False
+
                 visibility = self.state.tick()
                 wants_visible = visibility in (Visibility.VISIBLE, Visibility.LINGERING)
 
@@ -131,7 +132,10 @@ class Overlay:
                     try:
                         self.scene.update(dt)
                         self.scene.elapsed += dt
-                        self._render()
+                        self.window.begin()
+                        self.scene.draw()
+                        self._draw_caption()
+                        self.window.end()
                     except Exception as exc:
                         # A bug in one generated world should cost that world,
                         # not the daemon. Drop it; the next show builds a fresh
@@ -145,8 +149,7 @@ class Overlay:
                         self._end_scene()
                         continue
 
-                self.backend.set_opacity(self.alpha * self.cfg.opacity)
-                self.backend.present()
+                self.window.set_opacity(self.alpha * self.cfg.opacity)
 
                 # Sleep the remainder of the frame rather than spinning.
                 spare = frame_budget - (time.monotonic() - now)
@@ -155,15 +158,9 @@ class Overlay:
         finally:
             self.shutdown()
 
-    def _pump_events(self) -> None:
-        # Draining the event queue is not optional even for a click-through
-        # window: an SDL window that never pumps is flagged unresponsive by the
-        # OS and can be dimmed or killed.
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                self.running = False
+    def _draw_caption(self) -> None:
+        if self.cfg.show_caption and self.state.caption:
+            chip(self.state.caption, 14, self.cfg.height - 30)
 
     def _advance_fade(self, dt: float, wants_visible: bool) -> None:
         target = 1.0 if wants_visible else 0.0
@@ -179,38 +176,31 @@ class Overlay:
     def _go_idle(self) -> None:
         """Drop to zero cost: hide the window and discard the world."""
         if self._window_shown:
-            self.backend.set_visible(False)
+            self.window.set_visible(False)
             self._window_shown = False
         self._end_scene()
+        # Even hidden, the window's event queue must be drained or the OS
+        # flags the process unresponsive.
+        self.window.pump()
 
     def _show_window(self) -> None:
         if not self._window_shown:
-            self.backend.set_visible(True)
+            self.window.set_visible(True)
             self._window_shown = True
-
-    def _render(self) -> None:
-        assert self.surface is not None and self.scene is not None
-        self.scene.draw(self.surface)
-        if self.cfg.show_caption and self.state.caption:
-            text(
-                self.surface,
-                self.state.caption,
-                self.cfg.width // 2,
-                self.cfg.height - 14,
-                size=13,
-                color=self.scene.palette.ink,
-                anchor="midbottom",
-            )
 
     def shutdown(self) -> None:
         self.running = False
         self._end_scene()
         self.listener.stop()
         try:
-            self.backend.destroy()
+            from .. import assets
+            from . import textures
+
+            assets.unload_all()
+            textures.clear()
         except Exception:
             pass
-        # Caches hold Fonts and Surfaces bound to the SDL instance we are about
-        # to tear down; leaving them would poison a subsequent daemon.
-        reset_caches()
-        pygame.quit()
+        try:
+            self.window.destroy()
+        except Exception:
+            pass
