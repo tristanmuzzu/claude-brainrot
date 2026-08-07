@@ -4,21 +4,25 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-brainrot"
-version = "0.1.0"
-description = "Procedurally generated brainrot overlay for Claude Code's thinking time"
+version = "0.2.0"
+description = "Generated 3D brainrot overlay for Claude Code's thinking time"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
-    "pygame-ce>=2.5",
-    # Used to bake textures, clouds and sphere sprites at scene construction.
-    # Never on the per-frame path.
-    "numpy>=1.24",
+    # GPU renderer and overlay window. ~2 MB wheel, no transitive deps.
+    "raylib>=6.0",
+    # Procedural texture generation at scene construction, and PNG output for
+    # `brainrot shoot`. Never on the per-frame path.
+    "pillow>=10.0",
 ]
 
 [project.optional-dependencies]
 windows = ["pywin32>=306"]
 dev = ["pytest>=8.0"]
+# Rebuilding the committed .glb assets from their Blender scripts. Heavy
+# (Blender as a pip module); only needed when editing files in assets/src/.
+assets = ["bpy>=4.2"]
 
 [project.scripts]
 brainrot = "brainrot.cli:main"
@@ -26,7 +30,10 @@ brainrot = "brainrot.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"brainrot.assets" = ["data/*.glb", "data/*.png"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# The offscreen video driver is set in tests/conftest.py, which runs before
-# pygame is imported.
+# Headless rendering needs the SDL dummy driver and the software rasteriser;
+# tests/conftest.py sets both up before raylib is imported.
