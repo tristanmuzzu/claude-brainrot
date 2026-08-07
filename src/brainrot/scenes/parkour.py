@@ -874,11 +874,18 @@ class ParkourScene(Scene):
         # Not too strong. Dawn and dusk fog is a saturated gold or pink, and at
         # the alpha this used to carry it stopped being aerial perspective and
         # became an orange wash laid over the middle of the frame.
-        band = textures.alpha_band(f"haze-{self.ctx.seed.run}", pal.fog, 155, 1.6,
-                                   ramp=0.22)
-        horizon = int(self.height * 0.30)
+        # The sea is one flat plane with no distance shading of its own, so
+        # without this it meets the sky along a drawn line rather than
+        # dissolving into one. The band therefore has to be near its strongest
+        # exactly where the sea ends -- a little above 0.42 of the frame -- and
+        # fade downward from there. It also fades *in* at its top edge, because
+        # a band that starts at full strength draws its own line across the sky
+        # a few rows above the one it was meant to hide.
+        band = textures.alpha_band(f"haze-{self.ctx.seed.run}", pal.fog, 235, 1.7,
+                                   ramp=0.09)
+        horizon = int(self.height * 0.355)
         rl.DrawTexturePro(band, (0, 0, 4, 128),
-                          (0, horizon, self.width, int(self.height * 0.46)),
+                          (0, horizon, self.width, int(self.height * 0.45)),
                           (0, 0), 0.0, rl.WHITE4)
         rl.BeginMode3D(cam[0])
 
@@ -978,6 +985,22 @@ class ParkourScene(Scene):
             rl.DrawModelEx(ground_quad(), (isl["x"], 0.06, isl["z"]), (0, 1, 0), 0.0,
                            (isl["reef"], 1.0, isl["reef"]), rl.rgba(reef, 235))
 
+    def _below_tint(self, dist: float, biome=None):
+        """Aerial perspective for the world far below.
+
+        Distance fog here is a *tint*, and a tint multiplies -- so fogging a
+        dark object toward a dark fog colour only ever makes it darker. By day
+        the fog is near white and that reads correctly; at night it turned the
+        islands into black slicks lying on the water, darker than the sea they
+        were supposed to be receding into. So the far end of the range is
+        carried by alpha as well, which fades them into whatever is behind
+        them instead of toward a colour.
+        """
+        f = max(0.0, min(1.0, dist * 0.62 / FOG_FAR + BELOW_FOG * 0.4))
+        f = f * f * (3 - 2 * f)
+        alpha = int(255 - (205 if self.palette.is_dark else 95) * f)
+        return self._fog(dist * 0.62, BELOW_FOG * 0.4, alpha=alpha, tint=biome)
+
     def _draw_islands(self, x: float, z: float) -> None:
         for isl in self.islands:
             biome = isl["biome"]
@@ -986,7 +1009,7 @@ class ParkourScene(Scene):
                 dist = math.dist((x, z), (bx, bz))
                 if dist > 300:
                     continue
-                tint = self._fog(dist * 0.62, BELOW_FOG * 0.4, tint=biome)
+                tint = self._below_tint(dist, biome)
                 s = c.get("s")
                 if s is not None:
                     voxel.draw_block(self._model(c["style"]), bx, c["y"], bz, tint, s)
@@ -999,8 +1022,7 @@ class ParkourScene(Scene):
                 dist = math.dist((x, z), (bx, bz))
                 if dist <= 300:
                     voxel.draw_box(self._model("water"), bx, fall["h"] / 2, bz,
-                                   self._fog(dist * 0.62, BELOW_FOG * 0.3),
-                                   1.4, fall["h"], 1.4)
+                                   self._below_tint(dist), 1.4, fall["h"], 1.4)
 
     def _draw_shelves(self, x: float, z: float) -> None:
         """Cloud shelves drifting between the course and the sea.

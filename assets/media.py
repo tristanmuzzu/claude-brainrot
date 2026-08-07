@@ -31,9 +31,10 @@ W, H = 360, 640
 #: (file stem, scene, run) for the stills. Runs chosen for their palettes.
 STILLS = [
     ("runner-day", "runner", 3),
-    ("runner-night", "runner", 8),
+    ("runner-night", "runner", 1),
     ("parkour-day", "parkour", 5),
-    ("parkour-dusk", "parkour", 9),
+    ("parkour-dusk", "parkour", 2),
+    ("parkour-night", "parkour", 15),
 ]
 #: (file stem, scene, run, seconds, fps) for the animations
 CLIPS = [
