@@ -72,6 +72,11 @@ class Config:
     hotkey: str = "ctrl+alt+shift+home"
     #: Seconds without input before a driven scene resumes driving itself.
     handback_seconds: float = 8.0
+    #: Modifiers to hold to drag the strip somewhere else with the mouse.
+    #: Modifiers only, and only these ones catch a click: the rest of the time
+    #: the mouse falls straight through. Empty disables dragging entirely.
+    #: Double-click while holding them to go back to automatic placement.
+    drag_chord: str = "ctrl+alt"
 
     # --- Content ---------------------------------------------------------
     #: Scenes eligible to play. Order is irrelevant; selection is seeded.
@@ -147,10 +152,14 @@ class Config:
         self.handback_seconds = max(1.0, float(self.handback_seconds))
         # A hotkey that will not parse would silently mean "no takeover ever",
         # so fall back to the default rather than leaving it unusable.
-        from .engine.keys import parse_chord
+        from .engine.keys import parse_chord, parse_modifiers
 
         if not parse_chord(self.hotkey):
             self.hotkey = Config.hotkey
+        # "" is a deliberate "no dragging"; anything else that will not parse
+        # is a typo, and silently disabling the gesture would be a mystery.
+        if self.drag_chord and not parse_modifiers(self.drag_chord):
+            self.drag_chord = Config.drag_chord
         if not self.scenes:
             self.scenes = ["runner"]
         if self.quality not in ("high", "balanced", "low"):

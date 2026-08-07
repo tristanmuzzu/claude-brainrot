@@ -61,10 +61,11 @@ class Overlay:
         self._focus_ok = True
         self._focus_left_at = 0.0
 
-        from .input import Controller, Takeover
+        from .input import Controller, Mover, Takeover
 
         self.controller = Controller(handback=cfg.handback_seconds)
         self.takeover = Takeover(window, cfg.hotkey)
+        self.mover = Mover(window, cfg.drag_chord)
 
     # -- events -----------------------------------------------------------
 
@@ -149,11 +150,18 @@ class Overlay:
                     time.sleep(IDLE_SLEEP)
                     continue
 
+                # The takeover owns the window's styles while it is active, so
+                # the drag gesture stands well clear of it.
+                if not self.takeover.active:
+                    self.mover.update()
                 # Before showing, not after: appearing in last turn's position
                 # and then jumping is worse than a frame's delay. Cheap enough
                 # to redo every frame, which is also how it keeps up with a
-                # window being dragged around under it.
-                self.window.follow_host()
+                # window being dragged around under it. Not while somebody is
+                # dragging it, though -- placing it and being dragged are two
+                # things pulling on the same window.
+                if not self.mover.dragging:
+                    self.window.follow_host()
                 self._show_window()
                 if self.scene is not None:
                     try:
@@ -229,7 +237,10 @@ class Overlay:
     def _draw_caption(self) -> None:
         if self.cfg.show_caption and self.state.caption:
             chip(self.state.caption, 14, self.cfg.height - 30)
-        note = self.controller.caption(time.monotonic())
+        # The drag hint wins the second line while it is up: it appears only
+        # because someone is holding the chord, which means they are looking
+        # for exactly this.
+        note = self.mover.caption() or self.controller.caption(time.monotonic())
         if note:
             chip(note, 14, self.cfg.height - 56)
 
@@ -252,6 +263,7 @@ class Overlay:
             # owns focus is a window that has stolen it.
             if self.takeover.active:
                 self.takeover.toggle()
+            self.mover.release()
             self.window.set_visible(False)
             # Let go of the host while we have nothing to show. On Windows the
             # overlay is an *owned* window, and Windows destroys owned windows

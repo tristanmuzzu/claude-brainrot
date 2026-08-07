@@ -106,6 +106,142 @@ class Controller:
 # ---------------------------------------------------------------------------
 
 
+class Mover:
+    """Hold the chord, drag the strip somewhere better.
+
+    Automatic placement knows where the Claude Code window is and nothing at
+    all about where that window keeps its toolbar, so it will sometimes put
+    the strip over something that matters. This is the correction, and the
+    same three constraints as the takeover apply:
+
+    * **No global mouse hook.** The pointer and the button are polled, and
+      only one specific modifier combination is watched. Nothing about what
+      you click anywhere else is read, or readable.
+    * **No focus, ever.** ``WS_EX_NOACTIVATE`` stays on throughout; the strip
+      catches the click without becoming the window you are typing into.
+    * **Clicks belong to the app behind.** Click-through is lifted only while
+      the chord is held *and* the pointer is over the strip, and goes back the
+      instant either stops being true.
+
+    Double-click with the chord held to forget a dragged position and go back
+    to placing itself -- the way out of a corner you dragged it into.
+
+    Every input is injected so the whole gesture can be driven by a test
+    rather than by a hand.
+    """
+
+    #: Two presses closer together than this are a double-click.
+    DOUBLE_CLICK = 0.4
+
+    def __init__(self, window, chord: str = "", clock=time.monotonic,
+                 held=None, cursor=None, button=None) -> None:
+        from .keys import parse_modifiers
+
+        self.window = window
+        self.chord = chord
+        self.codes = parse_modifiers(chord)
+        self.clock = clock
+        self.dragging = False
+        #: Chord held with the pointer over the strip: it will catch a click.
+        self.armed = False
+        self._held = held or self._keys_held
+        self._cursor = cursor or self._cursor_pos
+        self._button = button or self._button_down
+        self._grab = (0, 0)
+        self._was_down = False
+        self._last_press = -1e9
+
+    # -- the real input sources, replaced wholesale in tests --------------
+
+    def _keys_held(self) -> bool:
+        if os.name != "nt":
+            return False
+        try:
+            from ..overlay import win32
+
+            return win32.keys_held(self.codes)
+        except Exception:
+            return False
+
+    def _cursor_pos(self) -> tuple[int, int]:
+        try:
+            from ..overlay import win32
+
+            return win32.cursor_pos()
+        except Exception:
+            return (0, 0)
+
+    def _button_down(self) -> bool:
+        try:
+            from ..overlay import win32
+
+            return win32.primary_button_down()
+        except Exception:
+            return False
+
+    # -- the gesture ------------------------------------------------------
+
+    def update(self) -> None:
+        """One frame of it. Call while the strip is on screen."""
+        if not self.codes:
+            self.release()
+            return
+
+        rect = self.window.rect()
+        if rect is None:
+            self.release()
+            return
+
+        x, y = self._cursor()
+        over = rect.left <= x < rect.right and rect.top <= y < rect.bottom
+        # Staying armed mid-drag matters: the pointer routinely runs ahead of
+        # a window that is being dragged, and leaving the rectangle must not
+        # drop what you are holding.
+        armed = self._held() and (over or self.dragging)
+        if armed != self.armed:
+            self.armed = armed
+            self.window.set_click_through(not armed)
+
+        down = self._button()
+        pressed = down and not self._was_down
+        self._was_down = down
+
+        if pressed and armed:
+            now = self.clock()
+            if now - self._last_press <= self.DOUBLE_CLICK:
+                self.dragging = False
+                self.window.clear_placement()
+            else:
+                self.dragging = True
+                self._grab = (x - rect.left, y - rect.top)
+            self._last_press = now
+        elif self.dragging and not down:
+            self.dragging = False
+            self.window.remember_placement()
+
+        if self.dragging:
+            self.window.move_to(x - self._grab[0], y - self._grab[1])
+
+    def release(self) -> None:
+        """Drop everything: click-through back on, a drag in progress kept.
+
+        Called when the strip goes off screen as well as when the chord is
+        let go, because a hidden window that still eats clicks is a window
+        that eats clicks for no reason at all.
+        """
+        if self.dragging:
+            self.dragging = False
+            self.window.remember_placement()
+        if self.armed:
+            self.armed = False
+            self.window.set_click_through(True)
+
+    def caption(self) -> str:
+        if self.dragging:
+            return "moving -- double-click to reset"
+        return "drag to move" if self.armed else ""
+
+
 class Takeover:
     """Watches for the chord, and flips the overlay in and out of input mode.
 

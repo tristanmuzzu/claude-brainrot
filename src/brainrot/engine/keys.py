@@ -82,6 +82,26 @@ def parse_chord(spec: str) -> frozenset[int]:
     return frozenset(codes)
 
 
+def parse_modifiers(spec: str) -> frozenset[int]:
+    """``"ctrl+alt"`` -> VK codes, for chords that are *only* modifiers.
+
+    :func:`parse_chord` refuses those on purpose: a chord that fires on
+    modifiers alone would trigger constantly while someone typed. Holding one
+    as a mouse gesture is the opposite case -- nothing happens until a button
+    is pressed too -- so it needs its own door rather than a loosened rule.
+    """
+    if not isinstance(spec, str):
+        return frozenset()
+    codes: set[int] = set()
+    for part in (p.strip().lower().replace(" ", "") for p in spec.split("+")):
+        if not part:
+            continue
+        if part not in MODIFIERS:
+            return frozenset()
+        codes.add(MODIFIERS[part])
+    return frozenset(codes)
+
+
 def describe(codes: "set[int] | frozenset[int]") -> str:
     """VK codes back to a config string, modifiers first and in a fixed order."""
     order = [0x11, 0x12, 0x10, 0x5B]

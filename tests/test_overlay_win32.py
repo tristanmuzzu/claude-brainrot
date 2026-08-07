@@ -471,6 +471,112 @@ def test_the_overlay_places_itself_beside_a_live_host(window, hosts) -> None:
                               was[2] - was[0], was[3] - was[1])
 
 
+def test_showing_it_cannot_activate_it(overlay_hwnd: int) -> None:
+    """raylib unhides through glfwShowWindow, whose GLFW_FOCUS_ON_SHOW is on
+    by default, and WS_EX_NOACTIVATE does not stop it: measured live, the
+    keyboard focus moved to the overlay 70ms after the strip appeared.
+    SW_SHOWNA is the same show with the activation left out.
+
+    (The focus theft itself only reproduces with a host window in another
+    process, which a test cannot arrange against the shared raylib window --
+    so what is pinned here is that showing goes through the call that has no
+    activation in it at all.)
+    """
+    win32.apply_overlay_styles(overlay_hwnd, Config())
+    try:
+        win32.set_window_shown(overlay_hwnd, False)
+        assert not user32.IsWindowVisible(overlay_hwnd)
+        win32.set_window_shown(overlay_hwnd, True)
+        assert user32.IsWindowVisible(overlay_hwnd)
+        ex = win32._get_long(overlay_hwnd, win32.GWL_EXSTYLE)
+        assert ex & win32.WS_EX_NOACTIVATE, "showing cleared the no-activate bit"
+    finally:
+        win32.set_window_shown(overlay_hwnd, True)
+
+
+def test_the_overlay_never_shows_itself_through_raylib(window, monkeypatch) -> None:
+    """The regression that matters: any future edit that goes back to
+    raylib's own hidden flag reintroduces the focus theft."""
+    calls = []
+    monkeypatch.setattr(win32, "set_window_shown",
+                        lambda hwnd, shown: calls.append((hwnd, shown)))
+    monkeypatch.setattr(rl, "SetWindowState",
+                        lambda *a: pytest.fail("showed through raylib's hide flag"))
+    monkeypatch.setattr(rl, "ClearWindowState",
+                        lambda *a: pytest.fail("showed through raylib's hide flag"))
+    window.set_visible(False)
+    window.set_visible(True)
+    assert calls == [(window._hwnd(), False), (window._hwnd(), True)]
+
+
+def test_click_through_is_a_real_style_bit(overlay_hwnd: int) -> None:
+    """The one property that keeps the overlay out of the way. Toggled for a
+    drag and put straight back, so it is worth watching the actual bit."""
+    win32.apply_overlay_styles(overlay_hwnd, Config())
+    assert win32.is_click_through(overlay_hwnd)
+    try:
+        win32.set_click_through(overlay_hwnd, False)
+        assert not win32.is_click_through(overlay_hwnd)
+        ex = win32._get_long(overlay_hwnd, win32.GWL_EXSTYLE)
+        assert ex & win32.WS_EX_NOACTIVATE, "catching a click is not taking focus"
+    finally:
+        win32.set_click_through(overlay_hwnd, True)
+    assert win32.is_click_through(overlay_hwnd)
+
+
+def test_the_cursor_is_somewhere_on_this_desk(overlay_hwnd: int) -> None:
+    x, y = win32.cursor_pos()
+    left = user32.GetSystemMetrics(76)          # SM_XVIRTUALSCREEN
+    top = user32.GetSystemMetrics(77)
+    width = user32.GetSystemMetrics(78)
+    height = user32.GetSystemMetrics(79)
+    assert left <= x <= left + width
+    assert top <= y <= top + height
+
+
+def test_a_whole_drag_against_the_real_window(window, hosts, monkeypatch,
+                                              tmp_path) -> None:
+    """The gesture end to end: real styles, a real window that really moves,
+    and a dropped position written where the next daemon will find it."""
+    from brainrot.engine.input import Mover
+
+    monkeypatch.setenv("BRAINROT_STATE_DIR", str(tmp_path))
+    host = hosts("claude")
+    window.attach_host(host)
+    win32.apply_overlay_styles(window._hwnd(), Config())
+    was = win32.window_rect(window._hwnd())
+    assert was
+
+    held, down, at = [True], [False], [(was[0] + 10, was[1] + 10)]
+    mover = Mover(window, "ctrl+alt", clock=lambda: 0.0, held=lambda: held[0],
+                  cursor=lambda: at[0], button=lambda: down[0])
+    try:
+        down[0] = True
+        mover.update()
+        assert mover.dragging and not win32.is_click_through(window._hwnd())
+
+        at[0] = (at[0][0] + 120, at[0][1] + 90)
+        mover.update()
+        moved = win32.window_rect(window._hwnd())
+        assert moved == (was[0] + 120, was[1] + 90,
+                         was[2] + 120, was[3] + 90), "the window did not follow"
+
+        down[0] = False
+        mover.update()
+        assert not mover.dragging
+        from brainrot import placement as store
+
+        assert store.load() is not None, "the drop was not written to disk"
+
+        held[0] = False
+        mover.update()
+        assert win32.is_click_through(window._hwnd()), "left it eating clicks"
+    finally:
+        win32.set_click_through(window._hwnd(), True)
+        win32.move_window(window._hwnd(), was[0], was[1],
+                          was[2] - was[0], was[3] - was[1])
+
+
 def _z_index(hwnd: int, ignore: int = 0) -> int:
     """Position of a window in the top-level z-order, or -1 if not found.
 

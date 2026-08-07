@@ -41,6 +41,14 @@ height, which is why "every orb laid down is collected" is a test rather than a
 hope. If you change the flight solver or the landing offsets, that test is the
 one that will tell you.
 
+The strip can also be **dragged where you want it**: hold `drag_chord`
+(`ctrl+alt`) and drag with the mouse; double-click while holding it to go back
+to automatic placement. Click-through is lifted only while the chord is held
+*and* the pointer is over the strip, so an ordinary click still belongs to the
+app behind, and focus is never taken. Where it was dropped is stored as an
+offset from the host window (`placement.py`), so a remembered spot still
+follows that window and still means something at another resolution.
+
 Either scene can also be **driven by hand** (`engine/input.py`): arrows or
 WASD, up/space to jump, down to duck, eight idle seconds to hand back. The
 overlay never reads a key until the takeover chord deliberately gives it focus
@@ -193,11 +201,24 @@ long jumps you need a different motion model, not a bigger number.
   reverts to a default that looks plausible. `brainrot doctor`'s `config`
   check prints the path that is genuinely being read; trust that, not the
   path printed next to "state dir".
-- **A leaked daemon can steal the foreground.** Chasing why the overlay hid
-  itself the instant it appeared cost an hour and produced a plausible,
-  entirely wrong theory about `glfwShowWindow` activating the window. It does
-  not: measured on a real `OverlayWindow`, raylib's own hide flag leaves the
-  foreground alone. It was three daemons. Check `instances` first.
+- **Showing the window through raylib steals the keyboard.** `set_visible`
+  must go through `win32.set_window_shown` (`SW_SHOWNA`), never
+  `FLAG_WINDOW_HIDDEN`: raylib unhides via `glfwShowWindow`, GLFW's
+  `GLFW_FOCUS_ON_SHOW` defaults on, and `WS_EX_NOACTIVATE` does **not** stop
+  it. Measured with `GetGUIThreadInfo`: strip visible at 1.62s, foreground at
+  1.64s, *keyboard focus* at 1.69s. Anyone mid-sentence lost the rest of it.
+- **That one only reproduces when the owner is in another process**, and it
+  cost the fix a whole round trip. A harness whose fake host was a window in
+  its own process showed no theft at all, twice, and was believed over the
+  live daemon; the correct fix was reverted on the strength of it. If a
+  reproduction disagrees with the running system, the reproduction is wrong
+  until proven otherwise. `/tmp`-style scratch harness that *does* reproduce
+  it: run the real `Overlay` in-process with an `OverlayWindow` subclass that
+  checks `foreground_root()` after each window call, and pass it the handle
+  of a real window belonging to some other application.
+- **A leaked daemon looks exactly like a window bug.** The same investigation
+  first blamed the show path for a 10Hz flap that was really three daemons
+  fighting. Check `brainrot doctor`'s `instances` line before theorising.
 - **Numbers the gameplay depends on live in `metrics.json`.** Rebuild an asset
   and you must re-run `python assets/measure.py`; `tests/test_assets.py` fails
   if they drift apart. Moving a hoarding's beam moves whether a slide fits

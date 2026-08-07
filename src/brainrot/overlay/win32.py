@@ -74,6 +74,10 @@ SWP_NOZORDER = 0x0004
 
 GA_ROOT = 2
 
+SW_HIDE = 0
+#: Show, but do not activate -- the only kind of showing an overlay may do.
+SW_SHOWNA = 8
+
 MONITOR_DEFAULTTOPRIMARY = 1
 MONITOR_DEFAULTTONEAREST = 2
 
@@ -116,6 +120,12 @@ user32.MonitorFromPoint.restype = wintypes.HANDLE
 user32.MonitorFromPoint.argtypes = [POINT, wintypes.DWORD]
 user32.GetMonitorInfoW.restype = wintypes.BOOL
 user32.GetMonitorInfoW.argtypes = [wintypes.HANDLE, ctypes.POINTER(MONITORINFO)]
+user32.GetCursorPos.restype = wintypes.BOOL
+user32.GetCursorPos.argtypes = [ctypes.POINTER(POINT)]
+user32.GetAsyncKeyState.restype = ctypes.c_short
+user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
+user32.ShowWindow.restype = wintypes.BOOL
+user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
 
 
 def apply_overlay_styles(hwnd: int, cfg: Config) -> None:
@@ -205,6 +215,69 @@ def foreground_window() -> int:
     at event time: whatever is foreground when you submit a prompt to Claude
     Code *is* the Claude Code host window."""
     return int(user32.GetForegroundWindow() or 0)
+
+
+def set_window_shown(hwnd: int, shown: bool) -> None:
+    """Put the overlay on or off screen without ever activating it.
+
+    raylib unhides through ``glfwShowWindow``, and GLFW's ``GLFW_FOCUS_ON_SHOW``
+    defaults on -- so raylib's way of showing a window also asks Windows to
+    make it the foreground window, and ``WS_EX_NOACTIVATE`` does not stop it.
+    Measured on this machine: the strip appeared, and 70ms later
+    ``GetGUIThreadInfo`` reported the *keyboard focus* on the overlay. Anyone
+    mid-sentence in Claude Code lost the rest of it.
+
+    It only reproduces when the host window belongs to another process, which
+    is why a first attempt at this was talked out of existence by a test whose
+    fake host was in-process. ``SW_SHOWNA`` is the same show with the
+    activation left out.
+    """
+    user32.ShowWindow(hwnd, SW_SHOWNA if shown else SW_HIDE)
+
+
+def set_click_through(hwnd: int, through: bool) -> None:
+    """Whether the mouse falls through the overlay or lands on it.
+
+    ``WS_EX_TRANSPARENT`` is the reason the strip is not in the way, so it
+    goes back on the moment the drag gesture ends. ``WS_EX_NOACTIVATE`` is
+    never touched: catching a click and *taking focus* are different things,
+    and the overlay may do the first without ever doing the second.
+    """
+    ex = _get_long(hwnd, GWL_EXSTYLE)
+    ex = (ex | WS_EX_TRANSPARENT) if through else (ex & ~WS_EX_TRANSPARENT)
+    _set_long(hwnd, GWL_EXSTYLE, ex)
+
+
+def is_click_through(hwnd: int) -> bool:
+    return bool(_get_long(hwnd, GWL_EXSTYLE) & WS_EX_TRANSPARENT)
+
+
+def cursor_pos() -> tuple[int, int]:
+    point = POINT()
+    if not user32.GetCursorPos(ctypes.byref(point)):
+        return (0, 0)
+    return int(point.x), int(point.y)
+
+
+def keys_held(codes) -> bool:
+    """Are all of these virtual keys down right now?
+
+    Polled, like the takeover chord, and for the same reason: the overlay has
+    no focus, so there is nothing to deliver a key press to. Reading one
+    specific combination is not the same as reading what somebody typed.
+    """
+    if not codes:
+        return False
+    return all(user32.GetAsyncKeyState(code) & 0x8000 for code in codes)
+
+
+#: VK_LBUTTON. Swapped by the OS when the buttons are swapped for a left-hander,
+#: so this stays "the primary button" rather than "the left one".
+VK_LBUTTON = 0x01
+
+
+def primary_button_down() -> bool:
+    return bool(user32.GetAsyncKeyState(VK_LBUTTON) & 0x8000)
 
 
 def window_rect(hwnd: int) -> tuple[int, int, int, int] | None:

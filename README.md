@@ -97,6 +97,11 @@ then on:
   entirely when the desktop has room. It follows the window if you move it.
 - **It rides one z-level above it.** Ownership, so raising your terminal
   raises the strip with it. `attach = "topmost"` restores float-over-all.
+- **You can move it.** Hold `ctrl+alt` and drag it wherever you like; where
+  you drop it is remembered and still follows the window. Double-click while
+  holding the chord to go back to automatic placement. Clicks are caught only
+  while that chord is held over the strip — otherwise the mouse falls
+  straight through, and focus is never taken either way.
 
 ## Try it without Claude Code
 
@@ -157,7 +162,8 @@ attach = "host"    # "host" = one level above Claude Code, "topmost" = above all
 grace_seconds = 1.5
 min_visible_seconds = 3.0
 hide_on_notification = true
-follow_focus = true   # on screen only while you are looking at Claude Code
+follow_focus = true      # on screen only while you are looking at Claude Code
+drag_chord = "ctrl+alt"  # hold to drag the strip; "" to disable
 
 [content]
 scenes = ["runner", "parkour"]

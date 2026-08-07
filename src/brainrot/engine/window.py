@@ -20,7 +20,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from .. import placement as placement_store
 from ..config import Config
+from ..placement import Manual
 from . import rl
 
 
@@ -48,7 +50,8 @@ class Rect:
         return self.bottom - self.top
 
 
-def place(cfg: Config, work: Rect, host: Rect | None = None) -> Placement:
+def place(cfg: Config, work: Rect, host: Rect | None = None,
+          manual: "Manual | None" = None) -> Placement:
     """Where the strip goes, given the desktop and the window it belongs to.
 
     Docking to a screen edge is what put the overlay straight on top of the
@@ -70,6 +73,17 @@ def place(cfg: Config, work: Rect, host: Rect | None = None) -> Placement:
     width = min(cfg.width, max(1, work.width))
     height = min(cfg.height, max(1, work.height))
     right_side = cfg.dock != "left"
+
+    if manual is not None:
+        # Somebody dragged it here. Geometry does not get a vote any more --
+        # only the clamp below, so a remembered spot cannot strand the strip
+        # off the side of a smaller screen.
+        anchor = host or work
+        x = (anchor.right - width - manual.dx) if right_side else (anchor.left + manual.dx)
+        y = anchor.top + manual.dy
+        x = max(work.left, min(int(x), work.right - width))
+        y = max(work.top, min(int(y), work.bottom - height))
+        return Placement(int(x), int(y), int(width), int(height))
 
     if host is None:
         x = work.right - width - cfg.margin_x if right_side else work.left + cfg.margin_x
@@ -186,6 +200,24 @@ class _BaseWindow:
     def follow_host(self) -> None:
         """Keep station on the host window. Windows overlay only."""
 
+    # -- being dragged by hand. Only the overlay can be; the rest of these
+    # are windows the window manager already lets you drag by their title bar.
+
+    def rect(self) -> "Rect | None":
+        return None
+
+    def set_click_through(self, through: bool) -> None:
+        pass
+
+    def move_to(self, x: int, y: int) -> None:
+        pass
+
+    def remember_placement(self) -> None:
+        pass
+
+    def clear_placement(self) -> None:
+        pass
+
     def detach_host(self) -> None:
         """Release any host attachment. Only meaningful on Windows."""
 
@@ -220,9 +252,12 @@ class OverlayWindow(_BaseWindow):
         self._host_hwnd = 0
         self._attached = False
         self._placed: Placement | None = None
+        self._manual: Manual | None = None
+        self._click_through = True
 
     def _after_create(self, cfg: Config) -> None:
         self._cfg = cfg
+        self._manual = placement_store.load()
         placement = compute_placement(cfg)
         rl.SetWindowPosition(placement.x, placement.y)
         self.set_visible(False)
@@ -240,7 +275,20 @@ class OverlayWindow(_BaseWindow):
         return int(rl.ffi.cast("intptr_t", rl.GetWindowHandle()))
 
     def set_visible(self, visible: bool) -> None:
-        super().set_visible(visible)
+        if os.name != "nt":
+            super().set_visible(visible)
+        elif visible != self._visible:
+            self._visible = visible
+            try:
+                # Not raylib's hide flag: that route asks Windows to activate
+                # the window on the way up, and it succeeds -- keyboard focus
+                # and all. See win32.set_window_shown.
+                from ..overlay.win32 import set_window_shown
+
+                set_window_shown(self._hwnd(), visible)
+            except Exception:
+                self._visible = not visible
+                super().set_visible(visible)
         # Re-take ownership on the way back up; detach_host dropped it when the
         # overlay last went idle.
         if visible:
@@ -353,7 +401,8 @@ class OverlayWindow(_BaseWindow):
     # -- placement --------------------------------------------------------
 
     def follow_host(self) -> None:
-        """Sit beside the Claude Code window, or in its margin.
+        """Sit beside the Claude Code window, or in its margin, or wherever
+        it was last dragged to.
 
         Called while the strip is on screen, so it keeps up with a window
         that gets moved, resized or maximised underneath it rather than
@@ -368,7 +417,8 @@ class OverlayWindow(_BaseWindow):
             area = work_area(self._host_hwnd or 0)
             if area is None:
                 return
-            wanted = place(self._cfg, Rect(*area), Rect(*host) if host else None)
+            wanted = place(self._cfg, Rect(*area),
+                           Rect(*host) if host else None, self._manual)
         except Exception:
             return
         if wanted == self._placed:
@@ -378,6 +428,78 @@ class OverlayWindow(_BaseWindow):
             move_window(self._hwnd(), wanted.x, wanted.y, wanted.width, wanted.height)
         except Exception:
             self._placed = None
+
+    # -- being dragged ----------------------------------------------------
+
+    def rect(self) -> Rect | None:
+        if os.name != "nt":
+            return None
+        try:
+            from ..overlay.win32 import window_rect
+
+            found = window_rect(self._hwnd())
+        except Exception:
+            return None
+        return Rect(*found) if found else None
+
+    def set_click_through(self, through: bool) -> None:
+        """Let the mouse fall through, or catch it.
+
+        Caught only while the drag chord is held over the strip: the rest of
+        the time a click belongs to whatever is behind, and taking one would
+        make the overlay exactly the thing it is built not to be.
+        """
+        if os.name != "nt" or through == self._click_through:
+            return
+        try:
+            from ..overlay.win32 import set_click_through
+
+            set_click_through(self._hwnd(), through)
+        except Exception:
+            return
+        self._click_through = through
+
+    def move_to(self, x: int, y: int) -> None:
+        """Put the strip here, now -- mid-drag, following the pointer."""
+        if os.name != "nt":
+            return
+        here = self.rect()
+        if here is None:
+            return
+        try:
+            from ..overlay.win32 import move_window
+
+            move_window(self._hwnd(), int(x), int(y), here.width, here.height)
+        except Exception:
+            return
+        self._placed = Placement(int(x), int(y), here.width, here.height)
+
+    def remember_placement(self) -> None:
+        """Keep where it was just dropped, as an offset from the host window."""
+        if os.name != "nt" or self._cfg is None:
+            return
+        here = self.rect()
+        if here is None:
+            return
+        try:
+            from ..overlay.win32 import window_rect, work_area
+
+            host = window_rect(self._host_hwnd) if self._host_hwnd else None
+            anchor = Rect(*(host or work_area(self._host_hwnd or 0) or (0, 0, 0, 0)))
+        except Exception:
+            return
+        if self._cfg.dock != "left":
+            dx = anchor.right - here.right
+        else:
+            dx = here.left - anchor.left
+        self._manual = Manual(int(dx), int(here.top - anchor.top))
+        placement_store.save(self._manual)
+
+    def clear_placement(self) -> None:
+        """Back to placing itself. The way out of a corner you dragged it into."""
+        self._manual = None
+        self._placed = None
+        placement_store.clear()
 
 
 class DesktopWindow(_BaseWindow):
