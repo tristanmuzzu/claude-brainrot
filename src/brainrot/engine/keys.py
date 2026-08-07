@@ -44,7 +44,12 @@ NAMED = {
 NAMED.update({f"f{i}": 0x6F + i for i in range(1, 25)})
 
 #: Reverse lookup, for turning what someone pressed back into a config string.
-_VK_NAMES = {vk: name for name, vk in NAMED.items()}
+#: Several names share a code ("pause"/"break", "esc"/"escape"); the *first*
+#: spelling wins, because this is the string someone copies into their config
+#: and "break" is a confusing thing to be told you pressed.
+_VK_NAMES: dict[int, str] = {}
+for _name, _vk in NAMED.items():
+    _VK_NAMES.setdefault(_vk, _name)
 _VK_NAMES.update({0x11: "ctrl", 0x12: "alt", 0x10: "shift", 0x5B: "win"})
 
 
