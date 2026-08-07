@@ -163,9 +163,24 @@ def test_parkour_advances_forever() -> None:
         scene.update(1 / 60)
         scene.elapsed += 1 / 60
     assert scene.distance > 60
-    assert 0.5 <= scene.jump_dur <= 0.85
+    assert 0.42 <= scene.air_dur <= 0.80
     # the trail is bounded: memory cannot grow with distance
     assert len(scene.blocks) < 40
+
+
+def test_parkour_lands_on_the_block_it_aimed_for() -> None:
+    """The ballistic solve must actually deliver the player onto the target
+    block, offsets included, for every hop."""
+    scene = build_parkour(4)
+    for _ in range(7200):
+        prev_phase = scene.phase
+        scene.update(1 / 60)
+        scene.elapsed += 1 / 60
+        if prev_phase == "air" and scene.phase == "ground":
+            blk = scene.blocks[scene.jump_index]
+            assert abs(scene.stand[0] - blk["x"]) <= 1.31
+            assert abs(scene.stand[2] - blk["z"]) <= 1.31
+            assert scene.stand[1] == pytest.approx(blk["y"] + 1.0)
 
 
 # -- every scene ----------------------------------------------------------

@@ -1,6 +1,13 @@
 """The runner. Stylized big-head proportions, hoodie + cap + backpack, with
 run / jump / roll clips. Zones the runtime recolours per seed: hoodie, cap,
-pants, pack. Skin and shoes stay fixed."""
+pants, pack. Skin, shoes and eyes stay fixed.
+
+The rig has real knees and elbows (two bones per limb, rigid-skinned), and
+the run cycle is keyed on the classic four positions -- contact, down,
+passing, up -- rather than a sine wave. A sine swing reads as a metronome;
+the asymmetry between the slow stance phase and the fast folded swing phase
+is most of what reads as *running*.
+"""
 
 import math
 import sys
@@ -8,8 +15,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from common import (  # noqa: E402
-    bake_and_export, box, build_armature, euler_q, record_action, reset,
-    run_script_banner, skin, skinned_part, zone, join,
+    bake_and_export, build_armature, lift, record_action, reset,
+    run_script_banner, skin, skinned_part, swing, zone, join,
 )
 
 reset()
@@ -25,12 +32,17 @@ PACK = zone("pack", (0.95, 0.72, 0.12))
 
 # Proportions: legs slightly short, head oversized -- the mobile-runner
 # silhouette that stays readable at 40 pixels tall.
-LEG = 0.80
+THIGH = 0.42
+SHIN = 0.38
+LEG = THIGH + SHIN
 TORSO = 0.78
 HEAD = 0.60
 HIP_Z = LEG
+KNEE_Z = SHIN
 SHO_Z = HIP_Z + TORSO * 0.88
-ARM_L = 0.62
+UPARM = 0.34
+FOREARM = 0.30
+ELB_Z = SHO_Z - UPARM
 
 parts = [
     skinned_part("torso", "spine", (0.56, 0.36, TORSO), (0, 0, HIP_Z + TORSO / 2), HOODIE, 0.06),
@@ -46,71 +58,113 @@ parts = [
                  (0.02 + HEAD / 2 + 0.005, +0.115, HIP_Z + TORSO + HEAD * 0.58), EYE, 0.0),
     skinned_part("captop", "head", (HEAD * 1.08, HEAD * 1.08, HEAD * 0.36), (0.02, 0, HIP_Z + TORSO + HEAD * 0.86), CAP, 0.03),
     skinned_part("brim", "head", (0.30, HEAD * 0.92, 0.055), (HEAD / 2 + 0.12, 0, HIP_Z + TORSO + HEAD * 0.72), CAP, 0.01),
-    skinned_part("arm_l", "arm.L", (0.16, 0.16, ARM_L), (0, -0.30, SHO_Z - ARM_L / 2), HOODIE),
-    skinned_part("arm_r", "arm.R", (0.16, 0.16, ARM_L), (0, +0.30, SHO_Z - ARM_L / 2), HOODIE),
-    skinned_part("hand_l", "arm.L", (0.14, 0.14, 0.13), (0, -0.30, SHO_Z - ARM_L - 0.05), SKIN, 0.02),
-    skinned_part("hand_r", "arm.R", (0.14, 0.14, 0.13), (0, +0.30, SHO_Z - ARM_L - 0.05), SKIN, 0.02),
-    skinned_part("leg_l", "leg.L", (0.20, 0.20, LEG - 0.09), (0, -0.14, HIP_Z - (LEG - 0.09) / 2), PANTS),
-    skinned_part("leg_r", "leg.R", (0.20, 0.20, LEG - 0.09), (0, +0.14, HIP_Z - (LEG - 0.09) / 2), PANTS),
-    skinned_part("shoe_l", "leg.L", (0.32, 0.20, 0.14), (0.05, -0.14, 0.07), SHOE, 0.02),
-    skinned_part("shoe_r", "leg.R", (0.32, 0.20, 0.14), (0.05, +0.14, 0.07), SHOE, 0.02),
 ]
+for side, sgn in (("L", -1), ("R", 1)):
+    y_arm = sgn * 0.30
+    y_leg = sgn * 0.14
+    parts += [
+        skinned_part(f"uparm_{side}", f"arm.{side}", (0.16, 0.16, UPARM),
+                     (0, y_arm, SHO_Z - UPARM / 2), HOODIE),
+        skinned_part(f"forearm_{side}", f"farm.{side}", (0.145, 0.145, FOREARM),
+                     (0, y_arm, ELB_Z - FOREARM / 2), HOODIE, 0.02),
+        skinned_part(f"hand_{side}", f"farm.{side}", (0.14, 0.14, 0.12),
+                     (0, y_arm, ELB_Z - FOREARM - 0.04), SKIN, 0.02),
+        skinned_part(f"thigh_{side}", f"leg.{side}", (0.21, 0.21, THIGH),
+                     (0, y_leg, HIP_Z - THIGH / 2), PANTS),
+        skinned_part(f"shin_{side}", f"shin.{side}", (0.185, 0.185, SHIN),
+                     (0, y_leg, KNEE_Z - SHIN / 2), PANTS, 0.02),
+        skinned_part(f"shoe_{side}", f"shin.{side}", (0.32, 0.20, 0.14),
+                     (0.05, y_leg, 0.07), SHOE, 0.02),
+    ]
 body = join(parts, "character")
 
 rig = build_armature({
     "root": ((0, 0, 0), (0, 0, 0.25), None),
     "spine": ((0, 0, HIP_Z), (0, 0, HIP_Z + TORSO), "root"),
     "head": ((0, 0, HIP_Z + TORSO), (0, 0, HIP_Z + TORSO + HEAD), "spine"),
-    "arm.L": ((0, -0.30, SHO_Z), (0, -0.30, SHO_Z - 0.75), "spine"),
-    "arm.R": ((0, +0.30, SHO_Z), (0, +0.30, SHO_Z - 0.75), "spine"),
-    "leg.L": ((0, -0.14, HIP_Z), (0, -0.14, 0.0), "root"),
-    "leg.R": ((0, +0.14, HIP_Z), (0, +0.14, 0.0), "root"),
+    "arm.L": ((0, -0.30, SHO_Z), (0, -0.30, ELB_Z), "spine"),
+    "farm.L": ((0, -0.30, ELB_Z), (0, -0.30, ELB_Z - FOREARM), "arm.L"),
+    "arm.R": ((0, +0.30, SHO_Z), (0, +0.30, ELB_Z), "spine"),
+    "farm.R": ((0, +0.30, ELB_Z), (0, +0.30, ELB_Z - FOREARM), "arm.R"),
+    "leg.L": ((0, -0.14, HIP_Z), (0, -0.14, KNEE_Z), "root"),
+    "shin.L": ((0, -0.14, KNEE_Z), (0, -0.14, 0.0), "leg.L"),
+    "leg.R": ((0, +0.14, HIP_Z), (0, +0.14, KNEE_Z), "root"),
+    "shin.R": ((0, +0.14, KNEE_Z), (0, +0.14, 0.0), "leg.R"),
 })
 skin(body, rig)
 
 
+def _key_track(table, t01):
+    """Piecewise-linear lookup in a [(t, value), ...] table, wrapping."""
+    t01 %= 1.0
+    pts = list(table) + [(table[0][0] + 1.0, table[0][1])]
+    for (t0, v0), (t1, v1) in zip(pts, pts[1:]):
+        if t0 <= t01 <= t1:
+            f = (t01 - t0) / (t1 - t0) if t1 > t0 else 0.0
+            return v0 + (v1 - v0) * f
+    return pts[0][1]
+
+
+# One leg's cycle: contact -> stance -> push-off -> folded swing -> reach.
+# Angles in degrees; thigh +ve swings forward, knee +ve folds the shin back.
+THIGH_KEYS = [(0.0, 34), (0.14, 8), (0.30, -22), (0.42, -38),
+              (0.55, -24), (0.68, 6), (0.82, 30), (0.92, 38)]
+KNEE_KEYS = [(0.0, 14), (0.14, 22), (0.30, 30), (0.42, 62),
+             (0.55, 96), (0.68, 82), (0.82, 40), (0.92, 16)]
+# Upper arm counter-swings; the elbow stays pumped at ~70 with a small beat.
+ARM_KEYS = [(0.0, -38), (0.25, -6), (0.5, 40), (0.75, 4)]
+
+
 def run_pose(pose, t01):
-    t = t01 * 2 * math.pi
-    swing = math.radians(58)
-    pose.bones["leg.L"].rotation_quaternion = euler_q(x=swing * math.sin(t))
-    pose.bones["leg.R"].rotation_quaternion = euler_q(x=swing * math.sin(t + math.pi))
-    # Arms counter-swing, elbows implied by a slight inward yaw.
-    pose.bones["arm.L"].rotation_quaternion = euler_q(
-        x=swing * 0.85 * math.sin(t + math.pi), z=math.radians(-8))
-    pose.bones["arm.R"].rotation_quaternion = euler_q(
-        x=swing * 0.85 * math.sin(t), z=math.radians(8))
-    pose.bones["spine"].rotation_quaternion = euler_q(
-        x=math.radians(8), z=math.radians(4) * math.sin(t))
-    pose.bones["head"].rotation_quaternion = euler_q(x=math.radians(-5))
-    # Bounce twice per cycle -- once per footfall.
-    pose.bones["root"].location = (0, 0, 0.07 * abs(math.sin(t)))
+    for side, phase in (("L", 0.0), ("R", 0.5)):
+        thigh = _key_track(THIGH_KEYS, t01 + phase)
+        knee = _key_track(KNEE_KEYS, t01 + phase)
+        swing(pose, f"leg.{side}", thigh)
+        swing(pose, f"shin.{side}", -knee)      # knee folds the shin backward
+        arm = _key_track(ARM_KEYS, t01 + phase)
+        swing(pose, f"arm.{side}", arm, side_deg=(4 if side == "L" else -4))
+        # elbows stay pumped: forearms folded up-forward with a small beat
+        swing(pose, f"farm.{side}", 74 + 12 * math.sin((t01 + phase) * math.tau))
+    # Two footfalls per cycle: the body is lowest just after each contact.
+    bounce = abs(math.sin(t01 * math.tau))
+    lift(pose, "root", up=-0.035 + 0.075 * bounce)
+    swing(pose, "spine", 9, side_deg=4 * math.sin(t01 * math.tau))
+    swing(pose, "head", -6, side_deg=-3 * math.sin(t01 * math.tau))
 
 
 def jump_pose(pose, t01):
     tuck = math.sin(t01 * math.pi)
-    pose.bones["leg.L"].rotation_quaternion = euler_q(x=math.radians(78) * tuck)
-    pose.bones["leg.R"].rotation_quaternion = euler_q(x=math.radians(50) * tuck)
-    pose.bones["arm.L"].rotation_quaternion = euler_q(x=math.radians(-130) * tuck, z=math.radians(-14) * tuck)
-    pose.bones["arm.R"].rotation_quaternion = euler_q(x=math.radians(-110) * tuck, z=math.radians(14) * tuck)
-    pose.bones["spine"].rotation_quaternion = euler_q(x=math.radians(16) * tuck)
-    pose.bones["head"].rotation_quaternion = euler_q(x=math.radians(-10) * tuck)
-    pose.bones["root"].location = (0, 0, 0.12 * tuck)
+    swing(pose, "leg.L", 62 * tuck)
+    swing(pose, "shin.L", -95 * tuck)
+    swing(pose, "leg.R", 28 * tuck)
+    swing(pose, "shin.R", -60 * tuck)
+    # arms thrown up and back for balance
+    swing(pose, "arm.L", -55 * tuck, side_deg=10 * tuck)
+    swing(pose, "arm.R", -45 * tuck, side_deg=-10 * tuck)
+    swing(pose, "farm.L", 40 * tuck)
+    swing(pose, "farm.R", 40 * tuck)
+    swing(pose, "spine", 14 * tuck)
+    swing(pose, "head", -9 * tuck)
+    lift(pose, "root", up=0.10 * tuck)
 
 
 def roll_pose(pose, t01):
     # A crouch-slide: sink low over the front foot, chest folded, arms back.
-    # The root drop and the knee fold must agree or the feet leave the ground.
     c = math.sin(t01 * math.pi)
-    pose.bones["root"].location = (0.10 * c, 0, -0.34 * c)
-    pose.bones["spine"].rotation_quaternion = euler_q(x=math.radians(38) * c)
-    pose.bones["head"].rotation_quaternion = euler_q(x=math.radians(-26) * c)
-    pose.bones["leg.L"].rotation_quaternion = euler_q(x=math.radians(62) * c)
-    pose.bones["leg.R"].rotation_quaternion = euler_q(x=math.radians(-18) * c)
-    pose.bones["arm.L"].rotation_quaternion = euler_q(x=math.radians(-46) * c, z=math.radians(-8) * c)
-    pose.bones["arm.R"].rotation_quaternion = euler_q(x=math.radians(-46) * c, z=math.radians(8) * c)
+    lift(pose, "root", up=-0.32 * c, forward=0.08 * c)
+    swing(pose, "spine", 36 * c)
+    swing(pose, "head", -26 * c)
+    swing(pose, "leg.L", 54 * c)
+    swing(pose, "shin.L", -78 * c)
+    swing(pose, "leg.R", -14 * c)
+    swing(pose, "shin.R", -32 * c)
+    swing(pose, "arm.L", -35 * c, side_deg=6 * c)
+    swing(pose, "arm.R", -35 * c, side_deg=-6 * c)
+    swing(pose, "farm.L", 22 * c)
+    swing(pose, "farm.R", 22 * c)
 
 
-record_action(rig, "run", 20, run_pose)
+record_action(rig, "run", 24, run_pose, step=1)
 record_action(rig, "jump", 22, jump_pose)
 record_action(rig, "roll", 22, roll_pose)
 

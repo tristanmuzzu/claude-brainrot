@@ -283,6 +283,44 @@ def euler_q(x=0.0, y=0.0, z=0.0):
     return Euler((x, y, z), "XYZ").to_quaternion()
 
 
+def world_axis_q(pose_bone, axis, deg):
+    """A pose-bone quaternion that rotates ``deg`` about a WORLD axis.
+
+    Pose-bone rotations are expressed in the bone's rest-local frame, whose
+    axes depend on which way the bone points -- keying "x" on a down-pointing
+    limb swings it sideways, which is how a run cycle becomes 7 Hz jumping
+    jacks. Conjugating by the rest orientation makes the intent explicit:
+    (0,1,0) is always the fore-aft swing axis, whatever the bone.
+
+    For child bones (shins, forearms) the axis is world-true in rest pose and
+    rides with the parent afterwards -- which is exactly what an anatomical
+    hinge should do.
+    """
+    from mathutils import Quaternion, Vector
+
+    rest = pose_bone.bone.matrix_local.to_quaternion()
+    return rest.inverted() @ Quaternion(Vector(axis), math.radians(deg)) @ rest
+
+
+def swing(pose, name, forward_deg, side_deg=0.0):
+    """Set a limb/spine bone: +forward_deg pitches toward the character's
+    facing (+X), +side_deg tilts to the character's left."""
+    pb = pose.bones[name]
+    q = world_axis_q(pb, (0, 1, 0), -forward_deg)
+    if side_deg:
+        q = q @ world_axis_q(pb, (1, 0, 0), side_deg)
+    pb.rotation_quaternion = q
+
+
+def lift(pose, name, up=0.0, forward=0.0):
+    """Translate a bone in world terms (metres), whatever its local frame."""
+    from mathutils import Vector
+
+    pb = pose.bones[name]
+    rest = pb.bone.matrix_local.to_quaternion()
+    pb.location = rest.inverted() @ Vector((forward, 0.0, up))
+
+
 def record_action(rig, name: str, length: int, pose_fn, step: int = 2) -> None:
     """Sample ``pose_fn(pose, t01)`` into a named Action and stash it on an NLA
     track so the exporter writes every clip, not just the last active one."""

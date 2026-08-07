@@ -34,7 +34,8 @@ def test_character_is_rigged_with_all_clips() -> None:
     for clip in ("run", "jump", "roll"):
         assert clip in ch.clips, f"missing clip {clip}"
         assert ch.clip_length(clip) > 10
-        assert ch.clips[clip].boneCount == 7
+        # 11 bones: root, spine, head, and two-bone limbs (knees + elbows)
+        assert ch.clips[clip].boneCount == 11
 
 
 def test_recolor_writes_and_reset_restores() -> None:

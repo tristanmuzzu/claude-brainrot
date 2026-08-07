@@ -22,10 +22,10 @@ GAUGE = 1.5          # rail-to-rail per lane
 reset()
 run_script_banner("track")
 
-BALLAST = zone("ballast", (0.35, 0.33, 0.34), rough=0.95)
-EDGE = zone("edge", (0.45, 0.44, 0.46), rough=0.9)
-RAIL = zone("rail", (0.60, 0.62, 0.66), rough=0.3)
-SLEEPER = zone("sleeper", (0.16, 0.13, 0.11), rough=0.9)
+BALLAST = zone("ballast", (0.40, 0.38, 0.39), rough=0.95)
+EDGE = zone("edge", (0.50, 0.50, 0.52), rough=0.9)
+RAIL = zone("rail", (0.74, 0.76, 0.80), rough=0.22)
+SLEEPER = zone("sleeper", (0.17, 0.14, 0.12), rough=0.9)
 
 full_w = LANE_SPACING * 2 + GAUGE + 1.6
 

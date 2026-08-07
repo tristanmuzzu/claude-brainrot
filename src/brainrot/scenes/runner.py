@@ -183,7 +183,9 @@ class RunnerScene(Scene):
         step = self.speed * dt
         self.travel += step
         self.score += self.speed * dt * 3.2
-        self.run_phase += dt * (2.6 + self.speed * 0.34)
+        # Stride cadence in CYCLES per second. A sprint is ~1.7 strides/s;
+        # anything much faster aliases at 30-60fps into limb flicker.
+        self.run_phase += dt * (1.35 + self.speed * 0.038)
         self.cam_shake = max(0.0, self.cam_shake - dt * 3.0)
 
         for e in self.entities:
@@ -276,12 +278,13 @@ class RunnerScene(Scene):
         self.sky.draw(self.elapsed)
 
         cam = self.camera
-        bob = math.sin(self.run_phase * 2.0) * 0.05 * (self.speed / TOP_SPEED)
+        # two footfalls per stride cycle drive the bob
+        bob = math.sin(self.run_phase * math.tau * 2) * 0.045 * (self.speed / TOP_SPEED)
         shake = (math.sin(self.elapsed * 43.0) * 0.05 + math.sin(self.elapsed * 61.0) * 0.03) * self.cam_shake
         # Ride directly behind the runner: with the camera between lanes, a
         # passing train in the next lane would wipe across the whole frame.
-        cam.position = (self.x * 0.92 + shake, 3.7 + bob, 7.4)
-        cam.target = (self.x, 1.45 + bob * 0.5 + shake * 0.6, -5.0)
+        cam.position = (self.x * 0.92 + shake, 3.5 + bob, 6.8)
+        cam.target = (self.x, 1.6 + bob * 0.5 + shake * 0.6, -4.6)
         cam.fovy = 56.0 + 6.0 * (self.speed - BASE_SPEED) / (TOP_SPEED - BASE_SPEED)
 
         rl.BeginMode3D(cam[0])
@@ -328,7 +331,10 @@ class RunnerScene(Scene):
                 rl.DrawModelEx(self.barrier.model, (self._lane_x(e["lane"]), 0.28, -d),
                                (0, 1, 0), 0, (1, 1, 1), fog)
             elif kind == "gantry":
-                y = 0.0 if e.get("low") else 0.9
+                if d < -1.5:
+                    continue  # passing the camera plane: never wipe the frame
+                # decorative gantries sit well above the camera's eye line
+                y = 0.0 if e.get("low") else 1.8
                 rl.DrawModelEx(self.gantry.model, (0, y + 0.28, -d), (0, 1, 0), 0,
                                (1, 1, 1), fog)
             elif kind == "coin" and not e["taken"]:
@@ -387,7 +393,7 @@ class RunnerScene(Scene):
         ch.model.transform = transform
         blob_shadow(self.x, RAIL_TOP + 0.04, 0.0, 0.62, alpha=int(110 * (1.0 - y / 3.0)))
         rl.DrawModelEx(ch.model, (self.x, RAIL_TOP + y, 0), (0, 1, 0), 0.0,
-                       (0.86, 0.86, 0.86), rl.WHITE4)
+                       (0.95, 0.95, 0.95), rl.WHITE4)
 
     def _draw_hud(self) -> None:
         pal = self.palette

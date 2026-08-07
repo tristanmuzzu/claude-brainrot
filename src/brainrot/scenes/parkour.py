@@ -71,12 +71,28 @@ class ParkourScene(Scene):
         while len(self.blocks) < AHEAD:
             self._spawn_block()
 
+        # -- motion: a ground/air state machine, not a tween ---------------
+        # Real parkour footage has a beat ON each block (land, settle, aim)
+        # and a ballistic arc between them: constant horizontal velocity,
+        # gravity vertically. Easing positions between block centres reads as
+        # teleportation, which is exactly what this replaces.
+        self.hop_rng = ctx.stream("hops")
         self.jump_index = 0           # block we are standing on
-        self.jump_t = 0.0             # progress through the current hop
-        self.jump_dur = 0.62
+        self.phase = "ground"
+        self.phase_t = 0.0
+        self.ground_dur = 0.5
+        self.air_dur = 0.6
+        first = self.blocks[0]
+        self.stand = [first["x"], first["y"] + 1.0, first["z"]]
+        self.takeoff = list(self.stand)
+        self.land_at = list(self.stand)
+        self.vy0 = 0.0
+        self.pos = list(self.stand)
+        self.vy = 0.0
         self.land_dip = 0.0
         self.distance = 0.0
         self.yaw = self.heading
+        self._roll = 0.0
 
         # islands: spawned along the spine as the course advances
         self.islands: list[dict] = []
@@ -174,36 +190,76 @@ class ParkourScene(Scene):
 
     # -- simulation -------------------------------------------------------
 
-    def _hop_points(self):
-        a = self.blocks[self.jump_index]
-        b = self.blocks[self.jump_index + 1]
-        return a, b
+    GRAVITY = 26.0
+    HOP_SPEED = 5.3               # horizontal m/s while airborne
+
+    def _landing_point(self, blk: dict) -> list[float]:
+        """Land somewhere ON the block, not at its centre -- nobody lands
+        dead-centre every jump, and the wander is what makes the next
+        takeoff angle (and therefore the camera) feel alive."""
+        margin = 0.9 if blk["wide"] else 0.24
+        return [blk["x"] + self.hop_rng.uniform(-margin, margin),
+                blk["y"] + 1.0,
+                blk["z"] + self.hop_rng.uniform(-margin, margin)]
+
+    def _begin_air(self) -> None:
+        target = self.blocks[self.jump_index + 1]
+        self.takeoff = list(self.stand)
+        self.land_at = self._landing_point(target)
+        dist = math.dist((self.takeoff[0], self.takeoff[2]),
+                         (self.land_at[0], self.land_at[2]))
+        self.air_dur = max(0.42, min(0.80, dist / self.HOP_SPEED))
+        dy = self.land_at[1] - self.takeoff[1]
+        # launch speed that lands exactly on target under gravity
+        self.vy0 = dy / self.air_dur + 0.5 * self.GRAVITY * self.air_dur
+        self.phase = "air"
+        self.phase_t = 0.0
+
+    def _land(self) -> None:
+        self.jump_index += 1
+        self.stand = list(self.land_at)
+        self.pos = list(self.stand)
+        self.phase = "ground"
+        self.phase_t = 0.0
+        self.land_dip = 1.0
+        self.distance += math.dist((self.takeoff[0], self.takeoff[2]),
+                                   (self.stand[0], self.stand[2]))
+        landed_on = self.blocks[self.jump_index]
+        # a proper breather on checkpoint platforms, a beat everywhere else
+        self.ground_dur = (self.hop_rng.uniform(0.5, 0.9) if landed_on["wide"]
+                           else self.hop_rng.uniform(0.10, 0.26))
+
+        # keep the horizon of generated course ahead of the player
+        while len(self.blocks) - self.jump_index < AHEAD:
+            self._spawn_block()
+        if self.jump_index > TRAIL:
+            drop = self.jump_index - TRAIL
+            self.blocks = self.blocks[drop:]
+            self.jump_index -= drop
+        z_here = self.stand[2]
+        if self.islands and self.islands[0]["z"] > z_here + 90:
+            self.islands.pop(0)
+        while self._next_island_z > z_here - 260:
+            self._spawn_island()
 
     def update(self, dt: float) -> None:
-        a, b = self._hop_points()
-        self.jump_t += dt / self.jump_dur
-        if self.jump_t >= 1.0:
-            self.jump_t = 0.0
-            self.jump_index += 1
-            self.land_dip = 1.0
-            self.distance += math.dist((a["x"], a["z"]), (b["x"], b["z"]))
-            a, b = self._hop_points()
-            gap = math.dist((a["x"], a["z"]), (b["x"], b["z"]))
-            rise = b["y"] - a["y"]
-            self.jump_dur = max(0.5, min(0.85, 0.42 + gap * 0.075 - rise * 0.03))
-            # keep the horizon of generated course ahead of the player
-            while len(self.blocks) - self.jump_index < AHEAD:
-                self._spawn_block()
-            if self.jump_index > TRAIL:
-                drop = self.jump_index - TRAIL
-                self.blocks = self.blocks[drop:]
-                self.jump_index -= drop
-            if self.islands and self.islands[0]["z"] > b["z"] + 90:
-                self.islands.pop(0)
-            while self._next_island_z > b["z"] - 260:
-                self._spawn_island()
+        self.phase_t += dt
+        if self.phase == "ground":
+            self.pos = list(self.stand)
+            self.vy = 0.0
+            if self.phase_t >= self.ground_dur:
+                self._begin_air()
+        else:
+            t = min(self.phase_t, self.air_dur)
+            f = t / self.air_dur
+            self.pos[0] = self.takeoff[0] + (self.land_at[0] - self.takeoff[0]) * f
+            self.pos[2] = self.takeoff[2] + (self.land_at[2] - self.takeoff[2]) * f
+            self.pos[1] = self.takeoff[1] + self.vy0 * t - 0.5 * self.GRAVITY * t * t
+            self.vy = self.vy0 - self.GRAVITY * t
+            if self.phase_t >= self.air_dur:
+                self._land()
 
-        self.land_dip = max(0.0, self.land_dip - dt * 6.0)
+        self.land_dip = max(0.0, self.land_dip - dt * 5.0)
         self.burst.update(dt)
 
     # -- drawing ----------------------------------------------------------
@@ -233,33 +289,53 @@ class ParkourScene(Scene):
         pal = self.palette
         self.sky.draw(self.elapsed)
 
-        a, b = self._hop_points()
-        t = self.jump_t
-        ease = t * t * (3 - 2 * t)
-        x = a["x"] + (b["x"] - a["x"]) * ease
-        z = a["z"] + (b["z"] - a["z"]) * ease
-        rise = b["y"] - a["y"]
-        apex = 1.05 + max(0.0, -rise) * 0.12
-        y = a["y"] + (b["y"] - a["y"]) * t + apex * 4 * t * (1 - t) * 1.0
-        y += 1.0  # stand on top of the block, block centres are at ["y"]
+        x, y, z = self.pos
 
-        target_yaw = math.atan2(b["x"] - x, -(b["z"] - z))
+        # Aim: mid-air, at where we will land; on the ground, pre-aim toward
+        # the NEXT landing so the turn happens as a deliberate look, not a
+        # camera glued to a moving block.
+        if self.phase == "air":
+            aim = self.land_at
+            ease = 0.14
+        else:
+            # aim through the course, not at one block: averaging the next
+            # few keeps more of the run in frame through bends
+            idx = self.jump_index
+            ahead = self.blocks[min(idx + 1, len(self.blocks) - 1):
+                                min(idx + 4, len(self.blocks))]
+            aim = (sum(b["x"] for b in ahead) / len(ahead),
+                   sum(b["y"] + 1.0 for b in ahead) / len(ahead),
+                   sum(b["z"] for b in ahead) / len(ahead))
+            ease = 0.06
+        target_yaw = math.atan2(aim[0] - x, -(aim[2] - z))
         dy = target_yaw - self.yaw
         while dy > math.pi:
             dy -= 2 * math.pi
         while dy < -math.pi:
             dy += 2 * math.pi
-        self.yaw += dy * 0.08
-        dip = math.sin(min(1.0, 1.0 - self.land_dip) * math.pi) * 0.0 + self.land_dip * 0.16
+        self.yaw += dy * ease
+        # a touch of roll into the turn sells the head motion
+        self._roll += (max(-0.05, min(0.05, dy * 0.35)) - self._roll) * 0.1
+
+        # landing dip with a small overshoot, plus an idle breath on ground
+        dip = self.land_dip ** 1.4 * 0.17 - math.sin(self.land_dip * math.pi) * 0.02
+        breathe = math.sin(self.elapsed * 2.1) * 0.012 if self.phase == "ground" else 0.0
 
         cam = self.camera
-        eye_y = y + EYE - dip
+        eye_y = y + EYE - dip + breathe
         cam.position = (x, eye_y, z)
         look = 5.5
+        # pitch follows vertical velocity: rising lifts the gaze, falling
+        # drops it toward the landing block. Base pitch keeps the horizon
+        # near mid-frame like the reference footage.
+        pitch_drop = 1.1 - max(-0.6, min(0.85, self.vy * 0.1))
         cam.target = (x + math.sin(self.yaw) * look,
-                      eye_y - 1.45,
+                      eye_y - pitch_drop,
                       z - math.cos(self.yaw) * look)
-        cam.fovy = 70.0
+        # roll: tilt the up vector about the view direction
+        fx, fz = math.sin(self.yaw), -math.cos(self.yaw)
+        cam.up = (math.sin(self._roll) * -fz, math.cos(self._roll), math.sin(self._roll) * fx)
+        cam.fovy = 70.0 + (2.5 if self.phase == "air" else 0.0)
 
         rl.BeginMode3D(cam[0])
 

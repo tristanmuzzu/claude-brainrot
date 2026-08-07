@@ -19,14 +19,22 @@ from common import (  # noqa: E402
 
 
 def barrier():
+    """A hurdle that cannot be mistaken for a bench: alternating hazard
+    stripes on the beam, a thin mid-bar, splayed legs."""
     STRIPE = zone("stripe", (0.95, 0.55, 0.08), rough=0.5)
+    WHITE = zone("white", (0.93, 0.93, 0.95), rough=0.5)
     DARK = zone("dark", (0.12, 0.12, 0.13), rough=0.8)
-    parts = [
-        box("beam", (1.9, 0.28, 0.5), (0, 0, 0.85), STRIPE, 0.05),
-        box("beam2", (1.9, 0.24, 0.24), (0, 0, 0.45), DARK, 0.04),
-    ]
+    parts = []
+    segs = 6
+    seg_w = 1.9 / segs
+    for i in range(segs):
+        x = -1.9 / 2 + (i + 0.5) * seg_w
+        parts.append(box(f"seg{i}", (seg_w, 0.26, 0.34), (x, 0, 0.92),
+                         STRIPE if i % 2 == 0 else WHITE, 0.02))
+    parts.append(box("midbar", (1.9, 0.2, 0.12), (0, 0, 0.5), DARK, 0.02))
     for side in (-1, 1):
-        parts.append(box(f"leg{side}", (0.16, 0.3, 1.1), (side * 0.82, 0, 0.55), DARK, 0.03))
+        parts.append(box(f"leg{side}", (0.16, 0.3, 1.06), (side * 0.86, 0, 0.53), DARK, 0.03))
+        parts.append(box(f"foot{side}", (0.34, 0.4, 0.08), (side * 0.86, 0, 0.04), DARK, 0.02))
     return join(parts, "barrier")
 
 
