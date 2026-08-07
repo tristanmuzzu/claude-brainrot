@@ -73,6 +73,8 @@ COMMIT_WINDOW = 1.2
 #: How far ahead the last-resort reflex looks. Only needs to cover the moment
 #: a move has to start, not the moment it is best planned.
 REFLEX_WINDOW = 1.0
+#: Seconds a pickup run stays on the HUD after the last coin.
+COMBO_HOLD = 1.6
 
 #: Minimum rows between two obstacles that demand a move. One move must be
 #: able to finish before the next begins even at top speed, or the corridor
@@ -122,6 +124,8 @@ class RunnerScene(Scene):
         self.gantry = assets.load("gantry")
         self.fence = assets.load("fence")
         self.pillar = assets.load("pillar")
+        self.lamp = assets.load("lamp")
+        self.signal = assets.load("signal")
         self.coin = assets.load("coin")
         self.buildings = [assets.load(f"building_{c}") for c in "abc"]
 
@@ -149,6 +153,9 @@ class RunnerScene(Scene):
         self.entities: list[dict] = []
         self.score = 0.0
         self.coins = 0
+        #: consecutive pickups, and how long the tally stays on screen
+        self.combo = 0
+        self.combo_t = 0.0
         self._last_action_row = -99
         self._last_hoarding_row = -99
         self._last_any_barrier_row = -99
@@ -338,6 +345,21 @@ class RunnerScene(Scene):
                 y = 0.55 + (1.35 * math.sin(math.pi * i / (n - 1)) if over else 0.0)
                 self.entities.append({"kind": "coin", "lane": clear, "d": dd,
                                       "y": y, "taken": False})
+
+        # Trackside furniture on a steady cadence. It never touches the
+        # runner -- it sits outside the running width, which the collision
+        # test asserts -- but it is close to the camera and regular, and that
+        # is what the eye actually uses to read speed.
+        if row % 2 == 0:
+            side = 1 if (row // 2) % 2 == 0 else -1
+            self.entities.append({"kind": "lamp", "x": side * 5.25,
+                                  "d": d0 + ROW * 0.5,
+                                  "yaw": 0.0 if side < 0 else 180.0})
+        if row % 7 == 3:
+            side = 1 if (row // 7) % 2 == 0 else -1
+            self.entities.append({"kind": "signal", "x": side * 4.55,
+                                  "d": d0 + ROW * 0.25,
+                                  "yaw": 0.0 if side < 0 else 180.0})
 
         # city canyon: a building per side on an independent cadence
         for side in (-1, 1):
@@ -566,6 +588,10 @@ class RunnerScene(Scene):
         self._collect_coins()
         self._resolve_contacts()
         self.burst.update(dt)
+        if self.combo_t > 0.0:
+            self.combo_t -= dt
+            if self.combo_t <= 0.0:
+                self.combo = 0
 
     def _reflex(self) -> None:
         """Jump or slide when this instant is the moment to, plan or no plan.
@@ -623,6 +649,8 @@ class RunnerScene(Scene):
                 e["taken"] = True
                 self.coins += 1
                 self.score += 25
+                self.combo += 1
+                self.combo_t = COMBO_HOLD
                 self.burst.spawn(self.x, RAIL_TOP + e["y"], -e["d"],
                                  (255, 215, 80), count=8, rng=self.rng)
 
@@ -724,6 +752,13 @@ class RunnerScene(Scene):
                 rl.DrawModelEx(b.model, (e["x"], 0, -d), (0, 1, 0), e["yaw"], (1, 1, 1), fog)
             elif kind == "pillar":
                 rl.DrawModelEx(self.pillar.model, (e["x"], 0, -d), (0, 1, 0), 0, (1, 1, 1), fog)
+            elif kind == "lamp":
+                rl.DrawModelEx(self.lamp.model, (e["x"], 0, -d), (0, 1, 0),
+                               e["yaw"], (1, 1, 1), fog)
+            elif kind == "signal":
+                self.signal.recolor({"stripe": pal.hazard})
+                rl.DrawModelEx(self.signal.model, (e["x"], 0, -d), (0, 1, 0),
+                               e["yaw"], (1, 1, 1), fog)
             elif kind == "train":
                 self._draw_train(e, fog)
             elif kind == "barrier":
@@ -754,6 +789,10 @@ class RunnerScene(Scene):
             if e["kind"] == "coin" and not e["taken"] and e["d"] < 30:
                 glow_billboard(self.camera, self._lane_x(e["lane"]),
                                RAIL_TOP + e["y"], -e["d"], 0.6, (255, 200, 60), 55)
+            elif e["kind"] == "lamp" and pal.is_dark and e["d"] < 60:
+                # the lamp head hangs over the track; light it from there
+                glow_billboard(self.camera, e["x"] + (0.78 if e["yaw"] else -0.78),
+                               4.05, -e["d"], 2.4, (255, 232, 170), 90)
             elif e["kind"] == "train" and e["vel"] and pal.is_dark and e["d"] < 70:
                 # oncoming headlights punching through the dark, on the nose --
                 # which faces us, so they sit at the near end of the hull
@@ -764,8 +803,34 @@ class RunnerScene(Scene):
         self.burst.draw(self.camera)
         rl.EndMode3D()
 
+        self._draw_speed_lines()
         self.weather.draw(self.elapsed)
         self._draw_hud()
+
+    def _draw_speed_lines(self) -> None:
+        """Streaks raked past the edges of the frame once the run is quick.
+
+        Screen space, and only near the sides, so they read as motion past the
+        lens rather than as objects in the world. Fades in over the top third
+        of the speed range -- at walking pace they would just be noise.
+        """
+        t = (self.speed - BASE_SPEED) / (TOP_SPEED - BASE_SPEED)
+        t = max(0.0, (t - 0.45) / 0.55)
+        if t <= 0.0:
+            return
+        rl.BeginBlendMode(rl.BLEND_ADDITIVE)
+        for i in range(14):
+            phase = (self.elapsed * (2.4 + (i % 5) * 0.5) + i * 0.137) % 1.0
+            y = phase * (self.height + 260) - 130
+            side = -1 if i % 2 else 1
+            x = self.width * (0.5 + side * (0.30 + (i % 7) * 0.028))
+            length = 60 + (i % 4) * 44
+            alpha = int(46 * t * math.sin(math.pi * min(1.0, phase * 1.6)))
+            if alpha <= 0:
+                continue
+            rl.DrawLineEx((x, y), (x + side * 12, y + length), 2.0,
+                          (255, 255, 255, alpha))
+        rl.EndBlendMode()
 
     def _draw_train(self, e: dict, fog) -> None:
         x = self._lane_x(e["lane"])
@@ -816,6 +881,12 @@ class RunnerScene(Scene):
         rl.DrawCircle(self.width - 66, 58, 7, (255, 205, 60, 255))
         rl.DrawCircle(self.width - 66, 58, 4, (255, 235, 140, 255))
         text(f"{self.coins}", self.width - 14, 48, 20, (255, 215, 90), anchor="topright")
+        # a run of pickups is worth saying out loud
+        if self.combo >= 4 and self.combo_t > 0.0:
+            fade = min(1.0, self.combo_t / (COMBO_HOLD * 0.5))
+            size = 18 + min(8, self.combo // 4)
+            text(f"x{self.combo}", self.width - 16, 76, size,
+                 rl.mix_rgb(pal.ink, (255, 214, 92), fade), anchor="topright")
 
 
 # ---------------------------------------------------------------------------

@@ -101,6 +101,43 @@ def ramp():
     return join(parts, "ramp")
 
 
+def lamp():
+    """Lineside lamp post: a mast with a cowled head leaning over the track.
+
+    Trackside furniture is what stops a corridor reading as a corridor. One
+    repeated post on a cadence does more for the sense of speed than anything
+    in the middle of the track, because it is close to the camera and it is
+    what the eye uses to measure how fast the world is moving.
+    """
+    POST = zone("dark", (0.17, 0.18, 0.21), rough=0.7)
+    LAMP = zone("lamp", (1.0, 0.94, 0.68), rough=0.15)
+    parts = [
+        box("base", (0.34, 0.34, 0.22), (0, 0, 0.11), POST, 0.03),
+        box("mast", (0.16, 0.16, 4.2), (0, 0, 2.2), POST, 0.03),
+        box("arm", (0.9, 0.13, 0.13), (0.42, 0, 4.22), POST, 0.03),
+        box("cowl", (0.62, 0.34, 0.12), (0.78, 0, 4.14), POST, 0.03),
+        box("bulb", (0.5, 0.24, 0.09), (0.78, 0, 4.03), LAMP, 0.02),
+    ]
+    return join(parts, "lamp")
+
+
+def signal():
+    """A three-aspect lineside signal, the other half of the trackside kit."""
+    POST = zone("dark", (0.15, 0.16, 0.18), rough=0.75)
+    HOOD = zone("steel", (0.36, 0.38, 0.42), rough=0.5)
+    RED = zone("stripe", (0.92, 0.18, 0.16), rough=0.3)
+    parts = [
+        box("base", (0.4, 0.4, 0.18), (0, 0, 0.09), POST, 0.03),
+        box("mast", (0.14, 0.14, 2.5), (0, 0, 1.3), POST, 0.03),
+        box("head", (0.34, 0.3, 0.95), (0, 0, 2.85), HOOD, 0.05),
+        box("ladder", (0.05, 0.22, 1.6), (-0.14, 0, 1.1), HOOD, 0.01),
+    ]
+    for i, z in enumerate((2.55, 2.85, 3.15)):
+        parts.append(box(f"aspect{i}", (0.1, 0.2, 0.2), (0.19, 0, z),
+                         RED if i == 0 else HOOD, 0.02))
+    return join(parts, "signal")
+
+
 def fence():
     """3 m tileable panel, origin at centre, runs along X."""
     POST = zone("dark", (0.14, 0.14, 0.16), rough=0.8)
@@ -138,6 +175,8 @@ for name, builder, res in (
     ("gantry", gantry, 256),
     ("hoarding", hoarding, 256),
     ("ramp", ramp, 256),
+    ("lamp", lamp, 256),
+    ("signal", signal, 256),
     ("fence", fence, 256),
     ("pillar", pillar, 256),
     ("coin", coin, 128),

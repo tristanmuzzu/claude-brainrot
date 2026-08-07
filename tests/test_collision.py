@@ -133,6 +133,35 @@ def test_runner_still_collects_while_staying_clean() -> None:
     assert scene.coins > 40, f"only {scene.coins} coins -- is it dodging the corridor?"
 
 
+def test_trackside_dressing_stays_out_of_reach() -> None:
+    """Lamps, signals, pillars and fences have no hitbox, which is only
+    honest if they are genuinely outside the width a body can occupy.
+
+    The runner can be anywhere from the left lane's left edge to the right
+    lane's right edge, so that -- not the lane centres -- is the span these
+    have to clear.
+    """
+    from brainrot import assets
+    from brainrot.scenes.runner import LANE_X
+
+    scene = simulate(2, 20.0)
+    reach = LANE_X + scene.body.half_w
+    seen = set()
+    for e in scene.entities:
+        kind = e["kind"]
+        if kind not in ("lamp", "signal", "pillar", "building"):
+            continue
+        seen.add(kind)
+        assert scene.solid_box(e) is None, f"{kind} claims a hitbox"
+        name = kind if kind != "building" else f"building_{'abc'[e['idx']]}"
+        half = (assets.bounds(name).x1 - assets.bounds(name).x0) / 2
+        near = abs(e["x"]) - half
+        assert near > reach, (
+            f"{kind} at x={e['x']:.2f} reaches within {near:.2f} m of centre, "
+            f"inside the runner's {reach:.2f} m span")
+    assert {"lamp", "signal"} <= seen, "trackside dressing was never spawned"
+
+
 def test_generator_leaves_at_most_one_lane_blocked_by_trains() -> None:
     """Trains cannot be jumped or slid under, so two abreast has no answer."""
     for run in (3, 12, 25, 31):

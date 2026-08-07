@@ -11,6 +11,11 @@ heading steered back when the course wanders too far off its spine.
 Far below: an ocean, drifting cloud shelves, and grass-capped voxel islands
 -- the drop is what supplies the vertigo, so the world down there exists to
 be fallen toward, never reached.
+
+Two things carry more of the "this is Minecraft" reading than any amount of
+terrain: the held block swinging in the corner of the frame, and the crosshair
+in the middle of it. Both are here, because a first-person shot without them
+reads as a generic flying camera.
 """
 
 from __future__ import annotations
@@ -59,6 +64,18 @@ class ParkourScene(Scene):
         self.grass = voxel.block_model(
             "terrain-grass", (124, 92, 62), noise=0.05, seed=4,
             top=(96, 186, 82), side_band=(104, 170, 76))
+
+        # What the player is carrying, and the arm holding it. Deliberately a
+        # stone grey rather than one of the palette's course colours: a held
+        # block in the same candy family as the platforms just reads as
+        # another platform floating oddly close to the lens.
+        self.held = voxel.block_model("held-stone", (122, 122, 130),
+                                      noise=0.07, seed=91)
+        self.sleeve = voxel.block_model(f"run{seed.run}-sleeve", pal.accent,
+                                        noise=0.03, seed=seed.run * 13 + 4)
+        self.skin = voxel.block_model("hand-skin", (198, 148, 112),
+                                      noise=0.03, seed=17)
+        self.swing = 0.0
 
         self.rng = ctx.stream("course")
         self.irng = ctx.stream("islands")
@@ -222,6 +239,13 @@ class ParkourScene(Scene):
         self.phase = "ground"
         self.phase_t = 0.0
         self.land_dip = 1.0
+        self.swing = 1.0
+        # a scuff of block-coloured dust at the feet, kicked up by the landing
+        blk = self.blocks[min(self.jump_index, len(self.blocks) - 1)]
+        tint = self.palette.blocks[blk["style"] % len(self.palette.blocks)] \
+            if blk["style"] != "ice" else (200, 232, 250)
+        self.burst.spawn(self.stand[0], self.stand[1] - 0.9, self.stand[2],
+                         tint, count=7, speed=1.6, rng=self.hop_rng)
         self.distance += math.dist((self.takeoff[0], self.takeoff[2]),
                                    (self.stand[0], self.stand[2]))
         landed_on = self.blocks[self.jump_index]
@@ -260,6 +284,7 @@ class ParkourScene(Scene):
                 self._land()
 
         self.land_dip = max(0.0, self.land_dip - dt * 5.0)
+        self.swing = max(0.0, self.swing - dt * 2.6)
         self.burst.update(dt)
 
     # -- drawing ----------------------------------------------------------
@@ -390,8 +415,108 @@ class ParkourScene(Scene):
                 voxel.draw_block(style, blk["x"], blk["y"] + 0.5, blk["z"], tint)
 
         self.burst.draw(self.camera)
+        self._draw_held()
         rl.EndMode3D()
 
         self.weather.draw(self.elapsed)
+        self._draw_crosshair()
         text(f"{int(self.distance)}m", self.width - 12, 10, 20, pal.ink,
              anchor="topright")
+
+    # -- first person -----------------------------------------------------
+
+    def _camera_basis(self):
+        """Right / up / forward of the current view, orthonormal."""
+        cam = self.camera
+        px, py, pz = cam.position.x, cam.position.y, cam.position.z
+        fx, fy, fz = cam.target.x - px, cam.target.y - py, cam.target.z - pz
+        fl = math.sqrt(fx * fx + fy * fy + fz * fz) or 1.0
+        fx, fy, fz = fx / fl, fy / fl, fz / fl
+        ux, uy, uz = cam.up.x, cam.up.y, cam.up.z
+        rx, ry, rz = fy * uz - fz * uy, fz * ux - fx * uz, fx * uy - fy * ux
+        rl_ = math.sqrt(rx * rx + ry * ry + rz * rz) or 1.0
+        rx, ry, rz = rx / rl_, ry / rl_, rz / rl_
+        # re-derive up so the three are exactly orthogonal even with roll on
+        ux, uy, uz = ry * fz - rz * fy, rz * fx - rx * fz, rx * fy - ry * fx
+        return (rx, ry, rz), (ux, uy, uz), (fx, fy, fz)
+
+    def _view_matrix(self, right, up, forward):
+        """A rotation that puts model +X along ``right``, +Y up, +Z back.
+
+        Built by hand rather than composed from yaw and pitch: the camera also
+        rolls into its turns, and a model oriented from Euler angles ignores
+        that and shears away from the frame it is supposed to be pinned to.
+        """
+        m = rl.ffi.new("Matrix *")
+        m.m0, m.m1, m.m2, m.m3 = right[0], right[1], right[2], 0.0
+        m.m4, m.m5, m.m6, m.m7 = up[0], up[1], up[2], 0.0
+        m.m8, m.m9, m.m10, m.m11 = -forward[0], -forward[1], -forward[2], 0.0
+        m.m12, m.m13, m.m14, m.m15 = 0.0, 0.0, 0.0, 1.0
+        return m[0]
+
+    def _draw_held(self) -> None:
+        """The block in your hand, bobbing in the corner of the frame.
+
+        Positioned from the camera basis rather than in screen space, so it
+        picks up the same perspective as the world and swings with the head.
+        Drawn last and very close in, which puts it in front of everything
+        without needing its own pass.
+        """
+        cam = self.camera
+        right, up, forward = self._camera_basis()
+        px, py, pz = cam.position.x, cam.position.y, cam.position.z
+
+        # Size everything against the actual frustum at the distance it is
+        # drawn, so the hand keeps its share of the frame whatever the field
+        # of view does -- and this view widens by 2.5 degrees in mid-air.
+        near = 0.5
+        half_h = near * math.tan(math.radians(cam.fovy * 0.5))
+        half_w = half_h * (self.width / self.height)
+
+        t = self.elapsed
+        bob_x = math.sin(t * 4.6) * 0.05
+        bob_y = abs(math.cos(t * 4.6)) * 0.05
+        punch = self.swing ** 1.5
+
+        def place(model, u, v, off_f, size, yaw, tilt):
+            """u, v are fractions of the half-frame: (1, -1) is bottom-right."""
+            off_r, off_u = u * half_w, v * half_h
+            x = px + forward[0] * (near + off_f) + right[0] * off_r + up[0] * off_u
+            y = py + forward[1] * (near + off_f) + right[1] * off_r + up[1] * off_u
+            z = pz + forward[2] * (near + off_f) + right[2] * off_r + up[2] * off_u
+            basis = self._view_matrix(right, up, forward)
+            spin = rl.MatrixMultiply(rl.MatrixRotateX(math.radians(tilt)),
+                                     rl.MatrixRotateY(math.radians(yaw)))
+            model.transform = rl.MatrixMultiply(spin, basis)
+            rl.DrawModelEx(model, (x, y, z), (0, 1, 0), 0.0,
+                           (size[0] * half_w, size[1] * half_w, size[2] * half_w),
+                           rl.WHITE4)
+
+        # Forearm out of the bottom-right corner, hand, then the block it is
+        # carrying -- turned so two faces are visible, which is what makes a
+        # cube read as a cube rather than a coloured square.
+        # Sat well into the corner with part of it past the frame edge, the
+        # way a held item actually sits -- fully inside the frame it stops
+        # being scenery you look past and becomes an object you look at.
+        drop = -1.06 - bob_y * 0.6 - punch * 0.34
+        place(self.sleeve, 1.08 + bob_x * 0.3, drop - 0.66, 0.02,
+              (0.34, 1.30, 0.34), yaw=-26.0, tilt=-24.0 + punch * 10.0)
+        place(self.skin, 0.94 + bob_x * 0.4, drop - 0.10, 0.01,
+              (0.34, 0.34, 0.34), yaw=-26.0, tilt=-24.0 + punch * 10.0)
+        place(self.held, 0.82 + bob_x * 0.5, drop + 0.24, 0.05,
+              (0.50, 0.50, 0.50), yaw=-32.0, tilt=-16.0 + punch * 14.0)
+
+    def _draw_crosshair(self) -> None:
+        """Centre-screen, dark-edged so it survives a bright sky.
+
+        Minecraft's own crosshair inverts whatever is behind it. There is no
+        blend mode here that does that, and plain white vanishes against the
+        sun -- so it gets a dark outline and a light core, which reads on
+        anything.
+        """
+        cx, cy = self.width // 2, self.height // 2
+        arm = 8
+        for pad, color in ((1, (20, 20, 24, 150)), (0, (238, 238, 242, 225))):
+            t = 2 + pad * 2
+            rl.DrawRectangle(cx - arm - pad, cy - t // 2, (arm + pad) * 2, t, color)
+            rl.DrawRectangle(cx - t // 2, cy - arm - pad, t, (arm + pad) * 2, color)
