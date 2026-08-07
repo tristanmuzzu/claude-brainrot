@@ -96,6 +96,15 @@ Two mechanisms, answering two different questions:
   hidden; "show over everything until we learn better" is the wrong default in
   both halves.
 
+- **Where on the desktop.** Also from the host window, not the monitor: a
+  screen edge is exactly where an editor keeps its sidebar. `place()` in
+  `engine/window.py` puts the strip *beside* the host window when the desktop
+  has room for it there — covering nothing at all — and otherwise into that
+  window's own margin on the `dock` side, which on a maximised app is the
+  gutter outside its content column. Recomputed every frame, so it keeps
+  station on a window being dragged or maximised underneath it. Pure geometry
+  with the window rectangles passed in, so it is tested without a desktop.
+
 `attach = "topmost"` and `follow_focus = false` restore the older, blunter
 behaviour for demos and recordings. All of it is ctypes; there is no pywin32
 dependency.

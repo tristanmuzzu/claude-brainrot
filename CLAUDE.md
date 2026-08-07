@@ -60,10 +60,27 @@ itself (the takeover chord makes the overlay the foreground window — a naive
 "hide unless the host is in front" hides the strip the instant you press it)
 → fade out. Unknown host means hidden, never topmost.
 
+It is also **placed against the host window rather than the screen**
+(`engine/window.py:place`, pure geometry, `tests/test_placement.py`). Docking
+to a monitor edge put it straight on top of the Claude Code sidebar, which is
+what a screen edge holds in every app worth overlaying. It now stands *beside*
+the host window when the desktop has room and in that window's own gutter when
+it does not, on the `dock` side, re-checked every frame so it keeps up with a
+window being dragged. Real geometry lives in `overlay/win32.py`
+(`window_rect`, `work_area`, `move_window` — `SetWindowPos`, never raylib's
+`SetWindowPosition`, which would block off-thread).
+
 ## Still outstanding
 
-1. **DPI**: on a scaled display check the strip's size and placement; raylib
-   windows are not DPI-aware by default.
+1. **DPI**: measured 2026-08-07 on the owner's 1920x1080 at 125%. The daemon
+   *is* per-monitor DPI aware — GLFW sets that at `InitWindow` — so every
+   `GetWindowRect`/`SetWindowPos`/work-area number inside it is in **physical
+   pixels**, and placement is self-consistent. What is still open is that
+   `width`/`height` are therefore physical too, so the strip is 1/1.25 of the
+   apparent size you would expect from the number. Beware when comparing
+   against an outside probe: a plain script is DPI-*un*aware and reads the
+   same window back scaled (1920 → 1536), which looks exactly like a bug and
+   is not. Call `SetProcessDpiAwareness(2)` in probes.
 2. Per-frame cost at sustained top speed, vsync off, on an idle machine:
    runner 2.6-3.0 ms, parkour 1.5-2.3 ms, against a 16.7 ms budget. Measure
    with `HeadlessWindow` + `SetTargetFPS(0)`; `DesktopWindow` has vsync on and
@@ -166,6 +183,16 @@ long jumps you need a different motion model, not a bigger number.
   `Where-Object CommandLine -like '*brainrot*'` matches **nothing** and a kill
   that reports no error can have killed no one. Count the windows instead:
   `brainrot doctor` has an `instances` check that does exactly that.
+- **A Microsoft Store Python cannot see `%APPDATA%`.** The whole subtree is
+  redirected into `…\Local\Packages\<pkg>\LocalCache\Roaming\`, for *reads as
+  well as writes*: `(state_dir()/"config.toml").exists()` is False for the
+  file you are looking at in Explorer. The owner's `hotkey` setting had never
+  once been read. There are several such copies here — the Claude desktop app
+  is a packaged app too, so anything it launches gets its own. `Config.load`
+  swallows the miss (`except OSError: raw = {}`) and every value silently
+  reverts to a default that looks plausible. `brainrot doctor`'s `config`
+  check prints the path that is genuinely being read; trust that, not the
+  path printed next to "state dir".
 - **A leaked daemon can steal the foreground.** Chasing why the overlay hid
   itself the instant it appeared cost an hour and produced a plausible,
   entirely wrong theory about `glfwShowWindow` activating the window. It does

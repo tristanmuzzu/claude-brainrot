@@ -39,6 +39,7 @@ if os.name == "nt":
     user32.DestroyWindow.argtypes = [wintypes.HWND]
 
 WS_POPUP = 0x80000000
+WS_VISIBLE = 0x10000000
 WS_EX_TOOLWINDOW = 0x00000080
 
 
@@ -54,9 +55,15 @@ def overlay_hwnd():
     win32._set_long(handle, win32.GWLP_HWNDPARENT, 0)
 
 
-def _make_host(name: str = "brainrot-test-host") -> int:
+def _make_host(name: str = "brainrot-test-host", visible: bool = False) -> int:
+    """A stand-in for a Claude Code window.
+
+    ``visible`` is for the one test that needs a window Windows will actually
+    put in the foreground; the rest stay hidden so a test run never flashes
+    anything at whoever is using the machine.
+    """
     hwnd = user32.CreateWindowExW(
-        WS_EX_TOOLWINDOW, "STATIC", name, WS_POPUP,
+        WS_EX_TOOLWINDOW, "STATIC", name, WS_POPUP | (WS_VISIBLE if visible else 0),
         10, 10, 200, 120, None, None, None, None)
     if not hwnd:
         pytest.skip("could not create a test host window")
@@ -84,8 +91,8 @@ def hosts(overlay_hwnd: int):
     """Make as many stand-in host windows as a test needs."""
     made: list[int] = []
 
-    def make(name: str = "brainrot-test-host") -> int:
-        made.append(_make_host(name))
+    def make(name: str = "brainrot-test-host", visible: bool = False) -> int:
+        made.append(_make_host(name, visible))
         return made[-1]
 
     yield make
@@ -253,8 +260,11 @@ def test_owned_only_while_visible(host: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_no_known_host_means_hidden(window) -> None:
-    assert window.focus_allows(frozenset()) is False
+def test_no_known_host_means_hidden(window, hosts) -> None:
+    # An explicit foreground, because the window in front of a real desktop
+    # mid-test-run is occasionally this very overlay -- which is a legitimate
+    # reason to stay up, and nothing to do with what this is asserting.
+    assert window.focus_allows(frozenset(), foreground=hosts("anything")) is False
 
 
 def test_a_host_that_is_not_in_front_stays_hidden(window, hosts) -> None:
@@ -279,13 +289,36 @@ def test_only_the_sessions_that_are_working_count(window, hosts) -> None:
 def test_the_live_foreground_window_is_what_is_actually_consulted(window) -> None:
     """No override: whatever is genuinely in front of this desktop right now."""
     front = win32.foreground_root()
-    if not front:
-        pytest.skip("no foreground window on this desktop")
+    if not front or front == win32.root_of(window._hwnd()):
+        pytest.skip("nothing but our own window in front right now")
     allowed = window.focus_allows({front})
+    denied = window.focus_allows(frozenset())
     if win32.foreground_root() != front:
         pytest.skip("the foreground window changed mid-test")
-    assert allowed is True
-    assert window.focus_allows(frozenset()) is False
+    assert allowed is True, "the window genuinely in front did not count"
+    assert denied is False, "showed with no host at all"
+
+
+def test_against_a_window_actually_brought_to_the_front(window, hosts) -> None:
+    """No override anywhere: a real window is pushed to the front and the
+    overlay is asked, through ``GetForegroundWindow``, whether it may show.
+
+    Windows only grants ``SetForegroundWindow`` to a process that already owns
+    the foreground -- true here whenever the shared raylib window has it, and
+    skipped when it does not rather than fought.
+    """
+    was = win32.foreground_window()
+    stage = hosts("in-front", visible=True)
+    other = hosts("behind")
+    if not user32.SetForegroundWindow(stage) or win32.foreground_root() != stage:
+        pytest.skip("this process may not set the foreground window right now")
+    try:
+        assert window.focus_allows({stage}) is True, "hid with its host in front"
+        assert window.focus_allows({other}) is False, "showed for a window behind"
+        assert window.focus_allows(frozenset()) is False, "showed with no host"
+    finally:
+        if win32.is_window(was):
+            user32.SetForegroundWindow(was)
 
 
 def test_the_overlay_being_in_front_is_not_the_user_leaving(window, hosts) -> None:
@@ -360,7 +393,82 @@ def test_reattaching_to_a_dead_host_forgets_it(window, hosts) -> None:
     window.set_visible(True)            # what the daemon does on the way back up
     assert window._attached is False
     assert window._host_hwnd == 0
-    assert window.focus_allows(frozenset()) is False
+    assert window.focus_allows(frozenset(), foreground=hosts("elsewhere")) is False
+
+
+# ---------------------------------------------------------------------------
+# Standing beside the host rather than on top of it
+# ---------------------------------------------------------------------------
+
+
+def test_window_rect_reads_the_real_rectangle(hosts) -> None:
+    """The stand-in hosts are created at (10,10) 200x120, which is the whole
+    assertion: placement is only as good as this read."""
+    rect = win32.window_rect(hosts("measure-me"))
+    assert rect is not None
+    left, top, right, bottom = rect
+    assert (left, top) == (10, 10)
+    assert (right - left, bottom - top) == (200, 120)
+
+
+def test_a_dead_window_has_no_rectangle(hosts) -> None:
+    doomed = hosts("doomed")
+    assert user32.DestroyWindow(doomed)
+    assert win32.window_rect(doomed) is None
+    assert win32.window_rect(0) is None
+
+
+def test_the_work_area_is_real_and_excludes_the_taskbar(hosts) -> None:
+    area = win32.work_area(hosts("somewhere"))
+    assert area is not None
+    left, top, right, bottom = area
+    assert right > left and bottom > top
+    screen_h = user32.GetSystemMetrics(1)      # SM_CYSCREEN
+    assert bottom - top <= screen_h, "work area taller than the screen"
+
+
+def test_moving_a_window_puts_it_exactly_where_asked(hosts) -> None:
+    """``move_window`` sets size as well as position, and both have to land:
+    the strip is placed into a gap it has to fit inside."""
+    hwnd = hosts("movable")
+    win32.move_window(hwnd, 300, 140, 260, 380)
+    assert win32.window_rect(hwnd) == (300, 140, 560, 520)
+
+
+def test_moving_the_overlay_does_not_activate_it(window, hosts) -> None:
+    """Placement runs while the strip is on screen and the user is typing
+    somewhere else. A move that stole the foreground would undo the whole
+    point of following it."""
+    before = win32.foreground_root()
+    if not before or before == win32.root_of(window._hwnd()):
+        pytest.skip("no other window in front to lose")
+    hwnd = hosts("movable")
+    win32.move_window(hwnd, 320, 160, 200, 200)
+    assert win32.foreground_root() == before
+
+
+def test_the_overlay_places_itself_beside_a_live_host(window, hosts) -> None:
+    """End to end on real windows: a small host in the top-left of a real
+    desktop has room beside it, so the strip must land clear of it."""
+    host = hosts("claude")                      # (10,10)-(210,130)
+    window.attach_host(host)
+    window._cfg = Config()
+    window._cfg.width, window._cfg.height = 200, 300
+    # The overlay here is the one raylib window the whole session shares, so
+    # put its rectangle back exactly as found -- resizing it behind raylib's
+    # back would hand every later test a surface of a size it did not ask for.
+    was = win32.window_rect(window._hwnd())
+    try:
+        window.follow_host()
+        spot = window._placed
+        assert spot is not None
+        assert spot.x >= 210, "landed on top of the window it follows"
+        assert win32.window_rect(window._hwnd()) == (
+            spot.x, spot.y, spot.x + spot.width, spot.y + spot.height)
+    finally:
+        if was:
+            win32.move_window(window._hwnd(), was[0], was[1],
+                              was[2] - was[0], was[3] - was[1])
 
 
 def _z_index(hwnd: int, ignore: int = 0) -> int:

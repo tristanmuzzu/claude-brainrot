@@ -32,21 +32,85 @@ class Placement:
     height: int
 
 
-def compute_placement(cfg: Config) -> Placement:
-    """Dock the strip to the left edge of the configured monitor. Uses real
-    monitor origins, so multi-monitor setups place correctly."""
-    width, height = cfg.width, cfg.height
+@dataclass(frozen=True)
+class Rect:
+    left: int
+    top: int
+    right: int
+    bottom: int
+
+    @property
+    def width(self) -> int:
+        return self.right - self.left
+
+    @property
+    def height(self) -> int:
+        return self.bottom - self.top
+
+
+def place(cfg: Config, work: Rect, host: Rect | None = None) -> Placement:
+    """Where the strip goes, given the desktop and the window it belongs to.
+
+    Docking to a screen edge is what put the overlay straight on top of the
+    Claude Code sidebar: the edge of the *monitor* has nothing to do with
+    where the app keeps anything. The host window's rectangle does, so:
+
+    1. **Beside the window** if the desktop has room for it there. The strip
+       then covers nothing at all, which is the best outcome available.
+    2. Otherwise **in the window's own margin** on the docked side -- the
+       gutter a maximised app leaves outside its content column. Not free,
+       but far cheaper than the navigation the other edge is made of.
+
+    ``work`` is the work area rather than the whole monitor, so the taskbar
+    is not somewhere the strip can hide.
+
+    Pure geometry, no window API: everything here is exercised by tests that
+    do not need a desktop.
+    """
+    width = min(cfg.width, max(1, work.width))
+    height = min(cfg.height, max(1, work.height))
+    right_side = cfg.dock != "left"
+
+    if host is None:
+        x = work.right - width - cfg.margin_x if right_side else work.left + cfg.margin_x
+        top, bottom = work.top, work.bottom
+    else:
+        gap = cfg.margin_x * 2 + width
+        if right_side and work.right - host.right >= gap:
+            x = host.right + cfg.margin_x                 # beside it, covering nothing
+        elif not right_side and host.left - work.left >= gap:
+            x = host.left - cfg.margin_x - width
+        elif right_side:
+            x = host.right - width - cfg.margin_x         # tucked into its own margin
+        else:
+            x = host.left + cfg.margin_x
+        top = max(work.top, host.top)
+        bottom = min(work.bottom, host.bottom)
+
+    travel = max(0, (bottom - top) - height - cfg.margin_y * 2)
+    y = top + cfg.margin_y + int(travel * cfg.anchor_y)
+    # Never leave the work area, however small the window it is following is.
+    x = max(work.left, min(x, work.right - width))
+    y = max(work.top, min(y, work.bottom - height))
+    return Placement(int(x), int(y), int(width), int(height))
+
+
+def monitor_work_area(cfg: Config) -> Rect:
+    """The configured monitor, as raylib sees it. No taskbar information --
+    the Win32 path below has that, and this is the fallback."""
     count = rl.GetMonitorCount()
     if count <= 0:
-        return Placement(cfg.margin_x, 0, width, height)
+        return Rect(0, 0, max(1, cfg.width), max(1, cfg.height))
     index = max(0, min(cfg.monitor, count - 1))
     origin = rl.GetMonitorPosition(index)
-    screen_w = rl.GetMonitorWidth(index)
-    screen_h = rl.GetMonitorHeight(index)
-    height = min(height, screen_h) if screen_h > 0 else height
-    width = min(width, screen_w) if screen_w > 0 else width
-    y = int((screen_h - height) * cfg.anchor_y) if screen_h > 0 else 0
-    return Placement(int(origin.x) + cfg.margin_x, max(0, int(origin.y) + y), width, height)
+    return Rect(int(origin.x), int(origin.y),
+                int(origin.x) + rl.GetMonitorWidth(index),
+                int(origin.y) + rl.GetMonitorHeight(index))
+
+
+def compute_placement(cfg: Config) -> Placement:
+    """Placement with nothing known about a host window."""
+    return place(cfg, monitor_work_area(cfg))
 
 
 class _BaseWindow:
@@ -119,6 +183,9 @@ class _BaseWindow:
         """Layer this window relative to the Claude Code host window. Only the
         Windows overlay backend has anything to do here."""
 
+    def follow_host(self) -> None:
+        """Keep station on the host window. Windows overlay only."""
+
     def detach_host(self) -> None:
         """Release any host attachment. Only meaningful on Windows."""
 
@@ -152,6 +219,7 @@ class OverlayWindow(_BaseWindow):
         self._cfg: Config | None = None
         self._host_hwnd = 0
         self._attached = False
+        self._placed: Placement | None = None
 
     def _after_create(self, cfg: Config) -> None:
         self._cfg = cfg
@@ -281,6 +349,35 @@ class OverlayWindow(_BaseWindow):
 
     def _topmost_mode(self) -> bool:
         return self._cfg is not None and self._cfg.attach == "topmost"
+
+    # -- placement --------------------------------------------------------
+
+    def follow_host(self) -> None:
+        """Sit beside the Claude Code window, or in its margin.
+
+        Called while the strip is on screen, so it keeps up with a window
+        that gets moved, resized or maximised underneath it rather than
+        holding a position that was right when the turn started.
+        """
+        if os.name != "nt" or self._cfg is None:
+            return
+        try:
+            from ..overlay.win32 import move_window, window_rect, work_area
+
+            host = window_rect(self._host_hwnd) if self._host_hwnd else None
+            area = work_area(self._host_hwnd or 0)
+            if area is None:
+                return
+            wanted = place(self._cfg, Rect(*area), Rect(*host) if host else None)
+        except Exception:
+            return
+        if wanted == self._placed:
+            return
+        self._placed = wanted
+        try:
+            move_window(self._hwnd(), wanted.x, wanted.y, wanted.width, wanted.height)
+        except Exception:
+            self._placed = None
 
 
 class DesktopWindow(_BaseWindow):

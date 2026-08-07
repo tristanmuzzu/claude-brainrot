@@ -2,8 +2,8 @@
 
 *Subway Surfers while CC is thinking.*
 
-A narrow strip of generated gameplay that appears on the left edge of your
-screen while Claude Code is thinking, and gets out of the way when it stops.
+A narrow strip of generated gameplay that appears beside your Claude Code
+window while it is thinking, and gets out of the way when it stops.
 
 No footage, no downloads. Every world is generated at runtime from a seed that
 has never been used before and never will be again — rendered in real 3D with
@@ -79,14 +79,24 @@ brainrot run                  # long-lived; leave it running
 That is the whole setup. Open Claude Code and give it something slow to do.
 Check any machine with `brainrot doctor`. Remove with `brainrot uninstall`.
 
-## It attaches to Claude Code, not to your screen
+## It belongs to Claude Code, not to your screen
 
-On Windows the overlay is **not** globally always-on-top. The hook shim notes
-which window you submitted your prompt from — that window *is* your Claude
-Code — and the daemon layers the strip exactly one z-level above it. Raise
-your terminal and the strip rides with it; focus anything else and that window
-covers both. Set `attach = "topmost"` in the config if you want the old
-float-over-everything behaviour.
+On Windows the overlay is **not** globally always-on-top, and it is not on
+screen just because Claude is busy. The hook shim notes which window you
+submitted your prompt from — that window *is* your Claude Code — and from
+then on:
+
+- **It only appears while you are looking at that window.** Switch to your
+  browser and it fades out; switch back and it returns. Nothing known about
+  where Claude Code is means it stays hidden, rather than floating over
+  everything. (`follow_focus = false` for the always-on behaviour, which is
+  what demos and screen recordings want.)
+- **It stands beside that window, not on your screen edge.** A screen edge is
+  wherever the app keeps its sidebar; the strip goes into the empty gutter on
+  the `dock` side of the Claude Code window instead, and *outside* that window
+  entirely when the desktop has room. It follows the window if you move it.
+- **It rides one z-level above it.** Ownership, so raising your terminal
+  raises the strip with it. `attach = "topmost"` restores float-over-all.
 
 ## Try it without Claude Code
 
@@ -125,13 +135,20 @@ Optional `config.toml`, next to the run-counter state:
 - Linux/macOS: `~/.local/state/claude-brainrot/config.toml`
 - Windows: `%APPDATA%\claude-brainrot\config.toml`
 
+Run `brainrot doctor` for the path it is actually reading. On a **Microsoft
+Store** Python that is not the path above: the Store redirects `%APPDATA%`
+into the package's `LocalCache`, and the copy you can see in Explorer is one
+the daemon cannot open at all. The `config` check prints the real one.
+
 ```toml
 [window]
 width = 360
 height = 640
-margin_x = 12      # gap from the left screen edge
-anchor_y = 0.5     # 0 = top, 1 = bottom
-monitor = 0
+dock = "right"     # which side of the Claude Code window to stand on
+margin_x = 12      # gap from that side
+margin_y = 20      # gap from the top and bottom of that window
+anchor_y = 0.0     # 0 = top of it, 1 = bottom of it
+monitor = 0        # only used when no host window is known
 opacity = 0.88
 fps = 60
 attach = "host"    # "host" = one level above Claude Code, "topmost" = above all
@@ -140,6 +157,7 @@ attach = "host"    # "host" = one level above Claude Code, "topmost" = above all
 grace_seconds = 1.5
 min_visible_seconds = 3.0
 hide_on_notification = true
+follow_focus = true   # on screen only while you are looking at Claude Code
 
 [content]
 scenes = ["runner", "parkour"]

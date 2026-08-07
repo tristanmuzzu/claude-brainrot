@@ -26,10 +26,17 @@ class Config:
     # --- Window ----------------------------------------------------------
     width: int = 360
     height: int = 640
-    #: Gap from the left screen edge, in pixels.
+    #: Which side of the Claude Code window to sit on, "right" or "left".
+    #: The strip goes *beside* that window when the desktop has room and into
+    #: that side's margin when it does not -- never onto the screen edge for
+    #: its own sake, which is how it used to land on top of the sidebar.
+    dock: str = "right"
+    #: Gap from the docked edge, in pixels.
     margin_x: int = 12
-    #: Vertical placement, 0.0 = top, 0.5 = centred, 1.0 = bottom.
-    anchor_y: float = 0.5
+    #: Gap from the top and bottom of the window it is following.
+    margin_y: int = 20
+    #: Vertical placement within that window, 0.0 = top, 1.0 = bottom.
+    anchor_y: float = 0.0
     #: Which monitor to dock to (0 = primary).
     monitor: int = 0
     opacity: float = 0.88
@@ -112,7 +119,7 @@ class Config:
             if env is None:
                 continue
             try:
-                if f.type is int or f.name in ("port", "width", "height", "margin_x", "monitor", "fps", "force_seed"):
+                if f.type is int or f.name in ("port", "width", "height", "margin_x", "margin_y", "monitor", "fps", "force_seed"):
                     setattr(self, f.name, int(env))
                 elif f.name in ("opacity", "anchor_y", "grace_seconds",
                                 "min_visible_seconds", "fade_seconds",
@@ -150,4 +157,8 @@ class Config:
             self.quality = "high"
         if self.attach not in ("host", "topmost"):
             self.attach = "host"
+        if self.dock not in ("left", "right"):
+            self.dock = "right"
+        self.margin_x = max(0, int(self.margin_x))
+        self.margin_y = max(0, int(self.margin_y))
         self.follow_focus = bool(self.follow_focus)

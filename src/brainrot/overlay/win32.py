@@ -70,8 +70,25 @@ SWP_NOSIZE = 0x0001
 SWP_NOACTIVATE = 0x0010
 SWP_SHOWWINDOW = 0x0040
 SWP_NOOWNERZORDER = 0x0200
+SWP_NOZORDER = 0x0004
 
 GA_ROOT = 2
+
+MONITOR_DEFAULTTOPRIMARY = 1
+MONITOR_DEFAULTTONEAREST = 2
+
+
+class POINT(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+
+class MONITORINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", wintypes.RECT),
+        ("rcWork", wintypes.RECT),
+        ("dwFlags", wintypes.DWORD),
+    ]
 
 _set_long = user32.SetWindowLongPtrW
 _get_long = user32.GetWindowLongPtrW
@@ -91,6 +108,14 @@ user32.GetAncestor.restype = wintypes.HWND
 user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
 user32.GetForegroundWindow.restype = wintypes.HWND
 user32.GetForegroundWindow.argtypes = []
+user32.GetWindowRect.restype = wintypes.BOOL
+user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+user32.MonitorFromWindow.restype = wintypes.HANDLE
+user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
+user32.MonitorFromPoint.restype = wintypes.HANDLE
+user32.MonitorFromPoint.argtypes = [POINT, wintypes.DWORD]
+user32.GetMonitorInfoW.restype = wintypes.BOOL
+user32.GetMonitorInfoW.argtypes = [wintypes.HANDLE, ctypes.POINTER(MONITORINFO)]
 
 
 def apply_overlay_styles(hwnd: int, cfg: Config) -> None:
@@ -180,6 +205,47 @@ def foreground_window() -> int:
     at event time: whatever is foreground when you submit a prompt to Claude
     Code *is* the Claude Code host window."""
     return int(user32.GetForegroundWindow() or 0)
+
+
+def window_rect(hwnd: int) -> tuple[int, int, int, int] | None:
+    """Screen rectangle of a window, or None if the handle is dead."""
+    if not is_window(hwnd):
+        return None
+    rect = wintypes.RECT()
+    if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+        return None
+    return int(rect.left), int(rect.top), int(rect.right), int(rect.bottom)
+
+
+def work_area(hwnd: int = 0) -> tuple[int, int, int, int] | None:
+    """Usable desktop of the monitor a window is on -- taskbar excluded.
+
+    The work area rather than the monitor because the taskbar is not a place
+    the overlay may hide behind, and on a multi-monitor desk the monitor that
+    matters is the one Claude Code is on, not the one raylib calls first.
+    """
+    monitor = (user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) if hwnd
+               else user32.MonitorFromPoint(POINT(0, 0), MONITOR_DEFAULTTOPRIMARY))
+    if not monitor:
+        return None
+    info = MONITORINFO()
+    info.cbSize = ctypes.sizeof(MONITORINFO)
+    if not user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
+        return None
+    work = info.rcWork
+    return int(work.left), int(work.top), int(work.right), int(work.bottom)
+
+
+def move_window(hwnd: int, x: int, y: int, width: int, height: int) -> None:
+    """Reposition without activating, restacking, or disturbing the owner.
+
+    Deliberately ``SetWindowPos`` and not raylib's ``SetWindowPosition``: this
+    is called from whichever thread notices the host has moved, and GLFW's
+    window calls post to the thread that owns the window and block until it
+    pumps its queue.
+    """
+    user32.SetWindowPos(hwnd, HWND_TOP, x, y, width, height,
+                        SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER)
 
 
 def is_window(hwnd: int) -> bool:

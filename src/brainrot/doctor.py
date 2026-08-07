@@ -185,6 +185,51 @@ def _check_daemon(cfg: Config) -> Check:
         probe.close()
 
 
+def _packaged_copies() -> list[Path]:
+    """Every redirected copy of the state directory this machine can show us.
+
+    A Store-packaged interpreter does not merely redirect its *writes* under
+    ``%APPDATA%`` -- it cannot see the real folder at all. So a config.toml
+    sitting in plain sight at ``AppData\\Roaming\\claude-brainrot`` may be a
+    file the daemon has never once read, and there can be several copies, one
+    per packaged app that has run this code. Editing the wrong one changes
+    nothing and explains nothing.
+    """
+    local = os.environ.get("LOCALAPPDATA")
+    if os.name != "nt" or not local:
+        return []
+    try:
+        return sorted(Path(local, "Packages").glob("*/LocalCache/Roaming/claude-brainrot"))
+    except OSError:
+        return []
+
+
+def _check_config() -> Check:
+    """Which config.toml the daemon is actually reading."""
+    path = state_dir() / "config.toml"
+    detail = str(path) if path.exists() else f"{path} (absent -- built-in defaults)"
+
+    packaged = "WindowsApps" in sys.prefix or "WindowsApps" in sys.executable
+    if not packaged:
+        return Check("config", OK, detail)
+
+    copies = _packaged_copies()
+    mine = [p for p in copies if p.parent.parent.parent.name in sys.executable]
+    others = [p / "config.toml" for p in copies if p not in mine
+              and (p / "config.toml").exists()]
+    real = str(mine[0] / "config.toml") if mine else "(could not locate it)"
+    if not others:
+        return Check("config", OK, f"{detail}\n            on disk: {real}")
+    return Check(
+        "config", WARN,
+        f"{detail}\n            on disk: {real}",
+        "This interpreter is a Store build: %APPDATA% is redirected and the "
+        "plain AppData\\Roaming copy is invisible to it. Edit the 'on disk' "
+        "path above; these other copies are being ignored: "
+        + ", ".join(str(p) for p in others),
+    )
+
+
 def _count_overlay_windows() -> int:
     """How many overlay windows exist right now, across every process."""
     import ctypes
@@ -275,6 +320,7 @@ def run(cfg: Config | None = None) -> int:
     checks.append(_check_assets())
     checks += _check_backend(cfg)
     checks.append(_check_pythonw())
+    checks.append(_check_config())
     checks += _check_hooks(cfg)
     checks.append(_check_daemon(cfg))
     instances = _check_one_daemon()

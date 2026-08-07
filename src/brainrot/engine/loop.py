@@ -149,6 +149,11 @@ class Overlay:
                     time.sleep(IDLE_SLEEP)
                     continue
 
+                # Before showing, not after: appearing in last turn's position
+                # and then jumping is worse than a frame's delay. Cheap enough
+                # to redo every frame, which is also how it keeps up with a
+                # window being dragged around under it.
+                self.window.follow_host()
                 self._show_window()
                 if self.scene is not None:
                     try:
