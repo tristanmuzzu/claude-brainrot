@@ -125,6 +125,34 @@ def test_block_model_builds_with_texture() -> None:
     assert voxel.block_model("test-red", (200, 40, 40), seed=3) is model
 
 
+def test_capture_frame_returns_the_colours_it_drew() -> None:
+    """Every art decision on this project was made by looking at a capture, so
+    a capture that swaps red and blue silently invalidates all of them.
+
+    The mark is deliberately asymmetric in both axes: a channel swap changes
+    its colour, a vertical flip moves it to the wrong end of the frame, and
+    either one fails here rather than in someone's eye a week later.
+    """
+    from conftest import H, W
+
+    window = ensure_window()
+    mark = (203, 96, 24)
+    # Twice: a read-back can be one buffer swap behind the draw.
+    for _ in range(2):
+        window.begin()
+        rl.DrawRectangle(0, 0, W, H // 4, rl.rgba(mark))
+        window.end()
+    raw = rl.capture_frame()
+    width = rl.GetScreenWidth()
+
+    def pixel(x: int, y: int) -> tuple[int, int, int]:
+        i = (y * width + x) * 4
+        return tuple(raw[i:i + 3])
+
+    assert pixel(4, 4) == mark, "capture mangled the colours it was given"
+    assert pixel(4, rl.GetScreenHeight() - 5) == (0, 0, 0), "capture is upside down"
+
+
 def test_capture_frame_shape() -> None:
     window = ensure_window()
     window.begin()

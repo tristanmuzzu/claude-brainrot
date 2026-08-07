@@ -94,43 +94,62 @@ def _raw_screen() -> "tuple[bytes, int, int] | None":
         UnloadImage(img)
 
 
-def _capture_fix() -> "tuple[bool, bool]":
+def _capture_fix(attempts: int = 6) -> "tuple[bool, bool]":
     """Work out what this renderer's captures need, by drawing a known frame.
 
     Paints the framebuffer black with a red patch in the top-left corner, then
     reads it straight back. Where the patch turns up says whether rows arrive
     bottom-up, and which byte of it holds the 255 says whether the channels
-    are RGBA or BGRA. Costs one frame, once.
+    are RGBA or BGRA.
+
+    The marker is drawn *repeatedly until the read-back is decisive*, because
+    on a double-buffered GPU context ``LoadImageFromScreen`` after
+    ``EndDrawing`` returns the frame before last -- so a single marker frame
+    reads back as whatever was on screen previously. That is not a hypothetical:
+    it read back a blue sky, saw more blue than red, concluded the channels
+    were swapped, and every ``shoot`` PNG on this machine came out with the sky
+    orange. Decisive means one saturated channel over a dark remainder at one
+    corner and black at the other, which no scene frame satisfies by accident.
     """
     global _FIX
     if _FIX is not None:
         return _FIX
     _FIX = (False, False)          # provisional, so a failure cannot recurse
     try:
-        BeginDrawing()
-        ClearBackground((0, 0, 0, 255))
-        DrawRectangle(0, 0, 8, 8, (255, 0, 0, 255))
-        EndDrawing()
-        probe = _raw_screen()
-        if probe is None:
-            return _FIX
-        raw, w, h = probe
-        top = (2 * w + 2) * 4
-        bottom = ((h - 3) * w + 2) * 4
-        top_px = raw[top:top + 3]
-        bottom_px = raw[bottom:bottom + 3]
-        if max(top_px) > 128:
-            flip, marker = False, top_px
-        elif max(bottom_px) > 128:
-            flip, marker = True, bottom_px
-        else:
-            return _FIX            # nothing readable; leave uncorrected
-        # The patch was pure red: whichever channel carries it names the order.
-        swap = marker[2] > marker[0]
-        _FIX = (flip, swap)
+        for _ in range(attempts):
+            BeginDrawing()
+            ClearBackground((0, 0, 0, 255))
+            DrawRectangle(0, 0, 8, 8, (255, 0, 0, 255))
+            EndDrawing()
+            probe = _raw_screen()
+            if probe is None:
+                continue
+            raw, w, h = probe
+            if w < 8 or h < 8:
+                return _FIX
+            top = raw[(2 * w + 2) * 4:(2 * w + 2) * 4 + 3]
+            bottom = raw[((h - 3) * w + 2) * 4:((h - 3) * w + 2) * 4 + 3]
+            for flip, marker, elsewhere in ((False, top, bottom),
+                                            (True, bottom, top)):
+                if (max(marker) > 200 and sorted(marker)[1] < 60
+                        and max(elsewhere) < 60):
+                    # The patch was pure red: whichever channel carries it
+                    # names the order.
+                    _FIX = (flip, marker[2] > marker[0])
+                    return _FIX
     except Exception:
         pass
     return _FIX
+
+
+def calibrate_capture() -> "tuple[bool, bool]":
+    """Decide the capture correction now, while the framebuffer is expendable.
+
+    Called once at window creation. Calibrating lazily instead means the first
+    capture pays for it *and* the marker frames it draws land in the middle of
+    a scene, so the next capture reads a black frame with a red square in it.
+    """
+    return _capture_fix()
 
 
 def capture_frame() -> "bytes | None":

@@ -68,6 +68,9 @@ class _BaseWindow:
         rl.SetConfigFlags(self.creation_flags)
         rl.InitWindow(cfg.width, cfg.height, b"claude-brainrot")
         self.width, self.height = cfg.width, cfg.height
+        # Settle the capture correction against this renderer while there is
+        # nothing on screen worth keeping -- it draws marker frames.
+        rl.calibrate_capture()
         self._after_create(cfg)
 
     def _after_create(self, cfg: Config) -> None:
