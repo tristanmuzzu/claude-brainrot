@@ -89,13 +89,29 @@ def cloud_blob(seed: int, size: int = 160):
             w = rng.randint(size // 5, size // 2)
             h = rng.randint(size // 8, size // 4)
             x = cx + rng.randint(-size // 3, size // 3) - w // 2
-            y = base - rng.randint(0, size // 10) - h // 2
+            # puffs sit on a common base line: the classic cumulus silhouette,
+            # without a hard erase that would leave a visible straight edge
+            y = base - h + rng.randint(0, size // 24)
             d.ellipse([x, y, x + w, y + h], fill=(255, 255, 255, 235))
-        # flat base line, the classic cumulus look
-        d.rectangle([size // 6, base, size - size // 6, size // 2], fill=(255, 255, 255, 0))
-        return im.filter(ImageFilter.GaussianBlur(2))
+        return im.filter(ImageFilter.GaussianBlur(3))
 
     return from_pil(f"cloud{seed}", build)
+
+
+def alpha_band(key: str, color: rl.RGB, top_alpha: int = 200,
+               falloff: float = 1.6, height: int = 128):
+    """A vertical alpha fade of one colour -- screen-space haze bands."""
+
+    def build():
+        im = Image.new("RGBA", (4, height))
+        px = im.load()
+        for y in range(height):
+            a = int(top_alpha * (1.0 - y / (height - 1)) ** falloff)
+            for x in range(4):
+                px[x, y] = (*color, a)
+        return im
+
+    return from_pil(f"band-{key}", build)
 
 
 def vertical_gradient(key: str, stops: list[tuple[float, rl.RGB]], height: int = 256):
