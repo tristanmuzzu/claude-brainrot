@@ -148,20 +148,61 @@ def jump_pose(pose, t01):
     lift(pose, "root", up=0.10 * tuck)
 
 
+#: Fraction of the roll clip spent ramping in, and again ramping out. The
+#: remainder is a flat hold at the bottom -- see roll_pose.
+ROLL_RAMP = 0.18
+
+
+def _hold(t01, ramp=ROLL_RAMP):
+    """A smoothed trapezoid: 0 at the ends, a flat 1 across the middle."""
+    if t01 < ramp:
+        f = t01 / ramp
+    elif t01 > 1.0 - ramp:
+        f = (1.0 - t01) / ramp
+    else:
+        return 1.0
+    return f * f * (3.0 - 2.0 * f)
+
+
 def roll_pose(pose, t01):
-    # A crouch-slide: sink low over the front foot, chest folded, arms back.
-    c = math.sin(t01 * math.pi)
-    lift(pose, "root", up=-0.32 * c, forward=0.08 * c)
-    swing(pose, "spine", 36 * c)
-    swing(pose, "head", -26 * c)
-    swing(pose, "leg.L", 54 * c)
-    swing(pose, "shin.L", -78 * c)
-    swing(pose, "leg.R", -14 * c)
-    swing(pose, "shin.R", -32 * c)
-    swing(pose, "arm.L", -35 * c, side_deg=6 * c)
-    swing(pose, "arm.R", -35 * c, side_deg=-6 * c)
-    swing(pose, "farm.L", 22 * c)
-    swing(pose, "farm.R", 22 * c)
+    """A baseball slide: hips drop, legs shoot forward, chest folds over them.
+
+    Two things this has to get right, because the collision model is measured
+    from the result rather than assumed:
+
+    * The silhouette must actually get LOW -- the point of the move is to pass
+      under a gantry, so the top of the head is the number that matters.
+    * Nothing may sink below y=0. Dropping the root alone takes the feet
+      through the track with it; the legs have to fold up by as much as the
+      hips come down, which is what a real slide does anyway.
+    """
+    # Drop, HOLD, rise -- not a sine through the bottom. How long the body
+    # stays low is what decides whether it fits under a hoarding, and a sine
+    # is only at its lowest for an instant: at the bottom of the speed range
+    # the runner spends over a third of a second under the board, and a slide
+    # that merely touches its lowest point in passing does not clear it.
+    # The flat middle is measured by assets/measure.py and is what
+    # Kinematics.roll_low_from/to describe.
+    c = _hold(t01)
+    # Limbs lead, hips follow: the trailing heel has to be tucked *before* the
+    # hips drop onto it, or the foot is driven through the track on the way
+    # into the slide. Two curves, not one, is the whole trick.
+    cr = c ** 1.6
+    lift(pose, "root", up=-0.34 * cr, forward=0.12 * cr)
+    # Chest folded well over: this is what buys the height, not the hip drop.
+    swing(pose, "spine", 84 * c)
+    swing(pose, "head", -54 * c)
+    # Lead leg thrusts forward almost straight; the trailing heel folds right
+    # up under the hip so nothing reaches below the railhead.
+    swing(pose, "leg.L", 100 * c)
+    swing(pose, "shin.L", -22 * c)
+    swing(pose, "leg.R", 58 * c)
+    swing(pose, "shin.R", -150 * c)
+    # Arms swept back and low, out of the silhouette's top edge.
+    swing(pose, "arm.L", -66 * c, side_deg=16 * c)
+    swing(pose, "arm.R", -66 * c, side_deg=-16 * c)
+    swing(pose, "farm.L", 74 * c)
+    swing(pose, "farm.R", 74 * c)
 
 
 record_action(rig, "run", 24, run_pose, step=1)

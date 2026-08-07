@@ -17,6 +17,7 @@ material), so the GLB's JSON chunk is the source of truth.
 from __future__ import annotations
 
 import json
+import math
 import struct
 from importlib import resources
 from pathlib import Path
@@ -25,12 +26,59 @@ from ..engine import rl
 from ..engine.rl import ffi
 
 _CACHE: dict[str, "ModelAsset"] = {}
+_METRICS: dict | None = None
 
 
 def data_path(name: str) -> Path:
     """Filesystem path of a committed asset, wheel- and checkout-friendly."""
     root = resources.files(__package__) / "data" / f"{name}.glb"
     return Path(str(root))
+
+
+def metrics(name: str | None = None) -> dict:
+    """Recorded geometry: bounding boxes, and per-clip posed extents.
+
+    Written by ``assets/measure.py`` and checked by ``tests/test_assets.py``.
+    Scenes read their collision sizes from here rather than measuring at
+    startup (CPU-skinning every clip costs more than an overlay's whole launch
+    budget) and rather than hard-coding them (a rebuilt asset would silently
+    stop matching its hitbox).
+    """
+    global _METRICS
+    if _METRICS is None:
+        path = Path(str(resources.files(__package__) / "data" / "metrics.json"))
+        _METRICS = json.loads(path.read_text(encoding="utf-8"))
+    return _METRICS["assets"][name] if name else _METRICS
+
+
+def bounds(name: str):
+    """Recorded model-space bounding box of an asset, as an :class:`AABB`."""
+    from ..engine.collide import AABB
+
+    return AABB(*metrics(name)["bounds"])
+
+
+def clip_bounds(name: str, clip: str, t0: float = 0.0, t1: float = 1.0):
+    """Box enclosing the frames of ``clip`` between ``t0`` and ``t1``.
+
+    The default spans the whole clip -- what a hitbox must respect for the
+    entire animation. A narrower window matters for clips that pass through
+    their extremes: a roll starts and ends standing upright, so the union over
+    the whole clip reports the runner's *standing* height and would conclude
+    that ducking achieves nothing.
+    """
+    from ..engine.collide import AABB
+
+    data = metrics(name)["clips"][clip]
+    if t0 <= 0.0 and t1 >= 1.0:
+        return AABB(*data["union"])
+    frames = data["frames"]
+    n = len(frames)
+    lo = max(0, int(t0 * n))
+    hi = min(n, max(lo + 1, int(math.ceil(t1 * n))))
+    chosen = frames[lo:hi]
+    return AABB(*([min(f[k] for f in chosen) for k in range(3)]
+                  + [max(f[k] for f in chosen) for k in range(3, 6)]))
 
 
 def _gltf_material_names(path: Path) -> list[str]:

@@ -177,6 +177,11 @@ class Overlay:
         """Drop to zero cost: hide the window and discard the world."""
         if self._window_shown:
             self.window.set_visible(False)
+            # Let go of the host while we have nothing to show. On Windows the
+            # overlay is an *owned* window, and Windows destroys owned windows
+            # along with their owner -- so remaining attached while idle means
+            # closing the terminal takes the daemon's window with it.
+            self.window.detach_host()
             self._window_shown = False
         self._end_scene()
         # Even hidden, the window's event queue must be drained or the OS

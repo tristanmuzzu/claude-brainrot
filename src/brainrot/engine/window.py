@@ -111,6 +111,9 @@ class _BaseWindow:
         """Layer this window relative to the Claude Code host window. Only the
         Windows overlay backend has anything to do here."""
 
+    def detach_host(self) -> None:
+        """Release any host attachment. Only meaningful on Windows."""
+
     def destroy(self) -> None:
         rl.CloseWindow()
 
@@ -128,6 +131,7 @@ class OverlayWindow(_BaseWindow):
         super().__init__()
         self._cfg: Config | None = None
         self._host_hwnd = 0
+        self._attached = False
 
     def _after_create(self, cfg: Config) -> None:
         self._cfg = cfg
@@ -147,18 +151,50 @@ class OverlayWindow(_BaseWindow):
     def _hwnd(self) -> int:
         return int(rl.ffi.cast("intptr_t", rl.GetWindowHandle()))
 
+    def set_visible(self, visible: bool) -> None:
+        super().set_visible(visible)
+        # Re-take ownership on the way back up; detach_host dropped it when the
+        # overlay last went idle.
+        if visible:
+            self._reattach()
+
     def attach_host(self, hwnd: int) -> None:
-        if os.name != "nt" or not hwnd or hwnd == self._host_hwnd:
+        """Remember the Claude Code host window, and ride above it."""
+        if os.name != "nt" or not hwnd:
             return
         if self._cfg is not None and self._cfg.attach != "host":
+            return
+        self._host_hwnd = hwnd
+        self._reattach()
+
+    def _reattach(self) -> None:
+        if not self._host_hwnd or self._attached:
             return
         try:
             from ..overlay.win32 import attach_to_host
 
-            if attach_to_host(self._hwnd(), hwnd):
-                self._host_hwnd = hwnd
+            self._attached = attach_to_host(self._hwnd(), self._host_hwnd)
         except Exception:
             pass
+
+    def detach_host(self) -> None:
+        """Give up ownership, keeping the host for next time.
+
+        Called whenever the overlay goes idle. An owned window is destroyed
+        along with its owner, so staying owned around the clock means the
+        daemon's window dies the moment the user closes the terminal it was
+        attached to. Being owned only while visible keeps that risk to the
+        seconds a scene is actually on screen.
+        """
+        if os.name != "nt" or not self._attached:
+            return
+        try:
+            from ..overlay.win32 import detach
+
+            detach(self._hwnd())
+        except Exception:
+            pass
+        self._attached = False
 
 
 class DesktopWindow(_BaseWindow):
@@ -178,7 +214,14 @@ class HeadlessWindow(_BaseWindow):
         os.environ["BRAINROT_HEADLESS"] = "1"
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         if rl.IsWindowReady():
-            rl.SetWindowSize(cfg.width, cfg.height)
+            # Only resize when the size actually differs. Resizing is not a
+            # free no-op: on the GPU (GLFW) build under Windows it posts to the
+            # thread that owns the window and blocks until that thread pumps
+            # its message queue. A caller on a *different* thread -- which is
+            # exactly how the integration tests drive the daemon -- therefore
+            # deadlocks on a resize to the size the window already is.
+            if (rl.GetScreenWidth(), rl.GetScreenHeight()) != (cfg.width, cfg.height):
+                rl.SetWindowSize(cfg.width, cfg.height)
             self.width, self.height = cfg.width, cfg.height
             return
         super().create(cfg)

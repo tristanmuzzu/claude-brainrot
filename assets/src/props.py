@@ -2,10 +2,17 @@
 the corridor. Exported as individual GLBs.
 
 * barrier   -- waist-high hurdle to jump (stripes = hazard zone)
-* gantry    -- overhead sign bridge to roll under (sign = accent zone)
+* gantry    -- overhead sign bridge, high enough to run under: pure dressing
+* hoarding  -- low advertising bridge; its underside is genuinely below head
+               height, so it is the obstacle that has to be rolled under
+* ramp      -- sloped launcher onto a train roof (stripes = hazard zone)
 * fence     -- tileable lineside fence panel
 * pillar    -- elevated-line support column
 * coin      -- squat gold disc, additive glow added at runtime
+
+Heights here are load-bearing: ``assets/measure.py`` records them and the
+runner plans jumps and rolls against the recorded numbers, so moving a beam
+moves the gameplay with it. See ``tests/test_assets.py``.
 """
 
 import math
@@ -14,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from common import (  # noqa: E402
-    bake_and_export, box, cylinder, join, reset, run_script_banner, zone,
+    bake_and_export, box, cylinder, join, reset, run_script_banner, wedge, zone,
 )
 
 
@@ -46,6 +53,52 @@ def gantry():
     for side in (-1, 1):
         parts.append(box(f"post{side}", (0.3, 0.3, 2.9), (side * 4.0, 0, 1.45), STEEL, 0.04))
     return join(parts, "gantry")
+
+
+def hoarding():
+    """A low advertising bridge across the whole track.
+
+    The one number that matters: the underside of the board sits at 1.55, so
+    drawn at railhead height its soffit lands at 1.85 -- under the running
+    character's 2.39 head, over the 1.48 of a slide. That gap *is* the reason
+    the roll exists, and the asset test asserts it stays true.
+    """
+    STEEL = zone("dark", (0.16, 0.17, 0.19), rough=0.7)
+    BOARD = zone("sign", (0.88, 0.24, 0.30), rough=0.45)
+    CREAM = zone("cream", (0.92, 0.90, 0.84), rough=0.5)
+    SOFFIT = 1.55
+    parts = [
+        box("board", (7.4, 0.16, 0.68), (0, 0, SOFFIT + 0.34), BOARD, 0.03),
+        box("underbeam", (8.0, 0.34, 0.13), (0, 0, SOFFIT + 0.065), STEEL, 0.03),
+        box("topcap", (7.8, 0.3, 0.12), (0, 0, SOFFIT + 0.74), STEEL, 0.03),
+    ]
+    # a cream band across the board so it reads as signage, not a red slab
+    parts.append(box("band", (6.4, 0.06, 0.2), (0, -0.1, SOFFIT + 0.34), CREAM, 0.01))
+    for side in (-1, 1):
+        parts.append(box(f"post{side}", (0.34, 0.34, SOFFIT + 0.8),
+                         (side * 3.9, 0, (SOFFIT + 0.8) / 2), STEEL, 0.04))
+        parts.append(box(f"foot{side}", (0.6, 0.6, 0.16), (side * 3.9, 0, 0.08), STEEL, 0.03))
+    return join(parts, "hoarding")
+
+
+def ramp():
+    """A launcher onto a train roof: a hazard-striped wedge one lane wide.
+
+    Rises to 1.15 over 3.4 m. The runner does not physically ride the slope --
+    touching it commits a scripted launch whose arc is solved against the roof
+    height -- but the slope has to look like it could produce that arc.
+    """
+    STRIPE = zone("stripe", (0.95, 0.55, 0.08), rough=0.5)
+    DARK = zone("dark", (0.13, 0.13, 0.15), rough=0.8)
+    STEEL = zone("steel", (0.46, 0.48, 0.52), rough=0.4)
+    parts = [wedge("slope", 2.0, 3.4, 1.15, (0, 0, 0.0), STRIPE)]
+    # side cheeks and a lip so the wedge does not read as a paper triangle
+    for side in (-1, 1):
+        parts.append(box(f"cheek{side}", (0.12, 3.4, 0.1),
+                         (side * 1.0, 0, 0.05), DARK, 0.02))
+    parts.append(box("lip", (2.1, 0.18, 0.12), (0, 1.7, 1.12), STEEL, 0.03))
+    parts.append(box("kick", (2.1, 0.2, 0.1), (0, -1.7, 0.05), DARK, 0.02))
+    return join(parts, "ramp")
 
 
 def fence():
@@ -83,6 +136,8 @@ def coin():
 for name, builder, res in (
     ("barrier", barrier, 256),
     ("gantry", gantry, 256),
+    ("hoarding", hoarding, 256),
+    ("ramp", ramp, 256),
     ("fence", fence, 256),
     ("pillar", pillar, 256),
     ("coin", coin, 128),

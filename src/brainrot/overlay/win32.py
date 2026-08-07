@@ -16,6 +16,21 @@ Two jobs:
    ``attach = "topmost"`` in the config restores the old always-on-top mode;
    ``attach = "host"`` (default) uses ownership when a host handle arrives and
    falls back to topmost until one does.
+
+   **Ownership binds lifetimes, not just z-order.** ``DestroyWindow`` destroys
+   a window's owned windows along with it, so while the overlay is owned by
+   the terminal, closing that terminal destroys the overlay's window out from
+   under the daemon. This is not hypothetical -- it took out the shared window
+   mid-test-run the first time these paths ran on real Windows. The daemon
+   therefore only stays owned while it is actually on screen and detaches when
+   it goes idle (see :meth:`OverlayWindow.detach_host`), which reduces the
+   exposure to the few seconds an answer is being drawn.
+
+Every call here declares its argument and return types. Left to itself ctypes
+passes Python integers as C ``int`` and reads returns as ``int`` -- which
+truncates a 64-bit ``HWND`` to 32 bits. Window handles happen to stay inside
+32 bits on current Windows, so the bug is silent rather than absent, and it
+stops being silent on the day the OS stops being generous.
 """
 
 from __future__ import annotations
@@ -36,6 +51,7 @@ WS_EX_NOACTIVATE = 0x08000000
 WS_EX_LAYERED = 0x00080000
 WS_EX_APPWINDOW = 0x00040000
 
+HWND_TOP = 0
 HWND_TOPMOST = -1
 HWND_NOTOPMOST = -2
 
@@ -43,6 +59,9 @@ SWP_NOMOVE = 0x0002
 SWP_NOSIZE = 0x0001
 SWP_NOACTIVATE = 0x0010
 SWP_SHOWWINDOW = 0x0040
+SWP_NOOWNERZORDER = 0x0200
+
+GA_ROOT = 2
 
 _set_long = user32.SetWindowLongPtrW
 _get_long = user32.GetWindowLongPtrW
@@ -50,6 +69,18 @@ _set_long.restype = ctypes.c_longlong
 _set_long.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_longlong]
 _get_long.restype = ctypes.c_longlong
 _get_long.argtypes = [wintypes.HWND, ctypes.c_int]
+
+user32.SetWindowPos.restype = wintypes.BOOL
+user32.SetWindowPos.argtypes = [
+    wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+    ctypes.c_int, ctypes.c_int, wintypes.UINT,
+]
+user32.IsWindow.restype = wintypes.BOOL
+user32.IsWindow.argtypes = [wintypes.HWND]
+user32.GetAncestor.restype = wintypes.HWND
+user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+user32.GetForegroundWindow.restype = wintypes.HWND
+user32.GetForegroundWindow.argtypes = []
 
 
 def apply_overlay_styles(hwnd: int, cfg: Config) -> None:
@@ -59,13 +90,9 @@ def apply_overlay_styles(hwnd: int, cfg: Config) -> None:
     ex |= WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW
     ex &= ~WS_EX_APPWINDOW  # keep it off the taskbar
     _set_long(hwnd, GWL_EXSTYLE, ex)
-
-    if cfg.attach == "topmost":
-        _order_topmost(hwnd)
-    # attach == "host": stay topmost until a host window announces itself,
-    # then attach_to_host() reparents us.
-    else:
-        _order_topmost(hwnd)
+    # Either way we start topmost: in host mode that is the fallback until a
+    # host window announces itself, and attach_to_host() drops out of the band.
+    _order_topmost(hwnd)
 
 
 def _order_topmost(hwnd: int) -> None:
@@ -81,19 +108,27 @@ def attach_to_host(hwnd: int, host_hwnd: int) -> bool:
     """
     if not host_hwnd or not user32.IsWindow(host_hwnd):
         return False
-    root = user32.GetAncestor(host_hwnd, 2)  # GA_ROOT
+    root = user32.GetAncestor(host_hwnd, GA_ROOT)
     if root:
         host_hwnd = root
+    if host_hwnd == hwnd:
+        return False        # never own yourself: that is an unbreakable loop
     # Drop out of the topmost band first: owned windows follow their owner's
     # band, and a stale TOPMOST bit would defeat the whole point.
     user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
     _set_long(hwnd, GWLP_HWNDPARENT, host_hwnd)
-    # Nudge the z-order so ownership takes effect immediately.
-    user32.SetWindowPos(hwnd, host_hwnd, 0, 0, 0, 0,
-                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
-    user32.SetWindowPos(host_hwnd, hwnd, 0, 0, 0, 0,
-                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+    # Ownership alone does not restack anything already on screen, so nudge
+    # the overlay to the top of its band once.
+    #
+    # Only the overlay moves. The previous version also yanked the *host*
+    # window in front of the overlay immediately afterwards, which both undid
+    # the ordering it had just asked for and hoisted the user's terminal above
+    # whatever they had deliberately put in front of it. Raising someone
+    # else's window is not this program's business.
+    user32.SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+                        | SWP_NOOWNERZORDER)
     return True
 
 
@@ -103,8 +138,17 @@ def detach(hwnd: int) -> None:
     _order_topmost(hwnd)
 
 
+def owner_of(hwnd: int) -> int:
+    """Current owner handle, or 0. Exists so the attachment is testable."""
+    return int(_get_long(hwnd, GWLP_HWNDPARENT) or 0)
+
+
+def is_topmost(hwnd: int) -> bool:
+    return bool(_get_long(hwnd, GWL_EXSTYLE) & 0x00000008)  # WS_EX_TOPMOST
+
+
 def foreground_window() -> int:
     """The window the user is working in right now. The hook shim calls this
     at event time: whatever is foreground when you submit a prompt to Claude
     Code *is* the Claude Code host window."""
-    return int(user32.GetForegroundWindow())
+    return int(user32.GetForegroundWindow() or 0)

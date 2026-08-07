@@ -81,6 +81,39 @@ def cylinder(name, radius, depth, loc, material, rot=None, vertices=16):
     return ob
 
 
+def wedge(name, width, length, height, loc, material, back_height=0.0):
+    """A ramp: a box whose top face slopes from ``back_height`` at -length/2 up
+    to ``height`` at +length/2. Built from explicit geometry because the ops
+    primitives only make boxes, and a stepped stand-in reads as a staircase.
+
+    Local axes match :func:`box`: X is width, Y is length, Z is up.
+    """
+    hw, hl = width / 2, length / 2
+    verts = [
+        (-hw, -hl, 0.0), (hw, -hl, 0.0), (hw, hl, 0.0), (-hw, hl, 0.0),
+        (-hw, -hl, back_height), (hw, -hl, back_height),
+        (hw, hl, height), (-hw, hl, height),
+    ]
+    faces = [
+        (0, 1, 2, 3),      # underside
+        (4, 5, 6, 7),      # slope
+        (0, 4, 7, 3),      # left
+        (1, 2, 6, 5),      # right
+        (0, 1, 5, 4),      # low end
+        (3, 7, 6, 2),      # high end
+    ]
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(verts, [], faces)
+    mesh.validate()
+    mesh.update()
+    ob = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(ob)
+    ob.location = loc
+    ob.data.materials.append(material)
+    bpy.context.view_layer.objects.active = ob
+    return ob
+
+
 def join(objects, name):
     bpy.ops.object.select_all(action="DESELECT")
     for ob in objects:

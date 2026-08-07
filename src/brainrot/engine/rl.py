@@ -3,11 +3,18 @@
 Everything in the engine imports raylib through this module rather than
 directly. It owns the two quirks that must not leak anywhere else:
 
-* **Headless capture correction.** The software rasteriser used in CI and by
-  ``brainrot shoot`` returns screen captures vertically flipped and with red
-  and blue swapped relative to what a GPU presents. :func:`capture_frame`
-  produces identical, correct pixels on both paths -- which is the entire
-  basis for trusting CI screenshots as art review.
+* **Capture correction.** Screen captures come back differently depending on
+  which rasteriser is underneath: the software build used in CI returns them
+  vertically flipped with red and blue swapped, a GPU build does not.
+  :func:`capture_frame` produces identical, correct pixels on both paths --
+  which is the entire basis for trusting CI screenshots as art review.
+
+  The correction is *measured*, not assumed. Assuming it is how ``shoot``
+  came to write upside-down PNGs on Windows for every run: the platform test
+  that picks the correction and the library that actually renders are
+  different questions, and only one of them can be answered by looking at
+  ``os.name``. :func:`_capture_fix` draws a marker frame and reads back where
+  it landed, so the answer comes from the renderer in the process.
 
 * **cffi structs.** Long-lived pointers (cameras, models) must stay referenced
   or cffi frees them under raylib's feet. Helpers here hand back objects that
@@ -70,23 +77,83 @@ def make_camera(fovy: float = 55.0):
     return cam
 
 
-def capture_frame() -> "bytes | None":
-    """The current frame as raw RGBA bytes (width*height*4), corrected so the
-    same scene yields the same bytes on GPU and software backends."""
+#: (flip_vertically, swap_red_blue), decided once per process by measurement.
+_FIX: "tuple[bool, bool] | None" = None
+
+
+def _raw_screen() -> "tuple[bytes, int, int] | None":
+    """Screen pixels as RGBA bytes, with no correction applied at all."""
     img = LoadImageFromScreen()
     try:
-        ImageFlipVertical(ffi.addressof(img))
         ImageFormat(ffi.addressof(img), PIXELFORMAT_UNCOMPRESSED_R8G8B8A8)
-        size = img.width * img.height * 4
-        raw = bytes(ffi.buffer(img.data, size))
-        if HEADLESS:
-            # RLSW stores BGRA; swap back to true RGBA.
-            swapped = bytearray(raw)
-            swapped[0::4], swapped[2::4] = raw[2::4], raw[0::4]
-            raw = bytes(swapped)
-        return raw
+        w, h = img.width, img.height
+        if w <= 0 or h <= 0:
+            return None
+        return bytes(ffi.buffer(img.data, w * h * 4)), w, h
     finally:
         UnloadImage(img)
+
+
+def _capture_fix() -> "tuple[bool, bool]":
+    """Work out what this renderer's captures need, by drawing a known frame.
+
+    Paints the framebuffer black with a red patch in the top-left corner, then
+    reads it straight back. Where the patch turns up says whether rows arrive
+    bottom-up, and which byte of it holds the 255 says whether the channels
+    are RGBA or BGRA. Costs one frame, once.
+    """
+    global _FIX
+    if _FIX is not None:
+        return _FIX
+    _FIX = (False, False)          # provisional, so a failure cannot recurse
+    try:
+        BeginDrawing()
+        ClearBackground((0, 0, 0, 255))
+        DrawRectangle(0, 0, 8, 8, (255, 0, 0, 255))
+        EndDrawing()
+        probe = _raw_screen()
+        if probe is None:
+            return _FIX
+        raw, w, h = probe
+        top = (2 * w + 2) * 4
+        bottom = ((h - 3) * w + 2) * 4
+        top_px = raw[top:top + 3]
+        bottom_px = raw[bottom:bottom + 3]
+        if max(top_px) > 128:
+            flip, marker = False, top_px
+        elif max(bottom_px) > 128:
+            flip, marker = True, bottom_px
+        else:
+            return _FIX            # nothing readable; leave uncorrected
+        # The patch was pure red: whichever channel carries it names the order.
+        swap = marker[2] > marker[0]
+        _FIX = (flip, swap)
+    except Exception:
+        pass
+    return _FIX
+
+
+def capture_frame() -> "bytes | None":
+    """The current frame as raw RGBA bytes (width*height*4), corrected so the
+    same scene yields the same bytes on GPU and software backends.
+
+    Calibration runs on the first call and overwrites the framebuffer, so the
+    frame being captured is read out *before* that happens.
+    """
+    probe = _raw_screen()
+    if probe is None:
+        return None
+    raw, w, h = probe
+    flip, swap = _capture_fix()
+    if swap:
+        swapped = bytearray(raw)
+        swapped[0::4], swapped[2::4] = raw[2::4], raw[0::4]
+        raw = bytes(swapped)
+    if flip:
+        stride = w * 4
+        raw = b"".join(raw[r * stride:(r + 1) * stride]
+                       for r in range(h - 1, -1, -1))
+    return raw
 
 
 def save_frame(path: str) -> None:

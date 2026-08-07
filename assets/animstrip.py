@@ -54,12 +54,16 @@ def main() -> int:
         return 1
 
     bb = GetModelBoundingBox(model)
-    cy = (bb.min.y + bb.max.y) / 2
-    radius = max(bb.max.y - bb.min.y, 1.0)
-    dist = radius * 1.9
+    height = max(bb.max.y - bb.min.y, 1.0)
+    # Frame the whole figure from the waist's height, looking level: a camera
+    # above the subject foreshortens exactly the vertical extent these strips
+    # exist to judge. Keep the eye on the mid-line and the ground stays where
+    # the eye expects it.
+    cy = height * 0.5
+    dist = height * 2.3
     yaw = math.radians(args.yaw)
     cam = ffi.new("Camera3D *")
-    cam.position = (dist * math.cos(yaw), cy + radius * 0.15, dist * math.sin(yaw))
+    cam.position = (dist * math.cos(yaw), cy, dist * math.sin(yaw))
     cam.target = (0.0, cy, 0.0)
     cam.up = (0.0, 1.0, 0.0)
     cam.fovy = 40.0
@@ -74,8 +78,14 @@ def main() -> int:
             ClearBackground((238, 241, 246, 255))
             BeginMode3D(cam[0])
             DrawModel(model, (0, 0, 0), 1.0, WHITE)
-            DrawLine3D((-2, 0, -2), (2, 0, -2), (150, 150, 160, 255))
-            DrawLine3D((-2, 0, 2), (2, 0, 2), (150, 150, 160, 255))
+            # Ground plus half-metre rules: the strip is for judging how high
+            # a jump gets and how low a duck reaches, so give it a ruler.
+            for k in range(0, 7):
+                h = k * 0.5
+                shade = (60, 60, 70, 255) if k == 0 else (
+                    (170, 176, 190, 255) if k % 2 else (205, 210, 220, 255))
+                DrawLine3D((-2, h, -1.2), (2, h, -1.2), shade)
+            DrawLine3D((0, 0, -1.2), (0, 0, 1.2), (150, 150, 160, 255))
             EndMode3D()
             EndDrawing()
         img = LoadImageFromScreen()

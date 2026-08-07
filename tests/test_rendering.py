@@ -39,13 +39,33 @@ def test_character_is_rigged_with_all_clips() -> None:
 
 
 def test_recolor_writes_and_reset_restores() -> None:
+    """reset_colors restores the colours baked into the asset.
+
+    The expected value is read from the .glb's own material factor rather than
+    from whatever the shared asset happens to be tinted right now: models are
+    cached and every scene recolours them, so sampling the "before" colour
+    here just measures which test ran first.
+    """
+    import json
+    import struct
+
     train = assets.load("train_cab")
     assert "body" in train.zones
-    original = train._color_of(train.zones["body"])
+
+    blob = assets.data_path("train_cab").read_bytes()
+    length, = struct.unpack_from("<I", blob, 12)
+    header = json.loads(blob[20:20 + length].decode("utf-8"))
+    factor = next(m["pbrMetallicRoughness"]["baseColorFactor"]
+                  for m in header["materials"] if m["name"] == "body")
+    baked = tuple(round(c * 255) for c in factor[:3])
+
     train.recolor({"body": (10, 200, 30)})
     assert train._color_of(train.zones["body"]) == (10, 200, 30)
     train.reset_colors()
-    assert train._color_of(train.zones["body"]) == original
+    restored = train._color_of(train.zones["body"])
+    assert all(abs(a - b) <= 1 for a, b in zip(restored, baked)), (
+        f"reset gave {restored}, asset declares {baked}"
+    )
 
 
 def test_recolor_ignores_unknown_zones() -> None:
