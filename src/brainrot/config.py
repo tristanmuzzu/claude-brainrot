@@ -47,6 +47,17 @@ class Config:
     fade_seconds: float = 0.35
     #: Hide when Claude asks for permission or input -- you need the terminal.
     hide_on_notification: bool = True
+    #: Chord that hands the keyboard to the overlay, as "mod+mod+key".
+    #:
+    #: Deliberately obscure, and deliberately configurable. The overlay watches
+    #: for this by polling rather than registering it, so it never takes a
+    #: combination away from another program -- which cuts both ways: pick one
+    #: something else already uses and *both* will fire. `brainrot hotkey`
+    #: prints the setting for whatever you press, so you can find a free one
+    #: rather than guess.
+    hotkey: str = "ctrl+alt+shift+home"
+    #: Seconds without input before a driven scene resumes driving itself.
+    handback_seconds: float = 8.0
 
     # --- Content ---------------------------------------------------------
     #: Scenes eligible to play. Order is irrelevant; selection is seeded.
@@ -96,7 +107,9 @@ class Config:
             try:
                 if f.type is int or f.name in ("port", "width", "height", "margin_x", "monitor", "fps", "force_seed"):
                     setattr(self, f.name, int(env))
-                elif f.name in ("opacity", "anchor_y", "grace_seconds", "min_visible_seconds", "fade_seconds"):
+                elif f.name in ("opacity", "anchor_y", "grace_seconds",
+                                "min_visible_seconds", "fade_seconds",
+                                "handback_seconds"):
                     setattr(self, f.name, float(env))
                 elif f.name in ("hide_on_notification", "show_caption"):
                     setattr(self, f.name, env.strip().lower() in ("1", "true", "yes", "on"))
@@ -117,6 +130,13 @@ class Config:
         self.grace_seconds = max(0.0, float(self.grace_seconds))
         self.min_visible_seconds = max(0.0, float(self.min_visible_seconds))
         self.fade_seconds = max(0.0, float(self.fade_seconds))
+        self.handback_seconds = max(1.0, float(self.handback_seconds))
+        # A hotkey that will not parse would silently mean "no takeover ever",
+        # so fall back to the default rather than leaving it unusable.
+        from .engine.keys import parse_chord
+
+        if not parse_chord(self.hotkey):
+            self.hotkey = Config.hotkey
         if not self.scenes:
             self.scenes = ["runner"]
         if self.quality not in ("high", "balanced", "low"):

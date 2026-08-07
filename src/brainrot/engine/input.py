@@ -32,11 +32,9 @@ from dataclasses import dataclass, field
 
 from . import rl
 
-#: Seconds of no input before a scene resumes driving itself.
+#: Seconds of no input before a scene resumes driving itself. Overridable per
+#: install via ``Config.handback_seconds``.
 IDLE_HANDBACK = 8.0
-
-#: Virtual-key codes for the takeover chord: Ctrl+Alt+B.
-_VK_CONTROL, _VK_MENU, _VK_B = 0x11, 0x12, 0x42
 
 
 @dataclass
@@ -61,6 +59,7 @@ class Controller:
     last_input: float = field(default=-1e9)
     #: set when the player takes over or hands back, for the caption
     changed_at: float = field(default=-1e9)
+    handback: float = IDLE_HANDBACK
 
     def poll(self, now: float, focused: bool) -> Intent:
         """Sample the keys and decide who is driving.
@@ -85,7 +84,7 @@ class Controller:
             self.last_input = now
             if not self.engaged:
                 self._set(True, now)
-        elif self.engaged and now - self.last_input > IDLE_HANDBACK:
+        elif self.engaged and now - self.last_input > self.handback:
             # Hands off the keys for long enough: give it back rather than
             # leaving a motionless runner waiting for someone who has gone.
             self._set(False, now)
@@ -114,10 +113,12 @@ class Takeover:
     this does nothing and :meth:`focused` simply reports the truth.
     """
 
-    CHORD = "Ctrl+Alt+B"
+    def __init__(self, window, chord: str = "") -> None:
+        from .keys import parse_chord
 
-    def __init__(self, window) -> None:
         self.window = window
+        self.chord = chord
+        self.codes = parse_chord(chord)
         self.active = False
         self._was_down = False
         self._previous_foreground = 0
@@ -125,16 +126,20 @@ class Takeover:
     # -- chord detection --------------------------------------------------
 
     def _chord_down(self) -> bool:
-        if os.name != "nt":
+        """Are all of the chord's keys held right now?
+
+        Polled rather than registered, which is why it can never take a
+        combination away from another program -- and why it cannot tell that
+        another program already owns one. Both will fire. Hence
+        ``brainrot hotkey``, for finding a combination nothing else wants.
+        """
+        if os.name != "nt" or not self.codes:
             return False
         try:
             import ctypes
 
             user32 = ctypes.windll.user32
-            def down(vk: int) -> bool:
-                return bool(user32.GetAsyncKeyState(vk) & 0x8000)
-
-            return down(_VK_CONTROL) and down(_VK_MENU) and down(_VK_B)
+            return all(user32.GetAsyncKeyState(vk) & 0x8000 for vk in self.codes)
         except Exception:
             return False
 

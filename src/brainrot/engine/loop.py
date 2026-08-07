@@ -49,8 +49,8 @@ class Overlay:
 
         from .input import Controller, Takeover
 
-        self.controller = Controller()
-        self.takeover = Takeover(window)
+        self.controller = Controller(handback=cfg.handback_seconds)
+        self.takeover = Takeover(window, cfg.hotkey)
 
     # -- events -----------------------------------------------------------
 

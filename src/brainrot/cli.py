@@ -118,6 +118,12 @@ def cmd_shoot(args: argparse.Namespace) -> int:
         scene.draw()
         window.end()
         if frame % max(1, args.every) == 0:
+            # A GPU read-back can be one buffer swap behind the draw, so
+            # present this frame a second time before reading it: otherwise
+            # the PNG holds the frame before the one it is named after.
+            window.begin()
+            scene.draw()
+            window.end()
             path = out / f"{name}-run{run}-{frame:04d}.png"
             rl.save_frame(str(path))
             saved.append(path)
@@ -164,6 +170,62 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return doctor.run(_config_from(args))
 
 
+def cmd_hotkey(args: argparse.Namespace) -> int:
+    """Print the config line for whatever chord you press.
+
+    The takeover chord is *polled*, not registered, so it can never take a
+    combination away from another program -- and equally can never discover
+    that another program already owns one. Pick a combination nothing else
+    reacts to, press it here, and paste the line it prints.
+    """
+    import time
+
+    if os.name != "nt":
+        print("hotkey capture is Windows-only; set `hotkey` in config.toml")
+        return 1
+
+    import ctypes
+
+    from .engine.keys import MODIFIERS, describe, parse_chord
+
+    user32 = ctypes.windll.user32
+    cfg = _config_from(args)
+    print(f"current hotkey: {cfg.hotkey}")
+    print("\nHold a combination you want to use. Watch whether anything else")
+    print("on your machine reacts to it -- if something does, try another.")
+    print("Ctrl-C to stop.\n")
+
+    mods = set(MODIFIERS.values())
+    best: frozenset[int] = frozenset()
+    shown = ""
+    try:
+        while True:
+            held = {vk for vk in range(0x08, 0xFF)
+                    if user32.GetAsyncKeyState(vk) & 0x8000}
+            # Ignore mouse buttons, which GetAsyncKeyState also reports.
+            held -= {0x01, 0x02, 0x04, 0x05, 0x06}
+            if held:
+                # Grow to the largest combination held in one go, so releasing
+                # in any order still reports what was actually pressed.
+                if len(held) >= len(best):
+                    best = frozenset(held)
+            elif best:
+                spec = describe(best)
+                if parse_chord(spec) and not set(best) <= mods:
+                    if spec != shown:
+                        print(f"  {spec}")
+                        print(f"      config.toml:  hotkey = \"{spec}\"")
+                        print(f"      or:           set BRAINROT_HOTKEY={spec}\n")
+                        shown = spec
+                elif set(best) <= mods:
+                    print("  (modifiers only -- add a real key)\n")
+                best = frozenset()
+            time.sleep(0.03)
+    except KeyboardInterrupt:
+        print("\nstopped")
+    return 0
+
+
 def cmd_scenes(args: argparse.Namespace) -> int:
     from .engine import scene as scene_api
 
@@ -200,6 +262,12 @@ def build_parser() -> argparse.ArgumentParser:
     shoot.add_argument("--every", type=int, default=30, help="save every Nth frame")
     shoot.add_argument("--out", default="shots")
     shoot.set_defaults(func=cmd_shoot)
+
+    hotkey = sub.add_parser(
+        "hotkey",
+        help="find a free chord for handing the overlay the keyboard")
+    _add_common(hotkey)
+    hotkey.set_defaults(func=cmd_hotkey)
 
     install = sub.add_parser("install", help="register Claude Code hooks")
     _add_common(install)

@@ -181,6 +181,81 @@ def test_the_loop_wires_the_keyboard_through_to_the_scene(monkeypatch) -> None:
     assert overlay.scene.motion.target_lane != start, "the key did nothing"
 
 
+# -- the takeover chord -----------------------------------------------------
+
+
+@pytest.mark.parametrize("spec,size", [
+    ("ctrl+alt+shift+home", 4),
+    ("Ctrl + Alt + B", 3),
+    ("win+f13", 2),
+    ("scrolllock", 1),
+    ("pause", 1),
+    ("ctrl+7", 2),
+])
+def test_chords_parse(spec: str, size: int) -> None:
+    from brainrot.engine.keys import parse_chord
+
+    assert len(parse_chord(spec)) == size
+
+
+@pytest.mark.parametrize("spec", [
+    "", "   ", "ctrl+", "ctrl+alt", "shift", "ctrl+nonsense", "ctrl++",
+])
+def test_unusable_chords_are_rejected(spec: str) -> None:
+    """Modifiers alone would fire constantly while someone typed, and a typo
+    must not silently mean "no takeover ever"."""
+    from brainrot.engine.keys import parse_chord
+
+    assert parse_chord(spec) == frozenset()
+
+
+def test_a_bad_hotkey_falls_back_rather_than_disabling_takeover() -> None:
+    from brainrot.config import Config
+    from brainrot.engine.keys import parse_chord
+
+    cfg = Config()
+    cfg.hotkey = "ctrl+alt"          # modifiers only: unusable
+    cfg._validate()
+    assert cfg.hotkey == Config.hotkey
+    assert parse_chord(cfg.hotkey)
+
+
+def test_describe_round_trips_a_chord() -> None:
+    """`brainrot hotkey` prints what describe() produces, and the config then
+    parses it back -- so the two have to agree exactly."""
+    from brainrot.engine.keys import describe, parse_chord
+
+    for spec in ("ctrl+alt+shift+home", "win+f13", "ctrl+alt+b", "pause"):
+        codes = parse_chord(spec)
+        assert parse_chord(describe(codes)) == codes
+
+
+def test_the_configured_chord_is_what_gets_watched() -> None:
+    from brainrot.engine.input import Takeover
+    from brainrot.engine.keys import parse_chord
+    from brainrot.engine.window import OverlayWindow
+
+    t = Takeover(OverlayWindow(), "win+f13")
+    assert t.codes == parse_chord("win+f13")
+    # An unusable chord means no takeover, not a crash.
+    assert Takeover(OverlayWindow(), "shift").codes == frozenset()
+    assert Takeover(OverlayWindow(), "shift")._chord_down() is False
+
+
+def test_the_loop_takes_the_chord_from_config() -> None:
+    from brainrot.config import Config
+    from brainrot.engine.keys import parse_chord
+    from brainrot.engine.loop import Overlay
+    from brainrot.engine.window import HeadlessWindow
+
+    cfg = Config()
+    cfg.hotkey = "ctrl+shift+f9"
+    cfg.handback_seconds = 3.0
+    overlay = Overlay(cfg, HeadlessWindow())
+    assert overlay.takeover.codes == parse_chord("ctrl+shift+f9")
+    assert overlay.controller.handback == 3.0
+
+
 def test_parkour_is_not_offered_the_keyboard_yet() -> None:
     """Scenes opt in. Parkour's control scheme is still to be designed, and
     the loop must not hand it input it has no idea what to do with."""
