@@ -64,6 +64,11 @@ PLAN_HORIZON = 2.8
 #: between decisions, so it has to stay well under the depth of the thinnest
 #: obstacle -- a 0.4 m hurdle crossed at 15.5 m/s is gone in 0.026 s.
 PLAN_STEP = 0.03
+#: Resolution of the *lane* search, which is coarser on purpose. Lanes change
+#: on the scale of a quarter-second; solving them at the collision grid's
+#: resolution costs four times the work for a decision that cannot use it,
+#: and the lane DP was comfortably the most expensive thing in the scene.
+LANE_STEP = 0.06
 PLAN_EVERY = 0.10
 #: Rounds of "solve, check, mark what failed as unavoidable, solve again".
 PLAN_ATTEMPTS = 5
@@ -75,6 +80,10 @@ COMMIT_WINDOW = 1.2
 REFLEX_WINDOW = 1.0
 #: Seconds a pickup run stays on the HUD after the last coin.
 COMBO_HOLD = 1.6
+
+#: Entity kinds a body can actually hit. Everything else is scenery, and
+#: checking that first is what keeps the per-frame collision pass cheap.
+SOLID_KINDS = frozenset(("barrier", "hoarding", "gantry", "train"))
 
 #: Minimum rows between two obstacles that demand a move. One move must be
 #: able to finish before the next begins even at top speed, or the corridor
@@ -390,6 +399,30 @@ class RunnerScene(Scene):
                            self.body.half_w, self.body.height(rolling),
                            self.body.depth(rolling))
 
+    def _solids_near(self, reach: float) -> list[tuple[dict, AABB]]:
+        """The entities close enough to matter, with their world boxes.
+
+        Built once per frame and shared by everything that needs it. Most of
+        what is on screen is scenery -- buildings, lamps, coins -- and boxing
+        all of it three times a frame was the single largest cost in the
+        scene, well ahead of anything that draws.
+        """
+        out = []
+        for e in self.entities:
+            kind = e["kind"]
+            if kind not in SOLID_KINDS:
+                continue
+            d = e["d"]
+            # A train's ``d`` is its near end; the rest of it trails away, so
+            # it stays relevant long after that end has gone past.
+            behind = -(e["cars"] * TRAIN_CAR_LEN + 4.0) if kind == "train" else -4.0
+            if d > reach or d < behind:
+                continue
+            box = self.solid_box(e)
+            if box is not None:
+                out.append((e, box))
+        return out
+
     def solid_box(self, e: dict) -> AABB | None:
         """World hitbox of an entity, or None when it is pure decoration.
 
@@ -423,10 +456,8 @@ class RunnerScene(Scene):
     def _threats(self) -> list[plan.Threat]:
         """Every obstacle inside the horizon, as lane/height/time facts."""
         out: list[plan.Threat] = []
-        for e in self.entities:
-            box = self.solid_box(e)
-            if box is None:
-                continue
+        reach = PLAN_HORIZON * (self.speed * 2.0) + 8.0
+        for e, box in self._solids_near(reach):
             closing = self._closing_speed(e)
             half_len = (box.z1 - box.z0) * 0.5
             centre_d = -0.5 * (box.z0 + box.z1)
@@ -479,16 +510,16 @@ class RunnerScene(Scene):
 
     def _corridor_lanes(self) -> list[int]:
         """The generator's clear lane at each step of the planning horizon."""
-        steps = max(1, int(math.ceil(PLAN_HORIZON / PLAN_STEP)))
+        steps = max(1, int(math.ceil(PLAN_HORIZON / LANE_STEP)))
         out = []
         for i in range(steps):
-            ahead = self.travel + self.speed * (i * PLAN_STEP)
+            ahead = self.travel + self.speed * (i * LANE_STEP)
             out.append(self._lane_clear(int(ahead / ROW)))
         return out
 
     def _replan(self) -> None:
         threats = self._threats()
-        transit = max(1, int(round(self.kin.lane_time / PLAN_STEP)))
+        transit = max(1, int(round(self.kin.lane_time / LANE_STEP)))
         # When the body next becomes available: mid-jump or mid-slide, it is
         # committed, and anything scheduled inside that window would simply be
         # dropped at execution time and never noticed.
@@ -499,11 +530,11 @@ class RunnerScene(Scene):
         # actually helped, and often it does not.
         best = (-1.0, self._lane_plan, [])
         for _ in range(PLAN_ATTEMPTS):
-            grid = plan.occupancy(threats, PLAN_HORIZON, PLAN_STEP, corridor)
+            grid = plan.occupancy(threats, PLAN_HORIZON, LANE_STEP, corridor)
             # Plan onward from where the body is committed to arriving, not
             # from where it happens to be mid-slide.
             lane_plan = plan.choose_lanes(grid, self.motion.target_lane,
-                                          PLAN_STEP, transit)
+                                          LANE_STEP, transit)
             booked, unsolved = plan.schedule_vertical(
                 threats, lane_plan, self.body, self.kin, RAIL_TOP, busy_until)
             if not unsolved:
@@ -572,7 +603,10 @@ class RunnerScene(Scene):
         while self._booked and self._booked[0][0] <= self.elapsed:
             _, action = self._booked.pop(0)
             self.motion.begin(action, self.kin)
-        self._reflex()
+        # One pass over what is close enough to matter, shared by the reflex
+        # and the contact check.
+        near = self._solids_near(REFLEX_WINDOW * self.speed + 6.0)
+        self._reflex(near)
 
         was_airborne = self.motion.airborne
         self.motion.advance(dt, self.kin, self._lane_plan.lane_at(
@@ -586,14 +620,14 @@ class RunnerScene(Scene):
                 self.impact_t = -1.0
 
         self._collect_coins()
-        self._resolve_contacts()
+        self._resolve_contacts(near)
         self.burst.update(dt)
         if self.combo_t > 0.0:
             self.combo_t -= dt
             if self.combo_t <= 0.0:
                 self.combo = 0
 
-    def _reflex(self) -> None:
+    def _reflex(self, near: list[tuple[dict, AABB]]) -> None:
         """Jump or slide when this instant is the moment to, plan or no plan.
 
         The planner decides a lane and a set of take-offs in two stages, and
@@ -612,9 +646,8 @@ class RunnerScene(Scene):
         if m.airborne or m.rolling:
             return
         body = self.body_box()
-        for e in self.entities:
-            box = self.solid_box(e)
-            if box is None or box.x1 <= body.x0 or box.x0 >= body.x1:
+        for e, box in near:
+            if box.x1 <= body.x0 or box.x0 >= body.x1:
                 continue
             closing = self._closing_speed(e)
             half_len = (box.z1 - box.z0) * 0.5
@@ -654,7 +687,7 @@ class RunnerScene(Scene):
                 self.burst.spawn(self.x, RAIL_TOP + e["y"], -e["d"],
                                  (255, 215, 80), count=8, rng=self.rng)
 
-    def _resolve_contacts(self) -> None:
+    def _resolve_contacts(self, near: list[tuple[dict, AABB]]) -> None:
         """Last line of defence: if a body box is inside an obstacle box, take
         the hit and push back out, rather than letting the mesh pass through.
 
@@ -665,9 +698,8 @@ class RunnerScene(Scene):
         one that occasionally shows a runner clipping a train and stumbling.
         """
         body = self.body_box()
-        for e in self.entities:
-            box = self.solid_box(e)
-            if box is None or not body.overlaps(box):
+        for e, box in near:
+            if not body.overlaps(box):
                 continue
             depth = body.penetration(box)
             self.contacts += 1
