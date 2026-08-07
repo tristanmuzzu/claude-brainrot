@@ -151,8 +151,9 @@ def generate(seed: Seed) -> Palette:
     accent = hsv(base_hue + 0.5 + rng.uniform(-0.06, 0.06), 0.88, 0.98)
     accent2 = hsv(base_hue + 0.5 + 0.33 + rng.uniform(-0.05, 0.05), 0.80, 0.92)
     train = hsv(base_hue + rng.uniform(0.42, 0.58), 0.72, 0.80)
-    # Hazards must never be mistaken for scenery: pinned to red-orange.
-    hazard = hsv(rng.uniform(-0.02, 0.05), 0.90, 0.98)
+    # Hazards must never be mistaken for scenery: pinned inside the
+    # red-to-orange band (never wrapping toward magenta).
+    hazard = hsv(rng.uniform(0.02, 0.09), 0.90, 0.98)
     window_lit = hsv(0.115 + rng.uniform(-0.02, 0.02), 0.55, 1.0)
 
     # Ground and structures deliberately do NOT share the sky's hue. Deriving

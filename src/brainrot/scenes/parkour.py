@@ -113,22 +113,34 @@ class ParkourScene(Scene):
             rise = 1
         elif prev["y"] + rise > COURSE_ALT + 10:
             rise = -1
-        # Gaussian sideways drift, steered back toward the spine. If the hop
-        # would land on top of recent course, straighten and stretch instead --
-        # the reference generator refuses self-overlapping placements too.
-        for attempt in range(3):
-            drift = rng.gauss(0.0, 0.55)
-            steer = -0.028 * self.lateral
-            heading = max(-0.9, min(0.9, self.heading + drift * 0.22 + steer))
-            step = gap + 1.0 + attempt * 0.5
-            dx = math.sin(heading) * step
-            dz = -math.cos(heading) * step
-            nx, nz = prev["x"] + dx, prev["z"] + dz
-            if all(math.dist((nx, nz), (b["x"], b["z"])) > 1.45
-                   for b in self.blocks[-7:-1]):
+        # Gaussian sideways drift, steered back toward the spine. Candidate
+        # headings fan out from the drifted one and the first that does not
+        # land on recent course wins -- the reference generator likewise
+        # refuses self-overlapping placements.
+        drift = rng.gauss(0.0, 0.55)
+        steer = -0.028 * self.lateral
+        preferred = max(-0.9, min(0.9, self.heading + drift * 0.22 + steer))
+        recent = self.blocks[-7:-1]
+
+        def landing(heading: float, step: float):
+            return (prev["x"] + math.sin(heading) * step,
+                    prev["z"] - math.cos(heading) * step)
+
+        best, best_clearance = preferred, -1.0
+        step = gap + 1.0
+        for fan in (0.0, 0.2, -0.2, 0.45, -0.45, 0.7, -0.7):
+            heading = max(-1.1, min(1.1, preferred + fan))
+            nx, nz = landing(heading, step)
+            clearance = min((math.dist((nx, nz), (b["x"], b["z"])) for b in recent),
+                            default=99.0)
+            if clearance > 1.45:
+                best = heading
                 break
-            heading = self.heading * 0.4       # straighten out of the knot
-        self.heading = heading
+            if clearance > best_clearance:
+                best, best_clearance = heading, clearance
+        self.heading = best
+        dx = math.sin(best) * step
+        dz = -math.cos(best) * step
         self.lateral += dx
 
         n = len(self.blocks)

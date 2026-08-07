@@ -166,11 +166,21 @@ class DesktopWindow(_BaseWindow):
 
 
 class HeadlessWindow(_BaseWindow):
-    """Software rendering; frames only exist to be captured."""
+    """Software rendering; frames only exist to be captured.
+
+    There is one raylib window per process, so create() is idempotent -- a
+    second headless consumer (tests, an in-process daemon) resizes the
+    existing window rather than fighting over it -- and destroy() is a no-op:
+    the process exit reclaims an offscreen framebuffer just fine.
+    """
 
     def create(self, cfg: Config) -> None:
         os.environ["BRAINROT_HEADLESS"] = "1"
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        if rl.IsWindowReady():
+            rl.SetWindowSize(cfg.width, cfg.height)
+            self.width, self.height = cfg.width, cfg.height
+            return
         super().create(cfg)
 
     def set_visible(self, visible: bool) -> None:
@@ -181,6 +191,9 @@ class HeadlessWindow(_BaseWindow):
 
     def should_close(self) -> bool:
         return False
+
+    def destroy(self) -> None:
+        pass
 
 
 def select_backend(force: str = "") -> _BaseWindow:

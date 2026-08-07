@@ -1,7 +1,13 @@
 """Procedural textures, generated with PIL at scene construction and uploaded
-once. A keyed cache keeps the backing buffers alive for the lifetime of the
-process -- raylib's software rasteriser reads texture memory at draw time, so
-freeing a buffer after upload would be a use-after-free there.
+once. A keyed cache keeps the backing buffers alive while a texture can still
+be drawn -- raylib's software rasteriser reads texture memory at draw time, so
+freeing a buffer early would be a use-after-free there.
+
+Textures are scoped. ``scene`` textures (skies, clouds, block atlases -- all
+keyed by run number) are unloaded when the next scene is built: exactly one
+scene is ever alive, and without eviction a long-lived daemon grows VRAM run
+by run while the software rasteriser simply runs out of texture slots.
+``global`` textures (glow sprites, discs) live for the process.
 """
 
 from __future__ import annotations
@@ -11,10 +17,11 @@ from PIL import Image, ImageDraw, ImageFilter
 from . import rl
 
 _CACHE: dict[str, tuple[object, object, object]] = {}  # key -> (texture, image struct, buffer)
+_SCENE_KEYS: set[str] = set()
 
 
-def from_pil(key: str, build) -> object:
-    """Upload ``build() -> PIL.Image`` under ``key``, once."""
+def from_pil(key: str, build, scope: str = "scene") -> object:
+    """Upload ``build() -> PIL.Image`` under ``key``, once per scope life."""
     entry = _CACHE.get(key)
     if entry is not None:
         return entry[0]
@@ -31,7 +38,21 @@ def from_pil(key: str, build) -> object:
     texture = rl.LoadTextureFromImage(img[0])
     rl.SetTextureFilter(texture, rl.TEXTURE_FILTER_BILINEAR)
     _CACHE[key] = (texture, img, raw)
+    if scope == "scene":
+        _SCENE_KEYS.add(key)
     return texture
+
+
+def end_scene() -> None:
+    """Unload every scene-scoped texture. Called when a new scene is built."""
+    for key in _SCENE_KEYS:
+        entry = _CACHE.pop(key, None)
+        if entry is not None:
+            try:
+                rl.UnloadTexture(entry[0])
+            except Exception:
+                pass
+    _SCENE_KEYS.clear()
 
 
 def clear() -> None:
@@ -41,6 +62,7 @@ def clear() -> None:
         except Exception:
             pass
     _CACHE.clear()
+    _SCENE_KEYS.clear()
 
 
 # -- stock builders ---------------------------------------------------------
@@ -59,7 +81,7 @@ def radial_glow(size: int = 96, hardness: float = 2.2):
                       fill=(255, 255, 255, a))
         return im
 
-    return from_pil(f"glow{size}x{hardness}", build)
+    return from_pil(f"glow{size}x{hardness}", build, scope="global")
 
 
 def soft_disc(size: int = 64):
@@ -72,7 +94,7 @@ def soft_disc(size: int = 64):
         d.ellipse([pad, pad, size - pad, size - pad], fill=(255, 255, 255, 255))
         return im.filter(ImageFilter.GaussianBlur(size // 16))
 
-    return from_pil(f"disc{size}", build)
+    return from_pil(f"disc{size}", build, scope="global")
 
 
 def cloud_blob(seed: int, size: int = 160):

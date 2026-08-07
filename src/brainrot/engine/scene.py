@@ -86,6 +86,15 @@ def build(name: str, ctx: SceneContext) -> Scene:
         cls = _REGISTRY[name]
     except KeyError:
         raise KeyError(f"unknown scene {name!r}; available: {available()}") from None
+
+    # Exactly one scene is ever alive. Building the next one evicts the
+    # previous scene's textures and block models -- without this a long-lived
+    # daemon leaks a scene's textures per run, and the software rasteriser
+    # exhausts its texture slots within a handful of runs.
+    from . import textures, voxel
+
+    voxel.clear()
+    textures.end_scene()
     return cls(ctx)
 
 

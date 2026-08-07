@@ -214,8 +214,9 @@ class RunnerScene(Scene):
             else:
                 # every lane threatened: take the one whose train is furthest
                 target = max(danger, key=lambda ln: danger[ln])
-        if target != self.lane and self.jump_t < 0 and self.roll_t < 0:
-            self.lane = target
+        # Lane changes work mid-air too (they do in the reference game) --
+        # freezing them during a jump would let a dodge arrive too late.
+        self.lane = target
         self.x += (self._lane_x(self.lane) - self.x) * min(1.0, dt * 7.5)
 
         # react to whatever is coming up in my lane
@@ -228,7 +229,8 @@ class RunnerScene(Scene):
                     self.roll_t = 0.0
                     break
             else:
-                if self.rng.random() < dt * 0.06:   # style jump
+                # style jumps only in calm moments, never while dodging
+                if not danger and self.rng.random() < dt * 0.06:
                     self.jump_t = 0.0
 
         if self.jump_t >= 0:

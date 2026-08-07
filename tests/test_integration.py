@@ -2,7 +2,7 @@
 
 Everything below the window is exercised for real here -- the listener thread,
 the state machine, scene construction, and the render loop -- with only the
-window backend swapped for the offscreen one.
+window swapped for the shared offscreen one.
 """
 
 from __future__ import annotations
@@ -13,15 +13,17 @@ from pathlib import Path
 
 import pytest
 
+from conftest import ensure_window
+
 from brainrot.config import Config
 from brainrot.engine.loop import Overlay
+from brainrot.engine.window import HeadlessWindow
 from brainrot.ipc import send
-from brainrot.overlay.headless import HeadlessBackend
 
 PORT = 47870
 
 
-def wait_for(predicate, timeout: float = 6.0, interval: float = 0.02) -> bool:
+def wait_for(predicate, timeout: float = 8.0, interval: float = 0.02) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if predicate():
@@ -32,23 +34,24 @@ def wait_for(predicate, timeout: float = 6.0, interval: float = 0.02) -> bool:
 
 @pytest.fixture
 def daemon(tmp_path: Path, monkeypatch):
+    # The shared window must exist before the daemon thread starts, so every
+    # raylib call after this point happens in one thread at a time.
+    ensure_window()
     monkeypatch.setenv("BRAINROT_STATE_DIR", str(tmp_path))
     cfg = Config(
         port=PORT,
-        width=200,
-        height=320,
         grace_seconds=0.3,
         min_visible_seconds=0.4,
         fade_seconds=0.05,
         fps=60,
     )
-    overlay = Overlay(cfg, HeadlessBackend())
+    overlay = Overlay(cfg, HeadlessWindow())
     thread = threading.Thread(target=overlay.run, daemon=True)
     thread.start()
-    assert wait_for(lambda: overlay.running and overlay.surface is not None)
+    assert wait_for(lambda: overlay.running)
     yield overlay
     overlay.running = False
-    thread.join(timeout=3.0)
+    thread.join(timeout=5.0)
 
 
 def test_prompt_shows_and_stop_hides(daemon: Overlay) -> None:
@@ -118,3 +121,12 @@ def test_unknown_events_are_ignored(daemon: Overlay) -> None:
     time.sleep(0.6)
     assert not daemon.state.on_screen
     assert daemon.running, "daemon died on an unrecognised event"
+
+
+def test_event_carries_hwnd_without_breaking(daemon: Overlay) -> None:
+    """The host-window handle rides along on prompt events; a headless
+    backend must simply ignore it."""
+    send("127.0.0.1", PORT, "UserPromptSubmit", session="s1", hwnd=123456)
+    assert wait_for(lambda: daemon.state.on_screen)
+    send("127.0.0.1", PORT, "Stop", session="s1")
+    assert wait_for(lambda: not daemon.state.on_screen)

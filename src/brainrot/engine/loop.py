@@ -194,9 +194,12 @@ class Overlay:
         self.listener.stop()
         try:
             from .. import assets
-            from . import textures
+            from . import textures, voxel
 
             assets.unload_all()
+            # Voxel models reference cached textures, so both caches go
+            # together or later loads would dangle.
+            voxel.clear()
             textures.clear()
         except Exception:
             pass
