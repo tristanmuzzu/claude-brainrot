@@ -202,6 +202,68 @@ def test_corridor_holds_a_lane_long_enough_to_reach_it() -> None:
                 held = 1
 
 
+# -- what happens if one ever does get through ----------------------------
+
+
+def test_a_forced_contact_becomes_a_stumble_not_a_pass_through() -> None:
+    """The last line of defence, exercised on purpose.
+
+    Contacts are supposed to be unreachable, and the tests above assert they
+    are -- which means this path never runs in a real scene and would rot
+    unnoticed. So put a barrier on top of the runner and check the scene does
+    the two things that distinguish taking a hit from ignoring one: it reacts,
+    and it pushes the body back out of the geometry.
+    """
+    from brainrot.scenes.runner import IMPACT_TIME, RAIL_TOP
+
+    scene = build(5)
+    for _ in range(60):
+        scene.update(DT)
+        scene.elapsed += DT
+
+    scene.entities.append({"kind": "barrier", "lane": scene.lane, "d": 0.0})
+    scene.update(DT)
+
+    assert scene.contacts > 0, "an obstacle inside the body went unnoticed"
+    assert scene.impact_t >= 0.0, "no reaction to being hit"
+    assert scene.cam_shake > 0.0, "the camera did not register the hit"
+
+    # pushed clear: the body no longer intersects what it hit
+    hit = scene.entities[-1]
+    assert scene.body_box().penetration(scene.solid_box(hit)) == 0.0
+
+    # and the reaction is temporary, not a permanent state
+    for _ in range(int((IMPACT_TIME + 0.2) / DT)):
+        scene.update(DT)
+        scene.elapsed += DT
+    assert scene.impact_t < 0.0, "the stumble never ended"
+    assert scene.travel > 0 and RAIL_TOP > 0
+
+
+def test_the_stumble_does_not_derail_the_run() -> None:
+    """A hit costs a stagger, not the rest of the run.
+
+    An earlier version bled speed on impact, which invalidated every take-off
+    already booked against the old speed and produced a second contact, and a
+    third. Speed is deliberately untouched now.
+    """
+    scene = build(6)
+    for _ in range(120):
+        scene.update(DT)
+        scene.elapsed += DT
+    before = scene.speed
+    scene.entities.append({"kind": "barrier", "lane": scene.lane, "d": 0.0})
+    scene.update(DT)
+    scene.elapsed += DT
+    assert scene.speed == pytest.approx(before, abs=0.05)
+
+    travel_at_hit = scene.travel
+    for _ in range(int(4.0 / DT)):
+        scene.update(DT)
+        scene.elapsed += DT
+    assert scene.travel - travel_at_hit > 30, "the runner never recovered"
+
+
 # -- the solvers -----------------------------------------------------------
 
 

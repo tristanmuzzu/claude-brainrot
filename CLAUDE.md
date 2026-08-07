@@ -10,30 +10,52 @@ per-seed. Read `docs/ARCHITECTURE.md` for how the pieces fit; it is current.
 Branch `claude/project-visuals-animations-qzbkiq` holds a complete rebuild:
 pygame → raylib + baked-light glTF assets, both scenes rebuilt to match the
 real reel formats, animation overhaul (rig with knees/elbows, world-axis pose
-system, ballistic parkour hops with ground beats), 224 tests green. All work
-so far was done and verified in a headless cloud container via the software
-rasteriser — **nothing has been verified on real Windows hardware yet.**
+system, ballistic parkour hops with ground beats).
+
+**Now verified on real Windows hardware with a GPU**, which turned up several
+things the software-rasteriser cloud sessions could not have seen — see
+"Landmines" below. 288 tests green, including a Win32 suite that exercises the
+real window API.
+
+The runner has a real collision model. Obstacles carry hitboxes derived from
+the assets' own measured geometry (`assets/measure.py` → `metrics.json`), and
+`scenes/runnerplan.py` plans lanes and take-offs *in time* and then verifies
+the plan by simulating it before committing. Evidence: zero interpenetration
+across 60 seeds × 180 s of simulated running, at every speed. If you change
+anything in the runner, re-run that sweep — `tests/test_collision.py` covers
+the same ground in a form that fits in the suite.
 
 ## If you are a local Claude session on the owner's Windows machine
 
-You have what the cloud sessions did not: a GPU, a real display, and the
-actual overlay window path. The highest-value work, in order:
+Still outstanding, in order:
 
-1. `pip install -e .` then `brainrot doctor` — every check should pass or
-   warn sensibly on Windows. Report anything red.
-2. `brainrot demo --scene runner` and `--scene parkour`: verify frame rate
-   (should be an easy 60), that colours/animation match `docs/media/*.gif`,
-   and that nothing GPU-specific diverges from the software-rendered media
-   (that pipeline was designed to match — confirm it actually does).
-3. The overlay itself: `brainrot install && brainrot run`, then use Claude
-   Code normally. Verify: appears ~1.5s after a prompt, fades, never steals
-   focus, clicks pass through, hides on permission prompts.
-4. Window attachment (`attach = "host"`, the default): the overlay should sit
-   one z-level above the window hosting the Claude Code session and be
-   covered by anything else you focus. `overlay/win32.py` is ctypes and was
-   written blind — this is the most likely place to need fixes.
-5. DPI: on a scaled display check the strip's size/placement; raylib windows
-   are not DPI-aware by default.
+1. **The overlay end to end.** `brainrot install && brainrot run`, then use
+   Claude Code normally. Verify: appears ~1.5 s after a prompt, fades, never
+   steals focus, clicks pass through, hides on permission prompts. *Not yet
+   done* — `brainrot install` writes hooks into `~/.claude/settings.json`,
+   which needs the owner's explicit go-ahead.
+2. **Window attachment in anger.** The ctypes was written blind and had real
+   bugs (now fixed and tested against the live API), but only the mechanism
+   is proven, not the feel. Watch whether the strip sits one z-level above
+   the terminal and is covered by anything else you focus.
+3. **DPI**: on a scaled display check the strip's size and placement; raylib
+   windows are not DPI-aware by default.
+4. `brainrot demo --scene runner` / `--scene parkour` for a visual read.
+   Measured cost per frame at sustained top speed, vsync off: runner 6.1 ms,
+   parkour 1.3 ms, against a 16.7 ms budget.
+
+## Tried and reverted: running along train roofs
+
+Ramps that mount the runner onto a train roof (the signature Subway Surfers
+move) are implemented in full in the history around this commit and were
+**reverted** — not because the riding did not work, it did, but because the
+lane search and the mount decision are made in separate stages. The lane
+search is pulled toward a rideable train; if verification then rejects the
+mount, the runner is already committed to a lane with a train across it, and
+contacts went from zero to thousands. Making it work needs the lane choice and
+the mount to be solved *jointly*, not in sequence. Worth doing; not worth
+shipping half-done, because it regresses the one property the collision work
+exists to guarantee.
 
 ## Dev loop (works headless and locally)
 
@@ -41,7 +63,9 @@ actual overlay window path. The highest-value work, in order:
   renders exact frames of exact runs to PNG. This is how all art direction
   was done: render, look, adjust, repeat.
 - `python assets/build.py [name]` rebuilds committed .glb files from their
-  scripts (needs `pip install bpy`, one subprocess per asset).
+  scripts (needs `pip install bpy`, one subprocess per asset). Blender 5.0.1
+  reproduces every committed asset's geometry and materials exactly.
+  **Always follow a rebuild with `python assets/measure.py`.**
 - `python assets/preview.py <asset>` and
   `python assets/animstrip.py character run` render assets/clips for review.
 - On a machine without a display or GPU:
@@ -63,8 +87,25 @@ actual overlay window path. The highest-value work, in order:
 - **raylib maps glTF material i to slot i+1** (slot 0 is its default). Zone
   names come from the GLB JSON chunk; see `src/brainrot/assets/__init__.py`.
 - **bpy imports once per process**: asset builds run one subprocess each.
-- Headless captures come back vertically flipped with R/B swapped;
-  `engine/rl.py:capture_frame` corrects this — never read the screen directly.
+- **Capture correction is measured, not assumed.** Which rasteriser is
+  underneath decides whether captures come back flipped and BGR-swapped, and
+  `os.name` cannot answer that question — assuming it wrote every `shoot`
+  frame upside down on Windows for the entire life of the branch.
+  `engine/rl.py:_capture_fix` draws a marker frame and reads back where it
+  landed. Never read the screen directly.
+- **GLFW window calls block off-thread.** On the GPU build under Windows,
+  `SetWindowSize` and friends post to the thread that owns the window and wait
+  for it to pump messages. Calling one from a worker thread deadlocks — which
+  is why `HeadlessWindow.create` skips a resize to the size it already is.
+- **An owned window dies with its owner.** The overlay is owned by the Claude
+  Code host window for z-order, and `DestroyWindow` on an owner destroys what
+  it owns. The daemon therefore detaches whenever it goes idle. In tests,
+  destroy the fake host *after* detaching or it takes the shared raylib window
+  with it.
+- **Numbers the gameplay depends on live in `metrics.json`.** Rebuild an asset
+  and you must re-run `python assets/measure.py`; `tests/test_assets.py` fails
+  if they drift apart. Moving a hoarding's beam moves whether a slide fits
+  under it.
 
 ## Conventions
 
