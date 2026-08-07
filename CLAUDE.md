@@ -14,7 +14,7 @@ system, ballistic parkour hops with ground beats).
 
 **Now verified on real Windows hardware with a GPU**, which turned up several
 things the software-rasteriser cloud sessions could not have seen — see
-"Landmines" below. 288 tests green, including a Win32 suite that exercises the
+"Landmines" below. 349 tests green, including a Win32 suite that exercises the
 real window API.
 
 The runner has a real collision model. Obstacles carry hitboxes derived from
@@ -30,23 +30,35 @@ hooks registered, daemon running, `brainrot doctor` 10/10. Measured live —
 appears 2.0 s after `UserPromptSubmit`, click-through, never focused, off
 alt-tab, hides 3.0 s after `Stop`.
 
+The parkour scene has had the same depth pass. Its course is generated in
+**set-pieces** (`SEGMENT_TABLE`) rather than as a uniform stream of cubes, its
+materials carry texel patterns, and the crucial structural change is that
+**the course knows its own path**: where the player will stand on each block is
+decided when the block is generated, so the exact ballistic arc of every future
+hop is computable at generation time. Orbs are hung on that arc at chest
+height, which is why "every orb laid down is collected" is a test rather than a
+hope. If you change the flight solver or the landing offsets, that test is the
+one that will tell you.
+
 Either scene can also be **driven by hand** (`engine/input.py`): arrows or
 WASD, up/space to jump, down to duck, eight idle seconds to hand back. The
-overlay never reads a key until `Ctrl+Alt+B` deliberately gives it focus —
-there is no global key hook, on purpose. `brainrot demo` needs no chord.
-`Scene.playable` gates this; the runner opts in, parkour does not yet.
+overlay never reads a key until the takeover chord deliberately gives it focus
+— there is no global key hook, on purpose. `brainrot demo` needs no chord.
+Both scenes now opt in via `Scene.playable`. Steering parkour bends the
+*course* rather than moving a body: there is no free movement to give a runner
+made of solved arcs between blocks that do not exist yet.
 
 ## Still outstanding
 
-1. **Parkour needs the depth the runner got** — see
-   `docs/HANDOFF-parkour.md`, which has the job and a prompt to start it.
-2. **Window attachment in anger.** The mechanism is proven and tested against
-   the live API; the *feel* is not. Watch whether the strip sits one z-level
-   above the terminal and is covered by anything else you focus.
-3. **DPI**: on a scaled display check the strip's size and placement; raylib
+1. **Window attachment in anger.** See `docs/HANDOFF-overlay-focus.md`.
+2. **DPI**: on a scaled display check the strip's size and placement; raylib
    windows are not DPI-aware by default.
-4. Per-frame cost at sustained top speed, vsync off: runner 6.1 ms, parkour
-   1.3 ms, against a 16.7 ms budget.
+3. Per-frame cost at sustained top speed, vsync off, on an idle machine:
+   runner 2.6-3.0 ms, parkour 1.5-2.3 ms, against a 16.7 ms budget. Measure
+   with `HeadlessWindow` + `SetTargetFPS(0)`; `DesktopWindow` has vsync on and
+   will report a flat 16.6 ms that tells you nothing. Take the reading on a
+   *quiet* machine — with a browser and Docker busy, both scenes measure two
+   to four times higher and the comparison is worthless.
 
 ## Tried and reverted: running along train roofs
 
@@ -60,6 +72,16 @@ contacts went from zero to thousands. Making it work needs the lane choice and
 the mount to be solved *jointly*, not in sequence. Worth doing; not worth
 shipping half-done, because it regresses the one property the collision work
 exists to guarantee.
+
+## Known limit: how long a parkour jump can be
+
+The chasm set-piece is only a little wider than the gap table's own maximum,
+and deliberately. The hop is a ballistic arc that lands exactly where it aimed,
+so a longer jump can only be paid for by crossing the ground faster than a body
+runs or by arcing higher than a body jumps, and both look wrong immediately. A
+chasm reads as a chasm because of the void under it and the two lit platforms
+either side, not because of another metre of distance. If you want genuinely
+long jumps you need a different motion model, not a bigger number.
 
 ## Dev loop (works headless and locally)
 
@@ -95,8 +117,24 @@ exists to guarantee.
   underneath decides whether captures come back flipped and BGR-swapped, and
   `os.name` cannot answer that question — assuming it wrote every `shoot`
   frame upside down on Windows for the entire life of the branch.
-  `engine/rl.py:_capture_fix` draws a marker frame and reads back where it
+  `engine/rl.py:_capture_fix` draws marker frames and reads back where they
   landed. Never read the screen directly.
+- **Read-back is one buffer swap behind the draw** on the GPU build here, so
+  the probe above draws its marker *until the read is decisive* and runs at
+  window creation. A single marker frame read back the previous frame — a blue
+  sky, in which blue beats red — concluded the channels were swapped, and every
+  `shoot` PNG came out with an orange sky and a brown ocean. Anything that
+  wants to capture a frame must present it twice.
+- **rlgl batches some draws and issues others immediately.** `DrawPlane` goes
+  into the render batch and is not submitted until `EndMode3D`; `DrawModelEx`
+  draws at once. So a ground plane drawn first is drawn *last* and loses the
+  depth test to everything above it. Opaque models hide this; transparent ones
+  do not — it punched cloud-shaped holes in the parkour sea. Call `rl.flush()`
+  after any batched draw whose order matters.
+- **Shared block models must be left as they were found.** The parkour kit is
+  built from the same `voxel` models the course is, so a `model.transform` left
+  behind by the held item tilts every block of that material in the world on
+  the next frame.
 - **GLFW window calls block off-thread.** On the GPU build under Windows,
   `SetWindowSize` and friends post to the thread that owns the window and wait
   for it to pump messages. Calling one from a worker thread deadlocks — which
@@ -119,4 +157,8 @@ exists to guarantee.
   never by rejection sampling; invariants live in `tests/test_generation.py`.
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~15s).
+- Run `python -m pytest tests/` before committing; it is fast (~50s).
+- Art direction is done by looking at `brainrot shoot` output. That only works
+  if the capture is honest, so there are tests on the capture itself: colours
+  survive, the frame is the right way up, and drawing the same state twice
+  draws the same picture (`draw()` must not advance anything).

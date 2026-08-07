@@ -98,8 +98,8 @@ told us more than reading the source did.
 
 ## Do not disturb
 
-Another session is doing the parkour content pass (see
-`docs/HANDOFF-parkour.md`) and is editing `scenes/parkour.py` and friends. This
+Another session is doing the parkour content pass (finished, and that handoff
+retired) and is editing `scenes/parkour.py` and friends. This
 work is confined to `engine/loop.py`, `engine/window.py`, `overlay/win32.py`
 and `config.py`, which should not collide — but that session's tooling has been
 seen running `git stash` across the whole tree, so commit early and check

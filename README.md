@@ -30,7 +30,7 @@ Two scenes, chosen per run from the run's seed.
 | Scene | What it is |
 |---|---|
 | `runner` | The classic: three locked lanes, a chase camera, subway cars with per-run liveries, hazard barriers, gantries, coin arcs, and a city canyon whose windows light up at night. An autopilot follows a corridor that is guaranteed reachable *by construction* and live-dodges oncoming trains. |
-| `parkour` | First-person infinite parkour, the way the actual background reels do it: one flawless sprint-jump per beat across candy-coloured blocks floating high over an ocean, grass-capped voxel islands and cloud shelves drifting far below. Gap and rise are drawn from the same weighted tables as the plugin that generates the real footage. |
+| `parkour` | First-person infinite parkour, the way the actual background reels do it: one flawless sprint-jump per beat, high over an ocean of wooded islands, reef shallows and drifting cloud shelves. The course arrives in set-pieces — a staircase, a plank causeway, a spiral round a brick tower, a gate you run *through*, a long fall onto a lantern-lit platform — each built from one family of materials. Orbs hang on the exact arc of the jump that reaches them, so every one laid down is collected. Something is always in your hand: a block, a sword, a pickaxe, a torch. |
 
 Every run also generates its own palette, time of day, weather and sky — a sun
 or crescent moon with a real glow, parallax clouds, a starfield that thins
@@ -165,12 +165,13 @@ pip install raylib-software --force-reinstall --no-deps  # headless machines/CI
 pytest
 ```
 
-223 tests covering the show/hide state machine, the seeding guarantees, hook
+349 tests covering the show/hide state machine, the seeding guarantees, hook
 install/uninstall, the real shim end to end, a full daemon driven over UDP,
 pixel-identical determinism per seed, and the generation invariants — the
 corridor that can never strand the runner, the single-oncoming-train rule and
-the live dodge, the parkour jump tables, self-overlap refusal and altitude
-band.
+the live dodge, zero interpenetration over hours of simulated running, no
+parkour hop the flight solver cannot fly, self-overlap refusal, the altitude
+band, and every orb the parkour generator hangs being collected.
 
 Docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how the pieces fit and
 why, [`docs/HOOKS.md`](docs/HOOKS.md) for the hook layer specifically.
