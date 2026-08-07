@@ -98,37 +98,56 @@ def soft_disc(size: int = 64):
 
 
 def cloud_blob(seed: int, size: int = 160):
-    """A lumpy cumulus silhouette, unique per seed."""
+    """A lumpy cumulus silhouette, unique per seed.
+
+    Every puff is kept clear of the image border. Puffs allowed to run off the
+    edge get cut off square, and the union of five or six clipped puffs is a
+    rectangle -- which is fine at the size the sky draws them and very much not
+    fine on the cloud shelves below the course, where they read as sheets of
+    glass lying on the sea.
+    """
 
     def build():
         import random
 
         rng = random.Random(seed)
-        im = Image.new("RGBA", (size, size // 2), (255, 255, 255, 0))
+        height = size // 2
+        im = Image.new("RGBA", (size, height), (255, 255, 255, 0))
         d = ImageDraw.Draw(im)
-        cx, base = size // 2, size // 3
+        pad = max(3, size // 20)
+        cx, base = size // 2, int(height * 0.66)
         for _ in range(rng.randint(5, 8)):
-            w = rng.randint(size // 5, size // 2)
-            h = rng.randint(size // 8, size // 4)
-            x = cx + rng.randint(-size // 3, size // 3) - w // 2
+            w = rng.randint(size // 6, size // 3)
+            h = rng.randint(size // 12, size // 6)
+            x = cx + rng.randint(-size // 4, size // 4) - w // 2
             # puffs sit on a common base line: the classic cumulus silhouette,
             # without a hard erase that would leave a visible straight edge
             y = base - h + rng.randint(0, size // 24)
+            x = max(pad, min(size - w - pad, x))
+            y = max(pad, min(height - h - pad, y))
             d.ellipse([x, y, x + w, y + h], fill=(255, 255, 255, 235))
-        return im.filter(ImageFilter.GaussianBlur(3))
+        return im.filter(ImageFilter.GaussianBlur(max(3, size // 40)))
 
     return from_pil(f"cloud{seed}", build)
 
 
 def alpha_band(key: str, color: rl.RGB, top_alpha: int = 200,
-               falloff: float = 1.6, height: int = 128):
-    """A vertical alpha fade of one colour -- screen-space haze bands."""
+               falloff: float = 1.6, height: int = 128, ramp: float = 0.0):
+    """A vertical alpha fade of one colour -- screen-space haze bands.
+
+    ``ramp`` is the fraction of the band spent fading *in* at the top. A band
+    that starts at full strength draws its own hard edge across the sky, which
+    is exactly the seam a haze band exists to hide.
+    """
 
     def build():
         im = Image.new("RGBA", (4, height))
         px = im.load()
+        lead = max(1, int(height * ramp))
         for y in range(height):
             a = int(top_alpha * (1.0 - y / (height - 1)) ** falloff)
+            if y < lead:
+                a = int(a * (y / lead) ** 0.8)
             for x in range(4):
                 px[x, y] = (*color, a)
         return im

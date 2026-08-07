@@ -120,16 +120,78 @@ def test_runner_dodges_oncoming_trains() -> None:
 
 @pytest.mark.parametrize("run", range(1, 25))
 def test_parkour_jumps_stay_physical(run: int) -> None:
-    """Every hop must fit the weighted tables the generator claims to use."""
+    """Every hop must be one a jump can actually make.
+
+    The set-pieces widened what a hop may be -- a chasm is far longer than any
+    entry in the gap table and a descent falls further than any entry in the
+    rise table -- so the invariant is stated against the flight solver instead
+    of against the tables. A hop is legal when the ballistic solve lands on it
+    inside the allowed hang time and without crossing the ground faster than a
+    body can run.
+    """
+    from brainrot.scenes.parkour import (
+        AIR_MAX, AIR_MIN, BAND, COURSE_ALT, HOP_SPEED_MAX, flight)
+
     scene = build_parkour(run)
     while len(scene.blocks) < 400:
         scene._spawn_block()
     blocks = scene.blocks
     for a, b in zip(blocks, blocks[1:]):
-        gap = math.dist((a["x"], a["z"]), (b["x"], b["z"]))
-        rise = b["y"] - a["y"]
-        assert 1.4 <= gap <= 5.6, f"run {run}: gap of {gap:.2f}"
-        assert -2 <= rise <= 1, f"run {run}: rise of {rise}"
+        frm, to = scene._stand_point(a), scene._stand_point(b)
+        gap = math.dist((frm[0], frm[2]), (to[0], to[2]))
+        dur, vy0 = flight(frm, to)
+        assert AIR_MIN <= dur <= AIR_MAX, f"run {run}: {dur:.2f}s hang"
+        assert gap / dur <= HOP_SPEED_MAX, f"run {run}: {gap / dur:.1f} m/s hop"
+        assert 1.0 <= gap <= 8.0, f"run {run}: gap of {gap:.2f}"
+        # the arc must clear the block it leaves and land on the one it aims at
+        landed = frm[1] + vy0 * dur - 0.5 * 26.0 * dur * dur
+        assert landed == pytest.approx(to[1], abs=1e-6)
+        assert COURSE_ALT - BAND - 2 <= b["y"] <= COURSE_ALT + BAND + 2
+
+
+@pytest.mark.parametrize("run", range(1, 25))
+def test_parkour_uses_its_whole_vocabulary(run: int) -> None:
+    """A run of any length must not be one set-piece over and over -- which is
+    the single thing that made the old course tiring to look at."""
+    from brainrot.scenes.parkour import SEGMENT_TABLE
+
+    scene = build_parkour(run)
+    while len(scene.blocks) < 400:
+        scene._spawn_block()
+    seen = {b["segment"] for b in scene.blocks}
+    assert len(seen) >= 5, f"run {run}: only {seen}"
+    assert seen <= {n for n, _ in SEGMENT_TABLE} | {"start"}
+    # every block carries a material the catalogue knows how to draw
+    for blk in scene.blocks:
+        assert blk["style"] in scene.styles
+        for deco in blk["deco"]:
+            assert deco["style"] in scene.styles
+
+
+def test_parkour_orbs_are_placed_where_the_body_will_be() -> None:
+    """Every orb the generator hangs is collected, because it is hung on the
+    flight path rather than near it. A missed orb means the arc that was solved
+    at generation is not the arc that gets flown."""
+    scene = build_parkour(12)
+    for _ in range(7200):
+        scene.update(1 / 60)
+        scene.elapsed += 1 / 60
+    assert scene.orbs > 40, f"only {scene.orbs} orbs in two minutes"
+    assert scene.orbs_missed == 0, f"{scene.orbs_missed} orbs went past uncollected"
+
+
+def test_parkour_orb_hitbox_is_the_model_it_draws() -> None:
+    """The box comes from the orb model pushed through the orb's own draw
+    transform, so it cannot disagree with the picture."""
+    from brainrot.engine.collide import model_aabb, placed
+    from brainrot.scenes.parkour import ORB_SCALE
+
+    scene = build_parkour(3)
+    orb = next(o for blk in scene.blocks for o in blk["orbs"])
+    want = placed(model_aabb(scene._model("orb")),
+                  (orb["x"], orb["y"], orb["z"]),
+                  scale=(ORB_SCALE, ORB_SCALE, ORB_SCALE))
+    assert scene.orb_box(orb) == want
 
 
 @pytest.mark.parametrize("run", range(1, 25))
@@ -148,24 +210,34 @@ def test_parkour_course_does_not_self_overlap(run: int) -> None:
 
 @pytest.mark.parametrize("run", range(1, 15))
 def test_parkour_altitude_stays_in_band(run: int) -> None:
-    from brainrot.scenes.parkour import COURSE_ALT
+    """The course wanders further than it used to -- that is the point of the
+    descent and staircase set-pieces -- but it still has to come back."""
+    from brainrot.scenes.parkour import BAND, COURSE_ALT
 
     scene = build_parkour(run)
     while len(scene.blocks) < 400:
         scene._spawn_block()
     for blk in scene.blocks:
-        assert COURSE_ALT - 16 <= blk["y"] <= COURSE_ALT + 12
+        assert COURSE_ALT - BAND - 2 <= blk["y"] <= COURSE_ALT + BAND + 2
+    # and it must actually use the room: a course pinned to one altitude has
+    # no verticality however wide the band is
+    heights = [blk["y"] for blk in scene.blocks]
+    assert max(heights) - min(heights) > 8, f"run {run}: course is flat"
 
 
 def test_parkour_advances_forever() -> None:
+    from brainrot.scenes.parkour import AIR_MAX, AIR_MIN
+
     scene = build_parkour(9)
     for _ in range(3600):
         scene.update(1 / 60)
         scene.elapsed += 1 / 60
     assert scene.distance > 60
-    assert 0.42 <= scene.air_dur <= 0.80
+    assert AIR_MIN <= scene.air_dur <= AIR_MAX
     # the trail is bounded: memory cannot grow with distance
     assert len(scene.blocks) < 40
+    assert sum(len(b["orbs"]) for b in scene.blocks) < 60
+    assert sum(len(b["deco"]) for b in scene.blocks) < 400
 
 
 def test_parkour_lands_on_the_block_it_aimed_for() -> None:
@@ -180,7 +252,7 @@ def test_parkour_lands_on_the_block_it_aimed_for() -> None:
             blk = scene.blocks[scene.jump_index]
             assert abs(scene.stand[0] - blk["x"]) <= 1.31
             assert abs(scene.stand[2] - blk["z"]) <= 1.31
-            assert scene.stand[1] == pytest.approx(blk["y"] + 1.0)
+            assert scene.stand[1] == pytest.approx(scene.surface(blk))
 
 
 # -- every scene ----------------------------------------------------------
