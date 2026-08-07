@@ -180,6 +180,47 @@ def test_parkour_orbs_are_placed_where_the_body_will_be() -> None:
     assert scene.orbs_missed == 0, f"{scene.orbs_missed} orbs went past uncollected"
 
 
+def test_parkour_leaves_no_transform_on_a_shared_block_model() -> None:
+    """The held kit is assembled from the same block models the course is
+    drawn with. A rotation left on one of them tilts every block of that
+    material in the world from the next frame onward -- which is where the
+    slabs of brick lying at an angle over the sea came from."""
+    window = ensure_window()
+    scene = build_parkour(10)          # a run whose kit is a tool, not a block
+    for _ in range(2):
+        window.begin()
+        scene.draw()
+        window.end()
+    identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    for name, style in scene.styles.items():
+        m = style["model"].transform
+        got = [getattr(m, f"m{i}") for i in range(16)]
+        assert got == pytest.approx(identity), f"{name} kept a transform"
+
+
+def test_parkour_draw_is_the_same_frame_twice() -> None:
+    """Drawing without updating must draw the same picture.
+
+    Every screenshot this scene has ever been judged from is captured by
+    presenting a frame a second time, so a draw that quietly advances the
+    camera means the frame reviewed is not the frame the simulation is in.
+    """
+    window = ensure_window()
+    scene = build_parkour(6)
+    for _ in range(120):
+        scene.update(1 / 60)
+        scene.elapsed += 1 / 60
+
+    def render() -> bytes:
+        for _ in range(3):
+            window.begin()
+            scene.draw()
+            window.end()
+        return rl.capture_frame()
+
+    assert render() == render()
+
+
 def test_parkour_orb_hitbox_is_the_model_it_draws() -> None:
     """The box comes from the orb model pushed through the orb's own draw
     transform, so it cannot disagree with the picture."""

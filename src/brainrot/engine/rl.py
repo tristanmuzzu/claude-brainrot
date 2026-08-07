@@ -66,6 +66,24 @@ def mix_rgb(a: RGB, b: RGB, t: float) -> RGB:
     )
 
 
+def flush() -> None:
+    """Draw everything rlgl has queued, right now.
+
+    raylib has two rendering paths and they do not run in call order.
+    ``DrawPlane``, ``DrawLine3D`` and friends push vertices into rlgl's render
+    *batch*, which is not submitted until something forces it -- typically
+    ``EndMode3D``. ``DrawModelEx`` bypasses the batch and issues its draw call
+    immediately. So a scene that draws a ground plane and then a hundred models
+    actually draws the models first and the plane last, and the plane loses the
+    depth test against every model standing above it.
+
+    That is not a subtle difference: it punched shelf-shaped holes in the
+    parkour sea, through which you saw the sky. Call this after any batched
+    draw whose order matters.
+    """
+    rlDrawRenderBatchActive()
+
+
 def make_camera(fovy: float = 55.0):
     """A perspective Camera3D whose storage survives as long as the handle."""
     cam = ffi.new("Camera3D *")

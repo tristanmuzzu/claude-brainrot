@@ -125,6 +125,40 @@ def test_block_model_builds_with_texture() -> None:
     assert voxel.block_model("test-red", (200, 40, 40), seed=3) is model
 
 
+def test_a_batched_plane_is_drawn_before_the_models_above_it() -> None:
+    """raylib has two draw paths and they do not run in call order.
+
+    ``DrawPlane`` queues vertices in rlgl's render batch, which is not
+    submitted until ``EndMode3D``; ``DrawModelEx`` issues its draw call
+    immediately. So a ground plane drawn first is really drawn *last*, and
+    loses the depth test to everything standing above it. Opaque models hide
+    the damage; a transparent one does not, which is how this surfaced -- as
+    cloud-shelf-shaped holes in the parkour sea with the sky showing through.
+
+    Here the model above the plane is fully transparent, so the plane must
+    still be visible through it.
+    """
+    window = ensure_window()
+    ground = (0, 200, 0)
+    cam = rl.make_camera(60.0)
+    cam.position = (0.0, 5.0, 5.0)
+    cam.target = (0.0, 0.0, 0.0)
+    cam.up = (0.0, 1.0, 0.0)
+    invisible = voxel.block_model("flush-probe", (255, 0, 0), seed=5)
+    for _ in range(2):
+        window.begin()
+        rl.BeginMode3D(cam[0])
+        rl.DrawPlane((0.0, 0.0, 0.0), (60.0, 60.0), rl.rgba(ground))
+        rl.flush()
+        voxel.draw_block(invisible, 0.0, 1.5, 0.0, (255, 255, 255, 0), 3.0)
+        rl.EndMode3D()
+        window.end()
+    raw = rl.capture_frame()
+    width = rl.GetScreenWidth()
+    i = ((rl.GetScreenHeight() // 2) * width + width // 2) * 4
+    assert tuple(raw[i:i + 3]) == ground, "the ground lost the depth test"
+
+
 def test_capture_frame_returns_the_colours_it_drew() -> None:
     """Every art decision on this project was made by looking at a capture, so
     a capture that swaps red and blue silently invalidates all of them.

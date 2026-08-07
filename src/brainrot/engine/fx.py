@@ -11,9 +11,18 @@ from . import rl, textures
 _QUAD_CACHE: dict[str, object] = {}
 
 
-def ground_quad():
-    """A unit XZ quad with UVs, for blob shadows. Built once, drawn tinted."""
-    model = _QUAD_CACHE.get("ground")
+def unit_quad(key: str):
+    """A flat unit quad in the XZ plane, with UVs and its own material.
+
+    One place builds these. Every scene that wanted a textured sheet used to
+    hand-roll the mesh, and a hand-rolled one that gets a detail wrong does not
+    fail -- it draws the tint over the whole quad and ignores the texture's
+    alpha, which looks like a deliberate opaque slab rather than like a bug.
+
+    Cached per ``key``, so each caller owns its own material and can hang its
+    own texture on it without disturbing anyone else's.
+    """
+    model = _QUAD_CACHE.get(key)
     if model is not None:
         return model
     mesh = rl.ffi.new("Mesh *")
@@ -29,9 +38,17 @@ def ground_quad():
     mesh.indices = ib = rl.ffi.new("unsigned short[]", tris); keep.append(ib)
     rl.UploadMesh(mesh, False)
     model = rl.LoadModelFromMesh(mesh[0])
-    model.materials[0].maps[rl.MATERIAL_MAP_ALBEDO].texture = textures.soft_disc(64)
-    _QUAD_CACHE["ground"] = model
-    _QUAD_CACHE["ground-keep"] = (mesh, keep)
+    _QUAD_CACHE[key] = model
+    _QUAD_CACHE[f"{key}-keep"] = (mesh, keep)
+    return model
+
+
+def ground_quad():
+    """The blob-shadow quad: a unit XZ quad wearing a soft disc."""
+    model = _QUAD_CACHE.get("ground")
+    if model is None:
+        model = unit_quad("ground")
+        model.materials[0].maps[rl.MATERIAL_MAP_ALBEDO].texture = textures.soft_disc(64)
     return model
 
 

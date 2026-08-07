@@ -796,6 +796,10 @@ class RunnerScene(Scene):
 
         # ground plane under everything; fog handled by the horizon haze
         rl.DrawPlane((0, -0.05, -30), (240, 160), rl.rgba(pal.ground, 255))
+        # Submitted here rather than left in rlgl's batch, which would not be
+        # drawn until EndMode3D -- i.e. after every model in the scene, losing
+        # the depth test to all of them. See rl.flush.
+        rl.flush()
 
         # track tiles, snapped to the row grid
         first = int((self.travel - 8) / ROW)

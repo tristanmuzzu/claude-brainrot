@@ -45,7 +45,7 @@ import math
 
 from ..engine import rl, voxel
 from ..engine.collide import AABB, model_aabb, placed
-from ..engine.fx import Burst, Weather, glow_billboard, ground_quad
+from ..engine.fx import Burst, Weather, glow_billboard, ground_quad, unit_quad
 from ..engine.hud import text
 from ..engine.scene import Scene, SceneContext, register
 from ..engine import textures
@@ -211,7 +211,6 @@ class ParkourScene(Scene):
                 "yaw": crng.uniform(0, 360),
                 "drift": crng.uniform(0.4, 1.4),
             })
-        self._shelf_model = None
         self.cloud_tint = rl.mix_rgb(pal.sky_bottom, (255, 255, 255), 0.55)
 
     # -- style catalogue ---------------------------------------------------
@@ -749,6 +748,7 @@ class ParkourScene(Scene):
                 self._land()
 
         self._collect()
+        self._look()
         self.land_dip = max(0.0, self.land_dip - dt * 5.0)
         self.swing = max(0.0, self.swing - dt * 2.6)
         self.mine = max(0.0, self.mine - dt * 2.2)
@@ -772,21 +772,6 @@ class ParkourScene(Scene):
                  max(0, min(255, int(c[2] * tint[2]))))
         return rl.rgba(c, alpha)
 
-    def _shelf(self):
-        if self._shelf_model is None:
-            mesh = rl.ffi.new("Mesh *")
-            verts = [(-0.5, 0, -0.25), (0.5, 0, -0.25), (0.5, 0, 0.25), (-0.5, 0, 0.25)]
-            mesh.vertexCount = 4
-            mesh.triangleCount = 2
-            vb = rl.ffi.new("float[]", [c for v in verts for c in v])
-            nb = rl.ffi.new("float[]", [0, 1, 0] * 4)
-            tb = rl.ffi.new("float[]", [0, 0, 1, 0, 1, 1, 0, 1])
-            ib = rl.ffi.new("unsigned short[]", [0, 2, 1, 0, 3, 2, 0, 1, 2, 0, 2, 3])
-            mesh.vertices = vb; mesh.normals = nb; mesh.texcoords = tb; mesh.indices = ib
-            self._keep = (vb, nb, tb, ib, mesh)
-            rl.UploadMesh(mesh, False)
-            self._shelf_model = rl.LoadModelFromMesh(mesh[0])
-        return self._shelf_model
 
     def draw(self) -> None:
         pal = self.palette
@@ -809,7 +794,10 @@ class ParkourScene(Scene):
         # Starts above the true horizon and fades in, because the eye finds a
         # hard edge in a clear sky instantly -- and the previous band drew one
         # right where the sea was supposed to dissolve.
-        band = textures.alpha_band(f"haze-{self.ctx.seed.run}", pal.fog, 210, 1.6,
+        # Not too strong. Dawn and dusk fog is a saturated gold or pink, and at
+        # the alpha this used to carry it stopped being aerial perspective and
+        # became an orange wash laid over the middle of the frame.
+        band = textures.alpha_band(f"haze-{self.ctx.seed.run}", pal.fog, 155, 1.6,
                                    ramp=0.22)
         horizon = int(self.height * 0.30)
         rl.DrawTexturePro(band, (0, 0, 4, 128),
@@ -827,7 +815,15 @@ class ParkourScene(Scene):
         self._draw_crosshair()
         self._draw_hud()
 
-    def _aim_camera(self, x: float, y: float, z: float) -> None:
+    def _look(self) -> None:
+        """Ease the head toward where the run is going.
+
+        Lives in ``update`` rather than in ``draw`` so that drawing a frame
+        twice draws the same frame twice. It did not, and the difference is
+        not academic: every screenshot this scene is judged from is captured
+        by presenting a frame a second time.
+        """
+        x, z = self.pos[0], self.pos[2]
         # Aim: mid-air, at where we will land; on the ground, pre-aim toward
         # the NEXT landing so the turn happens as a deliberate look, not a
         # camera glued to a moving block.
@@ -854,6 +850,7 @@ class ParkourScene(Scene):
         # a touch of roll into the turn sells the head motion
         self._roll += (max(-0.05, min(0.05, dy * 0.35)) - self._roll) * 0.1
 
+    def _aim_camera(self, x: float, y: float, z: float) -> None:
         # landing dip with a small overshoot, plus an idle breath on ground
         dip = self.land_dip ** 1.4 * 0.17 - math.sin(self.land_dip * math.pi) * 0.02
         breathe = math.sin(self.elapsed * 2.1) * 0.012 if self.phase == "ground" else 0.0
@@ -886,6 +883,11 @@ class ParkourScene(Scene):
         # before the horizon does, and the strip of bare sky underneath it read
         # as a pale band lying on the water.
         rl.DrawPlane((x, 0.0, z - 900), (4000, 4000), rl.rgba(deep, 255))
+        # Submit it before anything else draws. A batched plane is otherwise
+        # rendered after every model in the frame and loses the depth test to
+        # all of them -- which is where the sea grew holes in the shape of the
+        # cloud shelves floating above it.
+        rl.flush()
         # Each island sits on its own pale shallow. Drawn as the soft-edged
         # disc the blob shadows use rather than as a quad: a hard-edged
         # rectangle of lighter blue on the sea reads as a mistake, and the
@@ -931,7 +933,7 @@ class ParkourScene(Scene):
         as everything else down there. Without it a shelf reads as a pane of
         glass lying on the water.
         """
-        shelf = self._shelf()
+        shelf = unit_quad("cloud-shelf")
         for s in self.shelves:
             sx = s["x"] + math.sin(self.elapsed * 0.05 * s["drift"]) * 6
             if s["z"] > z + 60:
@@ -946,9 +948,10 @@ class ParkourScene(Scene):
             # above a single quad is unmistakably a single quad, and the second
             # layer is what gives it a top and a shoulder.
             for k, (lift, shrink) in enumerate(((0.0, 1.0), (3.5, 0.66))):
+                # the cloud texture is 2:1, so the quad is squashed to match
                 rl.DrawModelEx(shelf, (sx, s["y"] + lift, s["z"]), (0, 1, 0),
                                s["yaw"] + k * 37.0,
-                               (s["s"] * shrink, 1.0, s["s"] * shrink), tint)
+                               (s["s"] * shrink, 1.0, s["s"] * shrink * 0.5), tint)
 
     def _arrival(self, born: float) -> tuple[float, int]:
         """How far into its arrival a block is: a vertical offset and an alpha.
@@ -1089,6 +1092,12 @@ class ParkourScene(Scene):
             rl.DrawModelEx(model, (x, y, z), (0, 1, 0), 0.0,
                            (size[0] * half_w, size[1] * half_w, size[2] * half_w),
                            rl.WHITE4)
+            # Put it back. The kit is built from the same shared block models
+            # the course is, and a transform left on one is a transform every
+            # plank walkway and stone staircase in the world inherits on the
+            # next frame -- which is where the tilted slabs floating over the
+            # sea were coming from.
+            model.transform = rl.MatrixIdentity()
 
         # Forearm out of the bottom-right corner, hand, then whatever it is
         # carrying -- turned so two faces are visible, which is what makes a
