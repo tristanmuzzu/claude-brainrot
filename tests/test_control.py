@@ -256,10 +256,81 @@ def test_the_loop_takes_the_chord_from_config() -> None:
     assert overlay.controller.handback == 3.0
 
 
-def test_parkour_is_not_offered_the_keyboard_yet() -> None:
-    """Scenes opt in. Parkour's control scheme is still to be designed, and
-    the loop must not hand it input it has no idea what to do with."""
-    seed = Seed.for_run(5)
-    parkour = scene_api.build(
+# -- parkour ----------------------------------------------------------------
+
+
+def parkour(run: int = 5):
+    seed = Seed.for_run(run)
+    return scene_api.build(
         "parkour", scene_api.SceneContext(W, H, generate_palette(seed), seed))
-    assert parkour.playable is False
+
+
+def drive(scene, intent: Intent, seconds: float) -> None:
+    for _ in range(int(seconds / DT)):
+        scene.control(intent)
+        scene.update(DT)
+        scene.elapsed += DT
+
+
+def test_parkour_steering_bends_the_course() -> None:
+    """There is no free movement to give a first-person parkour runner, so
+    what a player gets is the decision the generator makes: which way to go.
+    Holding a direction has to actually take the course that way."""
+    for run in (5, 7, 11):
+        left, right = parkour(run), parkour(run)
+        drive(left, Intent(left=True), 12.0)
+        drive(right, Intent(right=True), 12.0)
+        apart = right.pos[0] - left.pos[0]
+        assert apart > 8.0, f"run {run}: steering only moved it {apart:.1f} m"
+
+
+def test_parkour_steering_leaves_the_committed_blocks_alone() -> None:
+    """The block being landed on and the one after it are committed. Rebuilding
+    them would move the ground out from under a jump in progress."""
+    scene = parkour(7)
+    drive(scene, Intent(), 2.0)
+    committed = [id(b) for b in scene.blocks[scene.jump_index:scene.jump_index + 2]]
+    scene.control(Intent(right=True))
+    scene._steer_course()
+    assert [id(b) for b in scene.blocks[scene.jump_index:scene.jump_index + 2]] \
+        == committed
+    assert len(scene.blocks) - scene.jump_index >= 14
+
+
+def test_parkour_jump_leaves_the_block_early() -> None:
+    scene = parkour(7)
+    while scene.phase != "ground":
+        scene.update(DT)
+        scene.elapsed += DT
+    scene.ground_dur = 0.9
+    scene.control(Intent(jump=True))
+    assert scene.ground_dur <= scene.phase_t
+
+
+def test_a_steered_run_still_collects_every_orb_it_lays() -> None:
+    """The guarantee the course is built on -- an orb hangs on the arc the
+    body will fly -- must survive being driven. Steering re-lays the course
+    through the same generator, and an early take-off changes the timing of an
+    arc rather than its endpoints."""
+    scene = parkour(11)
+    turn = Intent(right=True)
+    for i in range(3600):
+        # hold a direction, change it now and then, and jump off the beat
+        if i % 600 < 300:
+            turn = Intent(right=True, jump=i % 7 == 0)
+        else:
+            turn = Intent(left=True, duck=i % 11 == 0)
+        scene.control(turn)
+        scene.update(DT)
+        scene.elapsed += DT
+    assert scene.orbs > 20
+    assert scene.orbs_missed == 0
+
+
+def test_parkour_hands_itself_back() -> None:
+    """Stop pressing keys and the scene drives itself again."""
+    scene = parkour(7)
+    drive(scene, Intent(right=True), 1.0)
+    assert scene.driven and scene.steer != 0.0
+    settle(scene, 1.0)
+    assert not scene.driven and scene.steer == 0.0
