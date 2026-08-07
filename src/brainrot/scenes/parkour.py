@@ -183,7 +183,6 @@ class ParkourScene(Scene):
         self.vy = 0.0
         self.land_dip = 0.0
         self.distance = 0.0
-        self.hops = 0
         self.yaw = self.heading
         self._roll = 0.0
 
@@ -191,7 +190,6 @@ class ParkourScene(Scene):
         self.orbs = 0
         self.orbs_missed = 0
         self.combo = 0
-        self.best_combo = 0
         self.combo_t = 0.0
 
         # -- world below ---------------------------------------------------
@@ -663,7 +661,6 @@ class ParkourScene(Scene):
         self.phase_t = 0.0
         self.land_dip = 1.0
         self.swing = 1.0
-        self.hops += 1
         landed_on = self.blocks[self.jump_index]
         # a scuff of block-coloured dust at the feet, kicked up by the landing
         self.burst.spawn(self.stand[0], self.stand[1] - 0.1, self.stand[2],
@@ -799,7 +796,6 @@ class ParkourScene(Scene):
                 orb["taken"] = True
                 self.orbs += 1
                 self.combo += 1
-                self.best_combo = max(self.best_combo, self.combo)
                 self.combo_t = COMBO_HOLD
                 self.burst.spawn(orb["x"], orb["y"], orb["z"], ORB_COLOR,
                                  count=9, speed=2.2, rng=self.hop_rng)
@@ -876,16 +872,22 @@ class ParkourScene(Scene):
         # became an orange wash laid over the middle of the frame.
         # The sea is one flat plane with no distance shading of its own, so
         # without this it meets the sky along a drawn line rather than
-        # dissolving into one. The band therefore has to be near its strongest
-        # exactly where the sea ends -- a little above 0.42 of the frame -- and
-        # fade downward from there. It also fades *in* at its top edge, because
-        # a band that starts at full strength draws its own line across the sky
-        # a few rows above the one it was meant to hide.
+        # dissolving into one. The band therefore has to be strongest exactly
+        # where the sea ends and fade downward from there, and it has to fade
+        # *in* at its top edge, or it draws its own line across the sky a few
+        # rows above the one it was meant to hide.
+        #
+        # Where the sea ends is not a fixed fraction of the frame: the camera
+        # pitches with the jump. So it is projected rather than guessed -- a
+        # point at eye height and effectively infinite distance is the horizon
+        # by definition. Pinning it to a constant left a bruise-coloured strip
+        # of unhazed water above the haze whenever the head was up.
         band = textures.alpha_band(f"haze-{self.ctx.seed.run}", pal.fog, 235, 1.7,
-                                   ramp=0.09)
-        horizon = int(self.height * 0.355)
+                                   ramp=0.22)
+        horizon = self._horizon_y()
         rl.DrawTexturePro(band, (0, 0, 4, 128),
-                          (0, horizon, self.width, int(self.height * 0.45)),
+                          (0, horizon - int(self.height * 0.09), self.width,
+                           int(self.height * 0.45)),
                           (0, 0), 0.0, rl.WHITE4)
         rl.BeginMode3D(cam[0])
 
@@ -954,6 +956,24 @@ class ParkourScene(Scene):
         fx, fz = math.sin(self.yaw), -math.cos(self.yaw)
         cam.up = (math.sin(self._roll) * -fz, math.cos(self._roll), math.sin(self._roll) * fx)
         cam.fovy = 70.0 + (2.5 if self.phase == "air" else 0.0)
+
+    def _horizon_y(self) -> int:
+        """Screen row the sea's horizon falls on, this frame.
+
+        A point at eye height and effectively infinite distance projects to it
+        exactly, whatever the camera is doing. Clamped, because a projection
+        can degenerate and a haze band flung off the top of the frame would
+        take the horizon's disguise with it.
+        """
+        cam = self.camera
+        far = (cam.position.x + math.sin(self.yaw) * 1e5,
+               cam.position.y,
+               cam.position.z - math.cos(self.yaw) * 1e5)
+        try:
+            y = int(rl.GetWorldToScreen(far, cam[0]).y)
+        except Exception:
+            y = int(self.height * 0.42)
+        return max(int(self.height * 0.18), min(int(self.height * 0.68), y))
 
     def _draw_ocean(self, x: float, z: float) -> None:
         pal = self.palette
