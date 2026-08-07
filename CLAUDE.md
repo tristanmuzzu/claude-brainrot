@@ -58,7 +58,10 @@ made of solved arcs between blocks that do not exist yet.
    with `HeadlessWindow` + `SetTargetFPS(0)`; `DesktopWindow` has vsync on and
    will report a flat 16.6 ms that tells you nothing. Take the reading on a
    *quiet* machine — with a browser and Docker busy, both scenes measure two
-   to four times higher and the comparison is worthless.
+   to four times higher and the absolute numbers are worthless. **Measure
+   parkour against the runner in the same process**: that ratio is stable at
+   about 0.75 whatever else the machine is doing, and it is the number that
+   actually tells you whether a change cost anything.
 
 ## Tried and reverted: running along train roofs
 
