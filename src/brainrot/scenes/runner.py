@@ -80,6 +80,10 @@ COMMIT_WINDOW = 1.2
 REFLEX_WINDOW = 1.0
 #: Seconds a pickup run stays on the HUD after the last coin.
 COMBO_HOLD = 1.6
+#: How long a player's input keeps the planner switched off. Long enough that
+#: it does not fight between key presses, short enough that letting go of the
+#: keyboard hands the run back promptly.
+DRIVEN_HOLD = 0.6
 
 #: Entity kinds a body can actually hit. Everything else is scenery, and
 #: checking that first is what keeps the per-frame collision pass cheap.
@@ -191,6 +195,9 @@ class RunnerScene(Scene):
         self.last_contact: dict | None = None
         self.unsolvable = 0
         self.reflexes = 0
+        #: counts down while a person is at the controls; the planner stands
+        #: down for as long as it is above zero
+        self.driven_t = 0.0
 
         self._plan_at = -99.0
         self._lane_plan = plan.LanePlan(PLAN_STEP, [1] * 2)
@@ -506,6 +513,35 @@ class RunnerScene(Scene):
                 return False
         return True
 
+    # -- being driven -----------------------------------------------------
+
+    playable = True
+
+    def control(self, intent) -> None:
+        """Steer by hand for one frame.
+
+        Lane changes go through the same commitment the planner uses -- a
+        crossing finishes before another can start, and none begin in mid-air
+        -- so a player gets the same body, not a teleporting one. The planner
+        is suppressed while this is happening, including the reflex: a runner
+        that keeps saving itself is not one you are really driving.
+        """
+        self.driven_t = DRIVEN_HOLD
+        m = self.motion
+        if m.settled() and not m.airborne and not m.rolling:
+            if intent.left and m.target_lane > 0:
+                m.target_lane -= 1
+            elif intent.right and m.target_lane < 2:
+                m.target_lane += 1
+        if intent.jump:
+            m.begin("jump", self.kin)
+        elif intent.duck:
+            m.begin("roll", self.kin)
+
+    @property
+    def driven(self) -> bool:
+        return self.driven_t > 0.0
+
     # -- planning ---------------------------------------------------------
 
     def _corridor_lanes(self) -> list[int]:
@@ -596,21 +632,30 @@ class RunnerScene(Scene):
         self._forget_passed_spans()
         self._spawn_to_horizon()
 
-        if self.elapsed - self._plan_at >= PLAN_EVERY:
+        self.driven_t = max(0.0, self.driven_t - dt)
+        if not self.driven and self.elapsed - self._plan_at >= PLAN_EVERY:
             self._plan_at = self.elapsed
             self._replan()
 
-        while self._booked and self._booked[0][0] <= self.elapsed:
-            _, action = self._booked.pop(0)
-            self.motion.begin(action, self.kin)
+        if not self.driven:
+            while self._booked and self._booked[0][0] <= self.elapsed:
+                _, action = self._booked.pop(0)
+                self.motion.begin(action, self.kin)
+        else:
+            self._booked.clear()
         # One pass over what is close enough to matter, shared by the reflex
         # and the contact check.
         near = self._solids_near(REFLEX_WINDOW * self.speed + 6.0)
-        self._reflex(near)
+        if not self.driven:
+            self._reflex(near)
 
+        # While a person is driving, the lane they chose stands: feeding the
+        # planner's lane in here would quietly steer back out of it.
+        desired = (self.motion.target_lane if self.driven
+                   else self._lane_plan.lane_at(
+                       max(0.0, self.elapsed - self._plan_at)))
         was_airborne = self.motion.airborne
-        self.motion.advance(dt, self.kin, self._lane_plan.lane_at(
-            max(0.0, self.elapsed - self._plan_at)))
+        self.motion.advance(dt, self.kin, desired)
         if was_airborne and not self.motion.airborne:
             self.cam_shake = 0.5
 

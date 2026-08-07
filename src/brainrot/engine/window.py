@@ -52,6 +52,11 @@ def compute_placement(cfg: Config) -> Placement:
 class _BaseWindow:
     creation_flags = 0
 
+    #: Whether this window can receive keyboard input by simply being focused.
+    #: True for ordinary windows; the overlay is built never to take focus, so
+    #: it has to be handed the keyboard deliberately (engine/input.py).
+    accepts_input = True
+
     def __init__(self) -> None:
         self.width = 0
         self.height = 0
@@ -126,6 +131,10 @@ class OverlayWindow(_BaseWindow):
         | rl.FLAG_WINDOW_MOUSE_PASSTHROUGH
         | rl.FLAG_VSYNC_HINT
     )
+
+    #: Built never to take focus, so it cannot be typed into until the
+    #: takeover chord deliberately makes it focusable.
+    accepts_input = False
 
     def __init__(self) -> None:
         super().__init__()

@@ -53,6 +53,21 @@ class Scene(ABC):
     def draw(self) -> None:
         """Render the current state. Must fully cover the frame."""
 
+    #: Whether this scene can be driven by hand. Scenes that opt in implement
+    #: :meth:`control`; the rest keep driving themselves and the loop simply
+    #: never offers them the keyboard.
+    playable: bool = False
+
+    def control(self, intent) -> None:
+        """Take a player's :class:`~brainrot.engine.input.Intent` for one frame.
+
+        Called *before* ``update``, and only while someone is actually driving.
+        A scene is expected to keep every guarantee it makes on autopilot --
+        except the ones that were about its own choices. The runner will not
+        clip through a train because it plans not to, but a person steering it
+        into one gets to hit it.
+        """
+
     def teardown(self) -> None:
         """Release anything expensive. Optional."""
 

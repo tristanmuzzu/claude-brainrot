@@ -47,6 +47,11 @@ class Overlay:
         self.running = False
         self._window_shown = False
 
+        from .input import Controller, Takeover
+
+        self.controller = Controller()
+        self.takeover = Takeover(window)
+
     # -- events -----------------------------------------------------------
 
     def _on_event(self, event: Event) -> None:
@@ -130,6 +135,7 @@ class Overlay:
                 self._show_window()
                 if self.scene is not None:
                     try:
+                        self._drive(now)
                         self.scene.update(dt)
                         self.scene.elapsed += dt
                         self.window.begin()
@@ -158,9 +164,22 @@ class Overlay:
         finally:
             self.shutdown()
 
+    def _drive(self, now: float) -> None:
+        """Offer the keyboard to the scene, if anyone is asking for it."""
+        scene = self.scene
+        if scene is None or not scene.playable:
+            return
+        self.takeover.update()
+        intent = self.controller.poll(now, self.takeover.focused())
+        if self.controller.engaged:
+            scene.control(intent)
+
     def _draw_caption(self) -> None:
         if self.cfg.show_caption and self.state.caption:
             chip(self.state.caption, 14, self.cfg.height - 30)
+        note = self.controller.caption(time.monotonic())
+        if note:
+            chip(note, 14, self.cfg.height - 56)
 
     def _advance_fade(self, dt: float, wants_visible: bool) -> None:
         target = 1.0 if wants_visible else 0.0
@@ -176,6 +195,11 @@ class Overlay:
     def _go_idle(self) -> None:
         """Drop to zero cost: hide the window and discard the world."""
         if self._window_shown:
+            # Never hold the keyboard or the foreground across an idle spell:
+            # the overlay is about to vanish, and a vanished window that still
+            # owns focus is a window that has stolen it.
+            if self.takeover.active:
+                self.takeover.toggle()
             self.window.set_visible(False)
             # Let go of the host while we have nothing to show. On Windows the
             # overlay is an *owned* window, and Windows destroys owned windows
