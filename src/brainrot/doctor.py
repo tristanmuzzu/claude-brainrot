@@ -98,6 +98,7 @@ def _check_backend(cfg: Config) -> list[Check]:
         checks.append(_no_backend_check())
         return checks
 
+    answerable = "yes"
     if os.name == "nt":
         checks.append(
             Check("overlay", OK,
@@ -105,9 +106,21 @@ def _check_backend(cfg: Config) -> list[Check]:
                   f"window (attach = {cfg.attach})")
         )
     else:
-        checks += _check_linux_backend(cfg)
+        linux_checks, answerable = _check_linux_backend(cfg)
+        checks += linux_checks
 
-    if cfg.follow_focus and not native.focus_known():
+    if cfg.follow_focus and answerable == "cannot-tell":
+        # The daemon holds the port, so the snapshots go to it and not to us.
+        # Reporting what *this* process can see would be reporting on the
+        # wrong process, and it would say "blind" every time the daemon is
+        # up -- which is exactly when everything is working.
+        checks.append(
+            Check("focus", OK,
+                  "the daemon has the port, so it is the one being told; it "
+                  "prints which mode it is in when it starts and whenever "
+                  "that changes")
+        )
+    elif cfg.follow_focus and answerable == "no":
         checks.append(
             Check("focus", WARN,
                   "follow_focus is on, but nothing here can say who is in front",
@@ -155,8 +168,13 @@ def _no_backend_check() -> Check:
     )
 
 
-def _check_linux_backend(cfg: Config) -> list[Check]:
-    """The Linux backend is two halves, and they fail independently."""
+def _check_linux_backend(cfg: Config) -> "tuple[list[Check], str]":
+    """The Linux backend is two halves, and they fail independently.
+
+    Returns the checks and whether "who is in front" is answerable: "yes",
+    "no", or "cannot-tell" -- the last because the daemon holds the port, so
+    it is the process being told and this one never hears anything.
+    """
     from . import extinstall
     from .overlay import shell, x11
 
@@ -178,7 +196,7 @@ def _check_linux_backend(cfg: Config) -> list[Check]:
             "while you are looking at it, both need to ask the compositor "
             "where things are -- which only the GNOME extension does today.",
         ))
-        return checks
+        return checks, "no"
 
     if not extinstall.installed():
         checks.append(Check(
@@ -188,7 +206,7 @@ def _check_linux_backend(cfg: Config) -> list[Check]:
             "everything, and cannot be dragged. Install it with: "
             "brainrot extension install",
         ))
-        return checks
+        return checks, "no"
     if not extinstall.enabled():
         if extinstall.enabled_next_session():
             checks.append(Check(
@@ -205,7 +223,7 @@ def _check_linux_backend(cfg: Config) -> list[Check]:
                 "shell", WARN, "gnome-shell extension installed but disabled",
                 f"Enable it with: gnome-extensions enable {extinstall.UUID}",
             ))
-        return checks
+        return checks, "no"
     if not extinstall.up_to_date():
         checks.append(Check(
             "shell", WARN, "an older copy of the extension is installed",
@@ -221,7 +239,7 @@ def _check_linux_backend(cfg: Config) -> list[Check]:
             f"gsettings --schemadir {extinstall.target_dir()}/schemas set "
             f"{extinstall.SCHEMA_ID} port {cfg.port}",
         ))
-        return checks
+        return checks, "no"
 
     # Whether it is actually *talking* is a different question from whether it
     # is enabled, and the only honest way to answer it is to listen.
@@ -229,21 +247,22 @@ def _check_linux_backend(cfg: Config) -> list[Check]:
     if heard is None:
         checks.append(Check(
             "shell", OK,
-            "extension enabled (the daemon is running, so it is holding the "
-            "port -- ask it, not me)"))
-    elif heard:
+            "extension enabled (the daemon is holding the port, so it is the "
+            "one being told -- ask it, not me)"))
+        return checks, "cannot-tell"
+    if heard:
         snap = shell.bridge().snapshot
         checks.append(Check(
             "shell", OK,
             f"{len(snap.windows)} windows, {len(snap.monitors)} monitor(s), "
             f"{snap.scale_against(x11.screen_rect()[2]):g}x scale"))
-    else:
-        checks.append(Check(
-            "shell", FAIL, "extension enabled but sending nothing",
-            "gnome-shell may have failed to load it. Look for the reason: "
-            "journalctl --user -b -u org.gnome.Shell@wayland.service | tail -40",
-        ))
-    return checks
+        return checks, "yes"
+    checks.append(Check(
+        "shell", FAIL, "extension enabled but sending nothing",
+        "gnome-shell may have failed to load it. Look for the reason: "
+        "journalctl --user -b -u org.gnome.Shell@wayland.service | tail -40",
+    ))
+    return checks, "no"
 
 
 def _listen_for_shell(cfg: Config, timeout: float = 2.0) -> "bool | None":
