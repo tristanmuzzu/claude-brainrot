@@ -257,3 +257,40 @@ def test_a_host_can_be_learned_after_the_prompt_that_carried_it(clock: Clock) ->
     clock.advance(0.1)
     state.tick()
     assert state.hosts == frozenset({4242})
+
+
+def test_a_session_that_never_finishes_is_eventually_given_up_on(clock: Clock) -> None:
+    """The transport cannot promise the Stop arrives.
+
+    UDP was chosen for what it cannot do, and one of those things is deliver.
+    "A lost packet costs at most one missed show or hide, corrected by the
+    next event" holds for everything except the *last* event a session ever
+    sends: lose that, or lose the session (killed mid-answer, terminal
+    closed), and it thinks forever -- with the strip on screen for the life of
+    the daemon, which is the single worst way for this to fail.
+    """
+    state = ThinkingState(grace_seconds=0.0, min_visible_seconds=0.0,
+                          max_thinking_seconds=60.0, clock=clock)
+    state.handle("UserPromptSubmit", "lost")
+    clock.advance(1.0)
+    assert state.tick() is Visibility.VISIBLE
+
+    clock.advance(58.0)
+    assert state.tick() is Visibility.VISIBLE, "a long turn is still a turn"
+
+    clock.advance(2.0)
+    assert state.tick() is Visibility.HIDDEN
+    assert not state.busy
+
+
+def test_activity_keeps_a_long_turn_alive(clock: Clock) -> None:
+    """Anything from a session is evidence it is still there, so a turn that
+    keeps reporting tool use is never given up on however long it runs."""
+    state = ThinkingState(grace_seconds=0.0, min_visible_seconds=0.0,
+                          max_thinking_seconds=60.0, clock=clock)
+    state.handle("UserPromptSubmit", "busy")
+    for _ in range(10):
+        clock.advance(50.0)
+        state.handle("PreToolUse", "busy", tool="Bash")
+        assert state.tick() is Visibility.VISIBLE
+    assert state.busy

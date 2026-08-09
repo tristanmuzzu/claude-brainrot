@@ -50,6 +50,7 @@ class Overlay:
             grace_seconds=cfg.grace_seconds,
             min_visible_seconds=cfg.min_visible_seconds,
             hide_on_notification=cfg.hide_on_notification,
+            max_thinking_seconds=cfg.max_thinking_seconds,
         )
         self.counter = RunCounter()
 

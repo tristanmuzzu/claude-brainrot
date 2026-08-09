@@ -207,10 +207,16 @@ long jumps you need a different motion model, not a bigger number.
   it owns. The daemon therefore detaches whenever it goes idle. In tests,
   destroy the fake host *after* detaching or it takes the shared raylib window
   with it.
-- **Two daemons bind the same port quite happily.** UDP with `SO_REUSEADDR`
-  does not refuse the second bind; the hook events are then split between the
-  processes, each gets a fraction of the turn, and their windows fight over
-  the screen. Every symptom looks like a bug in the overlay. Worse, a Store
+- **Two daemons used to bind the same port quite happily.** UDP with
+  `SO_REUSEADDR` did not refuse the second bind; the datagrams then went to
+  one of them only -- the first showed the strip on a prompt, the second took
+  the `Stop`, and the first left a scene on screen for the rest of the day.
+  Every symptom of that reads as a bug in the overlay, and it cost an
+  afternoon twice. Fixed 2026-08-09 by dropping `SO_REUSEADDR`: the second
+  daemon now refuses to start. UDP has no `TIME_WAIT`, so nothing was bought
+  by allowing it. `brainrot doctor`'s `instances` line counts *processes* on
+  Linux rather than windows -- an idle duplicate has no window and is
+  invisible to a window count right up until it steals an event. Worse, a Store
   Python's `CommandLine` is not readable through WMI, so
   `Where-Object CommandLine -like '*brainrot*'` matches **nothing** and a kill
   that reports no error can have killed no one. Count the windows instead:
@@ -240,6 +246,11 @@ long jumps you need a different motion model, not a bigger number.
   it: run the real `Overlay` in-process with an `OverlayWindow` subclass that
   checks `foreground_root()` after each window call, and pass it the handle
   of a real window belonging to some other application.
+- **A session whose `Stop` never arrives used to think forever**, and the
+  strip stayed up with it. The transport cannot promise delivery, and "the
+  next event corrects it" is no correction when there is no next event for
+  that session. `max_thinking_seconds` (default 900) gives up on one that has
+  said nothing for that long; any event from it refreshes the clock.
 - **A leaked daemon looks exactly like a window bug.** The same investigation
   first blamed the show path for a 10Hz flap that was really three daemons
   fighting. Check `brainrot doctor`'s `instances` line before theorising.

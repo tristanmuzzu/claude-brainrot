@@ -184,3 +184,32 @@ def test_listener_survives_a_handler_exception() -> None:
         listener.stop()
 
     assert [e.kind for e in seen] == ["Stop"]
+
+
+def test_a_second_daemon_cannot_take_the_port() -> None:
+    """One listener, or the turn is split between them.
+
+    With SO_REUSEADDR a second daemon bound the same port quite happily and
+    then the datagrams went to only one of them: the first showed the strip on
+    a prompt, the second received the Stop, and the first left a scene on
+    screen indefinitely. Every symptom of that reads as a bug in the overlay,
+    which is what makes it worth refusing outright rather than detecting
+    afterwards.
+    """
+    import socket
+
+    from brainrot.ipc import AlreadyRunning, EventListener
+
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    probe.bind(("127.0.0.1", 0))
+    port = probe.getsockname()[1]
+    probe.close()
+
+    first = EventListener("127.0.0.1", port, lambda event: None)
+    first.start()
+    try:
+        second = EventListener("127.0.0.1", port, lambda event: None)
+        with pytest.raises(AlreadyRunning):
+            second.start()
+    finally:
+        first.stop()

@@ -42,6 +42,7 @@ def _config_from(args: argparse.Namespace) -> Config:
 def cmd_run(args: argparse.Namespace) -> int:
     from .engine.loop import Overlay
     from .engine.window import select_backend
+    from .ipc import AlreadyRunning
 
     cfg = _config_from(args)
     backend = select_backend(args.backend or "")
@@ -60,6 +61,11 @@ def cmd_run(args: argparse.Namespace) -> int:
         overlay.run()
     except KeyboardInterrupt:
         pass
+    except AlreadyRunning as exc:
+        print(f"\n{exc}", file=sys.stderr)
+        print("Stop the other one first, or start this with --port.",
+              file=sys.stderr)
+        return 1
     return 0
 
 

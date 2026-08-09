@@ -61,6 +61,12 @@ class Config:
     fade_seconds: float = 0.35
     #: Hide when Claude asks for permission or input -- you need the terminal.
     hide_on_notification: bool = True
+    #: Give up on a session that has said nothing for this long. The transport
+    #: cannot promise the Stop arrives, and a session that never sends one --
+    #: killed mid-answer, terminal closed, datagram dropped -- would otherwise
+    #: keep the strip on screen for the life of the daemon. Generous, because
+    #: a real turn can run for a long time. 0 disables it.
+    max_thinking_seconds: float = 900.0
     #: Chord that hands the keyboard to the overlay, as "mod+mod+key".
     #:
     #: Deliberately obscure, and deliberately configurable. The overlay watches
@@ -128,7 +134,7 @@ class Config:
                     setattr(self, f.name, int(env))
                 elif f.name in ("opacity", "anchor_y", "grace_seconds",
                                 "min_visible_seconds", "fade_seconds",
-                                "handback_seconds"):
+                                "handback_seconds", "max_thinking_seconds"):
                     setattr(self, f.name, float(env))
                 elif f.name in ("hide_on_notification", "show_caption", "follow_focus"):
                     setattr(self, f.name, env.strip().lower() in ("1", "true", "yes", "on"))
@@ -150,6 +156,7 @@ class Config:
         self.min_visible_seconds = max(0.0, float(self.min_visible_seconds))
         self.fade_seconds = max(0.0, float(self.fade_seconds))
         self.handback_seconds = max(1.0, float(self.handback_seconds))
+        self.max_thinking_seconds = max(0.0, float(self.max_thinking_seconds))
         # A hotkey that will not parse would silently mean "no takeover ever",
         # so fall back to the default rather than leaving it unusable.
         from .engine.keys import parse_chord, parse_modifiers

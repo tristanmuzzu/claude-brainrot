@@ -62,7 +62,19 @@ class ThinkingState:
     hide_on_notification: bool = True
     clock: Callable[[], float] = time.monotonic
 
+    #: A turn that produces no end event at all -- a lost datagram, a session
+    #: killed mid-answer, a terminal closed -- would otherwise leave its
+    #: session thinking for the life of the daemon, and the strip on screen
+    #: with it. UDP is chosen for what it cannot do, and one of those things
+    #: is guarantee the Stop arrives; "corrected by the next event" is no
+    #: correction at all when there is no next event for that session.
+    #: Generous, because a real turn can be very long, and a stuck strip is a
+    #: nuisance rather than a disaster.
+    max_thinking_seconds: float = 900.0
+
     _thinking: set[str] = field(default_factory=set)
+    #: session id -> when it last said it was working.
+    _since: dict[str, float] = field(default_factory=dict)
     #: session id -> handle of the window that session was prompted from.
     _hosts: dict[str, int] = field(default_factory=dict)
     #: Hosts of the sessions working in the current turn. Held through the
@@ -157,6 +169,9 @@ class ThinkingState:
         self.tick()
 
     def _begin(self, session: str) -> None:
+        # Refreshed even when already thinking: any event from a session is
+        # evidence it is still alive, which is what the expiry below measures.
+        self._since[session] = self.clock()
         if session in self._thinking:
             return
         was_idle = not self._thinking
@@ -167,14 +182,25 @@ class ThinkingState:
 
     def _end(self, session: str) -> None:
         self._thinking.discard(session)
+        self._since.pop(session, None)
         if not self._thinking:
             self._released_at = self.clock()
+
+    def _expire(self) -> None:
+        """Give up on sessions that stopped saying anything long ago."""
+        if not self._thinking or self.max_thinking_seconds <= 0:
+            return
+        cutoff = self.clock() - self.max_thinking_seconds
+        for session in [s for s in self._thinking
+                        if self._since.get(s, cutoff + 1) <= cutoff]:
+            self._end(session)
 
     # -- time -------------------------------------------------------------
 
     def tick(self) -> Visibility:
         """Advance timers. Call every frame; returns the current visibility."""
         now = self.clock()
+        self._expire()
 
         if self._thinking:
             # Recomputed rather than accumulated so a session that finishes

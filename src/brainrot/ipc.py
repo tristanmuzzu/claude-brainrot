@@ -21,7 +21,13 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 
-MAX_DATAGRAM = 4096
+#: Big enough for a desktop's worth of window geometry from the shell
+#: extension, which shares this socket with the hooks.
+MAX_DATAGRAM = 65536
+
+
+class AlreadyRunning(OSError):
+    """Another daemon already holds the port."""
 
 
 @dataclass(frozen=True)
@@ -97,8 +103,20 @@ class EventListener:
 
     def start(self) -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind((self.host, self.port))
+        # Deliberately *not* SO_REUSEADDR. It let a second daemon bind the same
+        # port quite happily, and then only one of them received anything: the
+        # first showed the strip on a prompt, the second took the Stop, and the
+        # first left a scene on screen for the rest of the day. Every symptom of
+        # that looks like a bug in the overlay, and it cost an afternoon twice.
+        # UDP has no TIME_WAIT, so nothing is bought by allowing it.
+        try:
+            sock.bind((self.host, self.port))
+        except OSError:
+            sock.close()
+            raise AlreadyRunning(
+                f"{self.host}:{self.port} is already taken -- another "
+                f"claude-brainrot daemon is running. Only one may listen, or "
+                f"the hook events are split between them.") from None
         # Periodic wakeups so stop() is responsive without a self-pipe.
         sock.settimeout(0.25)
         self._sock = sock

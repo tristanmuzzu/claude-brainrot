@@ -452,6 +452,28 @@ def _title_of(handle, win: int) -> str:
     return text.decode("utf-8", "replace")
 
 
+def _count_daemon_processes() -> int:
+    """Daemons running right now, counted from /proc.
+
+    Counting *windows* is the Windows answer and it is the weaker one: a
+    second daemon that is merely idle has no window, so it is invisible to
+    that check right up until the moment it takes a hook event away from the
+    first. The process is there the whole time.
+    """
+    seen = 0
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            argv = (entry / "cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        words = [a.decode("utf-8", "replace") for a in argv if a]
+        if any("brainrot" in w for w in words) and "run" in words:
+            seen += 1
+    return seen
+
+
 def _check_one_daemon() -> Check | None:
     """More than one daemon is not an idle curiosity.
 
@@ -463,6 +485,8 @@ def _check_one_daemon() -> Check | None:
     try:
         if os.name == "nt":
             count = _count_overlay_windows()
+        elif Path("/proc").is_dir():
+            count = _count_daemon_processes()
         elif os.environ.get("DISPLAY"):
             count = _count_x11_overlay_windows()
         else:
@@ -470,9 +494,9 @@ def _check_one_daemon() -> Check | None:
     except Exception:  # noqa: BLE001 - diagnostic only
         return None
     if count <= 1:
-        return Check("instances", OK, f"{count} overlay window")
+        return Check("instances", OK, f"{count} daemon")
     return Check(
-        "instances", WARN, f"{count} overlay windows -- more than one daemon",
+        "instances", WARN, f"{count} daemons running",
         "Hook events are split between them and they fight over the screen. "
         "Close the extras and start one with: brainrot run. On Windows a "
         "Store Python's command line is not readable through WMI, so a kill "
