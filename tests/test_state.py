@@ -223,3 +223,37 @@ def test_an_unknown_window_is_no_window(state: ThinkingState, clock: Clock) -> N
     clock.advance(2.0)
     assert state.tick() is Visibility.VISIBLE
     assert state.hosts == frozenset()
+
+
+def test_a_host_can_be_learned_after_the_prompt_that_carried_it(clock: Clock) -> None:
+    """A window that could not be looked up at prompt time.
+
+    On Linux the hook cannot send a window handle -- there is nothing to send
+    -- so the daemon looks the window up from the shim's process ancestry, and
+    that lookup needs the compositor to be answering. It is not, for the first
+    moments after login: the daemon autostarts before gnome-shell's extensions
+    are up. Without a second attempt the session stays homeless for a whole
+    turn, and the overlay spends it behaving exactly as though it does not
+    know where Claude Code is.
+    """
+    state = ThinkingState(grace_seconds=0.0, min_visible_seconds=0.0, clock=clock)
+
+    state.handle("UserPromptSubmit", "s1")          # no window with it
+    clock.advance(0.1)
+    state.tick()
+    assert state.busy
+    assert state.hosts == frozenset()
+
+    assert state.learn_host("s1", 4242)
+    assert state.hosts == frozenset({4242}), "the turn in flight gains the window"
+    assert not state.learn_host("s1", 4242), "and learning it twice changes nothing"
+
+    # It survives into the next turn like any other host, because it is the
+    # same fact the prompt would have carried.
+    state.handle("Stop", "s1")
+    clock.advance(10.0)
+    state.tick()
+    state.handle("UserPromptSubmit", "s1")
+    clock.advance(0.1)
+    state.tick()
+    assert state.hosts == frozenset({4242})

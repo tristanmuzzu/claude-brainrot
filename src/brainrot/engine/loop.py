@@ -67,6 +67,9 @@ class Overlay:
         self._focus_ok = True
         self._focus_left_at = 0.0
         self._blind: "bool | None" = None
+        #: Sessions whose window could not be resolved when their prompt
+        #: arrived, kept so it can be resolved once it becomes possible.
+        self._unresolved: dict[str, tuple[int, ...]] = {}
 
         from .input import Controller, Mover, Takeover
 
@@ -91,6 +94,8 @@ class Overlay:
             # the shim because it is the daemon that has the window list, and
             # because the shim must stay a single datagram.
             host = self.native.resolve_host(event.pids)
+            if not host:
+                self._unresolved[event.session or "default"] = event.pids
         self.state.handle(event.kind, event.session, event.tool, host)
         # A prompt submission tells us which window hosts Claude Code; layer
         # the overlay one level above it (no-op when there is nothing to layer
@@ -158,6 +163,7 @@ class Overlay:
                     self.running = False
 
                 self._report_mode()
+                self._retry_hosts()
                 visibility = self.state.tick()
                 wants_visible = (
                     visibility in (Visibility.VISIBLE, Visibility.LINGERING)
@@ -217,6 +223,28 @@ class Overlay:
                     time.sleep(spare)
         finally:
             self.shutdown()
+
+    def _retry_hosts(self) -> None:
+        """Ask again about windows we could not find the first time.
+
+        Cheap: a dict that is empty in the ordinary case, and a lookup in a
+        list the compositor has already sent us.
+        """
+        if not self._unresolved or self.native is None:
+            return
+        for session, pids in list(self._unresolved.items()):
+            try:
+                host = self.native.resolve_host(pids)
+            except Exception:
+                return
+            if not host:
+                continue
+            del self._unresolved[session]
+            if self.state.learn_host(session, host):
+                self.window.attach_host(host)
+                if self.verbose:
+                    print(f"[brainrot] resolved host {host} for {session[:8]}",
+                          flush=True)
 
     def _report_mode(self) -> None:
         """Say which of the two behaviours you are getting, and say it again

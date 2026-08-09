@@ -101,6 +101,27 @@ class ThinkingState:
 
     # -- input ------------------------------------------------------------
 
+    def learn_host(self, session: str, hwnd: int) -> bool:
+        """Attach a window to a session we already knew was working.
+
+        A prompt is normally the only thing trusted to say where you are
+        looking, and it still is -- this is the *same* prompt, resolved late.
+        On a desktop where the window has to be looked up rather than read off
+        the event (Linux), the lookup can fail at prompt time and start
+        working a moment later: the daemon autostarts at login and the shell
+        extension that answers the question is not up yet. Without this the
+        session stays homeless until the user's next prompt, which is a whole
+        turn of the overlay behaving as though it does not know where Claude
+        Code is -- because it does not.
+        """
+        session = session or "default"
+        if not hwnd or self._hosts.get(session) == hwnd:
+            return False
+        self._hosts[session] = int(hwnd)
+        if session in self._thinking:
+            self._turn_hosts = self._turn_hosts | {int(hwnd)}
+        return True
+
     def handle(self, kind: str, session: str = "", tool: str = "",
                hwnd: int = 0) -> None:
         """Fold one hook event into the state."""
