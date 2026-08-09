@@ -121,12 +121,11 @@ def cmd_shoot(args: argparse.Namespace) -> int:
         scene.draw()
         window.end()
         if frame % max(1, args.every) == 0:
-            # A GPU read-back can be one buffer swap behind the draw, so
-            # present this frame a second time before reading it: otherwise
-            # the PNG holds the frame before the one it is named after.
-            window.begin()
-            scene.draw()
-            window.end()
+            # A read-back is one or more buffer swaps behind the draw, so put
+            # this frame up again -- as many times as this renderer needs --
+            # before reading it. Otherwise the PNG holds the frame before the
+            # one it is named after.
+            window.present(scene.draw)
             path = out / f"{name}-run{run}-{frame:04d}.png"
             rl.save_frame(str(path))
             saved.append(path)
@@ -146,7 +145,45 @@ def cmd_install(args: argparse.Namespace) -> int:
     print(f"  events: {', '.join(events)}")
     print(f"  shim:   {shim}")
     print(f"  command: {hook_command(shim)}")
+
+    if sys.platform.startswith("linux") and not args.no_extension:
+        from . import extinstall
+
+        if extinstall.is_gnome():
+            ok, detail = extinstall.install(cfg)
+            print(f"\ngnome-shell extension: {detail}")
+            if not ok:
+                print("  the overlay still works without it -- see `brainrot doctor`")
+        else:
+            print("\ngnome-shell extension: skipped (not a GNOME session)")
+
     print("\nStart the daemon with:  brainrot run")
+    return 0
+
+
+def cmd_extension(args: argparse.Namespace) -> int:
+    """Install, remove or report on the gnome-shell half."""
+    from . import extinstall
+
+    cfg = _config_from(args)
+    if args.action == "remove":
+        ok, detail = extinstall.uninstall()
+        print(detail)
+        return 0 if ok else 1
+    if args.action == "install":
+        ok, detail = extinstall.install(cfg)
+        print(detail)
+        return 0 if ok else 1
+
+    print(f"uuid:      {extinstall.UUID}")
+    print(f"ships in:  {extinstall.source_dir()}")
+    print(f"installed: {extinstall.target_dir() if extinstall.installed() else 'no'}")
+    if extinstall.installed():
+        print(f"current:   {'yes' if extinstall.up_to_date() else 'no -- run: brainrot extension install'}")
+        print(f"enabled:   {'yes' if extinstall.enabled() else 'no'}")
+        print(f"port:      {extinstall.configured_port()}")
+    print(f"shell:     {extinstall.shell_version() or 'not found'}")
+    print(f"supports:  {', '.join(extinstall.supported_versions())}")
     return 0
 
 
@@ -175,10 +212,33 @@ def cmd_ping(args: argparse.Namespace) -> int:
             hwnd = foreground_window()
         except Exception:
             hwnd = 0
+    # Elsewhere the shim sends its ancestry instead of a handle, and so does
+    # this: the ancestry of `brainrot ping` reaches the terminal it was typed
+    # in, which makes that terminal the host -- exactly as if Claude Code were
+    # running there.
+    pids = _ancestry() if os.name != "nt" else ()
     send(cfg.host, cfg.port, args.event, session=args.session, tool=args.tool,
-         hwnd=hwnd)
+         hwnd=hwnd, pids=pids)
     print(f"sent {args.event} to {cfg.host}:{cfg.port}")
     return 0
+
+
+def _ancestry(limit: int = 12) -> tuple[int, ...]:
+    """This process and its parents, nearest first. See the hook shim."""
+    pids: list[int] = []
+    pid = os.getpid()
+    try:
+        for _ in range(limit):
+            pids.append(pid)
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                fields = handle.read().rsplit(b")", 1)[1].split()
+            parent = int(fields[1])
+            if parent <= 1 or parent == pid:
+                break
+            pid = parent
+    except OSError:
+        pass
+    return tuple(pids)
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -198,8 +258,21 @@ def cmd_hotkey(args: argparse.Namespace) -> int:
     import time
 
     if os.name != "nt":
-        print("hotkey capture is Windows-only; set `hotkey` in config.toml")
-        return 1
+        # Nothing to capture: on GNOME the chord is *grabbed* by the shell
+        # extension rather than polled, so it is a gsettings key rather than
+        # something this process could watch for -- and being grabbed, it
+        # cannot collide with another program the way a polled one can.
+        from . import extinstall
+
+        cfg = _config_from(args)
+        print(f"current hotkey: {cfg.hotkey}")
+        print("\nOn GNOME the chord is registered inside gnome-shell, so it is")
+        print("set there rather than here:\n")
+        print(f"  gsettings --schemadir {extinstall.target_dir()}/schemas \\")
+        print(f"      set {extinstall.SCHEMA_ID} takeover \"['<Control><Alt><Shift>Home']\"")
+        print("\nAnything gnome-shell already uses will simply refuse to bind,")
+        print("which is the collision check Windows has to do by hand.")
+        return 0
 
     import ctypes
 
@@ -265,12 +338,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = sub.add_parser("run", help="start the overlay daemon")
     _add_common(run)
-    run.add_argument("--backend", help="win32, desktop or headless")
+    run.add_argument("--backend", help="overlay, desktop or headless")
     run.set_defaults(func=cmd_run)
 
     demo = sub.add_parser("demo", help="watch a scene in a normal window")
     _add_common(demo)
-    demo.add_argument("--backend", help="win32, desktop or headless")
+    demo.add_argument("--backend", help="overlay, desktop or headless")
     demo.set_defaults(func=cmd_demo)
 
     shoot = sub.add_parser("shoot", help="render frames to PNG offscreen")
@@ -294,7 +367,21 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="also hook PreToolUse/PostToolUse for live tool captions (hot path)",
     )
+    install.add_argument(
+        "--no-extension",
+        action="store_true",
+        help="skip the gnome-shell extension (Linux); the overlay then docks "
+             "to the work area and stays up for the whole turn",
+    )
     install.set_defaults(func=cmd_install)
+
+    ext = sub.add_parser(
+        "extension",
+        help="the gnome-shell half: what Wayland will not tell a client")
+    _add_common(ext)
+    ext.add_argument("action", nargs="?", default="status",
+                     choices=("status", "install", "remove"))
+    ext.set_defaults(func=cmd_extension)
 
     remove = sub.add_parser("uninstall", help="remove Claude Code hooks")
     remove.add_argument("--scope", choices=("user", "project"), default="user")

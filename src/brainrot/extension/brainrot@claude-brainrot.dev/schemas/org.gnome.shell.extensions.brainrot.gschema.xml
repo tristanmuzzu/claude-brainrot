@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="brainrot">
+  <schema id="org.gnome.shell.extensions.brainrot"
+          path="/org/gnome/shell/extensions/brainrot/">
+    <key name="port" type="i">
+      <default>47821</default>
+      <summary>Daemon port</summary>
+      <description>
+        UDP port the overlay daemon listens on. Must match `port` in the
+        overlay's config.toml; `brainrot install` keeps the two in step.
+      </description>
+    </key>
+    <key name="takeover" type="as">
+      <default><![CDATA[['<Control><Alt><Shift>Home']]]></default>
+      <summary>Hand the keyboard to the overlay</summary>
+      <description>
+        Chord that lets you drive the scene yourself. Registered inside
+        gnome-shell because a Wayland client cannot register a global hotkey,
+        and grabbed rather than polled so nothing else reads what you type.
+      </description>
+    </key>
+  </schema>
+</schemalist>

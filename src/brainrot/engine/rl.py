@@ -160,6 +160,45 @@ def _capture_fix(attempts: int = 6) -> "tuple[bool, bool]":
     return _FIX
 
 
+#: How many *extra* presents of the same frame it takes before a read-back
+#: shows it. Measured, for the same reason the colour correction is.
+_LAG: "int | None" = None
+
+
+def _measure_present_lag(limit: int = 4) -> int:
+    """How deep this renderer's swap chain is, in frames.
+
+    ``LoadImageFromScreen`` reads the buffer that ``EndDrawing`` just swapped
+    away from, so a capture shows an *older* frame than the one just drawn.
+    How much older is a property of the driver and the compositor, not of the
+    platform: on the software rasteriser it is none, on a GPU under Windows it
+    is one, and on Mesa under a Wayland compositor -- triple buffered -- it is
+    two. Assuming any of those three is how a capture comes to show the frame
+    before the one it is named after, which is invisible until the moment it
+    matters and then invalidates every screenshot at once.
+
+    Measured by painting a colour nothing else on screen is and counting the
+    presents until it comes back.
+    """
+    marker = (7, 173, 61, 255)
+    try:
+        for extra in range(limit + 1):
+            BeginDrawing()
+            ClearBackground(marker)
+            EndDrawing()
+            raw = capture_frame()
+            if raw is not None and tuple(raw[0:3]) == marker[:3]:
+                return extra
+    except Exception:
+        pass
+    return 0
+
+
+def present_lag() -> int:
+    """Extra presents needed before a capture reflects the current frame."""
+    return 0 if _LAG is None else _LAG
+
+
 def calibrate_capture() -> "tuple[bool, bool]":
     """Decide the capture correction now, while the framebuffer is expendable.
 
@@ -167,7 +206,11 @@ def calibrate_capture() -> "tuple[bool, bool]":
     capture pays for it *and* the marker frames it draws land in the middle of
     a scene, so the next capture reads a black frame with a red square in it.
     """
-    return _capture_fix()
+    global _LAG
+    fix = _capture_fix()
+    if _LAG is None:
+        _LAG = _measure_present_lag()
+    return fix
 
 
 def capture_frame() -> "bytes | None":

@@ -346,3 +346,85 @@ def root_of(hwnd: int) -> int:
 def foreground_root() -> int:
     """Top-level window in front, or 0 if the desktop has no foreground."""
     return root_of(foreground_window())
+
+
+# ---------------------------------------------------------------------------
+# The names :mod:`brainrot.overlay` asks every backend for.
+#
+# On Windows one API knows about every window, so most of these are the same
+# call under a name that does not presume it. The Linux backend answers them
+# from two different places and needs the distinction to be real; keeping the
+# vocabulary identical is what lets the engine above stop caring.
+# ---------------------------------------------------------------------------
+
+
+def prepare() -> bool:
+    """Nothing to choose: raylib's Windows backend is the only one."""
+    return True
+
+
+def own_window(raylib_handle: int = 0) -> int:
+    """raylib hands out the real ``HWND`` on Windows, so this is a formality."""
+    return int(raylib_handle)
+
+
+def degraded() -> bool:
+    """Whether anything is missing. Nothing ever is, here."""
+    return False
+
+
+#: Windows reports every coordinate in physical pixels already, and the
+#: process is per-monitor DPI aware, so there is no conversion to do.
+def scale() -> float:
+    return 1.0
+
+
+def focus_known() -> bool:
+    """Always: ``GetForegroundWindow`` is never a guess."""
+    return True
+
+
+own_rect = window_rect
+host_rect = window_rect
+host_alive = is_window
+foreground_host = foreground_root
+
+
+def same_host(a: int, b: int) -> bool:
+    return bool(a) and bool(b) and root_of(a) == root_of(b)
+
+
+def is_own_window(front: int, own: int) -> bool:
+    return bool(front) and bool(own) and root_of(front) == root_of(own)
+
+
+def resolve_host(pids) -> int:
+    """Windows sends a window handle, not an ancestry: nothing to resolve."""
+    return 0
+
+
+def focus_window(win: int, focused: bool) -> None:
+    """Take or give back the keyboard, for the takeover chord only."""
+    ex = _get_long(win, GWL_EXSTYLE)
+    if focused:
+        ex &= ~(WS_EX_TRANSPARENT | WS_EX_NOACTIVATE)
+        _set_long(win, GWL_EXSTYLE, ex)
+        user32.SetForegroundWindow(win)
+    else:
+        ex |= WS_EX_TRANSPARENT | WS_EX_NOACTIVATE
+        _set_long(win, GWL_EXSTYLE, ex)
+
+
+#: The chord is polled here -- ``GetAsyncKeyState`` can read one specific
+#: combination without focus, which is the whole reason the takeover works on
+#: Windows without a system-wide keyboard hook.
+poll_chord = keys_held
+
+
+def takeover_state() -> "bool | None":
+    """No queued request: the chord is polled, so there is no news to collect."""
+    return None
+
+
+def set_foreground(win: int) -> None:
+    user32.SetForegroundWindow(win)

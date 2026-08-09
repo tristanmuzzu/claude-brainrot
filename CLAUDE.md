@@ -5,7 +5,7 @@ Minecraft parkour) that appears while Claude Code is thinking. raylib renderer,
 glTF assets built by the Blender scripts in `assets/src/`, worlds generated
 per-seed. Read `docs/ARCHITECTURE.md` for how the pieces fit; it is current.
 
-## State of the project (updated 2026-08-07)
+## State of the project (updated 2026-08-09)
 
 Branch `claude/project-visuals-animations-qzbkiq` holds a complete rebuild:
 pygame → raylib + baked-light glTF assets, both scenes rebuilt to match the
@@ -77,6 +77,30 @@ it does not, on the `dock` side, re-checked every frame so it keeps up with a
 window being dragged. Real geometry lives in `overlay/win32.py`
 (`window_rect`, `work_area`, `move_window` — `SetWindowPos`, never raylib's
 `SetWindowPosition`, which would block off-thread).
+
+## Linux (added 2026-08-09, verified on the owner's Ubuntu box)
+
+Runs on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200% scaling) with the same
+behaviour as Windows: appears while a Claude Code window that is working is in
+front, hides when you look elsewhere, hides on `Stop`, click-through, never
+focused, stands against the host window. Measured live, not inferred.
+
+The platform split is `overlay.native()`; the engine has no `os.name` tests
+left. Read `docs/ARCHITECTURE.md` § "Two platforms, one vocabulary" before
+touching any of it — the reasoning is there, this is the short list:
+
+- **The strip is an X11 (XWayland) window on a Wayland session.** A Wayland
+  client cannot place itself, raise itself, or shape its input region; an X11
+  one can, and mutter honours it. `x11.prepare()` sets `glfwInitHint(
+  GLFW_PLATFORM, X11)` before `InitWindow`. Clearing `WAYLAND_DISPLAY` does
+  **not** do this: libwayland defaults to the socket `wayland-0`.
+- **Everything about other windows comes from a gnome-shell extension**
+  (`src/brainrot/extension/`), pushed over the daemon's own UDP port.
+  `org.gnome.Shell.Introspect.GetWindows` is refused. It is optional; without
+  it the strip docks to the work area and stays up for the whole turn.
+- **The host is resolved from process ancestry, not a window handle.** There
+  is no handle to read on Wayland. The shim sends its `/proc` ancestry
+  nearest-first and `Snapshot.host_for` matches it against window pids.
 
 ## Still outstanding
 
@@ -232,7 +256,12 @@ long jumps you need a different motion model, not a bigger number.
   never by rejection sampling; invariants live in `tests/test_generation.py`.
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~50s).
+- Run `python -m pytest tests/` before committing; it is fast (~50s). 399
+  tests. The Win32 suite skips off Windows and the X11 suite skips without a
+  display, so a green run means less on the other platform's machine -- check
+  the count.
+- `brainrot doctor` is the per-machine check and knows about both platforms;
+  `brainrot extension status` reports on the gnome-shell half alone.
 - Art direction is done by looking at `brainrot shoot` output. That only works
   if the capture is honest, so there are tests on the capture itself: colours
   survive, the frame is the right way up, and drawing the same state twice

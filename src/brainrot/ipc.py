@@ -34,6 +34,13 @@ class Event:
     #: Native handle of the window hosting the Claude Code session, when the
     #: shim could discover one (Windows only). 0 means unknown.
     hwnd: int = 0
+    #: The shim's own process ancestry, nearest first (Linux). A Wayland
+    #: client cannot discover a window handle -- there is nothing to discover,
+    #: the protocol has no such concept -- so the shim sends what it *can*
+    #: know and the daemon matches it against the window list the compositor
+    #: reports. The terminal or app running Claude Code is an ancestor of the
+    #: hook; nothing else in the list owns a window.
+    pids: tuple[int, ...] = ()
 
     @classmethod
     def parse(cls, payload: bytes) -> "Event | None":
@@ -50,11 +57,18 @@ class Event:
             hwnd = int(data.get("hwnd") or 0)
         except (TypeError, ValueError):
             hwnd = 0
+        pids: list[int] = []
+        for value in data.get("pids") or ():
+            try:
+                pids.append(int(value))
+            except (TypeError, ValueError):
+                continue
         return cls(
             kind=kind,
             session=str(data.get("session") or data.get("session_id") or ""),
             tool=str(data.get("tool") or data.get("tool_name") or ""),
             hwnd=hwnd,
+            pids=tuple(pids),
         )
 
 
@@ -66,10 +80,17 @@ class EventListener:
     ``127.0.0.1`` keeps it off the network regardless of firewall state.
     """
 
-    def __init__(self, host: str, port: int, on_event: Callable[[Event], None]) -> None:
+    def __init__(self, host: str, port: int, on_event: Callable[[Event], None],
+                 on_raw: "Callable[[bytes], bool] | None" = None) -> None:
         self.host = host
         self.port = port
         self._on_event = on_event
+        # Not everything on this socket is a hook. On GNOME the shell
+        # extension pushes desktop snapshots to the same port -- one socket,
+        # one thing to get wrong, one thing for `brainrot doctor` to check --
+        # and this is the first refusal: if the backend claims a datagram, it
+        # never reaches the hook parser.
+        self._on_raw = on_raw
         self._sock: socket.socket | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -93,6 +114,12 @@ class EventListener:
                 continue
             except OSError:
                 break
+            if self._on_raw is not None:
+                try:
+                    if self._on_raw(payload):
+                        continue
+                except Exception:
+                    pass
             event = Event.parse(payload)
             if event is not None:
                 try:
@@ -112,10 +139,11 @@ class EventListener:
 
 
 def send(host: str, port: int, kind: str, session: str = "", tool: str = "",
-         hwnd: int = 0) -> None:
+         hwnd: int = 0, pids: "tuple[int, ...] | list[int]" = ()) -> None:
     """Fire a single event. Never raises -- used by the CLI and tests."""
     payload = json.dumps(
-        {"kind": kind, "session": session, "tool": tool, "hwnd": hwnd}
+        {"kind": kind, "session": session, "tool": tool, "hwnd": hwnd,
+         "pids": list(pids)}
     ).encode("utf-8")
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:

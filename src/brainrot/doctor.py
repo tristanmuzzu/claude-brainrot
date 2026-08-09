@@ -1,10 +1,17 @@
 """Self-diagnosis.
 
-The click-through overlay is Windows-only and cannot be exercised from CI or
-from any non-Windows machine, so the checks it needs live here instead: run
+Nothing about a click-through, never-focused, correctly-stacked overlay can be
+exercised from CI: it needs a real desktop with a real window manager, and the
+answers differ per platform. So the checks live here instead -- run
 ``brainrot doctor`` on the machine that actually matters and it reports what is
-wrong rather than leaving you to infer it from an overlay that silently does
+wrong, rather than leaving you to infer it from an overlay that silently does
 nothing.
+
+On Linux, "silently does nothing" has two quite different causes worth telling
+apart, and both are reported here: no X display for the strip's own window
+(fatal -- there is nothing to draw into), and no gnome-shell extension (not
+fatal -- the strip docks to the work area and stays up for the whole turn
+instead of following the Claude Code window).
 """
 
 from __future__ import annotations
@@ -13,6 +20,7 @@ import json
 import os
 import shutil
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -82,25 +90,32 @@ def _check_assets() -> Check:
 
 def _check_backend(cfg: Config) -> list[Check]:
     """The important one: can we actually make a click-through overlay?"""
+    from . import overlay as overlay_pkg
+
     checks: list[Check] = []
-    if os.name != "nt":
-        checks.append(
-            Check(
-                "overlay",
-                WARN,
-                f"{sys.platform}: plain window, no click-through",
-                "Click-through and host-window attachment are Windows-only. "
-                "Everything else works.",
-            )
-        )
+    native = overlay_pkg.native()
+    if native is None:
+        checks.append(_no_backend_check())
         return checks
 
-    checks.append(
-        Check("overlay", OK,
-              "click-through, never focused, layered above the Claude Code "
-              f"window (attach = {cfg.attach})")
-    )
-    if cfg.follow_focus:
+    if os.name == "nt":
+        checks.append(
+            Check("overlay", OK,
+                  "click-through, never focused, layered above the Claude Code "
+                  f"window (attach = {cfg.attach})")
+        )
+    else:
+        checks += _check_linux_backend(cfg)
+
+    if cfg.follow_focus and not native.focus_known():
+        checks.append(
+            Check("focus", WARN,
+                  "follow_focus is on, but nothing here can say who is in front",
+                  "The strip will stay up for the whole turn rather than only "
+                  "while you are looking at Claude Code. See the `shell` line "
+                  "above for how to fix that."),
+        )
+    elif cfg.follow_focus:
         checks.append(
             Check("focus", OK,
                   "hidden unless a working Claude Code window is in front")
@@ -114,6 +129,147 @@ def _check_backend(cfg: Config) -> list[Check]:
                   "only while you are looking at Claude Code."),
         )
     return checks
+
+
+def _no_backend_check() -> Check:
+    """No window surgery available: say which of the reasons it is."""
+    if not sys.platform.startswith("linux"):
+        return Check(
+            "overlay", WARN, f"{sys.platform}: plain window, no click-through",
+            "The overlay window treatment exists for Windows and for Linux/X11. "
+            "Everything else -- scenes, hooks, `brainrot shoot` -- works here.",
+        )
+    if not os.environ.get("DISPLAY"):
+        return Check(
+            "overlay", FAIL, "no DISPLAY: nothing to open a window on",
+            "The strip is an X11 window, which on a Wayland session means "
+            "XWayland. It is normally already running; if DISPLAY is genuinely "
+            "unset you are on a headless machine, where `brainrot shoot` is "
+            "the useful command.",
+        )
+    return Check(
+        "overlay", FAIL, "cannot open the X display named by DISPLAY",
+        "Check that XWayland is running: `xdpyinfo | head -3` should answer.",
+    )
+
+
+def _check_linux_backend(cfg: Config) -> list[Check]:
+    """The Linux backend is two halves, and they fail independently."""
+    from . import extinstall
+    from .overlay import shell, x11
+
+    checks: list[Check] = []
+    session = os.environ.get("XDG_SESSION_TYPE") or "unknown"
+    width = x11.screen_rect()[2]
+    checks.append(Check(
+        "overlay", OK,
+        f"X11 window on a {session} session, {width}px wide screen: "
+        "click-through, never focused, above"))
+
+    if not extinstall.is_gnome():
+        checks.append(Check(
+            "shell", WARN,
+            f"{os.environ.get('XDG_CURRENT_DESKTOP') or 'unknown desktop'}: "
+            "no window information available",
+            "The strip will dock to the work area and stay up for the whole "
+            "turn. Standing beside the Claude Code window, and appearing only "
+            "while you are looking at it, both need to ask the compositor "
+            "where things are -- which only the GNOME extension does today.",
+        ))
+        return checks
+
+    if not extinstall.installed():
+        checks.append(Check(
+            "shell", WARN, "gnome-shell extension not installed",
+            "Without it the strip docks to the work area and stays up for the "
+            "whole turn. Install it with: brainrot extension install",
+        ))
+        return checks
+    if not extinstall.enabled():
+        if extinstall.enabled_next_session():
+            checks.append(Check(
+                "shell", WARN,
+                "extension installed and switched on, but this gnome-shell has "
+                "not loaded it",
+                "gnome-shell only picks up a new extension when it starts, and "
+                "on Wayland that means the session. Log out and back in.",
+            ))
+        else:
+            checks.append(Check(
+                "shell", WARN, "gnome-shell extension installed but disabled",
+                f"Enable it with: gnome-extensions enable {extinstall.UUID}",
+            ))
+        return checks
+    if not extinstall.up_to_date():
+        checks.append(Check(
+            "shell", WARN, "an older copy of the extension is installed",
+            "Update it with: brainrot extension install",
+        ))
+
+    port = extinstall.configured_port()
+    if port is not None and port != cfg.port:
+        checks.append(Check(
+            "shell", FAIL,
+            f"extension sends to port {port}, daemon listens on {cfg.port}",
+            "Re-run `brainrot install` (it sets both), or set the port by hand: "
+            f"gsettings --schemadir {extinstall.target_dir()}/schemas set "
+            f"{extinstall.SCHEMA_ID} port {cfg.port}",
+        ))
+        return checks
+
+    # Whether it is actually *talking* is a different question from whether it
+    # is enabled, and the only honest way to answer it is to listen.
+    heard = _listen_for_shell(cfg)
+    if heard is None:
+        checks.append(Check(
+            "shell", OK,
+            "extension enabled (the daemon is running, so it is holding the "
+            "port -- ask it, not me)"))
+    elif heard:
+        snap = shell.bridge().snapshot
+        checks.append(Check(
+            "shell", OK,
+            f"{len(snap.windows)} windows, {len(snap.monitors)} monitor(s), "
+            f"{snap.scale_against(x11.screen_rect()[2]):g}x scale"))
+    else:
+        checks.append(Check(
+            "shell", FAIL, "extension enabled but sending nothing",
+            "gnome-shell may have failed to load it. Look for the reason: "
+            "journalctl --user -b -u org.gnome.Shell@wayland.service | tail -40",
+        ))
+    return checks
+
+
+def _listen_for_shell(cfg: Config, timeout: float = 2.0) -> "bool | None":
+    """Bind the daemon's port briefly and see whether a snapshot arrives.
+
+    None means the port is already taken -- which almost always means the
+    daemon itself has it, and is therefore the answer "cannot tell from here"
+    rather than a failure.
+    """
+    import socket
+
+    from .overlay import shell
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        try:
+            sock.bind((cfg.host, cfg.port))
+        except OSError:
+            return None
+        sock.settimeout(timeout)
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                payload, _ = sock.recvfrom(65535)
+            except socket.timeout:
+                break
+            if shell.bridge().offer(payload):
+                return True
+        return False
+    finally:
+        sock.close()
 
 
 def _check_pythonw() -> Check:
@@ -261,6 +417,35 @@ def _count_overlay_windows() -> int:
     return len(seen)
 
 
+def _count_x11_overlay_windows() -> int:
+    """The same count on X11: our window carries its own title."""
+    from .overlay import x11
+
+    handle = x11.lib()
+    if handle is None:
+        return 0
+    return sum(1 for win in x11._prop(handle, handle.root, "_NET_CLIENT_LIST")
+               if _title_of(handle, win) == "claude-brainrot")
+
+
+def _title_of(handle, win: int) -> str:
+    import ctypes
+
+    from .overlay import x11
+
+    actual, fmt = x11.Atom(), ctypes.c_int()
+    items, after = ctypes.c_ulong(), ctypes.c_ulong()
+    data = ctypes.POINTER(ctypes.c_ubyte)()
+    if handle.x11.XGetWindowProperty(
+            handle.display, win, handle.atom("_NET_WM_NAME"), 0, 64, 0, 0,
+            ctypes.byref(actual), ctypes.byref(fmt), ctypes.byref(items),
+            ctypes.byref(after), ctypes.byref(data)) != 0 or not data:
+        return ""
+    text = bytes(ctypes.cast(data, ctypes.POINTER(ctypes.c_ubyte))[:items.value])
+    handle.x11.XFree(data)
+    return text.decode("utf-8", "replace")
+
+
 def _check_one_daemon() -> Check | None:
     """More than one daemon is not an idle curiosity.
 
@@ -269,10 +454,13 @@ def _check_one_daemon() -> Check | None:
     fraction of the turn, both fight over the screen, and every symptom looks
     like a bug in the overlay rather than a spare process. Cost an hour here.
     """
-    if os.name != "nt":
-        return None
     try:
-        count = _count_overlay_windows()
+        if os.name == "nt":
+            count = _count_overlay_windows()
+        elif os.environ.get("DISPLAY"):
+            count = _count_x11_overlay_windows()
+        else:
+            return None
     except Exception:  # noqa: BLE001 - diagnostic only
         return None
     if count <= 1:
@@ -280,8 +468,9 @@ def _check_one_daemon() -> Check | None:
     return Check(
         "instances", WARN, f"{count} overlay windows -- more than one daemon",
         "Hook events are split between them and they fight over the screen. "
-        "Close the extras: Get-Process python | Stop-Process, then start one "
-        "with: brainrot run",
+        "Close the extras and start one with: brainrot run. On Windows a "
+        "Store Python's command line is not readable through WMI, so a kill "
+        "filtered on it matches nothing -- count the windows, as this does.",
     )
 
 

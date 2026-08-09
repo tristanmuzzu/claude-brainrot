@@ -109,6 +109,94 @@ Two mechanisms, answering two different questions:
 behaviour for demos and recordings. All of it is ctypes; there is no pywin32
 dependency.
 
+### 6. Two platforms, one vocabulary
+
+Every question above — is this window click-through, where is it, who is in
+front, how big is a pixel — is asked of a *backend*, resolved once by
+`overlay.native()`. The engine above it contains no platform tests at all.
+The two backends are shaped very differently underneath:
+
+- **Windows** (`overlay/win32.py`): one API knows about every window, so most
+  of the contract is one call under a name that does not presume it.
+- **Linux** (`overlay/linux.py`): two halves that fail independently, and the
+  seam is the interesting part.
+
+#### Why the Linux strip is an X11 window on a Wayland desktop
+
+GNOME 49 dropped the X11 session, so Ubuntu 25.10 and later are Wayland-only.
+That removes the *session*, not the protocol: XWayland is still there, and
+mutter runs a real X11 window manager for it. This matters because a Wayland
+client is forbidden — by design, not by omission — from doing every single
+thing an overlay is made of: it cannot know where it is, move itself, raise
+itself, or shape its input region.
+
+An X11 client can do all four, and mutter honours them for XWayland windows.
+So the daemon asks GLFW for the X11 backend before raylib initialises it
+(`x11.prepare()`, a `glfwInitHint` before `InitWindow`) and does its window
+surgery in X11. Measured against the live compositor on GNOME Shell 50.1:
+position honoured to the pixel, `_NET_WM_STATE_ABOVE` stacking the strip above
+native Wayland windows as well as X11 ones, an empty XShape input region
+making clicks fall through, and a window whose `WM_HINTS` say it takes no
+input mapping without moving the keyboard.
+
+#### Why there is a gnome-shell extension
+
+Two questions X11 cannot answer on that desktop, and one it answers wrongly:
+
+- **Who is in front.** `_NET_ACTIVE_WINDOW` names only X11 windows, and Claude
+  Code's host is usually a Wayland client. `org.gnome.Shell.Introspect` exists
+  for exactly this and refuses: *"GetWindows is not allowed"*.
+- **Where the Claude Code window is**, which is what `place()` needs.
+- **Where the pointer is.** `XQueryPointer` answers — with the last position X
+  saw, which over a Wayland surface is stale and plausible. Measured: y = 1564
+  on a screen 1728 tall, pointer nowhere near it.
+
+So a small extension (`src/brainrot/extension/`) runs inside gnome-shell,
+where all three are ordinary calls, and pushes snapshots to the daemon's
+existing UDP port — no D-Bus client in the daemon, no new dependency, and a
+daemon that is not running simply drops the packets. It idles at 4 Hz and
+speeds up to 60 Hz only while a modifier is held, which is the only time the
+pointer position is worth paying for.
+
+It is **optional on purpose**. Without it the strip docks to the work area and
+stays up for the whole turn; `linux.focus_known()` is what keeps those two
+states distinguishable, because a backend that cannot tell "nobody is in front"
+from "I cannot see who is in front" either hides the overlay forever or shows
+it over everything.
+
+#### The host window, without a window handle
+
+The Windows shim reads the foreground `HWND` at event time. On Wayland there
+is no such thing to read — a client cannot be told about windows, its own
+included. So the shim sends its own **process ancestry**, nearest first: the
+terminal or app running Claude Code is one of its ancestors. The daemon
+matches that against the window list the compositor reports (`Snapshot.
+host_for`), which is also why nearest-first matters — a shell inside a
+multiplexer resolves to the window you are actually looking at.
+
+#### Two coordinate spaces
+
+The compositor counts in logical pixels; X11 counts in device pixels; on a
+200% display those differ by a factor of two. Rather than trusting a scale
+factor from either side, the ratio is **measured**: the X screen width divided
+by the logical desktop width, two numbers each side can read directly
+(`Snapshot.scale_against`). Everything crossing `overlay/linux.py` is
+converted there, so `place()` above it is pure geometry in device pixels, and
+`cfg.width` keeps meaning "the size it should look".
+
+The strip is then a device-pixel window with the scene drawn into a
+render texture at the config's size and scaled on the way out — the scenes
+keep their own pixel geometry, so a HUD chip is 14 points high because that is
+what looks right rather than because of the display.
+
+Two things Windows can do that this cannot, both recorded here so they are not
+rediscovered: an *owned* window (mutter has no notion of an X11 window owned by
+a Wayland one, so `follow_focus` rather than z-order is what keeps the strip
+off other applications), and hot-installing the extension (gnome-shell only
+scans for new extensions at startup; `ReloadExtension` over D-Bus answers
+*"deprecated and does not work"*, so installing marks it enabled in gsettings
+and the next login switches it on).
+
 ## Never repeating, and replayable anyway
 
 Those two goals conflict unless you separate *which run is this* from *how is
@@ -312,9 +400,19 @@ src/brainrot/
 │   ├── fx.py         weather, blob shadows, glow billboards, bursts
 │   ├── hud.py        shadowed text and caption chips
 │   └── loop.py       frame loop, fades, scene lifecycle
+├── extinstall.py     copy/compile/enable the gnome-shell extension
+├── extension/        the gnome-shell half, shipped inside the wheel
+│   └── brainrot@claude-brainrot.dev/
 ├── overlay/
-│   └── win32.py      ctypes: click-through, no-activate, owned-window attach,
-│                     and which window is in front
+│   ├── __init__.py   native(): one backend per platform, one vocabulary
+│   ├── win32.py      ctypes: click-through, no-activate, owned-window attach,
+│   │                 and which window is in front
+│   ├── x11.py        ctypes on libX11/libXext: the same, for an XWayland
+│   │                 window -- input shape, EWMH states, map without focus
+│   ├── shell.py      what gnome-shell tells us: windows, monitors, pointer,
+│   │                 and the logical-to-device ratio derived from it
+│   └── linux.py      the seam between those two, and the only place the two
+│                     coordinate spaces meet
 └── scenes/
     ├── runner.py     three-lane chase-cam runner
     └── parkour.py    first-person infinite parkour

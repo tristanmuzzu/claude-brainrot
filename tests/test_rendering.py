@@ -145,14 +145,15 @@ def test_a_batched_plane_is_drawn_before_the_models_above_it() -> None:
     cam.target = (0.0, 0.0, 0.0)
     cam.up = (0.0, 1.0, 0.0)
     invisible = voxel.block_model("flush-probe", (255, 0, 0), seed=5)
-    for _ in range(2):
-        window.begin()
+
+    def draw() -> None:
         rl.BeginMode3D(cam[0])
         rl.DrawPlane((0.0, 0.0, 0.0), (60.0, 60.0), rl.rgba(ground))
         rl.flush()
         voxel.draw_block(invisible, 0.0, 1.5, 0.0, (255, 255, 255, 0), 3.0)
         rl.EndMode3D()
-        window.end()
+
+    window.present(draw)
     raw = rl.capture_frame()
     width = rl.GetScreenWidth()
     i = ((rl.GetScreenHeight() // 2) * width + width // 2) * 4
@@ -171,11 +172,9 @@ def test_capture_frame_returns_the_colours_it_drew() -> None:
 
     window = ensure_window()
     mark = (203, 96, 24)
-    # Twice: a read-back can be one buffer swap behind the draw.
-    for _ in range(2):
-        window.begin()
-        rl.DrawRectangle(0, 0, W, H // 4, rl.rgba(mark))
-        window.end()
+    # Repeatedly: a read-back is one buffer swap behind the draw on a GPU and
+    # two under a Wayland compositor. window.present knows which.
+    window.present(lambda: rl.DrawRectangle(0, 0, W, H // 4, rl.rgba(mark)))
     raw = rl.capture_frame()
     width = rl.GetScreenWidth()
 

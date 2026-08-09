@@ -187,10 +187,7 @@ def test_parkour_leaves_no_transform_on_a_shared_block_model() -> None:
     slabs of brick lying at an angle over the sea came from."""
     window = ensure_window()
     scene = build_parkour(10)          # a run whose kit is a tool, not a block
-    for _ in range(2):
-        window.begin()
-        scene.draw()
-        window.end()
+    window.present(scene.draw)
     identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
     for name, style in scene.styles.items():
         m = style["model"].transform
@@ -212,10 +209,7 @@ def test_parkour_draw_is_the_same_frame_twice() -> None:
         scene.elapsed += 1 / 60
 
     def render() -> bytes:
-        for _ in range(3):
-            window.begin()
-            scene.draw()
-            window.end()
+        window.present(scene.draw)
         return rl.capture_frame()
 
     assert render() == render()
@@ -306,10 +300,7 @@ def test_scene_renders_and_covers_the_frame(name: str) -> None:
     for _ in range(90):
         scene.update(1 / 60)
         scene.elapsed += 1 / 60
-    for _ in range(2):
-        window.begin()
-        scene.draw()
-        window.end()
+    window.present(scene.draw)
     raw = rl.capture_frame()
     assert raw is not None and len(raw) == W * H * 4
     # Fully covered (opaque) and actually drawn (not one flat colour).
@@ -327,10 +318,7 @@ def test_scene_is_deterministic_for_a_seed(name: str) -> None:
         for _ in range(60):
             scene.update(1 / 60)
             scene.elapsed += 1 / 60
-        for _ in range(2):
-            window.begin()
-            scene.draw()
-            window.end()
+        window.present(scene.draw)
         return rl.capture_frame()
 
     assert render() == render()

@@ -52,7 +52,13 @@ class Overlay:
             hide_on_notification=cfg.hide_on_notification,
         )
         self.counter = RunCounter()
-        self.listener = EventListener(cfg.host, cfg.port, self._on_event)
+
+        from .. import overlay
+
+        self.native = overlay.native()
+        self.listener = EventListener(
+            cfg.host, cfg.port, self._on_event,
+            on_raw=getattr(self.native, "offer_datagram", None))
 
         self.scene: scene_api.Scene | None = None
         self.alpha = 0.0
@@ -75,11 +81,20 @@ class Overlay:
         # derived values, so no lock is warranted here.
         if self.verbose:
             print(f"[brainrot] {event.kind} session={event.session[:8]} tool={event.tool}")
-        self.state.handle(event.kind, event.session, event.tool, event.hwnd)
+        host = event.hwnd
+        if not host and event.pids and self.native is not None:
+            # Nothing on this platform could tell the shim a window handle, so
+            # it sent its own ancestry instead and the compositor's window list
+            # is what turns that into a window. Resolved here rather than in
+            # the shim because it is the daemon that has the window list, and
+            # because the shim must stay a single datagram.
+            host = self.native.resolve_host(event.pids)
+        self.state.handle(event.kind, event.session, event.tool, host)
         # A prompt submission tells us which window hosts Claude Code; layer
-        # the overlay one level above it (no-op off Windows / when attached).
-        if event.kind == "UserPromptSubmit" and event.hwnd:
-            self.window.attach_host(event.hwnd)
+        # the overlay one level above it (no-op when there is nothing to layer
+        # against, or when already attached).
+        if event.kind == "UserPromptSubmit" and host:
+            self.window.attach_host(host)
 
     # -- scene lifecycle --------------------------------------------------
 
@@ -118,8 +133,12 @@ class Overlay:
     # -- main loop --------------------------------------------------------
 
     def run(self) -> None:
-        self.window.create(self.cfg)
+        # Before the window, not after: on GNOME the window's *size* depends on
+        # what the shell extension says a pixel is, and that answer arrives on
+        # this socket. Creating the window first would mean creating it at the
+        # wrong size and resizing it under a running scene.
         self.listener.start()
+        self.window.create(self.cfg)
         self.running = True
 
         frame_budget = 1.0 / self.cfg.fps

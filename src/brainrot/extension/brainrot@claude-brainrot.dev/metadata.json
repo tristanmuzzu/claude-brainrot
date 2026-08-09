@@ -1,0 +1,9 @@
+{
+  "uuid": "brainrot@claude-brainrot.dev",
+  "name": "Claude Brainrot",
+  "description": "Tells the claude-brainrot overlay daemon which window is in front, where it is, and where the pointer is. GNOME on Wayland refuses an ordinary client all three, and the overlay needs all three: to appear only while you are looking at Claude Code, to stand beside that window rather than on a screen edge, and to be draggable. Inside gnome-shell they are ordinary calls.",
+  "shell-version": ["45", "46", "47", "48", "49", "50"],
+  "settings-schema": "org.gnome.shell.extensions.brainrot",
+  "session-modes": ["user"],
+  "url": "https://github.com/tristanmuzzu/claude-brainrot"
+}

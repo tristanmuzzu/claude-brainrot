@@ -12,7 +12,9 @@ is built around three constraints:
    session.
 3. **It must start fast.** ``python -S`` skips ``site``, which is most of a
    cold interpreter's startup, and the script imports only builtins. On Windows
-   it runs under ``pythonw.exe`` so no console window flashes on every event.
+   it runs under ``pythonw.exe`` so no console window flashes on every event;
+   on Linux there is no console to flash, and the few ``/proc`` reads that
+   discover the shim's ancestry cost microseconds.
 
 One shim covers every event: the hook payload already carries
 ``hook_event_name``, so there is nothing to parameterise per hook.
@@ -67,12 +69,34 @@ try:
         except Exception:
             hwnd = 0
 
+    # On Wayland there is no such handle to read: a client cannot be told
+    # about windows, its own included. So send this process's ancestry
+    # instead -- the terminal or app running Claude Code is one of these
+    # processes -- and let the daemon match it against the window list the
+    # compositor gives it. Nearest ancestor first, so a shell inside a
+    # multiplexer resolves to the window you are actually looking at.
+    pids = []
+    if os.name != "nt":
+        try:
+            pid = os.getpid()
+            for _ in range(12):
+                pids.append(pid)
+                with open("/proc/%d/stat" % pid, "rb") as handle:
+                    fields = handle.read().rsplit(b")", 1)[1].split()
+                parent = int(fields[1])
+                if parent <= 1 or parent == pid:
+                    break
+                pid = parent
+        except Exception:
+            pass
+
     message = json.dumps(
         {{
             "kind": payload.get("hook_event_name", ""),
             "session": payload.get("session_id", ""),
             "tool": payload.get("tool_name", ""),
             "hwnd": hwnd,
+            "pids": pids,
         }}
     ).encode("utf-8")
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

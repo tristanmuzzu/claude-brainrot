@@ -1,5 +1,9 @@
-pygame-ce>=2.5
-# Bakes textures, clouds and sphere sprites at scene construction.
-numpy>=1.24
-# Windows only -- enables the click-through, always-on-top overlay.
-pywin32>=306; sys_platform == "win32"
+# The runtime dependencies, mirroring pyproject.toml for anyone who prefers a
+# requirements file. `pip install .` is the supported route.
+raylib>=6.0
+pillow>=10.0
+
+# Nothing platform-specific is needed. The Windows overlay is ctypes on
+# user32, the Linux one is ctypes on libX11/libXext plus a gnome-shell
+# extension that ships in this package -- no pywin32, no python-xlib, no
+# D-Bus binding.

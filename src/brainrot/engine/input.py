@@ -3,33 +3,41 @@
 The scenes drive themselves. This module lets a person interrupt that, and
 hands it back when they stop.
 
-The awkward part is that the overlay is built not to receive input. It carries
-``WS_EX_TRANSPARENT | WS_EX_NOACTIVATE`` so clicks fall through to whatever is
-behind it and it never takes focus -- which is the entire reason it is not
-annoying, and also the reason it cannot see a key press. There are three ways
-round that and only one of them is acceptable:
+The awkward part is that the overlay is built not to receive input. Clicks
+fall through it and it never takes focus -- which is the entire reason it is
+not annoying, and also the reason it cannot see a key press. There are three
+ways round that and only one of them is acceptable:
 
-* Poll every key with ``GetAsyncKeyState``. Works without focus, and means
-  arrow keys drive the runner *while you are typing into Claude Code*, where
-  arrows move your cursor. No.
-* Install a ``WH_KEYBOARD_LL`` hook. Works, and a background toy has no
-  business installing a system-wide keyboard hook. No.
+* Read every key. Works without focus, and means arrow keys drive the runner
+  *while you are typing into Claude Code*, where arrows move your cursor. No.
+* Install a system-wide keyboard hook. Works, and a background toy has no
+  business installing one. No.
 * Watch for one deliberate chord, and only on seeing it drop the overlay bits
   and take focus, at which point raylib reads the keyboard the ordinary way.
-  Nothing is intercepted until it is asked for, and the polling is a single
-  test of one specific combination rather than a read of everything typed.
+  Nothing is intercepted until it is asked for, and what is watched is a
+  single specific combination rather than everything typed.
 
 The third one is what this does. Releasing control puts the styles back and
 returns focus to the window it was taken from, so the overlay goes back to
 being ignorable.
+
+The two platforms get there differently, and the difference is instructive.
+Windows *polls* the chord, because ``GetAsyncKeyState`` can test one specific
+combination without focus -- which also means the chord can never be taken
+away from another program, and can never discover that another program
+already owns it. GNOME *grabs* it, inside the shell extension, because a
+Wayland client cannot register a global hotkey at all -- which makes the chord
+genuinely ours, and means nothing typed anywhere else is readable even in
+principle. :mod:`brainrot.overlay` hides the difference behind
+``poll_chord`` and ``takeover_state``.
 """
 
 from __future__ import annotations
 
-import os
 import time
 from dataclasses import dataclass, field
 
+from .. import overlay
 from . import rl
 
 #: Seconds of no input before a scene resumes driving itself. Overridable per
@@ -102,7 +110,7 @@ class Controller:
 
 
 # ---------------------------------------------------------------------------
-# Windows: the deliberate takeover
+# The deliberate takeover, and the deliberate drag
 # ---------------------------------------------------------------------------
 
 
@@ -117,8 +125,8 @@ class Mover:
     * **No global mouse hook.** The pointer and the button are polled, and
       only one specific modifier combination is watched. Nothing about what
       you click anywhere else is read, or readable.
-    * **No focus, ever.** ``WS_EX_NOACTIVATE`` stays on throughout; the strip
-      catches the click without becoming the window you are typing into.
+    * **No focus, ever.** The strip catches the click without ever becoming
+      the window you are typing into.
     * **Clicks belong to the app behind.** Click-through is lifted only while
       the chord is held *and* the pointer is over the strip, and goes back the
       instant either stops being true.
@@ -154,28 +162,23 @@ class Mover:
     # -- the real input sources, replaced wholesale in tests --------------
 
     def _keys_held(self) -> bool:
-        if os.name != "nt":
-            return False
         try:
-            from ..overlay import win32
-
-            return win32.keys_held(self.codes)
+            native = overlay.native()
+            return bool(native is not None and native.keys_held(self.codes))
         except Exception:
             return False
 
     def _cursor_pos(self) -> tuple[int, int]:
         try:
-            from ..overlay import win32
-
-            return win32.cursor_pos()
+            native = overlay.native()
+            return native.cursor_pos() if native is not None else (0, 0)
         except Exception:
             return (0, 0)
 
     def _button_down(self) -> bool:
         try:
-            from ..overlay import win32
-
-            return win32.primary_button_down()
+            native = overlay.native()
+            return bool(native is not None and native.primary_button_down())
         except Exception:
             return False
 
@@ -245,8 +248,9 @@ class Mover:
 class Takeover:
     """Watches for the chord, and flips the overlay in and out of input mode.
 
-    Off Windows, or on a window that already has focus (``brainrot demo``),
-    this does nothing and :meth:`focused` simply reports the truth.
+    With no platform backend, or on a window that already has focus
+    (``brainrot demo``), this does nothing and :meth:`focused` simply reports
+    the truth.
     """
 
     def __init__(self, window, chord: str = "") -> None:
@@ -264,23 +268,31 @@ class Takeover:
     def _chord_down(self) -> bool:
         """Are all of the chord's keys held right now?
 
-        Polled rather than registered, which is why it can never take a
-        combination away from another program -- and why it cannot tell that
-        another program already owns one. Both will fire. Hence
-        ``brainrot hotkey``, for finding a combination nothing else wants.
+        Only ever true on a backend that polls (Windows). Where the chord is
+        grabbed by the compositor instead, the request arrives through
+        :meth:`update` as a state rather than as a key state.
         """
-        if os.name != "nt" or not self.codes:
+        if not self.codes:
             return False
         try:
-            import ctypes
-
-            user32 = ctypes.windll.user32
-            return all(user32.GetAsyncKeyState(vk) & 0x8000 for vk in self.codes)
+            native = overlay.native()
+            return bool(native is not None and native.poll_chord(self.codes))
         except Exception:
             return False
 
     def update(self) -> None:
         """Toggle on the press edge, so holding the chord does not flap."""
+        try:
+            native = overlay.native()
+            wanted = native.takeover_state() if native is not None else None
+        except Exception:
+            wanted = None
+        if wanted is not None and wanted != self.active:
+            # Asked for by name rather than toggled: the compositor owns the
+            # state on that path, and a toggle would drift out of step with it
+            # the first time a request was missed.
+            self.toggle()
+
         down = self._chord_down()
         if down and not self._was_down:
             self.toggle()
@@ -295,37 +307,38 @@ class Takeover:
 
     # -- style switching --------------------------------------------------
 
+    def _window_handle(self) -> int:
+        return int(getattr(self.window, "_win", 0) or 0)
+
     def _grab(self) -> None:
-        if os.name != "nt":
+        native = overlay.native()
+        if native is None or not self._window_handle():
+            self.active = False
             return
         try:
-            import ctypes
-            from ..overlay import win32
-
-            user32 = ctypes.windll.user32
-            self._previous_foreground = win32.foreground_window()
-            hwnd = self.window._hwnd()
-            ex = win32._get_long(hwnd, win32.GWL_EXSTYLE)
-            ex &= ~(win32.WS_EX_TRANSPARENT | win32.WS_EX_NOACTIVATE)
-            win32._set_long(hwnd, win32.GWL_EXSTYLE, ex)
-            user32.SetForegroundWindow(hwnd)
+            self._previous_foreground = native.foreground_host()
+            native.focus_window(self._window_handle(), True)
         except Exception:
             self.active = False
 
     def _release(self) -> None:
-        if os.name != "nt":
+        """Give the keyboard back.
+
+        Two halves, and only one of them is ours everywhere: dropping our own
+        claim on the keyboard is, and putting focus somewhere sensible
+        afterwards is not. On Windows we can hand it straight back to the
+        window it came from. On GNOME the extension does that, because it
+        raised the chord in the first place and a Wayland client may not
+        activate somebody else's window.
+        """
+        native = overlay.native()
+        if native is None or not self._window_handle():
             return
         try:
-            import ctypes
-            from ..overlay import win32
-
-            user32 = ctypes.windll.user32
-            hwnd = self.window._hwnd()
-            ex = win32._get_long(hwnd, win32.GWL_EXSTYLE)
-            ex |= win32.WS_EX_TRANSPARENT | win32.WS_EX_NOACTIVATE
-            win32._set_long(hwnd, win32.GWL_EXSTYLE, ex)
-            if self._previous_foreground:
-                user32.SetForegroundWindow(self._previous_foreground)
+            native.focus_window(self._window_handle(), False)
+            restore = getattr(native, "set_foreground", None)
+            if restore is not None and self._previous_foreground:
+                restore(self._previous_foreground)
         except Exception:
             pass
 

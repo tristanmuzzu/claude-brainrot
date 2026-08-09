@@ -70,21 +70,63 @@ python assets/preview.py character  # render it for your eyeballs
 
 ## Install
 
+Same two commands everywhere; Linux has one extra step, for a reason worth
+knowing about (below).
+
+<details open>
+<summary><b>Windows</b></summary>
+
 ```bash
 pip install claude-brainrot   # or: git clone + pip install -e .
 brainrot install              # writes hooks into ~/.claude/settings.json
 brainrot run                  # long-lived; leave it running
 ```
 
-That is the whole setup. Open Claude Code and give it something slow to do.
-Check any machine with `brainrot doctor`. Remove with `brainrot uninstall`.
+That is the whole setup. No pywin32 — the window work is ctypes on `user32`.
+</details>
+
+<details open>
+<summary><b>Linux (GNOME/Wayland)</b></summary>
+
+```bash
+pip install claude-brainrot   # or: git clone + pip install -e .
+brainrot install              # hooks, plus the gnome-shell extension
+brainrot run
+```
+
+`brainrot install` also copies a small gnome-shell extension into
+`~/.local/share/gnome-shell/extensions` and switches it on. **Log out and back
+in once** afterwards: gnome-shell only picks up a new extension when it starts,
+and on Wayland that means the session.
+
+The extension exists because a Wayland client is not allowed to know which
+window is in front, where any window is, or where the pointer is — and the
+strip needs all three, to appear only while you are looking at Claude Code, to
+stand beside that window, and to be draggable. It sends window geometry, window
+classes, process ids and the pointer to the daemon on loopback. No titles, no
+contents, no keystrokes.
+
+**It works without the extension too** (`brainrot install --no-extension`, or
+just not logging out yet): the strip docks to the work area and stays up for
+the whole turn instead of following the Claude Code window. `brainrot doctor`
+says which of the two you are getting, and `brainrot extension status`
+reports on that half specifically.
+
+Wayland-only distributions are the reason this is not simpler: GNOME 49 dropped
+the X11 session, so Ubuntu 25.10 and later have no X11 session to fall back to.
+The strip is therefore an *XWayland* window — X11 is still a first-class
+protocol on that desktop, and it is the one that lets a window place itself,
+stay above, shape its input region and be shown without taking focus.
+</details>
+
+Open Claude Code and give it something slow to do. Check any machine with
+`brainrot doctor`. Remove with `brainrot uninstall`.
 
 ## It belongs to Claude Code, not to your screen
 
-On Windows the overlay is **not** globally always-on-top, and it is not on
-screen just because Claude is busy. The hook shim notes which window you
-submitted your prompt from — that window *is* your Claude Code — and from
-then on:
+The overlay is not on screen just because Claude is busy. The hook tells the
+daemon which window your prompt came from — that window *is* your Claude Code
+— and from then on:
 
 - **It only appears while you are looking at that window.** Switch to your
   browser and it fades out; switch back and it returns. Nothing known about
@@ -95,13 +137,22 @@ then on:
   wherever the app keeps its sidebar; the strip goes into the empty gutter on
   the `dock` side of the Claude Code window instead, and *outside* that window
   entirely when the desktop has room. It follows the window if you move it.
-- **It rides one z-level above it.** Ownership, so raising your terminal
-  raises the strip with it. `attach = "topmost"` restores float-over-all.
+- **It rides one z-level above it.** On Windows the strip is an *owned* window
+  of the Claude Code window, so raising your terminal raises the strip with it
+  and anything else you focus covers both. mutter has no notion of an X11
+  window owned by a Wayland one, so on Linux the strip is in the always-above
+  band and the focus rule above — not the z-order — is what keeps it off your
+  other applications. `attach = "topmost"` restores float-over-all on Windows.
 - **You can move it.** Hold `ctrl+alt` and drag it wherever you like; where
   you drop it is remembered and still follows the window. Double-click while
   holding the chord to go back to automatic placement. Clicks are caught only
   while that chord is held over the strip — otherwise the mouse falls
-  straight through, and focus is never taken either way.
+  straight through, and focus is never taken either way. (Linux: needs the
+  extension, which is where the pointer position comes from.)
+- **It is the size you asked for.** On a HiDPI display the strip is drawn at
+  the configured size and scaled to the display, so `width = 360` means 360
+  points rather than 360 device pixels — and the scenes keep their own pixel
+  geometry rather than rendering a HUD at half size.
 
 ## Try it without Claude Code
 
@@ -175,11 +226,17 @@ Any field can also be set with an environment variable:
 
 ## Platform support
 
-| | Overlay | Click-through | Attach to Claude Code | Notes |
-|---|---|---|---|---|
-| Windows | yes | yes | yes | the intended target; no extra deps |
-| Linux / macOS | yes | partial | no | undecorated window; fine for development |
-| Headless / CI | offscreen | n/a | n/a | software rasteriser, no display needed |
+| | Overlay | Click-through | Never focused | Follows Claude Code | Notes |
+|---|---|---|---|---|---|
+| Windows 10/11 | yes | yes | yes | yes, as an owned window | ctypes on `user32`, no extra deps |
+| Linux, GNOME/Wayland | yes | yes | yes | yes, via the shell extension | XWayland window; extension needs one log-out to load |
+| Linux, GNOME/Wayland, no extension | yes | yes | yes | docks to the work area, stays up for the turn | still useful; `brainrot doctor` says so |
+| Linux, other desktops | yes | yes | yes | work-area docking only | the X11 half is generic EWMH; only the compositor half is GNOME-specific |
+| macOS | plain window | no | no | no | scenes, hooks and `shoot` all work; no overlay backend |
+| Headless / CI | offscreen | n/a | n/a | n/a | software rasteriser, no display needed |
+
+Verified on Windows 11 and on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200%
+scaling) — both by measurement on the machine rather than by inspection.
 
 ## Development
 
@@ -189,9 +246,11 @@ pip install raylib-software --force-reinstall --no-deps  # headless machines/CI
 pytest
 ```
 
-349 tests covering the show/hide state machine, the seeding guarantees, hook
+399 tests covering the show/hide state machine, the seeding guarantees, hook
 install/uninstall, the real shim end to end, a full daemon driven over UDP,
-pixel-identical determinism per seed, and the generation invariants — the
+pixel-identical determinism per seed, the real overlay window driven against a
+real X server, the compositor bridge's parsing and host resolution, and the
+generation invariants — the
 corridor that can never strand the runner, the single-oncoming-train rule and
 the live dodge, zero interpenetration over hours of simulated running, no
 parkour hop the flight solver cannot fly, self-overlap refusal, the altitude
