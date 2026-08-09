@@ -385,38 +385,46 @@ def apply_overlay_styles(win: int, cfg: Config) -> None:
     # While the window is unmapped, _NET_WM_STATE is the client's to write and
     # is read by the window manager as the state to come up in. Once mapped it
     # belongs to the window manager and only a ClientMessage changes it --
-    # which is why _assert_states below exists as well as this.
-    _set_states_property(handle, win)
+    # which is why assert_states below exists as well as this.
+    _set_states_property(handle, win, above=True)
     set_click_through(win, True)
     handle.x11.XFlush(handle.display)
 
 
-#: The states the strip needs for its whole life: above everything, and out of
-#: the switcher, the dock and the workspace overview.
-OVERLAY_STATES = ("_NET_WM_STATE_ABOVE", "_NET_WM_STATE_SKIP_TASKBAR",
-                  "_NET_WM_STATE_SKIP_PAGER")
+#: Out of the switcher, the dock and the workspace overview, for its whole life.
+QUIET_STATES = ("_NET_WM_STATE_SKIP_TASKBAR", "_NET_WM_STATE_SKIP_PAGER")
+
+#: Above everything -- which is only right while something else can decide
+#: *when* the strip is on screen. See :func:`brainrot.overlay.linux.wants_above`.
+ABOVE_STATE = "_NET_WM_STATE_ABOVE"
+
+OVERLAY_STATES = (ABOVE_STATE,) + QUIET_STATES
 
 
-def _set_states_property(handle: _Lib, win: int) -> None:
-    atoms = (ctypes.c_ulong * len(OVERLAY_STATES))(
-        *(handle.atom(name) for name in OVERLAY_STATES))
+def _set_states_property(handle: _Lib, win: int, above: bool) -> None:
+    names = ((ABOVE_STATE,) if above else ()) + QUIET_STATES
+    atoms = (ctypes.c_ulong * len(names))(*(handle.atom(n) for n in names))
     handle.x11.XChangeProperty(handle.display, win, handle.atom("_NET_WM_STATE"),
                                XA_ATOM, 32, PROP_MODE_REPLACE,
-                               ctypes.byref(atoms), len(OVERLAY_STATES))
+                               ctypes.byref(atoms), len(names))
 
 
-def _assert_states(handle: _Lib, win: int) -> None:
-    """Ask for the states again, now that the window is mapped.
+def assert_states(win: int, above: bool) -> None:
+    """Ask for the window states again, now that the window is mapped.
 
-    mutter does not carry ``_NET_WM_STATE_ABOVE`` across an unmap and remap:
-    the strip goes idle at the end of a turn, comes back for the next one, and
+    mutter does not carry ``_NET_WM_STATE`` across an unmap and remap: the
+    strip goes idle at the end of a turn, comes back for the next one, and
     comes back in the ordinary stacking band -- where the Claude Code window
     it is standing on covers it. Measured on GNOME Shell 50.1, and invisible
     until the second turn of a session, which is the worst kind of invisible.
     Two atoms per message is the protocol's limit, hence two messages.
     """
-    _wm_state(handle, win, NET_WM_STATE_ADD, *OVERLAY_STATES[:2])
-    _wm_state(handle, win, NET_WM_STATE_ADD, OVERLAY_STATES[2])
+    handle = lib()
+    if handle is None or not win:
+        return
+    _wm_state(handle, win, NET_WM_STATE_ADD, *QUIET_STATES)
+    _wm_state(handle, win, NET_WM_STATE_ADD if above else NET_WM_STATE_REMOVE,
+              ABOVE_STATE)
 
 
 def _set_cardinal(handle: _Lib, win: int, name: str, value: int) -> None:
@@ -455,7 +463,7 @@ def _wm_state(handle: _Lib, win: int, action: int, *props: str) -> None:
     handle.x11.XFlush(handle.display)
 
 
-def set_window_shown(win: int, shown: bool) -> None:
+def set_window_shown(win: int, shown: bool, above: bool = True) -> None:
     """Put the overlay on or off screen without ever activating it.
 
     ``XMapWindow`` rather than raylib's unhide for the same reason Windows
@@ -472,7 +480,7 @@ def set_window_shown(win: int, shown: bool) -> None:
         handle.x11.XMapWindow(handle.display, win)
         # Not once at startup: the states do not survive being unmapped, and
         # the overlay is unmapped at the end of every turn.
-        _assert_states(handle, win)
+        assert_states(win, above)
     else:
         handle.x11.XUnmapWindow(handle.display, win)
     handle.x11.XFlush(handle.display)

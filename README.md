@@ -95,9 +95,17 @@ brainrot run
 ```
 
 `brainrot install` also copies a small gnome-shell extension into
-`~/.local/share/gnome-shell/extensions` and switches it on. **Log out and back
-in once** afterwards: gnome-shell only picks up a new extension when it starts,
-and on Wayland that means the session.
+`~/.local/share/gnome-shell/extensions` and switches it on. gnome-shell only
+looks for new extensions when it *starts*, though, and on Wayland that means
+the session — so it needs one of:
+
+```bash
+brainrot extension load    # loads it into the running shell, no logout
+```
+
+which walks you through a one-time fifteen-second toggle in Looking Glass
+(`Alt+F2` → `lg`) and puts the setting back afterwards; **or** simply log out
+and back in, which does the same job with no steps to follow.
 
 The extension exists because a Wayland client is not allowed to know which
 window is in front, where any window is, or where the pointer is — and the
@@ -107,10 +115,16 @@ classes, process ids and the pointer to the daemon on loopback. No titles, no
 contents, no keystrokes.
 
 **It works without the extension too** (`brainrot install --no-extension`, or
-just not logging out yet): the strip docks to the work area and stays up for
-the whole turn instead of following the Claude Code window. `brainrot doctor`
-says which of the two you are getting, and `brainrot extension status`
-reports on that half specifically.
+before you have loaded it): the strip docks to the work area, stays up for the
+whole turn, and cannot be dragged. It also deliberately stays *out* of the
+always-above band in that state — a window that floats over everything and
+cannot hide itself is a window that sits on top of your browser, so instead it
+comes up over the Claude Code window you were just typing into and gets buried
+the moment you click anything else.
+
+`brainrot run` says which of the two modes it is in, and says so again if that
+changes underneath it. `brainrot doctor` and `brainrot extension status` both
+report on it too.
 
 Wayland-only distributions are the reason this is not simpler: GNOME 49 dropped
 the X11 session, so Ubuntu 25.10 and later have no X11 session to fall back to.

@@ -438,6 +438,8 @@ class OverlayWindow(_BaseWindow):
     # -- showing ----------------------------------------------------------
 
     def set_visible(self, visible: bool) -> None:
+        if visible:
+            self._apply_stacking()
         if self._native is None:
             super().set_visible(visible)
         elif visible != self._visible:
@@ -575,6 +577,7 @@ class OverlayWindow(_BaseWindow):
         if native is None or self._cfg is None:
             return
         self._recheck_scale()
+        self._apply_stacking()
         try:
             host = native.host_rect(self._host) if self._host else None
             area = native.work_area(self._host or 0)
@@ -587,6 +590,23 @@ class OverlayWindow(_BaseWindow):
         if wanted == self._placed:
             return
         self._move(wanted)
+
+    def _apply_stacking(self) -> bool:
+        """Which stacking band the strip belongs in, asked again each time.
+
+        Only a backend that has more than one answer defines this; Windows
+        decides where the strip sits by *ownership* and has nothing to
+        reconsider. On Linux the answer depends on whether anything can say
+        who is in front, which can start being true at any moment.
+        """
+        native = self._native
+        apply = getattr(native, "apply_stacking", None)
+        if apply is None or self._cfg is None or not self._win:
+            return False
+        try:
+            return bool(apply(self._win, self._cfg))
+        except Exception:
+            return False
 
     def _recheck_scale(self) -> None:
         """Notice a change in what a pixel is, and rebuild for it.

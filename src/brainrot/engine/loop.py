@@ -66,6 +66,7 @@ class Overlay:
         self._window_shown = False
         self._focus_ok = True
         self._focus_left_at = 0.0
+        self._blind: "bool | None" = None
 
         from .input import Controller, Mover, Takeover
 
@@ -80,7 +81,8 @@ class Overlay:
         # set/scalar writes under the GIL and the render thread only ever reads
         # derived values, so no lock is warranted here.
         if self.verbose:
-            print(f"[brainrot] {event.kind} session={event.session[:8]} tool={event.tool}")
+            print(f"[brainrot] {event.kind} session={event.session[:8]} "
+                  f"tool={event.tool}", flush=True)
         host = event.hwnd
         if not host and event.pids and self.native is not None:
             # Nothing on this platform could tell the shim a window handle, so
@@ -140,6 +142,8 @@ class Overlay:
         self.listener.start()
         self.window.create(self.cfg)
         self.running = True
+        self._blind = None
+        self._report_mode()
 
         frame_budget = 1.0 / self.cfg.fps
         last = time.monotonic()
@@ -153,6 +157,7 @@ class Overlay:
                 if self.window.should_close() or rl.IsKeyPressed(rl.KEY_ESCAPE):
                     self.running = False
 
+                self._report_mode()
                 visibility = self.state.tick()
                 wants_visible = (
                     visibility in (Visibility.VISIBLE, Visibility.LINGERING)
@@ -212,6 +217,38 @@ class Overlay:
                     time.sleep(spare)
         finally:
             self.shutdown()
+
+    def _report_mode(self) -> None:
+        """Say which of the two behaviours you are getting, and say it again
+        when it changes.
+
+        A daemon that silently runs in the reduced mode is indistinguishable
+        from one that is broken: the strip turns up over your browser and
+        cannot be dragged, and nothing anywhere says why. It can also change
+        under us -- somebody logs back in, or runs `brainrot extension load` --
+        so this is checked every frame rather than announced once.
+        """
+        native = self.native
+        if native is None or not self.cfg.follow_focus:
+            return
+        try:
+            blind = not native.focus_known()
+        except Exception:
+            return
+        if blind == self._blind:
+            return
+        self._blind = blind
+        # flush, because this is a long-lived process whose output people
+        # redirect to a log, and a block-buffered explanation arrives after
+        # they have stopped wanting it.
+        if blind:
+            print("[brainrot] reduced mode: nothing here can say which window "
+                  "is in front, so the strip stays up for the whole turn and "
+                  "sits in the ordinary stacking band rather than above "
+                  "everything. Fix: brainrot extension load", flush=True)
+        else:
+            print("[brainrot] following the Claude Code window: on screen only "
+                  "while you are looking at it", flush=True)
 
     def _focus_allows(self) -> bool:
         """Whether the window in front is one the overlay belongs over.

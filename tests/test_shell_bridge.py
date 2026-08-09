@@ -130,3 +130,37 @@ def test_chords_become_compositor_modifier_bits() -> None:
     # see -- which would arm the drag gesture on a plain Ctrl.
     assert shell.mods_from_vk([0x11, 0x24]) == 0
     assert shell.mods_from_vk([]) == 0
+
+
+def test_the_strip_is_only_always_above_when_it_can_also_hide() -> None:
+    """The two have to be decided together.
+
+    Always-above is right precisely when something else decides *when* the
+    strip is on screen. Without the extension nothing can, so always-above
+    would mean sitting on top of whatever you switched to -- which is what
+    it did, and what it is not allowed to do.
+    """
+    import time
+
+    from brainrot.config import Config
+    from brainrot.overlay import linux
+
+    cfg = Config()
+    bridge = shell.bridge()
+    before = bridge.snapshot, bridge.seen
+    try:
+        bridge.snapshot, bridge.seen = shell.Snapshot(), 0
+        assert not linux.focus_known()
+        assert not linux.wants_above(cfg)
+
+        bridge.snapshot = shell.Snapshot.parse(snapshot(), now=time.monotonic())
+        bridge.seen = 1
+        assert linux.focus_known()
+        assert linux.wants_above(cfg)
+
+        # ...unless someone asked for the blunt behaviour on purpose.
+        bridge.snapshot, bridge.seen = shell.Snapshot(), 0
+        cfg.attach = "topmost"
+        assert linux.wants_above(cfg)
+    finally:
+        bridge.snapshot, bridge.seen = before

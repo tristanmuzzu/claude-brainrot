@@ -62,8 +62,10 @@ def settle(want, limit=2.0):
 
 window.set_visible(True)
 out["mapped_when_shown"] = settle(True)
+out["above_when_blind"] = x11.lib().atom(x11.ABOVE_STATE) in x11._prop(
+    x11.lib(), win, "_NET_WM_STATE")
 out["states_when_shown"] = sorted(
-    name for name in x11.OVERLAY_STATES
+    name for name in x11.QUIET_STATES
     if x11.lib().atom(name) in x11._prop(x11.lib(), win, "_NET_WM_STATE"))
 
 # The window manager reconfigures the frame asynchronously, so this waits for
@@ -90,7 +92,7 @@ out["hidden_again"] = not settle(False)
 # and the strip is unmapped at the end of every turn.
 window.set_visible(True)
 out["states_second_time"] = sorted(
-    name for name in x11.OVERLAY_STATES
+    name for name in x11.QUIET_STATES
     if x11.lib().atom(name) in x11._prop(x11.lib(), win, "_NET_WM_STATE"))
 window.set_visible(False)
 
@@ -133,14 +135,22 @@ def test_showing_and_hiding_maps_and_unmaps(probe: dict) -> None:
     assert probe["hidden_again"]
 
 
+def test_it_is_not_always_above_when_it_cannot_hide_itself(probe: dict) -> None:
+    """The probe runs with no shell extension talking to it, so nothing can
+    say which window is in front and the strip cannot hide when you look
+    away. A window that is both always-above *and* unable to hide is a window
+    that sits on top of your browser -- the one behaviour this project exists
+    to avoid -- so in that state it goes in the ordinary band instead."""
+    assert not probe["above_when_blind"]
+
+
 def test_the_states_survive_being_hidden_and_shown_again(probe: dict) -> None:
     """mutter drops ``_NET_WM_STATE_ABOVE`` across an unmap and remap. The
     strip goes idle at the end of every turn, so without re-asserting them it
     is correct on the first turn of a session and behind the Claude Code
     window on every turn after -- which is a bug you only see on the second
     prompt, and therefore blame on something else."""
-    wanted = sorted(["_NET_WM_STATE_ABOVE", "_NET_WM_STATE_SKIP_PAGER",
-                     "_NET_WM_STATE_SKIP_TASKBAR"])
+    wanted = sorted(["_NET_WM_STATE_SKIP_PAGER", "_NET_WM_STATE_SKIP_TASKBAR"])
     assert probe["states_when_shown"] == wanted
     assert probe["states_second_time"] == wanted
 

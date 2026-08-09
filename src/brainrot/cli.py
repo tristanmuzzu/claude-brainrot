@@ -48,8 +48,14 @@ def cmd_run(args: argparse.Namespace) -> int:
     overlay = Overlay(cfg, backend, verbose=args.verbose)
     print(
         f"claude-brainrot {__version__} listening on {cfg.host}:{cfg.port} "
-        f"({type(backend).__name__}, scenes: {', '.join(cfg.scenes)})"
+        f"({type(backend).__name__}, scenes: {', '.join(cfg.scenes)})",
+        flush=True,
     )
+    # Turns that were already running when the daemon started fired their
+    # UserPromptSubmit before anything was listening, so the first thing you
+    # see is the *next* prompt. Saying so beats it looking broken for a turn.
+    print("waiting for the next prompt (a turn already in flight is not "
+          "something a hook can be told about after the fact)", flush=True)
     try:
         overlay.run()
     except KeyboardInterrupt:
@@ -152,6 +158,8 @@ def cmd_install(args: argparse.Namespace) -> int:
         if extinstall.is_gnome():
             ok, detail = extinstall.install(cfg)
             print(f"\ngnome-shell extension: {detail}")
+            if ok and not extinstall.enabled():
+                print("  to skip the logout:  brainrot extension load")
             if not ok:
                 print("  the overlay still works without it -- see `brainrot doctor`")
         else:
@@ -162,10 +170,14 @@ def cmd_install(args: argparse.Namespace) -> int:
 
 
 def cmd_extension(args: argparse.Namespace) -> int:
-    """Install, remove or report on the gnome-shell half."""
+    """Install, load, remove or report on the gnome-shell half."""
+    import time
+
     from . import extinstall
 
     cfg = _config_from(args)
+    if args.action == "load":
+        return _load_extension_now(extinstall, time)
     if args.action == "remove":
         ok, detail = extinstall.uninstall()
         print(detail)
@@ -185,6 +197,60 @@ def cmd_extension(args: argparse.Namespace) -> int:
     print(f"shell:     {extinstall.shell_version() or 'not found'}")
     print(f"supports:  {', '.join(extinstall.supported_versions())}")
     return 0
+
+
+def _load_extension_now(extinstall, time) -> int:
+    """Get the extension running without ending the session.
+
+    gnome-shell scans for extensions once, at startup, and on Wayland it
+    cannot be restarted without logging out -- so a freshly installed one
+    normally waits for the next login. It can be loaded by hand from inside
+    the shell, which needs unsafe mode, which only a person can turn on. This
+    walks through that and then puts unsafe mode back.
+    """
+    ok, detail = extinstall.load_now()
+    if ok:
+        print(detail)
+        return 0
+    if detail != "gnome-shell is not in unsafe mode":
+        print(detail)
+        return 1
+
+    print("gnome-shell only looks for new extensions when it starts, and on")
+    print("Wayland that means the session. It can be told to load one now,")
+    print("but only from inside the shell -- which needs unsafe mode, and only")
+    print("you can turn that on:\n")
+    print("  1. press Alt+F2")
+    print("  2. type  lg  and press Enter (this is Looking Glass)")
+    print("  3. in the prompt at the bottom, type:")
+    print("       global.context.unsafe_mode = true")
+    print("     and press Enter")
+    print("  4. press Esc to close it\n")
+    print("Waiting for that... (Ctrl-C to give up and just log out instead)")
+
+    deadline = time.monotonic() + 180
+    try:
+        while time.monotonic() < deadline:
+            if extinstall.unsafe_mode():
+                break
+            time.sleep(0.5)
+        else:
+            print("\nTimed out. Logging out and back in does the same job.")
+            return 1
+    except KeyboardInterrupt:
+        print("\nstopped")
+        return 1
+
+    ok, detail = extinstall.load_now()
+    print(f"\n{detail}")
+    # Leave the machine as it was found: unsafe mode is not something to walk
+    # away from, and nothing here needs it once the extension is running.
+    if extinstall.set_unsafe_mode(False):
+        print("unsafe mode turned back off")
+    else:
+        print("could not turn unsafe mode back off -- do it in Looking Glass, "
+              "or just log out; it does not survive a session")
+    return 0 if ok else 1
 
 
 def cmd_uninstall(args: argparse.Namespace) -> int:
@@ -380,7 +446,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="the gnome-shell half: what Wayland will not tell a client")
     _add_common(ext)
     ext.add_argument("action", nargs="?", default="status",
-                     choices=("status", "install", "remove"))
+                     choices=("status", "install", "load", "remove"))
     ext.set_defaults(func=cmd_extension)
 
     remove = sub.add_parser("uninstall", help="remove Claude Code hooks")

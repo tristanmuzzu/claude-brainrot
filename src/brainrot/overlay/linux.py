@@ -84,7 +84,51 @@ def apply_overlay_styles(win: int, cfg: Config) -> None:
 
 
 def set_window_shown(win: int, shown: bool) -> None:
-    x11.set_window_shown(win, shown)
+    x11.set_window_shown(win, shown, above=_above)
+
+
+#: Whether the strip is currently in the always-above band. Recomputed by
+#: :func:`apply_stacking` whenever it is about to be shown.
+_above = False
+
+
+def wants_above(cfg: Config) -> bool:
+    """Should the strip float above everything?
+
+    Only when something else decides *when* it is on screen. With the shell
+    extension running that something is ``follow_focus``, and above is exactly
+    right: the strip sits over the Claude Code window and disappears the
+    moment you look at anything else.
+
+    Without it, nothing can say who is in front -- and a window that is both
+    always-above and unable to hide is a window that sits on top of your
+    browser, which is the one behaviour this project exists to avoid. So in
+    that state it goes in the ordinary stacking band instead: it still comes
+    up over the Claude Code window you were just typing into, because a
+    freshly mapped window is on top, and clicking on anything else buries it.
+    Worse than the real thing, better than being in the way.
+
+    ``attach = "topmost"`` overrides both, for demos and screen recordings.
+    """
+    return cfg.attach == "topmost" or focus_known()
+
+
+def apply_stacking(win: int, cfg: Config) -> bool:
+    """Put the strip in the band it has earned. Returns True if that changed.
+
+    Called before every show and once a frame while up, because the answer
+    changes under us: the shell extension can start talking at any moment --
+    somebody has just logged back in, or run ``brainrot extension load`` --
+    and the strip should come out of the ordinary band the moment it can hide
+    itself properly again.
+    """
+    global _above
+    wants = wants_above(cfg)
+    if wants == _above:
+        return False
+    _above = wants
+    x11.assert_states(win, wants)
+    return True
 
 
 def set_click_through(win: int, through: bool) -> None:

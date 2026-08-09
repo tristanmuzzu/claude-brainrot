@@ -112,8 +112,10 @@ def _check_backend(cfg: Config) -> list[Check]:
             Check("focus", WARN,
                   "follow_focus is on, but nothing here can say who is in front",
                   "The strip will stay up for the whole turn rather than only "
-                  "while you are looking at Claude Code. See the `shell` line "
-                  "above for how to fix that."),
+                  "while you are looking at Claude Code, and it stays out of "
+                  "the always-above band so that switching to another window "
+                  "buries it rather than leaving it on top. See the `shell` "
+                  "line above for how to get the real behaviour."),
         )
     elif cfg.follow_focus:
         checks.append(
@@ -181,8 +183,10 @@ def _check_linux_backend(cfg: Config) -> list[Check]:
     if not extinstall.installed():
         checks.append(Check(
             "shell", WARN, "gnome-shell extension not installed",
-            "Without it the strip docks to the work area and stays up for the "
-            "whole turn. Install it with: brainrot extension install",
+            "Without it the strip docks to the work area, stays up for the "
+            "whole turn, sits in the ordinary stacking band rather than above "
+            "everything, and cannot be dragged. Install it with: "
+            "brainrot extension install",
         ))
         return checks
     if not extinstall.enabled():
@@ -191,8 +195,10 @@ def _check_linux_backend(cfg: Config) -> list[Check]:
                 "shell", WARN,
                 "extension installed and switched on, but this gnome-shell has "
                 "not loaded it",
-                "gnome-shell only picks up a new extension when it starts, and "
-                "on Wayland that means the session. Log out and back in.",
+                "gnome-shell only picks up a new extension when it starts, "
+                "and on Wayland that means the session. Either log out and "
+                "back in, or load it into the running shell without a logout: "
+                "brainrot extension load",
             ))
         else:
             checks.append(Check(

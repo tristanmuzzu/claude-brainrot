@@ -147,6 +147,109 @@ def _mark_enabled() -> bool:
                  "enabled-extensions", updated]) is not None
 
 
+# ---------------------------------------------------------------------------
+# Loading it into the shell that is already running
+# ---------------------------------------------------------------------------
+#
+# gnome-shell scans for extensions exactly once, at startup: `_loadExtensions`
+# in its own extensionSystem.js is guarded by an initialisation promise and
+# there is no file monitor, `gnome-extensions enable` on an unknown uuid
+# returns "does not exist", and `ReloadExtension` over D-Bus answers
+# "deprecated and does not work". On Wayland the shell cannot be restarted
+# without ending the session.
+#
+# That is a no at the *session* layer, not at the compositor layer. One layer
+# down, the shell loads an extension with two ordinary calls -- the same two
+# its own installer makes after unpacking a download -- and `org.gnome.Shell.
+# Eval` can make them. Eval is refused unless unsafe mode is on, and unsafe
+# mode can only be turned on by a person, from Looking Glass. So this is a
+# fifteen-second manual step instead of a logout, and it is offered rather
+# than required.
+
+#: Runs inside gnome-shell. `Main`, `Gio` and `ExtensionUtils` are in scope
+#: because Eval evaluates in shellDBus.js's own module scope.
+_LOAD_SCRIPT = """
+(async () => {
+    const uuid = %(uuid)r;
+    const manager = Main.extensionManager;
+    if (manager.lookup(uuid))
+        return 'already-known';
+    const dir = Gio.File.new_for_path(%(path)r);
+    const extension = manager.createExtensionObject(
+        uuid, dir, ExtensionUtils.ExtensionType.PER_USER);
+    await manager.loadExtension(extension);
+    return manager.lookup(uuid) ? 'loaded' : 'not-loaded';
+})()
+"""
+
+
+def _eval(script: str) -> "tuple[bool, str] | None":
+    """Run JavaScript inside gnome-shell. None when the call itself failed."""
+    try:
+        done = subprocess.run(
+            ["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
+             "--object-path", "/org/gnome/Shell", "--method",
+             "org.gnome.Shell.Eval", script],
+            capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if done.returncode != 0:
+        return None
+    # gdbus prints (true, '"loaded"') / (false, '')
+    out = done.stdout.strip()
+    ok = out.startswith("(true")
+    body = out[out.find(",") + 1:].rstrip(")").strip() if "," in out else ""
+    return ok, body.strip("'\"")
+
+
+def unsafe_mode() -> bool:
+    """Whether gnome-shell will evaluate anything for us at all.
+
+    Probed by evaluating something harmless: there is no property to read, and
+    a refused Eval is reported as a *successful* call returning ``(false, '')``
+    rather than as an error, so this is the only honest test.
+    """
+    answer = _eval("1+1")
+    return bool(answer and answer[0])
+
+
+def load_now() -> tuple[bool, str]:
+    """Load the installed extension into the running shell. No logout.
+
+    Returns (ok, detail). Refuses politely rather than doing anything clever
+    when unsafe mode is off, because turning it on is a decision for the
+    person at the keyboard.
+    """
+    if not installed():
+        return False, "not installed yet -- run: brainrot extension install"
+    if enabled():
+        return True, "already loaded and enabled"
+    if not unsafe_mode():
+        return False, "gnome-shell is not in unsafe mode"
+
+    script = _LOAD_SCRIPT % {"uuid": UUID, "path": str(target_dir())}
+    answer = _eval(script)
+    if answer is None:
+        return False, "gnome-shell did not answer"
+    ok, detail = answer
+    if not ok:
+        return False, f"gnome-shell refused it: {detail}"
+    if detail not in ("loaded", "already-known"):
+        return False, f"the shell loaded nothing: {detail}"
+
+    # Now that the shell has an object for it, the ordinary command works.
+    if _run(["gnome-extensions", "enable", UUID]) is None:
+        return False, "loaded, but could not be enabled"
+    return (True, "loaded and enabled in the running shell") if enabled() else (
+        False, "loaded but did not come up -- check: gnome-extensions info " + UUID)
+
+
+def set_unsafe_mode(on: bool) -> bool:
+    """Put unsafe mode back the way it was found. Only works while it is on."""
+    answer = _eval(f"global.context.unsafe_mode = {'true' if on else 'false'}")
+    return bool(answer and answer[0])
+
+
 def uninstall() -> tuple[bool, str]:
     target = target_dir()
     if not installed():
