@@ -90,9 +90,17 @@ def place(cfg: Config, work: Rect, host: Rect | None = None,
         # Somebody dragged it here. Geometry does not get a vote any more --
         # only the clamp below, so a remembered spot cannot strand the strip
         # off the side of a smaller screen.
+        #
+        # The offset is stored in logical pixels, so it is scaled here with
+        # the config rather than used raw: a drop remembered at 125% means the
+        # same *distance* at 100%, which is what "still means the same thing at
+        # a different screen resolution" promises in :mod:`brainrot.placement`.
+        # Stored in device pixels it silently doubled when the scale changed.
+        dx = round(manual.dx * scale)
+        dy = round(manual.dy * scale)
         anchor = host or work
-        x = (anchor.right - width - manual.dx) if right_side else (anchor.left + manual.dx)
-        y = anchor.top + manual.dy
+        x = (anchor.right - width - dx) if right_side else (anchor.left + dx)
+        y = anchor.top + dy
         x = max(work.left, min(int(x), work.right - width))
         y = max(work.top, min(int(y), work.bottom - height))
         return Placement(int(x), int(y), int(width), int(height))
@@ -707,7 +715,12 @@ class OverlayWindow(_BaseWindow):
             dx = anchor.right - here.right
         else:
             dx = here.left - anchor.left
-        self._manual = Manual(int(dx), int(here.top - anchor.top))
+        # Both rectangles are device pixels; the offset is stored in logical
+        # ones so that it outlives a change of display scale as well as a
+        # restart. :func:`place` scales it back on the way out.
+        ratio = self._ratio if self._ratio > 0 else 1.0
+        self._manual = Manual(round(dx / ratio),
+                              round((here.top - anchor.top) / ratio))
         placement_store.save(self._manual)
 
     def clear_placement(self) -> None:

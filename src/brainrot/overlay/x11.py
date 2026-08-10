@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+import time
 from ctypes.util import find_library
 
 from ..config import Config
@@ -586,13 +587,61 @@ def window_rect(win: int) -> "tuple[int, int, int, int] | None":
     return int(ax.value), int(ay.value), int(ax.value + w.value), int(ay.value + h.value)
 
 
+#: How long a reading of the screen size is reused. Every device-pixel
+#: conversion in this backend measures against it, several times a frame, and
+#: a screen does not resize sixty times a second -- but it does resize, so the
+#: answer cannot simply be kept. A quarter of a second is under a frame of
+#: lag on a change nobody can make faster than they can see, and it costs four
+#: round trips a second rather than a few hundred.
+_SCREEN_TTL = 0.25
+_screen: "tuple[int, int, int, int] | None" = None
+_screen_at = 0.0
+
+
 def screen_rect() -> "tuple[int, int, int, int]":
-    """The whole X screen, in X11 pixels."""
+    """The whole X screen, in X11 pixels, as the server has it *now*.
+
+    Not ``XDisplayWidth``. That reads ``ScreenOfDisplay(dpy, scr)->width`` --
+    a field Xlib fills in once, from the connection setup block, and never
+    refreshes on its own. This daemon holds a single connection open for the
+    life of the session (:func:`lib`), and mutter resizes the X screen every
+    time the display scale or the resolution changes. So from the moment the
+    scale changes, that macro answers with the screen the session *used* to
+    have, for as long as the daemon runs.
+
+    That is not a cosmetic error: :func:`brainrot.overlay.linux.scale` divides
+    this by the compositor's logical width to get device pixels per logical
+    pixel, and every rectangle the overlay places is measured with it.
+    Measured here at 125% -> 100%: the strip stayed sized for the old screen,
+    was clamped against a work area twice as wide as the real one, and the
+    compositor pushed what was left to a sliver off the right-hand edge --
+    indistinguishable from an overlay that had stopped working.
+
+    The root window's geometry is not cached anywhere: ``XGetWindowAttributes``
+    is a round trip and its reply describes the screen as it is. Xlib's own
+    cure is ``XRRUpdateConfiguration``, which would mean linking libXrandr and
+    pumping an event queue this backend deliberately does not have.
+    """
+    global _screen, _screen_at
     handle = lib()
     if handle is None:
         return (0, 0, 0, 0)
-    return (0, 0, int(handle.x11.XDisplayWidth(handle.display, 0)),
-            int(handle.x11.XDisplayHeight(handle.display, 0)))
+    now = time.monotonic()
+    if _screen is not None and now - _screen_at < _SCREEN_TTL:
+        return _screen
+    attrs = XWindowAttributes()
+    if (handle.x11.XGetWindowAttributes(handle.display, handle.root,
+                                        ctypes.byref(attrs))
+            and attrs.width > 0 and attrs.height > 0):
+        rect = (0, 0, int(attrs.width), int(attrs.height))
+    else:
+        # A connection that cannot answer for its own root window is about to
+        # fail at everything else too. The stale numbers are still better than
+        # zeroes, which would make the scale ratio undefined rather than wrong.
+        rect = (0, 0, int(handle.x11.XDisplayWidth(handle.display, 0)),
+                int(handle.x11.XDisplayHeight(handle.display, 0)))
+    _screen, _screen_at = rect, now
+    return rect
 
 
 def work_area() -> "tuple[int, int, int, int] | None":

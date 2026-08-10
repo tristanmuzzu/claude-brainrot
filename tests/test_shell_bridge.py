@@ -164,3 +164,92 @@ def test_the_strip_is_only_always_above_when_it_can_also_hide() -> None:
         assert linux.wants_above(cfg)
     finally:
         bridge.snapshot, bridge.seen = before
+
+
+def test_the_screen_size_is_asked_of_the_server_not_read_from_the_cache(
+        monkeypatch) -> None:
+    """The bug that made the strip vanish when the display scale changed.
+
+    ``XDisplayWidth`` reads ``ScreenOfDisplay(dpy, scr)->width``, which Xlib
+    fills in once from the connection setup block. The daemon holds one X
+    connection for the whole session, so after mutter resized the X screen for
+    a new display scale that macro kept answering with the old screen -- and
+    every device-pixel conversion is measured against it. The strip came out
+    sized for a screen that was no longer there and clamped against edges that
+    did not exist.
+    """
+    import ctypes
+
+    from brainrot.overlay import x11
+
+    class FakeX11:
+        def __init__(self, size) -> None:
+            self.size = size
+            self.attribute_calls = 0
+            self.cached_macro_calls = 0
+
+        def XGetWindowAttributes(self, display, window, ref) -> int:
+            self.attribute_calls += 1
+            attrs = ref._obj
+            attrs.width, attrs.height = self.size
+            return 1
+
+        def XDisplayWidth(self, display, screen) -> int:
+            self.cached_macro_calls += 1
+            return 3072
+
+        def XDisplayHeight(self, display, screen) -> int:
+            self.cached_macro_calls += 1
+            return 1728
+
+    class FakeHandle:
+        def __init__(self, lib) -> None:
+            self.x11 = lib
+            self.display = ctypes.c_void_p(1)
+            self.root = 1
+
+    fake = FakeX11((3072, 1728))
+    monkeypatch.setattr(x11, "lib", lambda: FakeHandle(fake))
+    monkeypatch.setattr(x11, "_screen", None)
+    monkeypatch.setattr(x11, "_screen_at", 0.0)
+
+    assert x11.screen_rect() == (0, 0, 3072, 1728)
+    # Asked the server, rather than reading the number Xlib cached at connect.
+    assert fake.attribute_calls == 1
+    assert fake.cached_macro_calls == 0
+
+    # The scale changes: mutter resizes the X screen under the running daemon.
+    fake.size = (1920, 1080)
+    monkeypatch.setattr(x11, "_screen_at", 0.0)      # past the reading's life
+    assert x11.screen_rect() == (0, 0, 1920, 1080)
+
+    # ...but not once per call: several conversions happen every frame.
+    calls = fake.attribute_calls
+    x11.screen_rect()
+    assert fake.attribute_calls == calls
+
+
+def test_a_resized_screen_changes_the_measured_scale(monkeypatch) -> None:
+    """The ratio is measured, so both halves have to be live -- and after the
+    screen size started coming from the server, both are."""
+    import time
+
+    from brainrot.overlay import linux, x11
+
+    bridge = shell.bridge()
+    before = bridge.snapshot, bridge.seen
+    try:
+        # 125%: a 1536-wide logical desktop on a 3072-wide X screen.
+        bridge.snapshot = shell.Snapshot.parse(
+            snapshot(logical=[1536, 864]), now=time.monotonic())
+        bridge.seen = 1
+        monkeypatch.setattr(x11, "screen_rect", lambda: (0, 0, 3072, 1728))
+        assert linux.scale() == 2.0
+
+        # 100%: the compositor reports a wider desktop and the X screen shrinks.
+        bridge.snapshot = shell.Snapshot.parse(
+            snapshot(logical=[1920, 1080]), now=time.monotonic())
+        monkeypatch.setattr(x11, "screen_rect", lambda: (0, 0, 1920, 1080))
+        assert linux.scale() == 1.0
+    finally:
+        bridge.snapshot, bridge.seen = before

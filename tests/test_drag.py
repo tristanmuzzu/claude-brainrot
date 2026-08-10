@@ -245,6 +245,26 @@ def test_a_remembered_spot_cannot_strand_it_off_screen() -> None:
         assert WORK.top <= spot.y and spot.y + spot.height <= WORK.bottom
 
 
+def test_a_remembered_spot_survives_a_change_of_display_scale() -> None:
+    """The offset is logical pixels, so it means the same *distance* at any
+    scale.
+
+    Stored in device pixels it did not: a strip dropped at one scale came back
+    at another a different distance from the window it was dropped against --
+    far enough, on a single screen, to be clamped against the edge and vanish.
+    """
+    manual = placement_store.Manual(dx=100, dy=60)
+    host = Rect(0, 0, 1200, 900)
+    at_100 = place(cfg(), WORK, host, manual, scale=1.0)
+    # The same desktop at 200%: every rectangle doubles, and so must the gap.
+    big_work = Rect(0, 0, 3840, 2080)
+    big_host = Rect(0, 0, 2400, 1800)
+    at_200 = place(cfg(), big_work, big_host, manual, scale=2.0)
+    assert (big_host.right - (at_200.x + at_200.width)) == 2 * (
+        host.right - (at_100.x + at_100.width))
+    assert at_200.y - big_host.top == 2 * (at_100.y - host.top)
+
+
 def test_docking_left_measures_the_offset_from_the_left_edge() -> None:
     host = Rect(200, 0, 1400, 900)
     spot = place(cfg(dock="left"), WORK, host, placement_store.Manual(dx=60, dy=10))
