@@ -213,3 +213,21 @@ def test_a_second_daemon_cannot_take_the_port() -> None:
             second.start()
     finally:
         first.stop()
+
+
+def test_the_version_is_not_written_down_twice_differently() -> None:
+    """``pyproject.toml`` and ``brainrot.__version__`` are two copies of one
+    fact, and they drifted: 0.2.0 against 0.1.0, so the daemon announced the
+    wrong version in its own startup log and in ``brainrot --version`` -- the
+    two places anyone looks to work out which build is actually running.
+
+    Pinned here rather than derived at import, because ``importlib.metadata``
+    costs 36 ms to answer and this is a string that changes monthly.
+    """
+    import tomllib
+
+    import brainrot
+
+    root = Path(__file__).resolve().parent.parent
+    declared = tomllib.loads((root / "pyproject.toml").read_text())
+    assert brainrot.__version__ == declared["project"]["version"]
