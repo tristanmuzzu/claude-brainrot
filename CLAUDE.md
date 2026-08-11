@@ -73,7 +73,8 @@ touching anything in this scene; the first two rows are non-negotiable.
 | dead air (idle over 3 s, riding excluded) | 5.8% | **1.8%** |
 | speed at 15 s / 30 s | 9.9 / 11.3 m/s | **13.3 / 16.1 m/s** |
 | slides per minute | 4.6 | **4.5** |
-| mounts onto a train roof per minute | n/a | **1.63** |
+| mounts onto a train roof per minute | n/a | **1.84** |
+| median time to the first mount | n/a | **3.0 s** |
 | seconds spent on a roof per minute | n/a | **2.35** |
 | distinct obstacle kinds per 30 s | n/a | **9.1** |
 
@@ -285,6 +286,13 @@ touching any of it:
   can no longer be squarely in the ramp's lane before the foot of the ramp —
   while there is still track in which to leave that lane. Offering it right up
   to the ramp is what the reverted version did.
+- **A run opens on one, 62% of the time.** Not a weight -- `_begin_segment`
+  *tries* roofrun first on the opening set-piece, because a heavier weight is
+  still a dice roll. The strip is on screen for one thinking turn, often
+  fifteen or twenty seconds, and on the ordinary weights the median time to a
+  first mount was 19.7 s: the owner watched several turns, saw no train to run
+  on, and reasonably reported the feature as missing. It is 3.0 s now, and 72%
+  of runner runs show one inside fifteen seconds against 30% before.
 - **Riding is free to the lane search.** `MOUNT_COST` is 0.0 and has to be:
   the search already pays `preference` for every step spent outside the
   guaranteed corridor, so *any* positive cost on the roof makes standing

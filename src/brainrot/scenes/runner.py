@@ -176,6 +176,10 @@ RIDE_REACH = 70.0
 #: it exists for exactly the same reason. Every entry is a stretch of track
 #: *and* the corridor through it, decided together -- which is the only way to
 #: express a weave, a yard, or a ramp onto a roof.
+#: How often a run *opens* on a roof set-piece rather than drawing from the
+#: table. See ``_begin_segment``: what gets watched is the first few seconds.
+OPENING_ROOFRUN = 0.62
+
 SEGMENT_TABLE = (
     ("cruise", 2, 3, 0.7),
     ("hurdles", 5, 8, 2.2),
@@ -573,13 +577,30 @@ class RunnerScene(Scene):
         """
         rng = self.ctx.seed.stream(f"seg{row0}")
         table = [s for s in SEGMENT_TABLE if s[0] != self._last_segment]
-        total = sum(s[3] for s in table)
-        for _ in range(len(table)):
-            pick = rng.random() * total
-            for name, lo, hi, weight in table:
-                pick -= weight
-                if pick <= 0:
+        # Front-load the signature move. The strip is on screen for one
+        # thinking turn -- often fifteen or twenty seconds -- and on the
+        # ordinary weights the median time to a first mount is 19.7 s, so a
+        # viewer saw the runner get onto a train on about a quarter of turns
+        # and reasonably concluded the feature was not there. Opening on one
+        # puts it about two and a half seconds in. Tried first rather than
+        # merely weighted up: a heavier weight is still a dice roll, and this
+        # is the one set-piece whose absence reads as a missing feature.
+        forced = ("roofrun" if not self._last_segment
+                  and rng.random() < OPENING_ROOFRUN else None)
+        for _ in range(len(table) + 1):
+            if forced is not None:
+                name, lo, hi = next((e[0], e[1], e[2]) for e in SEGMENT_TABLE
+                                    if e[0] == forced)
+                forced = None
+            else:
+                total = sum(e[3] for e in table)
+                if not table:
                     break
+                pick = rng.random() * total
+                for name, lo, hi, weight in table:
+                    pick -= weight
+                    if pick <= 0:
+                        break
             mark = self._mark()
             used = getattr(self, f"_seg_{name}")(row0, rng.randint(lo, hi), rng)
             if used:
@@ -588,10 +609,7 @@ class RunnerScene(Scene):
                 self._fill_corridor(row0, used)
                 return
             self._rewind(mark, row0)
-            table = [s for s in table if s[0] != name]
-            total = sum(s[3] for s in table)
-            if not table:
-                break
+            table = [e for e in table if e[0] != name]
         self._seg_cruise(row0, 2, rng)
         self._last_segment = "cruise"
         self.segments["cruise"] = self.segments.get("cruise", 0) + 1
