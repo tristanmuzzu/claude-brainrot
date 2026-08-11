@@ -328,8 +328,23 @@ long jumps you need a different motion model, not a bigger number.
   renders exact frames of exact runs to PNG. This is how all art direction
   was done: render, look, adjust, repeat.
 - `python assets/build.py [name]` rebuilds committed .glb files from their
-  scripts (needs `pip install bpy`, one subprocess per asset). Blender 5.0.1
-  reproduces every committed asset's geometry and materials exactly.
+  scripts, one subprocess per asset. It needs a working `bpy` and finds one of
+  two ways: the **wheel**, imported by the venv's own Python, or a
+  **standalone Blender** driven as `blender -b -P script`. The wheel trails
+  Python releases and there is none for 3.14, which is what the venv is — so
+  on this machine it is the standalone, unpacked at
+  `~/.local/share/blender/5.0.1/`. `python assets/build.py --where` says which
+  it would use and prints the install recipe when there is neither;
+  `BRAINROT_BLENDER` forces a particular binary.
+
+  Verified 2026-08-11: a full rebuild of all sixteen assets through that path
+  reproduces every recorded bound and every recorded pose frame exactly — the
+  24 checks in `tests/test_assets.py` pass against the *committed*
+  `metrics.json` without re-measuring, and the whole suite stays green on the
+  rebuilt files. Nine of the sixteen .glb files differ in bytes afterwards;
+  that is bake noise and nothing else, which is what "byte-for-byte-
+  equivalent" in `docs/ARCHITECTURE.md` has always meant.
+
   **Always follow a rebuild with `python assets/measure.py`.**
 - `python assets/preview.py <asset>` and
   `python assets/animstrip.py character run` render assets/clips for review.
@@ -497,6 +512,11 @@ long jumps you need a different motion model, not a bigger number.
   undercounts by an order of magnitude, because a retired entity's id is
   handed straight back to the next one. The scene counts spawns itself
   (`RunnerScene.spawned`).
+- **Blender exits 0 when the script raises.** `blender -b -P thing.py` reports
+  success for a build that built nothing, which for a build script is the one
+  unforgivable failure mode. `--python-exit-code 1` fixes it and
+  `assets/build.py` always passes it — along with `--factory-startup`, so a
+  stray add-on or preference cannot change what comes out of a bake.
 - **Numbers the gameplay depends on live in `metrics.json`.** Rebuild an asset
   and you must re-run `python assets/measure.py`; `tests/test_assets.py` fails
   if they drift apart. Moving a hoarding's beam moves whether a slide fits

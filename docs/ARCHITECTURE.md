@@ -64,10 +64,16 @@ The first version generated every pixel in software, which capped how good it
 could ever look. The current split:
 
 - **Assets are crafted, reproducibly.** Every model is a glTF file built by a
-  Blender script committed to `assets/src/`, run under headless `bpy`. Nothing
-  is downloaded and nothing is hand-exported from an opaque tool; delete
+  Blender script committed to `assets/src/`, run headless. Nothing is
+  downloaded and nothing is hand-exported from an opaque tool; delete
   `src/brainrot/assets/data` and `python assets/build.py` recreates it
-  byte-for-byte-equivalent.
+  byte-for-byte-*equivalent* — measured, that means every recorded bound and
+  every recorded animation frame comes back identical while about half the
+  .glb files differ in bytes, which is the bake's own dithering and nothing
+  more. `bpy` is reached either as a wheel in the venv or as a standalone
+  Blender the build script goes looking for, because the wheel trails Python
+  releases by a year or so and a project should not be pinned to an old
+  interpreter by its art pipeline.
 - **Worlds are generated, uniquely.** Which track, which palette, which sky,
   which trains where — all drawn from a seed that never repeats.
 
@@ -545,7 +551,8 @@ tools/                offline, never imported by the daemon
 └── contact_sheet.py  tile a run's `shoot` frames into one image to look at
 
 assets/
-├── build.py          rebuild committed .glb files (one bpy subprocess each)
+├── build.py          rebuild committed .glb files (one subprocess each), via
+│                     the bpy wheel or a standalone Blender, whichever exists
 ├── preview.py        render any asset to PNG with the CI rasteriser
 └── src/              the Blender scripts that ARE the asset sources
     ├── common.py     zones, boxes, bake pipeline, rigging, GLB export
