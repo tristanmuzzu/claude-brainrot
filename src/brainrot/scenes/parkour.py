@@ -45,44 +45,110 @@ import math
 
 from ..engine import rl, voxel
 from ..engine.collide import AABB, model_aabb, placed
-from ..engine.fx import Burst, Weather, glow_billboard, ground_quad, unit_quad
+from ..engine.fx import (Burst, Weather, glow_pass, ground_quad, no_depth_write,
+                         unit_quad)
 from ..engine.hud import text
 from ..engine.scene import Scene, SceneContext, register
 from ..engine import textures
 from ..engine.sky import SkyDome
 from ..engine.textures import cloud_blob
 
-#: weighted like the reference generator: mostly short hops, rare long ones
-GAP_TABLE = (1, 1, 1, 2, 2, 2, 2, 3, 3, 4)
-RISE_TABLE = (-2, -1, -1, 0, 0, 0, 0, 0, 1, 1)
+#: A gap is blocks *of air*, so the centre-to-centre step is one more.
+#:
+#: Two tables, not one, because a course that is as hard after four minutes as
+#: it was after four seconds has nothing to show you. A run opens on the easy
+#: pair and ends on the hard pair, interpolated by :attr:`ParkourScene.
+#: difficulty` -- see :func:`_ramped` for how, and ``SEGMENT_RAMP`` for the
+#: same idea applied to which set-pieces get chosen.
+#:
+#: There is no entry below two, and that is not a taste call. ``MIN_HOP`` is
+#: 2 m, so :func:`fit_gap` widens a one-block gap to two wherever it is asked
+#: for; a table that still offered 1 would be describing a hop the generator
+#: cannot lay. One block of air is a step, not a jump, and a run of them back
+#: to back is the shuffling the rebuild was asked to get rid of.
+GAP_EASY = (2, 2, 2, 2, 3, 3, 3, 3, 4, 4)
+GAP_HARD = (2, 3, 3, 3, 3, 4, 4, 4, 5, 5)
+#: Rises pair with gaps because the physics ties them together: falling is the
+#: only thing that buys reach, so the hard table drops more often. It is also
+#: what keeps the long hops honest -- a five-block gap is only jumpable off a
+#: descent, and asking for one level just gets it narrowed back down.
+RISE_EASY = (-1, -1, 0, 0, 0, 0, 0, 0, 1, 1)
+RISE_HARD = (-2, -2, -1, -1, -1, 0, 0, 0, 1, 1)
+#: Blocks laid before a run is at full difficulty. Roughly eighty hops, which
+#: at sprint pace is a little under a minute -- inside the length of a turn the
+#: overlay is actually on screen for.
+RAMP_BLOCKS = 80
 
 EYE = 1.62
-COURSE_ALT = 58.0          # block altitude above the ocean
+COURSE_ALT = 58            # block altitude above the ocean
 #: How far the course may wander from its altitude before the generator insists
 #: on going the other way. Wide enough that a descent set-piece has somewhere
 #: to fall to.
-BAND = 18.0
+BAND = 18
 TRAIL = 2                  # blocks kept behind the player
 AHEAD = 14                 # blocks generated ahead
-FOG_FAR = 70.0
+#: Distance at which the course has faded fully into the haze. Generation runs
+#: fourteen blocks ahead, which is about forty metres, so at the old seventy
+#: the far half of the course sat washed out against a pale sea and read as
+#: two or three blocks and then nothing. Past the last block there is nothing
+#: to hide anyway -- blocks fade themselves in as they arrive.
+FOG_FAR = 95.0
 BELOW_FOG = 0.55           # extra fog on the world far below
 
-GRAVITY = 26.0
-HOP_SPEED = 5.3            # horizontal m/s while airborne
-#: Take-off speed a hop would use if it were only clearing a gap. Descents are
-#: timed against this: the arc leaves the block like any other hop and then
-#: simply keeps falling, which is what makes a five-block drop feel like one.
-HOP_LAUNCH = 4.6
-#: A level hop never hangs longer than this however wide the gap; without the
-#: cap a chasm turns into a moon jump.
-AIR_LEVEL_MAX = 0.85
-AIR_MIN, AIR_MAX = 0.42, 1.30
-#: Fastest a hop may cross the ground. Anything above this stops reading as a
-#: jump and starts reading as a dolly move; asserted in the generation tests.
-HOP_SPEED_MAX = 9.0
-#: Shortest hop the generator will lay down, measured stand point to stand
-#: point. Below this it is a shuffle, not a jump.
-MIN_HOP = 1.5
+# -- how a body moves, in Minecraft's own numbers ---------------------------
+#
+# Everything below is vanilla, converted from ticks to seconds, because the
+# motion is the single thing a viewer who has played the game will judge this
+# on. The previous version solved each hop for whatever duration made the
+# distance work and clamped the result into a hang-time window, which meant
+# horizontal speed swung between about 3.5 and 6 m/s from hop to hop -- and
+# then the body stopped dead on every block for up to nine tenths of a second
+# before the next one. Constant speed with a beat you never quite stop for is
+# the difference between a run and a slideshow.
+
+#: 0.08 blocks/tick^2 with vanilla's drag applied, so a jump apexes at the
+#: familiar 1.25 blocks and nothing can ever step up two.
+GRAVITY = 28.0
+#: 0.42 blocks/tick: the only jump impulse the game has.
+JUMP_V = 8.4
+#: Vanilla sprint, and what the player crosses a block at.
+RUN_SPEED = 5.612
+#: Sprinting adds a forward impulse on the tick you jump, which is the entire
+#: reason a four-block gap is clearable at all. Horizontal speed is constant at
+#: this for the whole flight -- no easing, no per-hop solve.
+AIR_SPEED = 7.10
+#: Vanilla walk. What holding the block down does: you cross it slower, you do
+#: not stand still.
+WALK_SPEED = 4.317
+#: A hop is legal exactly when the take-off it needs is one a body has. Zero is
+#: stepping off an edge without jumping; :data:`JUMP_V` is the only jump there
+#: is. Everything the generator lays down is checked against this pair, which
+#: is why there is no separate table of legal gaps and rises.
+#: The floor is not zero, and the reason is geometric rather than physical.
+#: The feet leave from the block's far *edge*, so half the body is still over
+#: the block at the moment of take-off -- 0.2 m of it on a wide platform, whose
+#: footprint reaches beyond where anybody stands on it. A hop that barely
+#: leaves the ground is therefore already falling while the body is still over
+#: the block it left, and the camera dips through the platform's own outer
+#: cube. A tenth of vanilla's jump is enough to be clear before that happens.
+VY_MIN = 1.6
+VY_MAX = JUMP_V
+#: Hang time bounds, derived from the above rather than chosen: a level hop at
+#: full jump is 0.6 s, and the longest fall the band allows is under 1.3 s.
+AIR_MIN, AIR_MAX = 0.12, 1.30
+#: Shortest hop the generator will lay down, take-off point to landing point.
+#: Below this it is a shuffle, not a jump.
+#:
+#: This one number does most of the work of raising the whole distribution, and
+#: it does it in one place. Every set-piece that hard-codes ``gap=1`` -- the
+#: staircase, the causeway, the spiral, half the zigzag -- goes through
+#: :func:`fit_gap`, which widens a gap until the hop across it is one this
+#: floor admits. At 1.1 a one-block gap was legal, so a third of every cruise
+#: and all of those set-pieces laid 1.32 m hops: in the real game that is a
+#: step you take without thinking about it, and a run of them reads as
+#: shuffling. At 2.0 the narrowest thing the generator can express is two
+#: blocks of air, and nothing else had to be touched to get it.
+MIN_HOP = 2.0
 
 #: The player's collision volume: vanilla's own 0.6 x 1.8 box, standing on the
 #: block surface. There is no player model in first person to measure, so this
@@ -92,25 +158,55 @@ BODY_HALF_W = 0.30
 BODY_H = 1.80
 #: Where on that body an orb is aimed, so passing through it cannot miss.
 CHEST = 0.90
+#: Headroom a landing needs, in whole cells: a 1.8 m body standing on a
+#: surface needs the two cells above it clear.
+HEADROOM = 2
 
 #: form -> height of the walking surface above the block's base.
+#:
+#: ``stair`` is a full block. It used to draw a second half-block a metre
+#: behind itself as a tread, which cut into the block it belonged to on every
+#: course not running due north -- and a real vanilla stair cannot help either,
+#: because the walking surface of one is 1.0 at one edge of the cell and 0.5 at
+#: the other, while a body lands on the near edge and leaves from the far one.
+#: A separated block at gap one and rise one already reads as a staircase; that
+#: is what an infinite-parkour staircase looks like in the reference footage.
 FORMS = {"full": 1.0, "slab": 0.5, "wide": 1.0, "stair": 1.0}
-#: form -> how far off centre a landing may wander. A three-wide breather
-#: platform is a place to relax; a single block is not.
-MARGIN = {"wide": 0.9}
+#: form -> how far from the block's centre the player's feet plant, along the
+#: direction of travel. You land on the near edge of a block and take off from
+#: the far one -- which is what a run-up *is*, and what makes the gap the body
+#: actually clears bigger than the gap between block centres.
+EDGE = {"full": 0.34, "slab": 0.34, "stair": 0.34, "wide": 1.30}
+#: Half-footprint of a form, in cells: a wide platform is three by three.
+SPREAD = {"wide": 1}
 
 #: The set-piece vocabulary, with its weights. Names map to ``_seg_<name>``.
 SEGMENT_TABLE = (
-    ("cruise", 30),
+    ("cruise", 26),
     ("staircase", 10),
     ("descent", 10),
-    ("zigzag", 10),
+    ("zigzag", 9),
     ("chasm", 8),
     ("causeway", 9),
     ("spiral", 8),
     ("gate", 7),
     ("lanternwalk", 6),
+    ("pillars", 9),
+    ("ruin", 8),
+    ("squeeze", 8),
+    ("slabs", 8),
 )
+#: How the ramp reweights the vocabulary: a weight is multiplied by
+#: ``1 + bias * difficulty``. The demanding set-pieces are rare at the start of
+#: a run and common by the end of it, and the forgiving ones go the other way.
+#: This is the half of the ramp a viewer actually *reads* -- a wider gap is a
+#: number, but a squeeze or a chasm arriving instead of a plank causeway is a
+#: change of subject.
+SEGMENT_RAMP = {
+    "squeeze": 3.0, "slabs": 2.5, "chasm": 2.0, "pillars": 1.0,
+    "cruise": -0.55, "causeway": -0.7, "lanternwalk": -0.4, "staircase": -0.3,
+    "spiral": -0.4,
+}
 #: Segments that climb, and segments that fall. Whichever way the course has
 #: drifted, the other list gets the weight -- which is how verticality happens
 #: without the altitude band ever having to veto a set-piece halfway through.
@@ -132,6 +228,16 @@ class ParkourScene(Scene):
         self.burst = Burst()
         self.camera = rl.make_camera(70.0)
         self.detail = {"high": 1.0, "balanced": 0.7, "low": 0.45}.get(ctx.quality, 1.0)
+        #: Glows queued by this frame's draws, issued in one pass at the end of
+        #: it. Emptied by :meth:`_draw_glows`, so it is per-frame state that a
+        #: frame drawn twice ends up with exactly as it started -- which is the
+        #: property every screenshot this scene is judged from depends on.
+        self._glows: list[tuple[float, float, float, float, rl.RGB, int]] = []
+        # A sea, not a blue floor: the deep is keyed to the sky, so night runs
+        # get a black ocean. Every island then sits on its own pale reef, which
+        # is most of what stops the water reading as a painted plane.
+        self.deep = rl.mix_rgb(rl.mix_rgb(pal.sky_bottom, (10, 46, 96), 0.78),
+                               pal.fog, 0.10)
 
         self.styles = _build_styles(pal, seed.run)
         self.candy = ["candy0", "candy1", "candy2"]
@@ -161,41 +267,68 @@ class ParkourScene(Scene):
         self.driven_t = 0.0
         self._pending: list[dict] = []
         self.segment = "cruise"
+        #: Every solid cell the live course occupies, rebuilt whenever the
+        #: course changes rather than maintained incrementally -- the course is
+        #: only ever a couple of dozen blocks long, and a stale occupancy map
+        #: is exactly the bug this exists to prevent.
+        self._solid: set[tuple[int, int, int]] = set()
+        #: How many times placement has had to fall back on its emergency hop.
+        #: Should be zero; the generation tests hold it to that.
+        self.stuck = 0
+        #: Blocks laid down this run. Drives :attr:`difficulty`, and nothing
+        #: else reads it.
+        self.laid = 0
         self._spawn_block(first=True)
         while len(self.blocks) < AHEAD:
             self._spawn_block()
 
-        # -- motion: a ground/air state machine, not a tween ---------------
-        # Real parkour footage has a beat ON each block (land, settle, aim)
-        # and a ballistic arc between them: constant horizontal velocity,
-        # gravity vertically. Easing positions between block centres reads as
-        # teleportation, which is exactly what this replaces.
+        # -- motion: a body that never stops -------------------------------
+        # Two phases, and horizontal speed is constant through both: you run
+        # across the block you are on, from where you landed to the edge you
+        # leave from, and then you fly. There is no beat where the body is
+        # stationary -- that beat is what made this read as a slideshow of
+        # camera positions rather than as somebody running.
         self.jump_index = 0           # block we are standing on
         self.phase = "ground"
         self.phase_t = 0.0
-        self.ground_dur = 0.5
-        self.air_dur = 0.6
-        self.stand = list(self._stand_point(self.blocks[0]))
+        self.ground_dur = 0.2
+        self.air_dur = 0.4
+        self.stand = list(self._land_point(self.blocks[0]))
         self.takeoff = list(self.stand)
         self.land_at = list(self.stand)
+        self.run_from = list(self.stand)
+        self.run_to = list(self.stand)
         self.vy0 = 0.0
         self.pos = list(self.stand)
         self.vy = 0.0
         self.land_dip = 0.0
         self.distance = 0.0
+        #: Ground distance covered, which is what drives the walk cycle. Time
+        #: would drive it too, but then the bob keeps swinging in mid-air.
+        self.stride = 0.0
         self.yaw = self.heading
+        self.pitch = 0.12
+        #: How much of a look is still owed. A player does not ease onto a new
+        #: heading at a constant rate -- they flick toward the next block as
+        #: they leave the one they are on, then hold it.
+        self._flick = 0.0
         self._roll = 0.0
+        self._speed = RUN_SPEED
+        self._begin_ground(self.blocks[0])
 
         # -- scoring -------------------------------------------------------
         self.orbs = 0
         self.orbs_missed = 0
+        #: Orbs thrown away with a re-laid tail while somebody was steering.
+        #: Not misses -- see :meth:`_steer_course`.
+        self.orbs_discarded = 0
         self.combo = 0
         self.combo_t = 0.0
 
         # -- world below ---------------------------------------------------
         self.islands: list[dict] = []
         self._next_island_z = 0.0
-        for _ in range(6):
+        for _ in range(int(9 * self.detail) or 5):
             self._spawn_island()
 
         # Cloud shelves: few, wide and low. Small crisp ones scattered under
@@ -226,10 +359,50 @@ class ParkourScene(Scene):
 
     # -- generation: segments ---------------------------------------------
 
+    @property
+    def difficulty(self) -> float:
+        """0 at the start of a run, 1 once it has been going a while.
+
+        Real infinite-parkour servers ramp -- gaps widen, landings narrow, the
+        margin for error shrinks -- and a course that does not is as hard at
+        four minutes as at four seconds, which is the same as having no shape
+        at all.
+
+        Counted in blocks laid rather than metres travelled, for two reasons.
+        Generation runs fourteen blocks ahead of the body, so metres travelled
+        is the wrong clock for deciding what to build. And the geometry probes
+        and half the generation tests grow a course by calling
+        :meth:`_spawn_block` without ever moving a body: keyed to
+        ``self.distance`` this would read zero forever, and every test that
+        believes it is checking the hard end of the course would be checking
+        the easy one.
+        """
+        return min(1.0, self.laid / RAMP_BLOCKS)
+
+    def _gap(self, rng, easy, hard) -> int:
+        """A set-piece's gap, ramped between two of its own tables.
+
+        Every set-piece goes through this rather than choosing a constant,
+        because the ramp has to reach the whole vocabulary to mean anything:
+        the cruise is about a fifth of the blocks laid, so a ramp that only
+        touched the cruise moved the median by two centimetres. Measured.
+
+        The tables are per set-piece and not shared, because what "harder"
+        means is not the same for all of them -- a causeway with a four-block
+        gap is not a causeway, and a staircase physically cannot have one.
+        """
+        return _ramped(rng, easy, hard, self.difficulty)
+
     def _node(self, gap: float, rise: float, style: str, turn: float | None = None,
-              form: str = "full", deco: str | None = None, orbs: int = 0) -> dict:
+              form: str = "full", deco: str | None = None, orbs: int = 0,
+              deco_style: str | None = None) -> dict:
         return {"gap": gap, "rise": rise, "turn": turn, "form": form,
-                "style": style, "deco": deco, "orbs": orbs}
+                "style": style, "deco": deco, "orbs": orbs,
+                # What the structure under a block is made of, when that is
+                # not what the block is made of. A coloured cap on a stone
+                # column is most of what a vanilla parkour map looks like, and
+                # a column in the same colour as its cap is a smear.
+                "deco_style": deco_style}
 
     def _plan_segment(self) -> None:
         """Choose the next set-piece and expand it into nodes."""
@@ -237,6 +410,7 @@ class ParkourScene(Scene):
         y = self.blocks[-1]["y"] if self.blocks else COURSE_ALT
         drift = (y - COURSE_ALT) / BAND        # -1 floor, +1 ceiling
 
+        hard = self.difficulty
         weights = []
         for name, weight in SEGMENT_TABLE:
             if name in FALLERS:
@@ -247,6 +421,10 @@ class ParkourScene(Scene):
                 if drift > 0.55:
                     continue
                 weight = int(weight * (1.0 + 2.0 * max(0.0, -drift)))
+            # The ramp. Applied after the altitude weighting and before the
+            # repetition rule, so it changes what a run reaches for without
+            # ever overriding either.
+            weight = int(weight * max(0.0, 1.0 + SEGMENT_RAMP.get(name, 0.0) * hard))
             # Never the same set-piece twice running: repetition is the exact
             # complaint this whole mechanism exists to answer.
             if name == self.segment and name != "cruise":
@@ -270,48 +448,139 @@ class ParkourScene(Scene):
         self._pending = getattr(self, f"_seg_{name}")(rng)
 
     def _seg_cruise(self, rng) -> list[dict]:
-        """The default: hops from the weighted tables, in the candy colours."""
+        """The default: hops from the weighted tables, in the candy colours.
+
+        Both tables are ramped, and the rise is drawn first because it is the
+        rise that decides what a gap is allowed to be -- there is one jump
+        impulse, so reach comes from falling and nothing else.
+        """
+        hard = self.difficulty
         out = []
         for i in range(rng.randint(4, 9)):
+            rise = _ramped(rng, RISE_EASY, RISE_HARD, hard)
             out.append(self._node(
-                gap=rng.choice(GAP_TABLE), rise=rng.choice(RISE_TABLE),
+                gap=fit_gap(_ramped(rng, GAP_EASY, GAP_HARD, hard), rise),
+                rise=rise,
                 style=self.candy[(i // 2) % 3],
-                form="slab" if rng.random() < 0.18 else "full",
+                # Landings narrow as the run goes on: a slab is half the
+                # target a full block is, and the eye reads that instantly.
+                form="slab" if rng.random() < 0.12 + 0.24 * hard else "full",
                 deco="crumb" if rng.random() < 0.22 else None,
                 orbs=1 if rng.random() < 0.45 else 0))
-        # a breather platform closes some cruises, as somewhere to arrive.
-        # Its posts are unlit: lanterns are what mark the set-pieces, and a
-        # lantern on every platform marks nothing.
-        if rng.random() < 0.4:
-            out.append(self._node(gap=rng.choice((2, 2, 3)), rise=0,
-                                  style="stone", form="wide", deco="posts",
-                                  orbs=1))
+        # A breather platform closes some cruises, as somewhere to arrive --
+        # and fewer of them arrive late in a run, because a breather is the
+        # opposite of the thing the ramp is for. Its posts are unlit: lanterns
+        # mark the set-pieces, and a lantern on every platform marks nothing.
+        if rng.random() < 0.42 - 0.30 * hard:
+            out.append(self._node(gap=3, rise=0, style="stone", form="wide",
+                                  deco="posts", orbs=1))
+        return out
+
+    def _seg_slabs(self, rng) -> list[dict]:
+        """A run of half-height landings: the same hop onto half the target.
+
+        ``FORMS`` has carried ``slab`` all along and the cruise sprinkles them,
+        but a *run* of them is a different thing to watch -- the course visibly
+        thins out, and because a slab's walking surface is halfway up its cell
+        the whole line sits at a height nothing else in the scene uses. It is
+        also the cheapest difficulty there is: no new geometry, no new
+        placement rule, and every guarantee the scene makes still holds,
+        because a slab is already a form placement knows how to reason about.
+        """
+        style = rng.choice(("quartz", "stonebrick"))
+        out = []
+        for i in range(rng.randint(5, 8)):
+            rise = rng.choice((0, 0, 0, -1))
+            out.append(self._node(
+                gap=fit_gap(self._gap(rng, (2, 3, 3, 4), (3, 3, 4, 4)), rise),
+                rise=rise,
+                style=style if i % 2 else self.candy[i % 3],
+                form="slab",
+                deco="rail" if i % 3 == 0 else None,
+                orbs=1 if rng.random() < 0.55 else 0))
+        return out
+
+    def _seg_squeeze(self, rng) -> list[dict]:
+        """Beams to skim under and columns to clear -- the two shapes vanilla
+        parkour uses to make an ordinary jump frightening.
+
+        Both are placed *against the arc that arrives*, which is the only
+        reason either is safe to build. A block's landing point and the
+        take-off it was jumped from are both known by the time its decoration
+        is expanded, so the exact flight the body is about to make is a list of
+        points -- and a beam hung a body's height above the highest of them, or
+        a column topped out just under the lowest, is guaranteed to be missed
+        while looking as though it will not be. :func:`_in_the_way` then checks
+        that guarantee rather than trusting it.
+
+        Note what is *not* being done. ``HEADROOM`` still keeps two cells clear
+        over every landing, because a body has to be able to stand where it
+        arrives; what is relaxed is the space over the **gap**, which nothing
+        ever needed and which is where a head-hitter lives in the real game.
+        """
+        style = rng.choice(("stonebrick", "brick", "stone"))
+        out = []
+        for i in range(rng.randint(4, 6)):
+            rise = rng.choice((0, 0, 0, -1))
+            out.append(self._node(
+                gap=fit_gap(self._gap(rng, (2, 3, 3), (3, 3, 4)), rise),
+                rise=rise,
+                style=self.candy[i % 3], deco_style=style,
+                deco="lintel" if i % 2 else "hurdle",
+                orbs=1 if rng.random() < 0.5 else 0))
         return out
 
     def _seg_staircase(self, rng) -> list[dict]:
-        """A flight of stairs, climbing one block a step."""
-        style = rng.choice(("stone", "quartz"))
-        bend = rng.uniform(-0.13, 0.13)
-        return [self._node(gap=1, rise=1, style=style, turn=bend, form="stair",
+        """A flight of stairs, climbing one block a step.
+
+        Stair blocks rather than cubes, and the tread lives *inside* the
+        block's own cell the way a vanilla stair does. The previous version
+        hung a second half-block a metre behind each step, which cut into the
+        step it belonged to on every course not running due north.
+
+        A staircase is the one set-piece the ramp cannot widen, and the reason
+        is arithmetic rather than taste: climbing a block means arriving past
+        the apex, so ``hop_span(1)`` tops out at 3.1 m and only a two-block gap
+        fits under it. What the ramp does with staircases instead is call for
+        fewer of them -- see ``SEGMENT_RAMP``.
+        """
+        style = rng.choice(("stonebrick", "quartz"))
+        bend = rng.uniform(-0.10, 0.10)
+        return [self._node(gap=2, rise=1, style=style, turn=bend, form="stair",
                            orbs=1 if i % 2 else 0)
                 for i in range(rng.randint(5, 8))]
 
     def _seg_descent(self, rng) -> list[dict]:
-        """The long fall. Pillars hang under the landings so the eye has
-        something to measure the drop against on the way down."""
+        """The long fall.
+
+        A drop cannot also be a short hop: the body keeps its speed all the way
+        down, so it covers as much ground as the fall takes. :func:`fit_gap`
+        opens the gap to whatever the drop needs, which is why these read as
+        leaping *out* into a void rather than as walking down a staircase.
+        Pillars hang under the landings so the eye has something to measure
+        the drop against on the way past.
+        """
         out = []
-        for i in range(rng.randint(3, 5)):
+        for i in range(rng.randint(3, 4)):
             drop = rng.randint(3, 5) if i == 0 else rng.randint(2, 4)
-            out.append(self._node(gap=rng.choice((2, 2, 3)), rise=-drop,
+            out.append(self._node(gap=fit_gap(self._gap(rng, (2, 3), (3, 4)), -drop),
+                                  rise=-drop,
                                   style="stone", deco="pillar", orbs=2))
         out.append(self._node(gap=2, rise=0, style="lantern", form="wide",
                               deco="lanterns", orbs=1))
         return out
 
     def _seg_zigzag(self, rng) -> list[dict]:
-        """Tight alternating turns -- the camera work is the point."""
-        swing = rng.uniform(0.5, 0.78)
-        return [self._node(gap=rng.choice((1, 1, 2)), rise=rng.choice((0, 0, 1, -1)),
+        """Tight alternating turns -- the camera work is the point.
+
+        The swing is smaller than it was. On a strip this narrow a
+        forty-degree change of heading throws the whole course out of frame,
+        and a viewer watching an empty ocean swing past is not watching
+        parkour.
+        """
+        swing = rng.uniform(0.34, 0.52)
+        gap = self._gap(rng, (2, 2, 3), (3, 3, 4))
+        return [self._node(gap=gap, rise=rng.choice((0, 0, 0, 1)),
                            style=self.candy[i % 3],
                            turn=swing if i % 2 else -swing,
                            orbs=1 if rng.random() < 0.5 else 0)
@@ -321,25 +590,27 @@ class ParkourScene(Scene):
         """Lantern platform, the longest jump in the game, lantern platform.
         Orbs strung across the void mark the line.
 
-        The gap is only a little wider than the gap table's own maximum, and
-        deliberately so: a purely ballistic arc that lands where it aimed can
-        answer a longer jump only by crossing the ground faster than a body
-        runs or by arcing higher than a body jumps, and both look wrong. What
-        makes this read as a chasm is the void under it and the two lit
-        platforms either side, not another metre of distance.
+        "The longest jump in the game" is a computed number here rather than a
+        dramatic one: a body leaves the ground at one speed and falls at one
+        rate, so the furthest it can reach is fixed, and reaching further is
+        only available by dropping. Hence the deliberate step down -- the extra
+        hang time of a one- or two-block drop is what buys the last metre, and
+        it is exactly how a player clears a gap they cannot make level.
         """
-        gap = rng.uniform(4.2, 4.9)
+        drop = rng.choice((-1, -1, -2))
         return [
-            self._node(gap=2, rise=0, style="quartz", form="wide", deco="lanterns"),
-            self._node(gap=gap, rise=rng.choice((0, 0, 1)), style="lantern", orbs=3),
-            self._node(gap=2, rise=0, style="quartz", form="wide", deco="lanterns",
-                       orbs=1),
+            self._node(gap=self._gap(rng, (2, 3), (3, 3)), rise=0,
+                       style="quartz", form="wide", deco="lanterns"),
+            self._node(gap=max_gap(drop), rise=drop, style="lantern", orbs=3),
+            self._node(gap=self._gap(rng, (2, 3), (3, 3)), rise=0,
+                       style="quartz", form="wide", deco="lanterns", orbs=1),
         ]
 
     def _seg_causeway(self, rng) -> list[dict]:
         """A plank walkway with a fence: short hops, a straight line, and a
         completely different material. Contrast is what makes the rest read."""
-        return [self._node(gap=1, rise=0, style="wood", form="slab",
+        gap = self._gap(rng, (2,), (2, 3))
+        return [self._node(gap=gap, rise=0, style="wood", form="slab",
                            turn=rng.uniform(-0.05, 0.05),
                            deco="rail" if i % 2 == 0 else None,
                            orbs=1 if i % 3 == 1 else 0)
@@ -347,8 +618,9 @@ class ParkourScene(Scene):
 
     def _seg_spiral(self, rng) -> list[dict]:
         """A staircase that winds, with a tower under it."""
-        turn = rng.choice((0.52, -0.52))
-        return [self._node(gap=rng.choice((1, 2)), rise=1 if i % 2 else 0,
+        turn = rng.choice((0.5, -0.5))
+        gap = self._gap(rng, (2,), (2, 3))
+        return [self._node(gap=gap, rise=1 if i % 2 else 0,
                            style="brick", turn=turn,
                            deco="pillar" if i % 2 == 0 else None,
                            orbs=1 if i % 3 == 0 else 0)
@@ -357,29 +629,157 @@ class ParkourScene(Scene):
     def _seg_gate(self, rng) -> list[dict]:
         """Something to run *through* rather than only on."""
         return [
-            self._node(gap=2, rise=0, style="quartz"),
-            self._node(gap=rng.choice((2, 3)), rise=0, style="quartz",
-                       deco="gate", orbs=1),
-            self._node(gap=2, rise=rng.choice((0, 0, -1)), style="quartz"),
+            self._node(gap=self._gap(rng, (2, 3), (3, 4)), rise=0,
+                       style="quartz"),
+            self._node(gap=self._gap(rng, (2, 3), (3, 4)), rise=0,
+                       style="quartz", deco="gate", orbs=1),
+            self._node(gap=self._gap(rng, (2, 3), (3, 4)),
+                       rise=rng.choice((0, 0, -1)), style="quartz"),
         ]
 
     def _seg_lanternwalk(self, rng) -> list[dict]:
         """Torchlit stepping stones -- the night runs live for this."""
-        return [self._node(gap=rng.choice((1, 2)), rise=rng.choice((0, 0, 1, -1)),
+        gap = self._gap(rng, (2, 3), (3, 3, 4))
+        return [self._node(gap=gap, rise=rng.choice((0, 0, 1, -1)),
                            style="lantern" if i % 2 else self.candy[i % 3],
                            deco="torch" if i % 2 == 0 else None,
                            orbs=1 if rng.random() < 0.6 else 0)
                 for i in range(rng.randint(4, 7))]
 
+    def _seg_pillars(self, rng) -> list[dict]:
+        """Columns standing out of the void, tops at staggered heights.
+
+        The one set-piece that is mostly *below* the path: each landing caps a
+        shaft running down out of sight, so this stretch reads as ruins
+        standing in the sea rather than as blocks hanging in air. Vanilla
+        parkour maps are full of these and it costs one decoration.
+        """
+        style = rng.choice(("stonebrick", "stone", "brick"))
+        out = []
+        for i in range(rng.randint(5, 8)):
+            rise = rng.choice((0, 0, 1, -1, -1))
+            out.append(self._node(gap=fit_gap(self._gap(rng, (2, 3, 3, 4),
+                                                        (3, 4, 4, 5)), rise),
+                                  rise=rise,
+                                  style=self.candy[i % 3] if i % 2 else style,
+                                  deco_style=style,
+                                  turn=rng.uniform(-0.16, 0.16),
+                                  deco="shaft",
+                                  orbs=1 if rng.random() < 0.5 else 0))
+        return out
+
+    def _seg_ruin(self, rng) -> list[dict]:
+        """A broken wall you hop along the top of, with what is left of its
+        arches still standing.
+
+        One material, buttresses under alternate blocks and a lintel over the
+        others, so the eye reads a structure that used to be something. A
+        course made only of free-floating cubes never gets to say that.
+        """
+        style = rng.choice(("stonebrick", "brick"))
+        bend = rng.uniform(-0.08, 0.08)
+        gap = self._gap(rng, (2, 2, 3), (3, 3, 4))
+        return [self._node(gap=gap,
+                           rise=rng.choice((0, 0, 1, -1)),
+                           style=style, turn=bend,
+                           deco="buttress" if i % 2 == 0 else "arch",
+                           orbs=1 if rng.random() < 0.45 else 0)
+                for i in range(rng.randint(5, 8))]
+
+    # -- generation: placement --------------------------------------------
+
+    # -- the occupancy map -------------------------------------------------
+    #
+    # Every solid thing the course draws lives in a whole cell of an integer
+    # lattice, and this set is what those cells are. It exists because the
+    # previous generator only ever asked "is the centre of the next block at
+    # least 1.45 m from the centre of a recent one", which is not a question
+    # about volumes at all: it let a three-wide platform's outer cube sit
+    # halfway inside the next platform's, and it never looked at decorations
+    # or at the air the player flies through. Measured over eight thousand
+    # blocks, one pair in two interpenetrated and the body was inside a solid
+    # block on nine per cent of frames.
+
+    def _cells_of(self, blk: dict):
+        """Every integer cell a block and its decorations fill.
+
+        Only whole-cube decoration counts. Fence posts, rails, torches and
+        lanterns are sub-block furniture that sits *inside* a cell exactly as
+        vanilla's does, so treating them as solid would have the generator
+        refusing to lay a course past a lamp post. They are kept out of the
+        player's way by where they are put instead -- see :meth:`_deco_cubes`.
+        """
+        x, y, z = blk["x"], blk["y"], blk["z"]
+        sp = SPREAD.get(blk["form"], 0)
+        for ox in range(-sp, sp + 1):
+            for oz in range(-sp, sp + 1):
+                yield (x + ox, y, z + oz)
+        for d in blk["deco"]:
+            if d["sx"] > 0.5 and d["sz"] > 0.5:
+                yield (x + _round(d["dx"]), y + _round(d["dy"]),
+                       z + _round(d["dz"]))
+
+    def _rebuild_solid(self) -> None:
+        self._solid = {c for blk in self.blocks for c in self._cells_of(blk)}
+
+    def _free(self, cells) -> bool:
+        return all(c not in self._solid for c in cells)
+
+    def _body_cells(self, x: float, y: float, z: float):
+        """Cells a body with its feet at (x, y, z) touches.
+
+        Deliberately generous at the edges: the body is 0.6 wide, so on the
+        grid it straddles two cells whenever it is not dead centre, and a
+        corridor test that missed the cell the shoulder is in would clear an
+        arc that visibly grazes a wall.
+        """
+        for cy in range(_floor(y + 0.05), _floor(y + BODY_H - 0.05) + 1):
+            for cx in (_round(x - BODY_HALF_W), _round(x + BODY_HALF_W)):
+                for cz in (_round(z - BODY_HALF_W), _round(z + BODY_HALF_W)):
+                    yield (cx, cy, cz)
+
+    def _arc_is_clear(self, frm, to, exempt: frozenset) -> bool:
+        """Nothing solid between the take-off and the landing.
+
+        Samples the actual arc the body will fly rather than a straight line,
+        because the whole point of an arc is that it goes over things.
+
+        Almost nothing is exempt, and that is the point. Feet standing on a
+        full block are level with the *top* of its cell, so the block never
+        shows up as an obstacle unless the arc has dipped below its own
+        take-off surface -- which, while still over the block it left, is
+        exactly the failure worth catching. Only a slab needs excusing, because
+        its walking surface is halfway up its cell and the lower half really is
+        air. Exempting both end blocks wholesale, as this used to, made the one
+        check that would have caught a hop leaving a wide platform too flat
+        blind to it by construction.
+        """
+        dur, vy0 = flight(frm, to)
+        if dur <= 0.0:
+            return False
+        for i in range(1, ARC_SAMPLES):
+            f = i / ARC_SAMPLES
+            t = dur * f
+            x = frm[0] + (to[0] - frm[0]) * f
+            z = frm[2] + (to[2] - frm[2]) * f
+            y = frm[1] + vy0 * t - 0.5 * GRAVITY * t * t
+            for cell in self._body_cells(x, y, z):
+                if cell in self._solid and cell not in exempt:
+                    return False
+        return True
+
     # -- generation: placement --------------------------------------------
 
     def _spawn_block(self, first: bool = False) -> None:
         if first:
-            self.blocks.append({
-                "x": 0.0, "y": COURSE_ALT, "z": 0.0, "ox": 0.0, "oz": 0.0,
+            blk = {
+                "x": 0, "y": COURSE_ALT, "z": 0,
                 "style": "candy0", "form": "wide", "yaw": 0.0, "born": -1e9,
-                "deco": [], "orbs": [], "segment": "start"})
+                "step": (0, -1), "deco": [], "orbs": [], "segment": "start"}
+            self.blocks.append(blk)
+            self._solid.update(self._cells_of(blk))
             return
+        self.laid += 1
         if not self._pending:
             self._plan_segment()
         node = self._pending.pop(0)
@@ -395,11 +795,9 @@ class ParkourScene(Scene):
             rise = -abs(rise) or -1
 
         # Gaussian sideways drift, steered back toward the spine, unless the
-        # segment asked for a specific turn. Candidate headings fan out from
-        # there and the first that does not land on recent course wins -- the
-        # reference generator likewise refuses self-overlapping placements.
-        # A held direction bends the course; ``self.steer`` is zero on
-        # autopilot, so this term does nothing until somebody is driving.
+        # segment asked for a specific turn. A held direction bends the course;
+        # ``self.steer`` is zero on autopilot, so this term does nothing until
+        # somebody is driving.
         hand = self.steer * STEER
         if node["turn"] is None:
             drift = rng.gauss(0.0, 0.55)
@@ -407,144 +805,332 @@ class ParkourScene(Scene):
             # someone is steering, or the two cancel and holding a direction
             # buys a couple of metres and then nothing.
             home = -0.028 * prev["x"] * (1.0 - 0.85 * abs(self.steer))
-            preferred = max(-0.9, min(0.9,
-                                      self.heading + drift * 0.22 + home + hand))
+            want = max(-0.9, min(0.9, self.heading + drift * 0.22 + home + hand))
         else:
-            preferred = max(-1.1, min(1.1, self.heading + node["turn"] + hand * 0.6))
-        recent = self.blocks[-7:-1]
-        step = node["gap"] + 1.0
-
-        def landing(heading: float):
-            return (prev["x"] + math.sin(heading) * step,
-                    prev["z"] - math.cos(heading) * step)
-
-        best, best_clearance = preferred, -1.0
-        for fan in (0.0, 0.2, -0.2, 0.45, -0.45, 0.7, -0.7):
-            heading = max(-1.1, min(1.1, preferred + fan))
-            nx, nz = landing(heading)
-            clearance = min((math.dist((nx, nz), (b["x"], b["z"])) for b in recent),
-                            default=99.0)
-            if clearance > 1.45:
-                best = heading
-                break
-            if clearance > best_clearance:
-                best, best_clearance = heading, clearance
-        self.heading = best
-        dx = math.sin(best) * step
-        dz = -math.cos(best) * step
+            want = self.heading + node["turn"] + hand * 0.6
+            # A set-piece that only asks for a small bend each block is doing a
+            # random walk in heading, and a random walk does not come back --
+            # so a pillar run or a ruined wall would curl steadily away and
+            # spend its second half leaving the frame. The ones that turn on
+            # purpose are exempt: a spiral that gets pulled straight is not a
+            # spiral.
+            if self.segment not in TURNERS:
+                want -= 0.20 * self.heading
+            want = max(-1.1, min(1.1, want))
 
         form = node["form"]
-        margin = MARGIN.get(form, 0.24)
-        # Where the player will stand, decided now: the arc of the hop that
-        # arrives here is a fact about the course from this moment on.
-        ox, oz = rng.uniform(-margin, margin), rng.uniform(-margin, margin)
-
-        # What makes a hop is the distance between the two *stand points*, not
-        # between the two block centres. A landing that wandered to the near
-        # edge of a three-wide platform can otherwise leave under a metre to
-        # the next block, which reads as a shuffle rather than a jump -- so the
-        # step is pushed out until there is a real jump to make.
-        frm = self._stand_point(prev)
-        for _ in range(6):
-            short = MIN_HOP - math.dist((frm[0], frm[2]),
-                                        (prev["x"] + dx + ox, prev["z"] + dz + oz))
-            if short <= 0.0:
-                break
-            step += short + 0.05
-            dx, dz = math.sin(best) * step, -math.cos(best) * step
+        # Every set-piece's gap is reconciled with its rise here rather than in
+        # nine separate places. A staircase asking for a one-block gap while
+        # climbing is asking for a hop no body can make -- there is not enough
+        # ground to cover before the arc comes back down -- and what used to
+        # happen was that placement rejected every candidate and fell through
+        # to its emergency answer, which is how a flight of stairs ended up
+        # stacked almost vertically.
+        gap = fit_gap(node["gap"], rise)
+        (sx, sz), rise = self._choose_cell(prev, gap, rise, want, form)
+        heading = math.atan2(sx, -sz)
+        self.heading = heading
 
         blk = {
-            "x": prev["x"] + dx,
+            "x": prev["x"] + sx,
             "y": prev["y"] + rise,
-            "z": prev["z"] + dz,
-            "ox": ox,
-            "oz": oz,
+            "z": prev["z"] + sz,
             "born": self.elapsed,
             "style": node["style"],
             "form": form,
-            "yaw": best,
+            "yaw": heading,
+            #: The integer offset that arrived here. Which way the block faces,
+            #: which side its decorations go, and where the player plants their
+            #: feet all come off this -- and being integer is what keeps every
+            #: one of those on the lattice too.
+            "step": (sx, sz),
             "deco": [],
             "orbs": [],
             "segment": self.segment,
+            "deco_style": node["deco_style"],
         }
+        # Prev's take-off is only decided once we know where the course goes
+        # next, so it is written here rather than when prev was laid down --
+        # and only now can its own scenery be checked against the run across it
+        # and the hop out of it, neither of which existed when it was built.
+        prev["out"] = (sx, sz)
+        self._clear_deco_path(prev, self._land_point(blk))
+        arc = _arc_points(self._takeoff_point(prev), self._land_point(blk))
         if node["deco"]:
-            blk["deco"] = self._deco_cubes(node["deco"], blk, rng)
+            blk["deco"] = self._deco_cubes(node["deco"], blk, rng, arc)
         self.blocks.append(blk)
+        self._solid.update(self._cells_of(blk))
         if node["orbs"]:
             self._hang_orbs(prev, blk, node["orbs"])
 
-    def _deco_cubes(self, kind: str, blk: dict, rng) -> list[dict]:
-        """Expand a decoration into boxes, in the block's own frame.
+    def _choose_cell(self, prev: dict, gap: int, rise: int, want: float,
+                     form: str):
+        """Pick the integer offset the next block sits at.
 
-        Offsets are rotated into the course's heading, so a gate faces the way
-        you are running through it rather than the way the world happens to be
-        pointing.
+        Four things have to be true at once and none of them is negotiable:
+        the block's own cells are empty, the two cells above the landing are
+        empty (a body is 1.8 m tall and has to fit somewhere), the hop is one
+        a body can actually make, and the arc does not pass through anything.
+        Candidates are tried in order of how close they are to the heading and
+        gap the set-piece asked for, so the first that satisfies all four is
+        also the nearest thing to what was wanted -- solvability by
+        construction, rather than by generating and then checking.
         """
-        yaw = blk["yaw"]
-        sin, cos = math.sin(yaw), math.cos(yaw)
+        # Rises are tried in the order that least disturbs the set-piece: what
+        # it asked for first, then a block either side of it -- and each is
+        # given the gap *it* needs, since a rise the caller did not ask for
+        # changes what a body can reach.
+        for strict in (True, False):
+            for r in (rise, rise - 1, rise + 1, rise - 2, rise + 2):
+                if not COURSE_ALT - BAND <= prev["y"] + r <= COURSE_ALT + BAND:
+                    continue
+                for sx, sz in _offsets(want, fit_gap(gap, r) + 1):
+                    if self._fits(prev, sx, sz, r, form, strict):
+                        return (sx, sz), r
+        # Still nothing, so stop trying to honour the set-piece and start
+        # trying to leave. A wider gap has strictly more cells to land in and a
+        # drop buys reach, so widening and descending is the direction that
+        # always has more room in it -- and it is far better to give up the
+        # shape of one hop than to lay one the body cannot fly.
+        for strict in (True, False):
+            for g in range(gap, 7):
+                for r in (0, -1, -2, -3):
+                    if prev["y"] + r < COURSE_ALT - BAND:
+                        continue
+                    for sx, sz in _offsets(want, fit_gap(g, r) + 1):
+                        if self._fits(prev, sx, sz, r, form, strict):
+                            return (sx, sz), r
+        self.stuck += 1
+        # Nothing worked, which means the course has boxed itself in. Step up
+        # and out: the cells above a landing are kept clear for the player's
+        # own head, so there is always somewhere up there, and a body can
+        # always jump one block. Better a dull hop than a generator that
+        # cannot return -- this runs inside the frame loop. It is counted, and
+        # the generation tests assert it stays at zero across many runs: a
+        # course that reaches this often is a course laying hops nobody can
+        # make, and the only visible symptom is a set-piece that looks wrong.
+        return _offsets(want, 3)[0], 0
 
-        def local(side: float, fwd: float, dy: float, sx: float, sy: float,
+    def _fits(self, prev: dict, sx: int, sz: int, rise: int, form: str,
+              strict: bool) -> bool:
+        bx, by, bz = prev["x"] + sx, prev["y"] + rise, prev["z"] + sz
+        sp = SPREAD.get(form, 0)
+        cells = [(bx + ox, by, bz + oz)
+                 for ox in range(-sp, sp + 1) for oz in range(-sp, sp + 1)]
+        if not self._free(cells):
+            return False
+        # Headroom over every cell of the landing: you have to be able to
+        # stand there. Without this the generator will happily tuck a landing
+        # under an arch it laid down three blocks ago.
+        if not self._free((cx, cy + h, cz)
+                          for cx, cy, cz in cells
+                          for h in range(1, HEADROOM + 1)):
+            return False
+        frm = _takeoff_of(prev, (sx, sz))
+        to = _land_of(bx, by + FORMS[form], bz, form, (sx, sz))
+        d = math.dist((frm[0], frm[2]), (to[0], to[2]))
+        if d < MIN_HOP:
+            return False
+        dur, vy0 = flight(frm, to)
+        if not (VY_MIN <= vy0 <= VY_MAX and AIR_MIN <= dur <= AIR_MAX):
+            return False
+        # You have to be on the way *down* when you arrive. A hop that is still
+        # rising as it reaches its target has come up through the side of it --
+        # which is what a short jump onto a higher block is, and it was putting
+        # the camera inside a staircase for a frame or two on every flight.
+        if dur < vy0 / GRAVITY:
+            return False
+        if not strict:
+            return True
+        return self._arc_is_clear(frm, to, _standing_cells(prev, prev["y"])
+                                  | _standing_cells({"form": form}, by, cells))
+
+    def _deco_cubes(self, kind: str, blk: dict, rng, arc) -> list[dict]:
+        """Expand a decoration into boxes, one per cell of the lattice.
+
+        Two rules keep the whole scene on the grid. First, a decoration's
+        offsets are whole cells, rotated into the *quantised* heading -- one of
+        the eight lattice directions -- rather than into the exact float angle
+        the course happens to be running at. A gate still faces the way you run
+        through it; it just cannot land its jamb three-fifths of the way into
+        a cell any more. Second, sub-block furniture (posts, rails, torches) is
+        centred inside its cell exactly as vanilla's is, so a fence occupies a
+        block without filling it.
+
+        Anything that would land in a cell already taken is dropped rather than
+        drawn: decoration is scenery, and one missing lantern is invisible
+        where a lantern buried in a wall is not.
+        """
+        fx, fz = _quantise(blk["step"])          # forward, on the lattice
+        rx, rz = -fz, fx                         # and ninety degrees off it
+        # What the structure under a block is made of, which is not always what
+        # the block is made of: a coloured cap standing on a stone column is
+        # the shape a vanilla parkour map is built in, and a column in the same
+        # colour as its cap is one smear from the sea to the sky.
+        under = blk.get("deco_style") or blk["style"]
+
+        def local(side: int, fwd: int, dy: float, sx: float, sy: float,
                   sz: float, style: str, glow: bool = False,
-                  loose: bool = False, born: float = -1e9) -> dict:
-            return {"dx": side * cos + fwd * sin, "dz": -side * sin + fwd * cos,
+                  loose: bool = False, born: float = -1e9,
+                  bias: float = 1.0) -> dict:
+            """``bias`` pushes sub-block furniture out within its own cell.
+
+            The cell it belongs to is still ``side``/``fwd``, so occupancy and
+            the drawing agree; the piece just sits toward that cell's outer
+            face the way a fence rail or a wall torch does, which is both what
+            the game looks like and how far it has to be from the line the
+            player runs along.
+            """
+            return {"dx": (side * rx + fwd * fx) * bias,
+                    "dz": (side * rz + fwd * fz) * bias,
                     "dy": dy, "sx": sx, "sy": sy, "sz": sz,
+                    # What this piece is, kept on the piece. Decoration used to
+                    # be anonymous once expanded, which made "does the squeeze
+                    # actually build any beams" a question nothing could ask --
+                    # and a set-piece whose scenery is silently dropped by the
+                    # path checks looks exactly like one that works.
+                    "kind": kind,
                     "style": style, "glow": glow, "loose": loose, "born": born}
 
+        out: list[dict] = []
         if kind == "pillar":
-            depth = rng.randint(3, 6)
-            return [local(0, 0, -1.0 - i, 0.86, 1.0, 0.86, blk["style"])
-                    for i in range(depth)]
-        if kind in ("lanterns", "posts"):
+            out = [local(0, 0, -1 - i, 1.0, 1.0, 1.0, under)
+                   for i in range(rng.randint(3, 6))]
+        elif kind == "shaft":
+            # Deeper than a pillar and tapering, so it reads as something
+            # standing in the sea rather than as a stub hung under a block.
+            depth = rng.randint(7, 12)
+            out = [local(0, 0, -1 - i, 1.0 if i < 2 else 0.86,
+                         1.0, 1.0 if i < 2 else 0.86, under)
+                   for i in range(depth)]
+        elif kind == "buttress":
+            side = rng.choice((-1, 1))
+            out = [local(0, 0, -1 - i, 1.0, 1.0, 1.0, under)
+                   for i in range(rng.randint(2, 4))]
+            out.append(local(side, 0, -1, 1.0, 1.0, 1.0, under))
+        elif kind == "arch":
+            # A lintel three cells up: high enough to run under, low enough to
+            # frame the shot. What is left of a wall reads as a wall.
+            for side in (-1, 1):
+                out.append(local(side, 0, HEADROOM + 1, 1.0, 1.0, 1.0,
+                                 under))
+            out.append(local(0, 0, HEADROOM + 1, 1.0, 1.0, 1.0, under))
+        elif kind in ("lanterns", "posts"):
+            # Out into the *corners* of the platform's corner cells, not their
+            # middles. The feet plant 1.3 m from a wide platform's centre, and
+            # on a course running diagonally that lands them within a hand's
+            # breadth of a post sitting at the middle of the corner cell --
+            # which is where the body was found standing inside the scenery.
             lit = kind == "lanterns"
-            out = []
-            for sx in (-1.3, 1.3):
-                for sz in (-1.3, 1.3):
-                    out.append(local(sx, sz, 1.0, 0.22, 1.0, 0.22, "wood"))
+            for side in (-1, 1):
+                for fwd in (-1, 1):
+                    out.append(local(side, fwd, 1, 0.22, 1.0, 0.22, "wood",
+                                     bias=CORNER))
                     if lit:
-                        out.append(local(sx, sz, 1.7, 0.34, 0.34, 0.34,
-                                         "lantern", glow=True))
+                        # sitting ON the post, not sunk into it: at 1.7 the
+                        # lantern ate the top 0.3 m of the post it stood on
+                        out.append(local(side, fwd, 2, 0.34, 0.34, 0.34,
+                                         "lantern", glow=True, bias=CORNER))
                     else:
                         # a fence cap, not a grey knob: a stone cube on a wood
                         # post reads as a mushroom from every angle
-                        out.append(local(sx, sz, 1.62, 0.4, 0.16, 0.4, "wood"))
-            return out
-        if kind == "torch":
-            side = rng.choice((-0.42, 0.42))
-            return [local(side, 0.0, 1.0, 0.14, 0.7, 0.14, "wood"),
-                    local(side, 0.0, 1.5, 0.2, 0.2, 0.2, "lantern", glow=True)]
-        if kind == "rail":
-            return [local(side, 0.0, 0.5, 0.16, 0.62, 0.16, "wood")
-                    for side in (-0.42, 0.42)]
-        if kind == "gate":
+                        out.append(local(side, fwd, 2, 0.4, 0.16, 0.4, "wood",
+                                         bias=CORNER))
+        elif kind == "torch":
+            # A wall torch on the side of the block, which is where a torch
+            # goes in the game. On *top* it cannot go: the body crosses the
+            # block within a third of a metre of its centre line, and a
+            # 1 x 1 block has nowhere on it that is far enough from that.
+            side = rng.choice((-1, 1))
+            out = [local(side, 0, 0.55, 0.12, 0.55, 0.12, "wood", bias=FLANK),
+                   local(side, 0, 1.10, 0.2, 0.2, 0.2, "lantern", glow=True,
+                         bias=FLANK)]
+        elif kind == "rail":
+            out = [local(side, 0, 1, 0.16, 0.62, 0.16, "wood", bias=FLANK)
+                   for side in (-1, 1)]
+        elif kind == "gate":
             # Light jambs, a dark lintel, a lantern hung in the opening. Built
             # the other way round -- dark posts under a pale beam -- it read as
             # a wall with a hole rather than as a doorway.
-            out = []
-            for side in (-1.6, 1.6):
-                for i in range(3):
-                    out.append(local(side, 0.0, 1.0 + i, 0.86, 1.0, 0.86, "quartz"))
-            for side in (-1.6, -0.8, 0.0, 0.8, 1.6):
-                out.append(local(side, 0.0, 4.0, 0.9, 0.7, 0.9, "stone"))
-            out.append(local(0.0, 0.0, 3.1, 0.34, 0.34, 0.34, "lantern", glow=True))
-            return out
-        if kind == "crumb":
+            for side in (-2, 2):
+                for i in range(HEADROOM + 1):
+                    out.append(local(side, 0, 1 + i, 1.0, 1.0, 1.0, "quartz"))
+            for side in (-2, -1, 0, 1, 2):
+                out.append(local(side, 0, HEADROOM + 2, 1.0, 0.7, 1.0, "stone"))
+            out.append(local(0, 0, HEADROOM + 1, 0.34, 0.34, 0.34, "lantern",
+                             glow=True))
+            out[-1]["dy"] = HEADROOM + 1.6       # hung from the beam
+        elif kind in ("lintel", "hurdle"):
+            out = _span_piece(kind, blk, arc, local, under)
+        elif kind == "crumb":
             # A loose block beside the path, there to be broken as you land.
-            side = rng.choice((-1.0, 1.0)) * rng.uniform(1.0, 1.4)
-            return [local(side, rng.uniform(-0.4, 0.4), rng.uniform(0.0, 0.8),
-                          0.8, 0.8, 0.8, rng.choice(self.candy), loose=True)]
-        return []
+            # Sits on the floor of its cell rather than floating a little way
+            # up it: a crumb counts as solid for occupancy, so an offset that
+            # is not a whole number of cells puts the drawn block and the cell
+            # it reserves in slightly different places.
+            out = [local(rng.choice((-1, 1)), rng.choice((-1, 0, 1)), 0,
+                         0.7, 0.7, 0.7, rng.choice(self.candy), loose=True)]
+
+        # Drop anything that would share a cell with the course, with the block
+        # it decorates, or with another part of itself -- and anything standing
+        # in the arc that arrives here. That last one is not a nicety: a block
+        # is placed before its decoration exists, so the hop onto it was
+        # cleared against a cell an arch had not been built in yet, and the
+        # body flew through the arch on every ruin the generator laid.
+        own = set(self._cells_of(blk))
+        # Whole cells stop whole cubes running into each other; furniture is
+        # smaller than a cell and needs its actual box compared. A lantern
+        # standing on a post is two boxes an inch apart by design, and getting
+        # that inch wrong is invisible in the code and obvious on screen.
+        near = [_deco_box(b, d) for b in self.blocks[-3:] for d in b["deco"]]
+        keep = []
+        for d in out:
+            solid = d["sx"] > 0.5 and d["sz"] > 0.5
+            cell = (blk["x"] + _round(d["dx"]), blk["y"] + _round(d["dy"]),
+                    blk["z"] + _round(d["dz"]))
+            if solid and (cell in self._solid or cell in own):
+                continue
+            if _in_the_way(blk, d, arc):
+                continue
+            box = _deco_box(blk, d)
+            if any(box.penetration(other) > 1e-4 for other in near):
+                continue
+            if solid:
+                own.add(cell)
+            near.append(box)
+            keep.append(d)
+        return keep
+
+    def _clear_deco_path(self, blk: dict, landing) -> None:
+        """Take away anything on ``blk`` that the player is about to run into.
+
+        Called once, at the moment the course commits to where it goes next.
+        Up to here a block's scenery has only ever been checked against the hop
+        that *arrives*; the run across the block and the hop that leaves it are
+        both decided later, and a fence post standing on the line of either is
+        a post the camera walks through. Nothing here is load-bearing, so the
+        answer is always to remove the furniture rather than move the player.
+        """
+        if not blk["deco"]:
+            return
+        path = (_line_points(self._land_point(blk), self._takeoff_point(blk))
+                + _arc_points(self._takeoff_point(blk), landing))
+        keep = [d for d in blk["deco"] if not _in_the_way(blk, d, path)]
+        if len(keep) != len(blk["deco"]):
+            blk["deco"] = keep
+            self._rebuild_solid()
 
     def _hang_orbs(self, prev: dict, blk: dict, count: int) -> None:
         """Put pickups on the flight path from ``prev`` to ``blk``.
 
-        Not near it: on it. The takeoff and landing points are both already
+        Not near it: on it. The take-off and landing points are both already
         decided, so the arc is known exactly, and an orb placed at the chest
         height of the body that will fly through cannot be missed. That makes
         "every orb laid down is collected" a property of generation rather
         than a hope, which is what the test asserts.
         """
-        frm = self._stand_point(prev)
-        to = self._stand_point(blk)
+        frm = self._takeoff_point(prev)
+        to = self._land_point(blk)
         dur, vy0 = flight(frm, to)
         fractions = {1: (0.5,), 2: (0.36, 0.68), 3: (0.28, 0.5, 0.72)}[count]
         for f in fractions:
@@ -563,34 +1149,76 @@ class ParkourScene(Scene):
         return blk["y"] + FORMS[blk["form"]]
 
     def _stand_point(self, blk: dict) -> tuple[float, float, float]:
-        """Exactly where the player stands on a block. Decided at generation,
-        so nothing downstream has to guess."""
-        return (blk["x"] + blk["ox"], self.surface(blk), blk["z"] + blk["oz"])
+        """The middle of a block's walking surface -- what to aim at."""
+        return (blk["x"], self.surface(blk), blk["z"])
+
+    def _land_point(self, blk: dict) -> tuple[float, float, float]:
+        """Where the feet touch down: the near edge, on the way in.
+
+        A player does not arrive in the middle of a block and stop. They catch
+        the near edge and carry on across it, and the gap they actually cleared
+        is therefore wider than the gap between the two block centres by the
+        width of two edges. Making this the landing point rather than a random
+        offset is what gives every block a run-up to take off from.
+        """
+        return _land_of(blk["x"], self.surface(blk), blk["z"],
+                        blk["form"], blk["step"])
+
+    def _takeoff_point(self, blk: dict) -> tuple[float, float, float]:
+        """Where the feet leave: the far edge, on the way out.
+
+        Falls back to the incoming direction when nothing has been generated
+        beyond this block yet, which only happens for the very last block of
+        the live course and is corrected the moment the next one is laid.
+        """
+        return _takeoff_of(blk, blk.get("out") or blk["step"])
 
     def body_box(self) -> AABB:
         """The player's volume right now, feet at :attr:`pos`."""
         return AABB.around(self.pos[0], self.pos[1], self.pos[2],
                            BODY_HALF_W, BODY_H, BODY_HALF_W)
 
+    def orb_hover(self) -> float:
+        """How far an orb is bobbing above its hung position this frame."""
+        return math.sin(self.elapsed * 3.4) * 0.08
+
+    def orb_spin(self) -> float:
+        return (self.elapsed * 150.0) % 360.0
+
     def orb_box(self, orb: dict) -> AABB:
         """An orb's hitbox, from the model that draws it and the transform it
-        is drawn with -- the same rule the runner's obstacles follow. Change
-        :data:`ORB_SCALE` and the box moves with the picture."""
+        is drawn with -- the same rule the runner's obstacles follow.
+
+        Including the bob and the spin, which it did not: an orb is drawn eight
+        centimetres above or below where its box sat, and drawn turning, so the
+        box was neither where the orb was nor the shape of it. It never changed
+        an outcome, because the pickup reaches most of a metre and the error is
+        under a tenth of one -- but a hitbox that is *nearly* the drawn object
+        is exactly the kind of thing this project has a rule against, and the
+        test that guards it was checking this method against itself.
+        """
         return placed(model_aabb(self._model("orb")),
-                      (orb["x"], orb["y"], orb["z"]),
+                      (orb["x"], orb["y"] + self.orb_hover(), orb["z"]),
+                      yaw_deg=self.orb_spin(),
                       scale=(ORB_SCALE, ORB_SCALE, ORB_SCALE))
 
     # -- the world below ---------------------------------------------------
 
     def _spawn_island(self) -> None:
-        """A wooded island: mound, shore, trees, and sometimes a ruin or a
-        waterfall. All of it is cheap -- the fog eats most of it -- and all of
-        it is what stops the ocean reading as an empty blue floor."""
+        """A wooded island: mound, shore, trees, and sometimes a ruin, a
+        waterfall or a sea stack.
+
+        Bigger and closer together than they were, because the camera sits
+        nearly sixty metres above them and looks slightly down: at the old size
+        and spacing they were specks and the lower two thirds of every frame
+        was flat blue. All of it is cheap -- the fog eats most of it -- and all
+        of it is what stops the ocean reading as a painted floor.
+        """
         rng = self.irng
-        z = self._next_island_z - rng.uniform(42, 95)
+        z = self._next_island_z - rng.uniform(30, 62)
         self._next_island_z = z
-        cx = rng.gauss(0.0, 24.0)      # hug the spine: vertigo needs land under
-        base = rng.uniform(7, 12)
+        cx = rng.gauss(0.0, 26.0)      # hug the spine: vertigo needs land under
+        base = rng.uniform(10, 20)
         cubes: list[dict] = []
 
         # biome tint, applied at draw time rather than as another texture
@@ -632,6 +1260,24 @@ class ParkourScene(Scene):
             for k in range(rng.randint(3, 6)):
                 cubes.append({"dx": rx, "dz": rz, "y": top + k * 1.6, "s": 1.9,
                               "style": "stone"})
+
+        # A sea stack: a stepped column climbing a third of the way to the
+        # course. Everything else down there is flat enough to read as a map
+        # rather than as a place, and there is no sense of the drop at all
+        # without something standing in it that the eye can measure against.
+        # It is also the most expensive thing on an island, so it is the first
+        # thing the lower quality settings stop drawing.
+        if rng.random() < 0.45 * self.detail:
+            sx_, sz_ = rng.uniform(-base, base), rng.uniform(-base, base)
+            height = rng.uniform(14, 30)
+            steps = int(height / 3.5) + 1
+            for k in range(steps):
+                w = rng.uniform(3.0, 6.5) * (1.0 - 0.55 * k / steps)
+                cubes.append({"dx": sx_ + rng.uniform(-1.2, 1.2),
+                              "dz": sz_ + rng.uniform(-1.2, 1.2),
+                              "y": 1.0 + k * (height / steps),
+                              "sx": w, "sy": height / steps + 1.2, "sz": w,
+                              "style": "stone" if k < steps - 1 else "grass"})
         waterfall = None
         if rng.random() < 0.3:
             wx, wz = rng.uniform(-base, base), rng.uniform(-base, base)
@@ -643,15 +1289,43 @@ class ParkourScene(Scene):
     # -- simulation -------------------------------------------------------
 
     def _begin_air(self) -> None:
+        """Leave the block from wherever the feet have got to.
+
+        The arc is re-solved here rather than read off generation, because a
+        player can jump early and that genuinely changes where the take-off is.
+        The orbs strung on this hop are moved onto the arc that is actually
+        about to be flown, which is what keeps "every orb laid down is
+        collected" true whether or not somebody is driving. On autopilot the
+        two are the same numbers and nothing moves.
+        """
         target = self.blocks[self.jump_index + 1]
-        self.takeoff = list(self.stand)
-        self.land_at = list(self._stand_point(target))
+        self.takeoff = list(self.pos)
+        self.land_at = list(self._land_point(target))
         self.air_dur, self.vy0 = flight(self.takeoff, self.land_at)
+        self._rehang(target)
         self.phase = "air"
         self.phase_t = 0.0
+        self.vy = self.vy0
+        self._speed = AIR_SPEED
+        # A new heading is committed the instant the feet leave: the look
+        # toward it is a flick, not a drift.
+        self._flick = 1.0
         # Leaving the block is when the hand does something other than bob.
         if self.hop_rng.random() < 0.35:
             self.mine = 1.0
+
+    def _rehang(self, blk: dict) -> None:
+        """Re-place this hop's orbs onto the arc that is about to be flown."""
+        orbs = [o for o in blk["orbs"] if not o["taken"]]
+        spread = ORB_FRACTIONS.get(len(orbs))
+        if spread is None:
+            return
+        frm, to, dur, vy0 = self.takeoff, self.land_at, self.air_dur, self.vy0
+        for orb, f in zip(orbs, spread):
+            t = dur * f
+            orb["x"] = frm[0] + (to[0] - frm[0]) * f
+            orb["y"] = frm[1] + vy0 * t - 0.5 * GRAVITY * t * t + CHEST
+            orb["z"] = frm[2] + (to[2] - frm[2]) * f
 
     def _land(self) -> None:
         self.jump_index += 1
@@ -659,6 +1333,8 @@ class ParkourScene(Scene):
         self.pos = list(self.stand)
         self.phase = "ground"
         self.phase_t = 0.0
+        self.vy = 0.0
+        self._speed = RUN_SPEED
         self.land_dip = 1.0
         self.swing = 1.0
         landed_on = self.blocks[self.jump_index]
@@ -675,6 +1351,14 @@ class ParkourScene(Scene):
         if crumbs:
             crumb = crumbs[0]
             landed_on["deco"].remove(crumb)
+            # A crumb is a whole cube, so it holds a cell. Breaking it has to
+            # give the cell back: the occupancy map is only ever rebuilt from
+            # the live course when blocks drop off the back, so until then the
+            # generator would keep refusing to place anything where a block the
+            # player already smashed used to be.
+            self._solid.discard((landed_on["x"] + _round(crumb["dx"]),
+                                 landed_on["y"] + _round(crumb["dy"]),
+                                 landed_on["z"] + _round(crumb["dz"])))
             self.burst.spawn(landed_on["x"] + crumb["dx"],
                              landed_on["y"] + crumb["dy"] + 0.4,
                              landed_on["z"] + crumb["dz"],
@@ -682,27 +1366,13 @@ class ParkourScene(Scene):
                              rng=self.hop_rng)
             self.mine = 1.0
 
-        # a proper breather on checkpoint platforms, a beat everywhere else
-        wide = landed_on["form"] == "wide"
-        self.ground_dur = (self.hop_rng.uniform(0.5, 0.9) if wide
-                           else self.hop_rng.uniform(0.10, 0.26))
         # A breather is long enough to do something with your hands. Carrying a
         # block, you put one down -- and it is still there behind you, because
         # a placement that leaves nothing behind is an animation, not an act.
+        wide = landed_on["form"] == "wide"
         if wide and self.hop_rng.random() < 0.7:
             if self.kit["name"] == "block":
-                self.place = 1.0
-                yaw = landed_on["yaw"]
-                side = self.hop_rng.choice((-1.3, 1.3))
-                fwd = self.hop_rng.uniform(-1.0, 1.0)
-                landed_on["deco"].append({
-                    "dx": side * math.cos(yaw) + fwd * math.sin(yaw),
-                    "dz": -side * math.sin(yaw) + fwd * math.cos(yaw),
-                    "dy": 1.0, "sx": 1.0, "sy": 1.0, "sz": 1.0,
-                    "style": self.kit["parts"][0]["style"],
-                    "glow": False, "loose": False,
-                    # dated forward: it arrives as the hand reaches out
-                    "born": self.elapsed + 0.18})
+                self._place_block(landed_on)
             else:
                 self.mine = 1.0
 
@@ -721,11 +1391,77 @@ class ParkourScene(Scene):
                 self.orbs_missed += sum(1 for o in blk["orbs"] if not o["taken"])
             self.blocks = self.blocks[drop:]
             self.jump_index -= drop
+            # Cells behind the player are released here and nowhere else. An
+            # occupancy map that only ever grows would refuse the whole world
+            # after a few hundred blocks; one rebuilt from the live course
+            # cannot go stale in either direction.
+            self._rebuild_solid()
+        self._begin_ground(self.blocks[self.jump_index])
         z_here = self.stand[2]
         if self.islands and self.islands[0]["z"] > z_here + 90:
             self.islands.pop(0)
         while self._next_island_z > z_here - 260:
             self._spawn_island()
+
+    def _place_block(self, blk: dict) -> None:
+        """Put a block down beside you, on the platform you have landed on.
+
+        The cell has to be empty *and* out of the way, and the second half is
+        the one that bit. Generated decoration goes through the path check in
+        :meth:`_clear_deco_path`; this is placed live, mid-run, and only ever
+        checked the occupancy map -- so on a platform where the course *turns*,
+        where the line from the landing edge to the take-off edge does not pass
+        through the middle, the block was put down exactly where the player was
+        about to walk. It is the same test either way; there is no reason for
+        this to be the one placement that skips it.
+        """
+        fx, fz = _quantise(blk["step"])
+        takeoff = self._takeoff_point(blk)
+        path = _line_points(self._land_point(blk), takeoff)
+        nxt = self.blocks[self.jump_index + 1] if \
+            self.jump_index + 1 < len(self.blocks) else None
+        if nxt is not None:
+            path += _arc_points(takeoff, self._land_point(nxt))
+        for side in self.hop_rng.sample((-1, 1), 2):
+            deco = {"dx": -side * fz, "dz": side * fx, "kind": "placed",
+                    "dy": 1, "sx": 1.0, "sy": 1.0, "sz": 1.0,
+                    "style": self.kit["parts"][0]["style"],
+                    "glow": False, "loose": False,
+                    # dated forward: it arrives as the hand reaches out
+                    "born": self.elapsed + 0.18}
+            cell = (blk["x"] + deco["dx"], blk["y"] + 1, blk["z"] + deco["dz"])
+            if cell in self._solid or _in_the_way(blk, deco, path):
+                continue
+            self._solid.add(cell)
+            blk["deco"].append(deco)
+            self.place = 1.0
+            return
+        # Nowhere to put it. Swing at the block instead -- doing nothing at all
+        # with your hands on a breather is the tell that nobody is holding them.
+        self.mine = 1.0
+
+    def _begin_ground(self, blk: dict) -> None:
+        """Set up the run across the block just landed on.
+
+        This is the whole of the fix for the scene reading as scripted. What
+        used to happen here was a stopwatch: the body was pinned to one point
+        for somewhere between a tenth of a second and nine tenths, and then
+        teleported onto an arc. Measured over three minutes of running, the
+        player was stationary for thirty per cent of every frame drawn.
+
+        What happens now is that the feet keep going. The landing was on the
+        near edge, the take-off is from the far one, and the time between them
+        is not a number anybody chose -- it is that distance at running pace.
+        A wide platform is still a breather, because crossing three blocks
+        takes half a second; it is just a breather you spend moving.
+        """
+        self.run_from = list(self.stand)
+        self.run_to = list(self._takeoff_point(blk))
+        self.run_len = math.dist((self.run_from[0], self.run_from[2]),
+                                 (self.run_to[0], self.run_to[2]))
+        self.run_s = 0.0
+        self.ground_speed = RUN_SPEED
+        self.ground_dur = max(GROUND_MIN, self.run_len / RUN_SPEED)
 
     # -- being driven -----------------------------------------------------
 
@@ -753,9 +1489,19 @@ class ParkourScene(Scene):
         if self.phase != "ground":
             return
         if intent.jump:
+            # Leave now, from wherever the feet have got to. The arc is solved
+            # against the real take-off point in :meth:`_begin_air`, so an early
+            # jump is a shorter run-up and a different hop -- not the same hop
+            # started sooner.
             self.ground_dur = min(self.ground_dur, self.phase_t)
         elif intent.duck:
-            self.ground_dur = min(self.ground_dur + 0.05, HOLD_MAX)
+            # Vanilla's own answer to "hold this block": walk it instead of
+            # sprinting it. Crossing takes longer because you are slower, which
+            # is a thing a body does; stretching the clock while the position
+            # was read off that clock was not.
+            self.ground_speed = WALK_SPEED
+            self.ground_dur = min(self.run_len / WALK_SPEED, HOLD_MAX) \
+                if self.run_len else HOLD_MAX
 
     @property
     def driven(self) -> bool:
@@ -773,8 +1519,22 @@ class ParkourScene(Scene):
         keep = self.jump_index + STEER_KEEP
         if len(self.blocks) <= keep + 1:
             return
+        # Orbs on the discarded tail were never in play -- the player has not
+        # reached that stretch and now never will, because it no longer exists.
+        # They are counted separately rather than as misses, because a miss is
+        # supposed to mean "ran past one and did not take it", which is the
+        # thing :attr:`orbs_missed` is asserted to be zero. Without this
+        # distinction a steered run can pass that assertion by deleting
+        # everything it would otherwise have had to collect.
+        for blk in self.blocks[keep + 1:]:
+            self.orbs_discarded += sum(1 for o in blk["orbs"] if not o["taken"])
         del self.blocks[keep + 1:]
         self._pending.clear()
+        self.blocks[-1].pop("out", None)
+        # The discarded tail's cells have to go with it, or a steered course
+        # spends the rest of the run refusing to be laid through the ghost of
+        # the one it replaced.
+        self._rebuild_solid()
         self.heading = self.blocks[-1]["yaw"]
         while len(self.blocks) - self.jump_index < AHEAD:
             self._spawn_block()
@@ -802,8 +1562,23 @@ class ParkourScene(Scene):
 
     def update(self, dt: float) -> None:
         self.phase_t += dt
+        was = (self.pos[0], self.pos[2])
         if self.phase == "ground":
-            self.pos = list(self.stand)
+            # Running across the block, not standing on it -- and advanced by
+            # *distance covered at a speed*, never by a fraction of the phase's
+            # duration. That distinction is the whole of it: the duration is
+            # something a player can change mid-phase (jump ends it early,
+            # holding the block stretches it), and a position interpolated
+            # against a duration that moves underneath it moves with it. Jump
+            # used to snap the feet to the far edge in a single frame -- three
+            # and a half metres, two hundred metres a second -- and holding the
+            # block dragged the body *backwards* across it, because the
+            # denominator grew faster than the numerator.
+            self.run_s = min(self.run_len, self.run_s + self.ground_speed * dt)
+            f = self.run_s / self.run_len if self.run_len else 1.0
+            self.pos[0] = self.run_from[0] + (self.run_to[0] - self.run_from[0]) * f
+            self.pos[1] = self.run_from[1]
+            self.pos[2] = self.run_from[2] + (self.run_to[2] - self.run_from[2]) * f
             self.vy = 0.0
             if self.phase_t >= self.ground_dur:
                 self._begin_air()
@@ -817,8 +1592,24 @@ class ParkourScene(Scene):
             if self.phase_t >= self.air_dur:
                 self._land()
 
+        moved = math.dist(was, (self.pos[0], self.pos[2]))
+        self._speed = moved / dt if dt > 0.0 else 0.0
+        # Ground distance is what drives the walk cycle. Time would drive it
+        # too, right up until the bob carried on swinging in mid-air.
+        if self.phase == "ground":
+            self.stride += moved
+
+        # Recycling a cloud shelf that has drifted behind the camera belongs
+        # here and not in the draw, however naturally it falls out of the loop
+        # that draws them. Drawing a frame twice has to draw the same frame
+        # twice -- every screenshot this scene is judged from is captured by
+        # presenting one a second time.
+        for s in self.shelves:
+            if s["z"] > self.pos[2] + 60:
+                s["z"] -= 300
+
         self._collect()
-        self._look()
+        self._look(dt)
         self.driven_t = max(0.0, self.driven_t - dt)
         if not self.driven:
             self.steer = 0.0
@@ -856,106 +1647,113 @@ class ParkourScene(Scene):
 
         rl.BeginMode3D(cam[0])
         self._draw_ocean(x, z)
+        self._draw_reefs(x, z)
         self._draw_islands(x, z)
         self._draw_shelves(x, z)
         rl.EndMode3D()
 
-        # Aerial perspective over the world below only: leave 3D, lay a smooth
-        # alpha fade from the horizon down, then re-enter the same camera for
-        # the course. The haze writes no depth, so the course draws over it
-        # while still depth-testing correctly against the islands.
-        # Starts above the true horizon and fades in, because the eye finds a
-        # hard edge in a clear sky instantly -- and the previous band drew one
-        # right where the sea was supposed to dissolve.
-        # Not too strong. Dawn and dusk fog is a saturated gold or pink, and at
-        # the alpha this used to carry it stopped being aerial perspective and
-        # became an orange wash laid over the middle of the frame.
-        # The sea is one flat plane with no distance shading of its own, so
-        # without this it meets the sky along a drawn line rather than
-        # dissolving into one. The band therefore has to be strongest exactly
-        # where the sea ends and fade downward from there, and it has to fade
-        # *in* at its top edge, or it draws its own line across the sky a few
-        # rows above the one it was meant to hide.
-        #
-        # Where the sea ends is not a fixed fraction of the frame: the camera
-        # pitches with the jump. So it is projected rather than guessed -- a
-        # point at eye height and effectively infinite distance is the horizon
-        # by definition. Pinning it to a constant left a bruise-coloured strip
-        # of unhazed water above the haze whenever the head was up.
-        band = textures.alpha_band(f"haze-{self.ctx.seed.run}", pal.fog, 235, 1.7,
-                                   ramp=0.22)
-        horizon = self._horizon_y()
-        rl.DrawTexturePro(band, (0, 0, 4, 128),
-                          (0, horizon - int(self.height * 0.09), self.width,
-                           int(self.height * 0.45)),
-                          (0, 0), 0.0, rl.WHITE4)
+        self._draw_haze(pal)
         rl.BeginMode3D(cam[0])
 
         self._draw_course(x, z)
         self._draw_orbs(x, z)
         self.burst.draw(self.camera)
         self._draw_held()
+        # Every glow in the frame goes down here, in one pass, after all the
+        # opaque geometry -- see :meth:`_draw_glows`. The held item still wins
+        # against them without needing a pass of its own: it is the nearest
+        # thing in the frame and the depth *test* is still on.
+        self._draw_glows()
         rl.EndMode3D()
 
         self.weather.draw(self.elapsed)
         self._draw_crosshair()
         self._draw_hud()
 
-    def _look(self) -> None:
-        """Ease the head toward where the run is going.
+    def _look(self, dt: float) -> None:
+        """Turn the head toward where the run is going.
 
         Lives in ``update`` rather than in ``draw`` so that drawing a frame
         twice draws the same frame twice. It did not, and the difference is
         not academic: every screenshot this scene is judged from is captured
         by presenting a frame a second time.
+
+        The profile matters as much as the target. A constant ease toward the
+        next block is a camera on rails -- it starts turning the instant the
+        block moves and never finishes. What a person does is *flick*: they
+        commit to the next jump as their feet leave the ground, snap the view
+        onto it, and then hold still while they fly. So the rate is high for a
+        moment after take-off and low the rest of the time, and the difference
+        between those two is the whole reason the shot reads as somebody
+        playing rather than as a path being followed.
         """
         x, z = self.pos[0], self.pos[2]
-        # Aim: mid-air, at where we will land; on the ground, pre-aim toward
-        # the NEXT landing so the turn happens as a deliberate look, not a
-        # camera glued to a moving block.
-        if self.phase == "air":
-            aim = self.land_at
-            ease = 0.14
-        else:
-            # aim through the course, not at one block: averaging the next
-            # few keeps more of the run in frame through bends
-            idx = self.jump_index
-            ahead = self.blocks[min(idx + 1, len(self.blocks) - 1):
-                                min(idx + 4, len(self.blocks))]
-            aim = (sum(b["x"] for b in ahead) / len(ahead),
-                   sum(self.surface(b) for b in ahead) / len(ahead),
-                   sum(b["z"] for b in ahead) / len(ahead))
-            ease = 0.06
-        target_yaw = math.atan2(aim[0] - x, -(aim[2] - z))
-        dy = target_yaw - self.yaw
-        while dy > math.pi:
-            dy -= 2 * math.pi
-        while dy < -math.pi:
-            dy += 2 * math.pi
-        self.yaw += dy * ease
-        # a touch of roll into the turn sells the head motion
-        self._roll += (max(-0.05, min(0.05, dy * 0.35)) - self._roll) * 0.1
+        idx = self.jump_index
+        # Aim at the block being jumped to, and a little through it toward the
+        # one after -- looking dead at your feet is what a beginner does, and
+        # it keeps nothing else in frame.
+        last = len(self.blocks) - 1
+        ahead = [(self.blocks[min(idx + n, last)], w)
+                 for n, w in ((1, 0.46), (2, 0.30), (3, 0.24))]
+        aim = (sum(b["x"] * w for b, w in ahead),
+               sum(self.surface(b) * w for b, w in ahead),
+               sum(b["z"] * w for b, w in ahead))
+
+        self._flick = max(0.0, self._flick - dt * 5.5)
+        rate = (5.0 + 22.0 * self._flick ** 2) * dt
+
+        dy = _wrap(math.atan2(aim[0] - x, -(aim[2] - z)) - self.yaw)
+        self.yaw += dy * min(1.0, rate)
+
+        # Aim at head height over the target, not at the block itself. A camera
+        # that points at the surface it is about to land on spends the whole
+        # run looking at its own feet -- with an eye 1.62 m up and a block
+        # three metres away that is nearly thirty degrees of downward pitch,
+        # and the picture it produces is a strip of sea with the sky pushed off
+        # the top of the frame.
+        flat = math.hypot(aim[0] - x, aim[2] - z)
+        want_pitch = math.atan2(self.pos[1] + EYE - (aim[1] + EYE * 0.95),
+                                max(3.4, flat))
+        # A body in the air looks where it is going: falling drops the gaze,
+        # rising lifts it, on top of wherever the target already is.
+        want_pitch -= max(-0.22, min(0.30, self.vy * 0.030))
+        self.pitch += _wrap(max(-0.16, min(0.55, want_pitch)) - self.pitch) \
+            * min(1.0, rate * 0.8)
+
+        # Roll comes off the walk cycle, not off the turn. Vanilla's own view
+        # bobbing tilts the camera in step with the feet and does not tilt at
+        # all for a turn, and a camera that banks into corners reads as a
+        # drone -- which is exactly the note this scene came back with.
+        want_roll = math.sin(self.stride * STRIDE_RATE) * 0.035
+        if self.phase != "ground":
+            want_roll = 0.0
+        self._roll += (want_roll - self._roll) * min(1.0, dt * 9.0)
 
     def _aim_camera(self, x: float, y: float, z: float) -> None:
-        # landing dip with a small overshoot, plus an idle breath on ground
+        # landing dip with a small overshoot, and the walk bob on top of it
         dip = self.land_dip ** 1.4 * 0.17 - math.sin(self.land_dip * math.pi) * 0.02
-        breathe = math.sin(self.elapsed * 2.1) * 0.012 if self.phase == "ground" else 0.0
+        # Vanilla's bob is a figure of eight: the head rises twice per stride
+        # and swings side to side once. Driven by distance covered, so it
+        # stops dead when the feet leave the ground instead of swimming on.
+        step = self.stride * STRIDE_RATE
+        bob_y = abs(math.sin(step)) * 0.055 if self.phase == "ground" else 0.0
+        sway = math.sin(step * 0.5) * 0.045 if self.phase == "ground" else 0.0
 
         cam = self.camera
-        eye_y = y + EYE - dip + breathe
-        cam.position = (x, eye_y, z)
+        eye_y = y + EYE - dip + bob_y
+        # the sway is across the direction of travel, which is what a head
+        # rolling over alternate feet actually does
+        cam.position = (x + math.cos(self.yaw) * sway, eye_y,
+                        z + math.sin(self.yaw) * sway)
         look = 5.5
-        # pitch follows vertical velocity: rising lifts the gaze, falling
-        # drops it toward the landing block. Base pitch keeps the horizon
-        # near mid-frame like the reference footage.
-        pitch_drop = 1.1 - max(-0.6, min(0.85, self.vy * 0.1))
-        cam.target = (x + math.sin(self.yaw) * look,
-                      eye_y - pitch_drop,
-                      z - math.cos(self.yaw) * look)
+        flat = math.cos(self.pitch) * look
+        cam.target = (cam.position.x + math.sin(self.yaw) * flat,
+                      eye_y - math.sin(self.pitch) * look,
+                      cam.position.z - math.cos(self.yaw) * flat)
         # roll: tilt the up vector about the view direction
         fx, fz = math.sin(self.yaw), -math.cos(self.yaw)
         cam.up = (math.sin(self._roll) * -fz, math.cos(self._roll), math.sin(self._roll) * fx)
-        cam.fovy = 70.0 + (2.5 if self.phase == "air" else 0.0)
+        cam.fovy = FOV + (2.0 if self.phase == "air" else 0.0)
 
     def _horizon_y(self) -> int:
         """Screen row the sea's horizon falls on, this frame.
@@ -976,12 +1774,7 @@ class ParkourScene(Scene):
         return max(int(self.height * 0.18), min(int(self.height * 0.68), y))
 
     def _draw_ocean(self, x: float, z: float) -> None:
-        pal = self.palette
-        # A sea, not a blue floor: the deep is keyed to the sky so night runs
-        # get a black ocean, and every island sits on its own pale reef, which
-        # is most of what stops the water reading as a painted plane.
-        deep = rl.mix_rgb(rl.mix_rgb(pal.sky_bottom, (10, 46, 96), 0.78),
-                          pal.fog, 0.10)
+        deep = self.deep
         # Big enough that its far edge is over the horizon rather than short of
         # it: a 760 m sea seen from 58 m up runs out three hundred metres
         # before the horizon does, and the strip of bare sky underneath it read
@@ -992,18 +1785,69 @@ class ParkourScene(Scene):
         # all of them -- which is where the sea grew holes in the shape of the
         # cloud shelves floating above it.
         rl.flush()
-        # Each island sits on its own pale shallow. Drawn as the soft-edged
-        # disc the blob shadows use rather than as a quad: a hard-edged
-        # rectangle of lighter blue on the sea reads as a mistake, and the
-        # only thing separating the two is which texture is on the quad.
-        shallow = rl.mix_rgb(deep, (120, 226, 226), 0.62)
-        for isl in self.islands:
-            dist = math.dist((x, z), (isl["x"], isl["z"]))
-            if dist > 260:
-                continue
-            reef = rl.mix_rgb(shallow, pal.fog, min(1.0, dist / 300))
-            rl.DrawModelEx(ground_quad(), (isl["x"], 0.06, isl["z"]), (0, 1, 0), 0.0,
-                           (isl["reef"], 1.0, isl["reef"]), rl.rgba(reef, 235))
+
+    def _draw_reefs(self, x: float, z: float) -> None:
+        """Each island's pale shallow, lying on the sea.
+
+        Drawn as the soft-edged disc the blob shadows use rather than as a
+        quad: a hard-edged rectangle of lighter blue on the sea reads as a
+        mistake, and the only thing separating the two is which texture is on
+        the quad.
+
+        The disc is soft-edged, so the quad carrying it is mostly transparent
+        --  and a transparent quad fifty metres across still stamps its whole
+        square into the depth buffer. What that removed was the far islands
+        seen past the near one's corner: measured at up to 110 pixels, and
+        replacing land with open sea, which is why the count is small and the
+        colour change is not. It is an overlay lying on the water with nothing
+        of its own to occlude, so it writes no depth at all.
+        """
+        shallow = rl.mix_rgb(self.deep, (120, 226, 226), 0.62)
+        with no_depth_write():
+            for isl in self.islands:
+                dist = math.dist((x, z), (isl["x"], isl["z"]))
+                if dist > 260:
+                    continue
+                reef = rl.mix_rgb(shallow, self.palette.fog, min(1.0, dist / 300))
+                rl.DrawModelEx(ground_quad(), (isl["x"], 0.06, isl["z"]),
+                               (0, 1, 0), 0.0,
+                               (isl["reef"], 1.0, isl["reef"]), rl.rgba(reef, 235))
+
+    def _draw_haze(self, pal) -> None:
+        """Aerial perspective over the world below only.
+
+        Leaves 3D, lays a smooth alpha fade from the horizon down, and the
+        caller then re-enters the same camera for the course. This is a 2D
+        draw, so it writes no depth at all and the course draws over it while
+        still depth-testing correctly against the islands.
+
+        Starts above the true horizon and fades in, because the eye finds a
+        hard edge in a clear sky instantly -- and the previous band drew one
+        right where the sea was supposed to dissolve. Not too strong, either:
+        dawn and dusk fog is a saturated gold or pink, and at the alpha this
+        used to carry it stopped being aerial perspective and became an orange
+        wash laid over the middle of the frame.
+
+        The sea is one flat plane with no distance shading of its own, so
+        without this it meets the sky along a drawn line rather than dissolving
+        into one. The band therefore has to be strongest exactly where the sea
+        ends and fade downward from there, and it has to fade *in* at its top
+        edge, or it draws its own line across the sky a few rows above the one
+        it was meant to hide.
+
+        Where the sea ends is not a fixed fraction of the frame: the camera
+        pitches with the jump. So it is projected rather than guessed -- a
+        point at eye height and effectively infinite distance is the horizon by
+        definition. Pinning it to a constant left a bruise-coloured strip of
+        unhazed water above the haze whenever the head was up.
+        """
+        band = textures.alpha_band(f"haze-{self.ctx.seed.run}", pal.fog, 235, 1.7,
+                                   ramp=0.22)
+        horizon = self._horizon_y()
+        rl.DrawTexturePro(band, (0, 0, 4, 128),
+                          (0, horizon - int(self.height * 0.09), self.width,
+                           int(self.height * 0.45)),
+                          (0, 0), 0.0, rl.WHITE4)
 
     def _below_tint(self, dist: float, biome=None):
         """Aerial perspective for the world far below.
@@ -1051,26 +1895,35 @@ class ParkourScene(Scene):
         they look like unless they fade -- so they take the same distance fog
         as everything else down there. Without it a shelf reads as a pane of
         glass lying on the water.
+
+        Cloud, and so it writes no depth. At alpha 34 to 64 these are barely
+        there, and they were still stamping their full quads into the depth
+        buffer and deleting the islands behind them -- up to 2,136 pixels of
+        one. They have nothing to occlude in any case: the two sheets of a
+        shelf are meant to blend into each other rather than one cutting the
+        other off, and the depth *test* still hides a shelf that really is
+        behind an island.
         """
         shelf = unit_quad("cloud-shelf")
-        for s in self.shelves:
-            sx = s["x"] + math.sin(self.elapsed * 0.05 * s["drift"]) * 6
-            if s["z"] > z + 60:
-                s["z"] -= 300
-                continue
-            dist = math.dist((x, z), (sx, s["z"]))
-            fade = max(0.0, min(1.0, dist / 200.0))
-            shelf.materials[0].maps[rl.MATERIAL_MAP_ALBEDO].texture = s["tex"]
-            tint = rl.rgba(rl.mix_rgb(self.cloud_tint, self.palette.fog, fade),
-                           int(64 - 30 * fade))
-            # Two sheets a little apart, the upper one smaller: from directly
-            # above a single quad is unmistakably a single quad, and the second
-            # layer is what gives it a top and a shoulder.
-            for k, (lift, shrink) in enumerate(((0.0, 1.0), (3.5, 0.66))):
-                # the cloud texture is 2:1, so the quad is squashed to match
-                rl.DrawModelEx(shelf, (sx, s["y"] + lift, s["z"]), (0, 1, 0),
-                               s["yaw"] + k * 37.0,
-                               (s["s"] * shrink, 1.0, s["s"] * shrink * 0.5), tint)
+        with no_depth_write():
+            for s in self.shelves:
+                if s["z"] > z + 60:
+                    continue                # recycled in update, not here
+                sx = s["x"] + math.sin(self.elapsed * 0.05 * s["drift"]) * 6
+                dist = math.dist((x, z), (sx, s["z"]))
+                fade = max(0.0, min(1.0, dist / 200.0))
+                shelf.materials[0].maps[rl.MATERIAL_MAP_ALBEDO].texture = s["tex"]
+                tint = rl.rgba(rl.mix_rgb(self.cloud_tint, self.palette.fog, fade),
+                               int(64 - 30 * fade))
+                # Two sheets a little apart, the upper one smaller: from
+                # directly above a single quad is unmistakably a single quad,
+                # and the second layer gives it a top and a shoulder.
+                for k, (lift, shrink) in enumerate(((0.0, 1.0), (3.5, 0.66))):
+                    # the cloud texture is 2:1, so the quad is squashed to match
+                    rl.DrawModelEx(shelf, (sx, s["y"] + lift, s["z"]), (0, 1, 0),
+                                   s["yaw"] + k * 37.0,
+                                   (s["s"] * shrink, 1.0, s["s"] * shrink * 0.5),
+                                   tint)
 
     def _arrival(self, born: float) -> tuple[float, int]:
         """How far into its arrival a block is: a vertical offset and an alpha.
@@ -1085,6 +1938,30 @@ class ParkourScene(Scene):
             return 0.0, 255
         p = max(0.0, p)
         return -(1.0 - p) * 0.45, int(40 + 215 * p)
+
+    def _glow(self, x: float, y: float, z: float, size: float, color: rl.RGB,
+              alpha: int) -> None:
+        """Queue an emissive overlay for the single glow pass.
+
+        Nothing draws a glow where it stands. See :meth:`_draw_glows`.
+        """
+        if alpha > 0:
+            self._glows.append((x, y, z, size, color, alpha))
+
+    def _draw_glows(self) -> None:
+        """Issue the frame's queued glows. :func:`~..engine.fx.glow_pass` owns
+        the reasoning: writing no depth, and drawn after everything opaque.
+
+        This scene is where that bug was found. Lanterns, gates and orbs all
+        glow, and their discs were being stamped into the depth buffer
+        *interleaved with the course itself*, so each one deleted whatever
+        block happened to be drawn after it and further away. In motion the
+        disc sweeps along the course, which is what "there's still like
+        invisible blocks or walls blocking other stuff from being seen" looks
+        like from the outside.
+        """
+        glow_pass(self.camera, self._glows)
+        self._glows.clear()
 
     def _draw_course(self, x: float, z: float) -> None:
         for blk in self.blocks:
@@ -1102,11 +1979,6 @@ class ParkourScene(Scene):
                 voxel.draw_box(model, bx, by + 0.25, bz, tint, 1.0, 0.5, 1.0)
             else:
                 voxel.draw_block(model, bx, by + 0.5, bz, tint)
-                if form == "stair":
-                    # the tread, set back toward where you came from
-                    yaw = blk["yaw"]
-                    voxel.draw_box(model, bx - math.sin(yaw), by + 0.25,
-                                   bz + math.cos(yaw), tint, 1.0, 0.5, 1.0)
             for d in blk["deco"]:
                 dx, dz = bx + d["dx"], bz + d["dz"]
                 dd = math.dist((x, z), (dx, dz))
@@ -1116,13 +1988,13 @@ class ParkourScene(Scene):
                                self._fog(dd, alpha=d_alpha),
                                d["sx"], d["sy"], d["sz"])
                 if d["glow"] and dd < 44:
-                    glow_billboard(self.camera, dx, dy, dz, 1.5, LANTERN_GLOW,
-                                   90 if self.palette.is_dark else 45)
+                    self._glow(dx, dy, dz, 1.5, LANTERN_GLOW,
+                               90 if self.palette.is_dark else 45)
 
     def _draw_orbs(self, x: float, z: float) -> None:
         model = self._model("orb")
-        spin = (self.elapsed * 150.0) % 360.0
-        hover = math.sin(self.elapsed * 3.4) * 0.08
+        spin = self.orb_spin()
+        hover = self.orb_hover()
         for blk in self.blocks:
             for orb in blk["orbs"]:
                 if orb["taken"]:
@@ -1133,8 +2005,12 @@ class ParkourScene(Scene):
                 voxel.draw_box(model, orb["x"], orb["y"] + hover, orb["z"],
                                self._fog(dist), ORB_SCALE, ORB_SCALE, ORB_SCALE,
                                yaw=spin)
-                glow_billboard(self.camera, orb["x"], orb["y"] + hover, orb["z"],
-                               0.85, ORB_COLOR, 110)
+                # The glow fades out as the orb comes at the lens. A billboard
+                # of fixed world size is a small spark at twenty metres and a
+                # bloom across a third of the frame at one, and every orb is
+                # collected from about one metre away.
+                self._glow(orb["x"], orb["y"] + hover, orb["z"], 0.85, ORB_COLOR,
+                           int(110 * min(1.0, max(0.0, (dist - 0.6) / 2.6))))
 
     # -- first person -----------------------------------------------------
 
@@ -1189,6 +2065,14 @@ class ParkourScene(Scene):
         near = 0.5
         half_h = near * math.tan(math.radians(cam.fovy * 0.5))
         half_w = half_h * (self.width / self.height)
+        # Sizes are quoted as a fraction of the half-frame, so widening the
+        # field of view scales the hand up with it -- and a held item is sized
+        # against the *width* of a 16:9 frame in the game, where this strip is
+        # a tall crop of one. Same fraction, much narrower frame, a lantern the
+        # size of your head. So the sizes get their own scale and the positions
+        # keep the real half-frame, which leaves the item in the corner it
+        # belongs in rather than dragging it toward the middle as it shrinks.
+        hand_w = half_w * HAND
 
         t = self.elapsed
         bob_x = math.sin(t * 4.6) * 0.05
@@ -1209,7 +2093,7 @@ class ParkourScene(Scene):
                                      rl.MatrixRotateY(math.radians(yaw)))
             model.transform = rl.MatrixMultiply(spin, basis)
             rl.DrawModelEx(model, (x, y, z), (0, 1, 0), 0.0,
-                           (size[0] * half_w, size[1] * half_w, size[2] * half_w),
+                           (size[0] * hand_w, size[1] * hand_w, size[2] * hand_w),
                            rl.WHITE4)
             # Put it back. The kit is built from the same shared block models
             # the course is, and a transform left on one is a transform every
@@ -1248,8 +2132,8 @@ class ParkourScene(Scene):
             gx = px + forward[0] * 0.6 + right[0] * half_w * 0.8 - up[0] * half_h * 0.9
             gy = py + forward[1] * 0.6 + right[1] * half_w * 0.8 - up[1] * half_h * 0.9
             gz = pz + forward[2] * 0.6 + right[2] * half_w * 0.8 - up[2] * half_h * 0.9
-            glow_billboard(self.camera, gx, gy, gz, 0.42, LANTERN_GLOW,
-                           150 if self.palette.is_dark else 70)
+            self._glow(gx, gy, gz, 0.42, LANTERN_GLOW,
+                       150 if self.palette.is_dark else 70)
 
     def _draw_crosshair(self) -> None:
         """Centre-screen, dark-edged so it survives a bright sky.
@@ -1285,9 +2169,13 @@ class ParkourScene(Scene):
 # ---------------------------------------------------------------------------
 
 #: Orbs are drawn and boxed at this scale; both read it, so they cannot drift.
-ORB_SCALE = 0.28
+ORB_SCALE = 0.24
 #: How far the player reaches for one. Roughly an arm.
 PICKUP_REACH = 0.85
+#: Where along a hop a run of orbs is strung. Shared by generation and by the
+#: re-hang at take-off, so a driven run cannot end up with them in a different
+#: order from the one they were laid in.
+ORB_FRACTIONS = {1: (0.5,), 2: (0.36, 0.68), 3: (0.28, 0.5, 0.72)}
 ORB_COLOR = (120, 240, 190)
 LANTERN_GLOW = (255, 216, 140)
 COMBO_HOLD = 1.8
@@ -1302,25 +2190,386 @@ STEER_KEEP = 2
 HOLD_MAX = 1.6
 #: How long a key press keeps the scene in the player's hands.
 DRIVEN_HOLD = 0.6
+#: Shortest a ground phase may be. Below a few frames the run-up stops being
+#: visible and the landing reads as a bounce.
+GROUND_MIN = 0.07
+#: Steps per metre, for the walk cycle. Vanilla's bob runs at roughly this
+#: against sprint speed, and it is what the head bob and the roll share.
+STRIDE_RATE = 2.9
+#: Points along a hop the corridor check tests the body at.
+ARC_SAMPLES = 9
+#: How far out into its own cell a piece of sub-block furniture sits. A fence
+#: post goes to the corner of the platform, a rail or a wall torch hugs the
+#: side of the block it is fixed to. Both numbers are what it takes to clear
+#: the line the body runs along, and both are also where the game puts them.
+CORNER = 1.3
+FLANK = 0.72
+#: How many integer offsets a placement will consider before giving up on the
+#: heading it wanted.
+OFFSET_FAN = 16
+#: How far a beam or a column in a gap stays clear of the body that flies past
+#: it. Small on purpose: the whole effect is that it looks as though it will
+#: not clear. It is a floor rather than the real margin, because both pieces
+#: are then rounded onto the lattice away from the body.
+SPAN_CLEAR = 0.06
+#: How much shorter than the step it was asked for an integer offset may be.
+#: Under one cell, so a diagonal is still reachable while a whole block of the
+#: requested gap can never be given away. See :func:`_offsets`.
+SHORT_FALL = 0.6
+#: How large the held item is against the frame's half-width. See
+#: :meth:`ParkourScene._draw_held` for why it is not simply 1.
+HAND = 0.76
+#: Vertical field of view. The strip is a tall crop of what would be a 16:9
+#: frame, so a vanilla-default 70 leaves barely forty degrees across it and a
+#: course that turns at all walks out of the picture. Widened until a bend
+#: stays on screen; past about here the block under the lens starts to smear.
+FOV = 76.0
+
+
+def _ramped(rng, easy, hard, difficulty: float):
+    """Draw from ``easy`` early in a run and from ``hard`` late in it.
+
+    A coin weighted by difficulty picks the table, rather than the two being
+    blended into a third. Blending would give a distribution that is always the
+    average of both and never either -- and the point of the hard table is that
+    the hops in it turn up, not that they raise a mean.
+    """
+    return rng.choice(hard if rng.random() < difficulty else easy)
+
+
+def _wrap(a: float) -> float:
+    """An angle folded into (-pi, pi]."""
+    return (a + math.pi) % (2 * math.pi) - math.pi
+
+
+def _floor(v: float) -> int:
+    return int(math.floor(v))
+
+
+def _round(v: float) -> int:
+    return int(math.floor(v + 0.5))
+
+
+def _quantise(step: tuple[int, int]) -> tuple[int, int]:
+    """An integer step reduced to one of the eight lattice directions.
+
+    Decorations hang off this rather than off the exact heading, which is what
+    keeps a gate's jambs and a fence's posts in whole cells however obliquely
+    the course happens to be running.
+    """
+    sx, sz = step
+    m = max(abs(sx), abs(sz)) or 1
+    qx = 0 if abs(sx) * 2 < m else (1 if sx > 0 else -1)
+    qz = 0 if abs(sz) * 2 < m else (1 if sz > 0 else -1)
+    return (qx, qz) if (qx or qz) else (0, -1)
+
+
+def _standing_cells(blk: dict, y: int, cells=None) -> frozenset:
+    """The cells a block's own walking surface sits inside, if any.
+
+    Empty for anything a full cell high: its surface is the top of its cell, so
+    a body standing there is above the cell, not in it. A slab's surface is
+    halfway up, so its cell has to be excused or every hop off one is refused.
+    """
+    if FORMS[blk["form"]] >= 1.0:
+        return frozenset()
+    if cells is not None:
+        return frozenset(cells)
+    sp = SPREAD.get(blk["form"], 0)
+    return frozenset((blk["x"] + ox, y, blk["z"] + oz)
+                     for ox in range(-sp, sp + 1) for oz in range(-sp, sp + 1))
+
+
+def _arc_points(frm, to) -> list[tuple[float, float, float]]:
+    """Where the feet are, sampled along a hop. Used to keep scenery out of
+    the way of a body that is already committed to flying through it."""
+    dur, vy0 = flight(frm, to)
+    out = []
+    for i in range(ARC_SAMPLES + 1):
+        f = i / ARC_SAMPLES
+        t = dur * f
+        out.append((frm[0] + (to[0] - frm[0]) * f,
+                    frm[1] + vy0 * t - 0.5 * GRAVITY * t * t,
+                    frm[2] + (to[2] - frm[2]) * f))
+    return out
+
+
+def _line_points(frm, to) -> list[tuple[float, float, float]]:
+    """A straight run, sampled the same way an arc is."""
+    return [(frm[0] + (to[0] - frm[0]) * i / ARC_SAMPLES,
+             frm[1] + (to[1] - frm[1]) * i / ARC_SAMPLES,
+             frm[2] + (to[2] - frm[2]) * i / ARC_SAMPLES)
+            for i in range(ARC_SAMPLES + 1)]
+
+
+def _span_piece(kind: str, blk: dict, arc, local, style: str) -> list[dict]:
+    """A beam over the gap, or a column standing in it.
+
+    Both are built out of the arc that arrives at ``blk``, which is why they
+    can be tight without ever being wrong. A ``lintel`` goes a body's height
+    above the highest point of that flight, so the head passes under it with
+    centimetres to spare; a ``hurdle`` tops out just below the lowest, so the
+    feet pass over it with the same. Neither is a guess: both clearances are
+    read off the sampled arc and rounded *away* from the body, and
+    :func:`_in_the_way` re-checks the result against the same arc before it is
+    kept.
+
+    The horizontal position is the cell the relevant arc point falls in,
+    expressed in the quantised heading -- the same whole-cell frame every other
+    decoration uses, so a beam is on the lattice like everything else.
+
+    Returns nothing at all when the arc is too flat to fit a piece into. A
+    hurdle needs somewhere below the feet that is still above the block it
+    stands beside, and a hop that barely leaves the ground has nowhere; the
+    honest answer there is no scenery rather than scenery in the way.
+    """
+    if len(arc) < 3:
+        return []
+    # Ends excluded: the first and last samples are the take-off and landing
+    # points themselves, which are on top of blocks rather than over the gap.
+    span = arc[1:-1]
+    fx, fz = _quantise(blk["step"])
+    n = fx * fx + fz * fz
+    mid = span[len(span) // 2]
+    fwd = _round(((mid[0] - blk["x"]) * fx + (mid[2] - blk["z"]) * fz) / n)
+    if fwd >= 0:
+        return []                  # the middle of the hop is over the block
+
+    # The heights the body reaches anywhere near that cell. "Near" and not
+    # "in", because a body is 0.6 m wide and a piece is checked against it with
+    # that width added: taking the extreme over the cell alone would clear a
+    # beam that the shoulder of the very next sample walks into, and the piece
+    # would then be silently dropped by :func:`_in_the_way` instead.
+    cx = blk["x"] + fwd * fx
+    cz = blk["z"] + fwd * fz
+    near = [p[1] for p in span
+            if abs(p[0] - cx) < 1.0 + BODY_HALF_W
+            and abs(p[2] - cz) < 1.0 + BODY_HALF_W]
+    if not near:
+        return []
+
+    if kind == "lintel":
+        # ceil, so rounding onto the lattice can only ever move the beam
+        # further from the head, never into it.
+        dy = math.ceil(max(near) + BODY_H + SPAN_CLEAR - blk["y"])
+        # Three cells across: a single cube overhead reads as debris, a beam
+        # reads as a thing you had to duck under.
+        return [local(side, fwd, dy, 1.0, 1.0, 1.0, style)
+                for side in (-1, 0, 1)]
+
+    # A column standing in the gap, topping out just under the feet. How far
+    # under is not a choice: the arc apexes less than a metre above the surface
+    # it left -- ``flight`` solves the take-off for the two endpoints, so a
+    # level hop peaks about 0.77 m up, not at vanilla's full 1.25 -- and a
+    # whole cell is one metre. So the top face lands at or just below the
+    # course itself, and what the eye reads is a pillar in the gap that the
+    # body clears rather than lands on. A first attempt hung this off the arc's
+    # *lowest* point, which is always at one of the ends where there is no
+    # clearance at all, and built precisely zero of them in twelve runs.
+    top = _floor(min(near) - SPAN_CLEAR - blk["y"])
+    return [local(0, fwd, top - 1 - i, 1.0, 1.0, 1.0, style)
+            for i in range(3)]
+
+
+def _deco_box(blk: dict, deco: dict) -> AABB:
+    """A decoration's world box, from the numbers ``_draw_course`` draws it
+    with -- the same rule every other hitbox in the project follows."""
+    return AABB.around(blk["x"] + deco["dx"], blk["y"] + deco["dy"],
+                       blk["z"] + deco["dz"],
+                       deco["sx"] * 0.5, deco["sy"], deco["sz"] * 0.5)
+
+
+def _in_the_way(blk: dict, deco: dict, arc) -> bool:
+    """Does this piece of scenery intersect the body flying the given arc?"""
+    dx = blk["x"] + deco["dx"]
+    dy = blk["y"] + deco["dy"]
+    dz = blk["z"] + deco["dz"]
+    half_x = deco["sx"] * 0.5 + BODY_HALF_W
+    half_z = deco["sz"] * 0.5 + BODY_HALF_W
+    for x, y, z in arc:
+        if (abs(x - dx) < half_x and abs(z - dz) < half_z
+                and y < dy + deco["sy"] and y + BODY_H > dy):
+            return True
+    return False
+
+
+def _unit(step: tuple[int, int]) -> tuple[float, float]:
+    sx, sz = step
+    length = math.hypot(sx, sz) or 1.0
+    return sx / length, sz / length
+
+
+def _edge_offset(form: str, ux: float, uz: float) -> tuple[float, float]:
+    """Where the feet plant, as an offset from a block's centre.
+
+    Measured against the block's *face* rather than as a fixed radius, because
+    a block is square and a radius is round. A three-wide platform reaches
+    1.5 m along an axis and 2.1 m into its corner; plant the feet at a flat
+    1.3 m and a course running diagonally takes off with a metre of platform
+    still ahead of it -- and since the arc starts falling almost immediately,
+    the camera dips straight through that platform's own outer cube. Scaling
+    by the larger component puts the feet the same distance inside the edge
+    whichever way the course is running, and leaves the per-axis offset no
+    bigger than ``EDGE[form]`` either way.
+    """
+    m = max(abs(ux), abs(uz)) or 1.0
+    e = EDGE[form] / m
+    return ux * e, uz * e
+
+
+def _takeoff_of(blk: dict, out_step: tuple[int, int]):
+    """The far edge of a block, along the way out of it."""
+    ox, oz = _edge_offset(blk["form"], *_unit(out_step))
+    return (blk["x"] + ox, blk["y"] + FORMS[blk["form"]], blk["z"] + oz)
+
+
+def _land_of(x: float, surface: float, z: float, form: str,
+             in_step: tuple[int, int]):
+    """The near edge of a block, along the way into it."""
+    ox, oz = _edge_offset(form, *_unit(in_step))
+    return (x - ox, surface, z - oz)
+
+
+_OFFSETS: dict[tuple[float, int], list[tuple[int, int]]] = {}
+
+
+def _offsets(heading: float, step: int) -> list[tuple[int, int]]:
+    """Integer offsets near a heading and a length, best first.
+
+    This is where the course meets the lattice. Everything upstream still
+    thinks in a continuous heading, because a course that may only run along
+    eight compass points looks like a maze; everything downstream is on whole
+    cells, because two cubes at whole cells cannot be inside one another. The
+    ranking is angle first and length second: which way the run is going is
+    what a viewer reads, and a gap one block wider than the set-piece asked
+    for is not something anybody can see.
+
+    The length window is deliberately lopsided. Overshooting is free -- a hop a
+    bit longer than asked for still looks like the hop that was asked for --
+    but undershooting is the exact defect this scene was sent back with. A
+    symmetric window let a request for a three-cell step be answered with one
+    of 1.65, and the scoring would take it whenever its angle was better, so a
+    set-piece that asked for a real jump kept getting a shuffle. Short
+    candidates are now simply not offered.
+    """
+    key = (round(heading, 2), int(step))
+    got = _OFFSETS.get(key)
+    if got is not None:
+        return got
+    want, s = key
+    scored = []
+    reach = s + 2
+    for dz in range(-reach, reach + 1):
+        for dx in range(-reach, reach + 1):
+            if dx == 0 and dz == 0:
+                continue
+            length = math.hypot(dx, dz)
+            if not (s - SHORT_FALL <= length <= s + 1.35):
+                continue
+            err = abs(_wrap(math.atan2(dx, -dz) - want))
+            if err > 0.9:
+                continue
+            scored.append((err * 1.7 + abs(length - s) * 0.5, dx, dz))
+    scored.sort()
+    got = [(dx, dz) for _, dx, dz in scored[:OFFSET_FAN]]
+    if not got:                              # a heading nothing lines up with
+        got = [(_round(math.sin(want) * s) or 1, -_round(math.cos(want) * s))]
+    _OFFSETS[key] = got
+    return got
 
 
 def flight(frm, to) -> tuple[float, float]:
-    """Duration and take-off speed of the hop from ``frm`` to ``to``.
+    """Duration and take-off vertical speed of the hop from ``frm`` to ``to``.
 
-    A hop covers its gap at running pace -- but a *fall* takes as long as a
-    fall takes, so a descent is timed by the drop instead, at the same launch
-    speed any other hop uses. That is the whole difference between a five-block
-    drop that reads as a drop and one that reads as a long step down.
+    One line, and it is the line the whole scene's motion rests on: horizontal
+    speed is *constant*, so the time a hop takes is simply how far it goes
+    divided by how fast a body sprints, and the take-off is then whatever
+    lands you on the far end under gravity.
+
+    The version this replaces solved for a duration and then clamped it into a
+    hang-time window, which meant the horizontal speed came out different on
+    every hop -- three and a half metres a second on the short ones, six on the
+    long. Nothing about that is visible as a number and all of it is visible as
+    motion: the short hops floated. What keeps a run reading as a run is that
+    the body never changes pace, and the only thing that varies between hops is
+    how high the arc goes.
+
+    Whether the take-off it asks for is one a body actually has is a separate
+    question, and :meth:`ParkourScene._fits` is where it gets asked -- no hop
+    outside ``VY_MIN..VY_MAX`` is ever laid down.
     """
     dist = math.dist((frm[0], frm[2]), (to[0], to[2]))
-    dy = to[1] - frm[1]
-    dur = min(dist / HOP_SPEED, AIR_LEVEL_MAX)
-    if dy < 0.0:
-        dur = max(dur, (HOP_LAUNCH + math.sqrt(HOP_LAUNCH ** 2
-                                               + 2 * GRAVITY * -dy)) / GRAVITY)
-    dur = max(AIR_MIN, min(AIR_MAX, dur))
-    # launch speed that lands exactly on target under gravity
-    return dur, dy / dur + 0.5 * GRAVITY * dur
+    dur = max(1e-4, dist / AIR_SPEED)
+    return dur, (to[1] - frm[1]) / dur + 0.5 * GRAVITY * dur
+
+
+def hop_span(rise: int) -> tuple[float, float]:
+    """Shortest and longest hop a body can make for a given change in height.
+
+    Both ends fall out of the same two facts -- one jump impulse, one constant
+    horizontal speed -- and neither is a number anybody chose:
+
+    * **Longest** is the full jump. Its flight time is the descending root of
+      ``rise = JUMP_V*t - g*t^2/2``, and the reach is that time at sprint
+      speed. A level hop makes 4.3 m; dropping buys more, because falling
+      takes longer and the body does not slow down while it does. Rising two
+      blocks has no solution at all, which is why nothing here can express it.
+    * **Shortest** is where the hop stops making sense in the other direction,
+      and the two directions stop for different reasons. A *climb* has to be
+      past its apex when it arrives -- land while still rising and the body has
+      come up through the side of the block rather than onto it -- which is
+      ``t >= sqrt(2*rise/g)``. A *drop* has to leave the ground properly rather
+      than be thrown off it, so its take-off has to clear ``VY_MIN``, which is
+      the larger root of ``g t^2 / 2 - VY_MIN t + rise = 0``.
+    """
+    if rise >= 0:
+        lo = AIR_SPEED * math.sqrt(2.0 * rise / GRAVITY)
+    else:
+        lo = AIR_SPEED * (VY_MIN + math.sqrt(VY_MIN * VY_MIN
+                                             - 2.0 * GRAVITY * rise)) / GRAVITY
+    disc = VY_MAX * VY_MAX - 2.0 * GRAVITY * rise
+    hi = 0.0 if disc < 0.0 else AIR_SPEED * (VY_MAX + math.sqrt(disc)) / GRAVITY
+    return max(MIN_HOP, lo), hi
+
+
+def fit_gap(gap: int, rise: int) -> int:
+    """Widen a gap until the hop across it is one a body can make.
+
+    A drop is the case that matters. Falling takes time, the body keeps its
+    speed the whole way down, and so a hop that descends four blocks covers
+    close to four metres of ground whether the set-piece wanted it to or not.
+    Ask for a two-block gap under a four-block drop and the only way to deliver
+    it is to throw the player at the floor, which is why the old descent looked
+    like falling down a lift shaft. Here the gap opens instead, and a descent
+    reads as leaping out into the drop.
+    """
+    lo, hi = hop_span(rise)
+    if hi <= 0.0:
+        # Nothing is jumpable at this rise -- two blocks up has no solution,
+        # here or in the game. The gap comes back unchanged rather than as
+        # some placeholder, because there is no answer to give and the caller
+        # is going to have every candidate rejected by ``_fits`` and move on
+        # to a different rise. Returning a number that *looks* jumpable is how
+        # a caller that skipped ``_fits`` would get a hop nobody can make.
+        return max(1, gap)
+    for g in range(max(1, gap), 9):
+        span = g + 1 - 2 * EDGE["full"]
+        if lo - 1e-6 <= span <= hi + 1e-6:
+            return g
+    return max(1, max_gap(rise))
+
+
+def max_gap(rise: int) -> int:
+    """The widest gap this rise can be jumped across, or zero if none can.
+
+    The chasm's whole premise, and a computed number rather than a chosen one.
+    """
+    hi = hop_span(rise)[1]
+    best = 0
+    for g in range(1, 9):
+        if g + 1 - 2 * EDGE["full"] <= hi:
+            best = g
+    return best
 
 
 def _build_styles(pal, run: int) -> dict[str, dict]:
@@ -1337,19 +2586,25 @@ def _build_styles(pal, run: int) -> dict[str, dict]:
     def tone(c: rl.RGB) -> rl.RGB:
         return rl.scale_rgb(c, lit)
 
+    # The course's own colours wear wool and concrete, because that is what
+    # brightly coloured blocks in the game are; the noise amplitude on top of
+    # each pattern is now small, since the patterns carry the grain themselves.
+    # Both used to be turned up far enough that a block read as a stamp rather
+    # than a material -- an eight-texel chequerboard on a magenta cube.
     recipe: list[tuple[str, rl.RGB, str, float]] = [
-        ("candy0", pal.blocks[0], "checker", 0.05),
-        ("candy1", pal.blocks[1], "noise", 0.06),
-        ("candy2", pal.blocks[2], "speck", 0.05),
-        ("wood", tone((150, 106, 60)), "planks", 0.04),
-        ("brick", tone((170, 88, 70)), "bricks", 0.04),
-        ("stone", tone((132, 132, 140)), "cobble", 0.05),
-        ("quartz", tone((228, 226, 218)), "grain", 0.03),
-        ("lantern", (255, 212, 128), "lantern", 0.03),
+        ("candy0", pal.blocks[0], "wool", 0.03),
+        ("candy1", pal.blocks[1], "concrete", 0.02),
+        ("candy2", pal.blocks[2], "wool", 0.03),
+        ("wood", tone((150, 106, 60)), "planks", 0.02),
+        ("brick", tone((170, 88, 70)), "bricks", 0.02),
+        ("stonebrick", tone((140, 140, 146)), "stonebrick", 0.02),
+        ("stone", tone((132, 132, 140)), "cobble", 0.03),
+        ("quartz", tone((228, 226, 218)), "grain", 0.02),
+        ("lantern", (255, 212, 128), "lantern", 0.02),
         ("orb", ORB_COLOR, "lantern", 0.02),
-        ("sand", tone((222, 208, 150)), "noise", 0.06),
-        ("leaf", tone((72, 148, 62)), "leaves", 0.05),
-        ("water", rl.scale_rgb((120, 200, 236), lit), "grain", 0.04),
+        ("sand", tone((222, 208, 150)), "sand", 0.03),
+        ("leaf", tone((72, 148, 62)), "leaves", 0.04),
+        ("water", rl.scale_rgb((120, 200, 236), lit), "grain", 0.03),
     ]
     styles = {
         name: {"model": voxel.block_model(f"run{run}-{name}", colour,
@@ -1360,10 +2615,10 @@ def _build_styles(pal, run: int) -> dict[str, dict]:
     }
     styles["grass"] = {
         "model": voxel.block_model(f"run{run}-grass", tone((124, 92, 62)),
-                                   noise=0.05, seed=run * 17 + 40,
+                                   noise=0.03, seed=run * 17 + 40,
                                    top=tone((96, 186, 82)),
                                    side_band=tone((104, 170, 76)),
-                                   pattern="speck"),
+                                   pattern="dirt"),
         "color": tone((96, 186, 82)),
     }
     return styles

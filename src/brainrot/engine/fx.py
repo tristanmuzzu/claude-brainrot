@@ -58,13 +58,86 @@ def blob_shadow(x: float, y: float, z: float, radius: float, alpha: int = 110) -
                    (radius * 2, 1.0, radius * 2), (0, 0, 0, alpha))
 
 
+class no_depth_write:
+    """Draw without recording anything in the depth buffer.
+
+    A blend mode changes how a fragment is *combined*, not whether it is
+    recorded. A translucent quad stamps its whole shape into the depth buffer
+    anyway, alpha and all -- so everything drawn afterwards and further away is
+    rejected, and a sprite that is barely visible deletes what is behind it. A
+    lamp that quietly removes blocks is what "invisible walls" looks like from
+    the outside, and it cost this project an afternoon of looking for geometry
+    that was not there.
+
+    ``rlDisableDepthMask`` stops the recording and leaves the *test* alone,
+    which is what an overlay wants: hidden by anything genuinely in front of
+    it, hiding nothing itself.
+
+    Both flushes are load-bearing, and for opposite reasons. rlgl batches some
+    draws and issues them later, while the depth mask is plain GL state that
+    changes immediately -- so without the first flush this turns depth writing
+    off for geometry queued *before* the block, and without the second it turns
+    it back on before the block's own draws have been issued. Either way the
+    state that reaches the driver is not the state the code reads as having
+    set, which is the failure mode this class exists to make impossible to
+    write by hand.
+    """
+
+    def __enter__(self) -> "no_depth_write":
+        rl.flush()
+        rl.rlDisableDepthMask()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        rl.flush()
+        rl.rlEnableDepthMask()
+
+
+class emissive(no_depth_write):
+    """:class:`no_depth_write`, additively blended: the state a glow wants."""
+
+    def __enter__(self) -> "emissive":
+        super().__enter__()
+        rl.BeginBlendMode(rl.BLEND_ADDITIVE)
+        return self
+
+    def __exit__(self, *exc) -> None:
+        rl.EndBlendMode()
+        super().__exit__(*exc)
+
+
 def glow_billboard(camera, x: float, y: float, z: float, size: float,
                    color: rl.RGB, alpha: int = 160) -> None:
-    """Additive radial glow facing the camera -- coins, lamps, pickups."""
-    rl.BeginBlendMode(rl.BLEND_ADDITIVE)
-    rl.DrawBillboard(camera[0], textures.radial_glow(), (x, y, z), size,
-                     rl.rgba(color, alpha))
-    rl.EndBlendMode()
+    """Additive radial glow facing the camera -- coins, lamps, pickups.
+
+    One glow, one state change. Drawing a run of these is :func:`glow_pass`,
+    which is the same picture for a fraction of the cost.
+    """
+    with emissive():
+        rl.DrawBillboard(camera[0], textures.radial_glow(), (x, y, z), size,
+                         rl.rgba(color, alpha))
+
+
+def glow_pass(camera, glows) -> None:
+    """A whole frame's worth of glows, in one state change, drawn last.
+
+    Depth writing off is necessary but not sufficient. A glow drawn between
+    two blocks is still *composited* between them, so the nearer block draws
+    over the glow that was meant to sit in front of it and a lamp flickers as
+    the course goes by. Collecting them and issuing them after all the opaque
+    geometry fixes the ordering as well as the occlusion, and costs one blend
+    mode switch per frame rather than one per lantern.
+
+    ``glows`` is an iterable of ``(x, y, z, size, colour, alpha)``.
+    """
+    glows = list(glows)
+    if not glows:
+        return
+    tex = textures.radial_glow()
+    with emissive():
+        for x, y, z, size, color, alpha in glows:
+            rl.DrawBillboard(camera[0], tex, (x, y, z), size,
+                             rl.rgba(color, alpha))
 
 
 class Weather:
@@ -142,11 +215,18 @@ class Burst:
         self.particles = alive
 
     def draw(self, camera) -> None:
+        """Additive, and so it writes no depth -- see :class:`emissive`.
+
+        A burst is spawned at the player's own feet, which is the closest thing
+        in the frame to the lens: a particle stamping its quad into the depth
+        buffer there takes out whatever is behind it, and there is a great deal
+        behind it.
+        """
         if not self.particles:
             return
-        rl.BeginBlendMode(rl.BLEND_ADDITIVE)
-        for p in self.particles:
-            a = int(255 * min(1.0, p[6] * 2.5))
-            rl.DrawBillboard(camera[0], textures.radial_glow(48), (p[0], p[1], p[2]),
-                             0.22, (int(p[7]), int(p[8]), int(p[9]), a))
-        rl.EndBlendMode()
+        tex = textures.radial_glow(48)
+        with emissive():
+            for p in self.particles:
+                a = int(255 * min(1.0, p[6] * 2.5))
+                rl.DrawBillboard(camera[0], tex, (p[0], p[1], p[2]),
+                                 0.22, (int(p[7]), int(p[8]), int(p[9]), a))

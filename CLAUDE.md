@@ -31,15 +31,72 @@ appears 2.0 s after `UserPromptSubmit`, click-through, never focused, off
 alt-tab, hides 3.0 s after `Stop`, and (2026-08-07) stays hidden while the
 window in front is not the one the prompt came from.
 
-The parkour scene has had the same depth pass. Its course is generated in
-**set-pieces** (`SEGMENT_TABLE`) rather than as a uniform stream of cubes, its
-materials carry texel patterns, and the crucial structural change is that
-**the course knows its own path**: where the player will stand on each block is
-decided when the block is generated, so the exact ballistic arc of every future
-hop is computable at generation time. Orbs are hung on that arc at chest
-height, which is why "every orb laid down is collected" is a test rather than a
-hope. If you change the flight solver or the landing offsets, that test is the
-one that will tell you.
+The parkour scene has had the same depth pass, and then a second one
+(2026-08-11) after the note that "the blocks are sometimes inside each other"
+and "the parkour feels fake and scripted". Both were true and both were
+measurable; `tools/parkour_probe.py` is the thing that measures them and the
+numbers it prints are the acceptance criteria. Before: 3,756 interpenetrating
+solid pairs in 8,000 blocks (worst 0.87 m), 0.2% of blocks on an integer grid,
+the body inside a solid block on 9.3% of frames, and the player standing
+perfectly still for 30% of every frame drawn. After: **0, 100%, 0.04 m worst
+case, and 0%.** Re-run it after touching anything in this scene.
+
+Then a third pass (2026-08-11, later) for "invisible blocks or walls blocking
+other stuff", "tiny jumps that would be very weird to do quickly", and "make it
+more difficult". All three were real:
+
+- **The invisible walls were the glows.** See the depth-write landmine below.
+- **The hops were too short**, and one number fixed nearly all of it: `MIN_HOP`
+  went 1.1 -> 2.0, and because every set-piece's gap goes through `fit_gap`,
+  every hard-coded one-block gap in the file widened to two at a stroke.
+  Take-off to landing went from min 1.32 / median 2.43 to **min 2.32 / median
+  2.79 / mean 3.03 m**; landing to landing, which is what the probe has always
+  printed, went from min 2.00 / median 3.13 / max 6.45 to **2.99 / 4.00 /
+  8.18**.
+- **The course now ramps.** `difficulty` goes 0 to 1 over the first 80 blocks
+  laid. Mean flight by block index: **2.93 -> 3.08 -> 3.15 -> 3.14 m** across
+  blocks 0-40, 40-80, 80-200, 200+ -- it climbs and then *holds*, which is the
+  half of a ramp that is easy to get wrong. Two new set-pieces, `slabs`
+  (half-height landings) and `squeeze` (beams to skim under, columns to
+  clear). Report the ramp on the **mean**: a hop length is one of a handful of
+  discrete values, so the median snaps between modes and can move the wrong
+  way between two samples that differ by a few per cent.
+
+Four structural facts, all of which the tests state:
+
+- **The course is on an integer lattice, with an occupancy map** (`_solid`).
+  Headings stay continuous — a course restricted to eight compass points looks
+  like a maze — but placement snaps to whole cells, and whole cells cannot
+  interpenetrate. Placement asks four questions: are the block's cells free,
+  are the two cells above the landing free, is the hop one a body can make,
+  and does the *arc* pass through anything.
+- **Motion is vanilla's.** `GRAVITY`, `JUMP_V`, `RUN_SPEED`, `AIR_SPEED` are
+  Minecraft's own numbers converted from ticks. Horizontal speed is
+  **constant**, so `flight()` is one line and every hop is the same motion at
+  a different height. What used to be there solved each hop for a duration and
+  then clamped it, so speed swung between 3.5 and 6 m/s from hop to hop.
+- **The body never stops.** It lands on a block's near edge, runs across it,
+  and leaves from the far edge; the beat on each block is a run-up, and its
+  length is that distance at sprint pace rather than a number anybody chose.
+  This is the single change that answers "feels scripted".
+- **The course knows its own path.** Where the feet land and leave is decided
+  when the block is generated, so the arc of every future hop is computable at
+  generation time. Orbs hang *on* that arc at chest height, which is why
+  "every orb laid down is collected" is a test rather than a hope. An early
+  jump moves the take-off, so `_begin_air` re-solves the arc and re-hangs that
+  hop's orbs; on autopilot the two are identical numbers.
+
+A fifth: **the difficulty ramp is counted in blocks laid, not metres
+travelled** (`ParkourScene.difficulty`). Generation runs fourteen blocks ahead
+of the body, and the probes and half the generation tests grow a course by
+calling `_spawn_block` without ever moving one -- keyed to `self.distance` the
+ramp would read zero forever and every test that believes it is checking the
+hard end of the course would be checking the easy one.
+
+`scene.stuck` counts the times placement fell back on its unchecked emergency
+hop. It must stay zero — when it was not, the visible symptom was a flight of
+stairs stacked nearly vertically, and the cause was a set-piece asking for a
+gap its rise could not support. `fit_gap` now reconciles the two centrally.
 
 The strip can also be **dragged where you want it**: hold `drag_chord`
 (`ctrl+alt`) and drag with the mouse; double-click while holding it to go back
@@ -113,15 +170,23 @@ touching any of it — the reasoning is there, this is the short list:
    against an outside probe: a plain script is DPI-*un*aware and reads the
    same window back scaled (1920 → 1536), which looks exactly like a bug and
    is not. Call `SetProcessDpiAwareness(2)` in probes.
-2. Per-frame cost at sustained top speed, vsync off, on an idle machine:
-   runner 2.6-3.0 ms, parkour 1.5-2.3 ms, against a 16.7 ms budget. Measure
-   with `HeadlessWindow` + `SetTargetFPS(0)`; `DesktopWindow` has vsync on and
-   will report a flat 16.6 ms that tells you nothing. Take the reading on a
-   *quiet* machine — with a browser and Docker busy, both scenes measure two
-   to four times higher and the absolute numbers are worthless. **Measure
-   parkour against the runner in the same process**: that ratio is stable at
-   about 0.75 whatever else the machine is doing, and it is the number that
-   actually tells you whether a change cost anything.
+2. Per-frame cost at sustained top speed, vsync off, against a 16.7 ms
+   budget. `python tools/frame_cost.py` is the harness and it does the things
+   that have to be right: `HeadlessWindow` + `SetTargetFPS(0)` (`DesktopWindow`
+   has vsync on and reports a flat 16.6 ms that tells you nothing), and the two
+   scenes built alternately round by round, because only one scene may be alive
+   at a time and alternating averages out whatever else the machine started
+   doing. Absolute milliseconds off a busy machine are worthless; **the ratio
+   between the two scenes in one process is not**.
+
+   Measured 2026-08-11: parkour **2.02 ms**, runner 1.78 ms, ratio 1.15. Do not
+   read that ratio against the old 0.75 without checking the denominator: the
+   runner is being rewritten in a parallel session and now measures 1.78 ms
+   against the 2.6-3.0 ms this file used to record, and 2.02/2.8 = 0.72, which
+   is the old number. What did change on this side is the new set-pieces --
+   parkour past the ramp costs 2.02 ms against 1.49 ms with `squeeze` and
+   `slabs` weighted out, so their geometry is about half a millisecond. The
+   ramp itself is free.
 
 ## Tried and reverted: running along train roofs
 
@@ -138,11 +203,21 @@ exists to guarantee.
 
 ## Known limit: how long a parkour jump can be
 
-The chasm set-piece is only a little wider than the gap table's own maximum,
-and deliberately. The hop is a ballistic arc that lands exactly where it aimed,
-so a longer jump can only be paid for by crossing the ground faster than a body
-runs or by arcing higher than a body jumps, and both look wrong immediately. A
-chasm reads as a chasm because of the void under it and the two lit platforms
+There is one jump impulse and one horizontal speed, so the furthest a hop can
+reach is fixed, and `hop_span(rise)` computes it rather than anybody choosing
+it. Level, that is about 4.3 m stand point to stand point; reaching further is
+available only by *dropping*, because falling takes longer and the body does
+not slow down while it does. That is why `_seg_chasm` steps down — the extra
+hang time of a one- or two-block drop is what buys the last metre, exactly as a
+player clears a gap they cannot make level.
+
+The same arithmetic runs the other way and is why `fit_gap` exists: a hop that
+descends four blocks *cannot* also be short, because the arc covers close to
+four metres of ground before it arrives. Descents therefore leap out into the
+drop. And nothing can rise two blocks in one hop, because the discriminant has
+no solution — the same reason vanilla cannot.
+
+A chasm reads as a chasm because of the void under it and the two lit platforms
 either side, not because of another metre of distance. If you want genuinely
 long jumps you need a different motion model, not a bigger number.
 
@@ -157,6 +232,26 @@ long jumps you need a different motion model, not a bigger number.
   **Always follow a rebuild with `python assets/measure.py`.**
 - `python assets/preview.py <asset>` and
   `python assets/animstrip.py character run` render assets/clips for review.
+- `python tools/parkour_probe.py --runs 24 --motion-runs 12` is the parkour
+  scene's acceptance test in numbers: interpenetration, grid alignment,
+  emergency hops, the hop distribution and its ramp, and whether the body ever
+  ends up inside a block. Currently: **0 overlapping pairs, 0 emergency hops,
+  100% on the grid, 0% frozen frames, body worst case 0.042 m.**
+- `python tools/depth_probe.py` says what each translucent draw is hiding, by
+  re-rendering the frame with that one draw's depth writing turned off and
+  counting the pixels that change -- and again against a silhouette of the
+  course alone, which is the number that matters. Everything reads 0 now.
+  `--legacy` reconstructs the pre-fix draw order in the same process, which is
+  where the before numbers come from.
+- `python tools/frame_cost.py` times each scene in one process with vsync off
+  and reports the ratio between them. Absolute milliseconds off a busy machine
+  are worthless; that ratio is not.
+- `python tools/atlas_sheet.py out.png` shows every block pattern at texel
+  scale *and* at block scale. Judging a texture at 8x is how the first set
+  ended up as four enormous bricks and a chequerboard.
+- `python tools/contact_sheet.py <shots dir> sheet.png` tiles a whole run into
+  one image. A single frame can be flattering by accident; what needs judging
+  is whether the course stays in shot from hop to hop.
 - On a machine without a display or GPU:
   `pip install raylib-software --force-reinstall --no-deps` swaps in the
   software rasteriser (CI uses this; colours/output match the GPU build).
@@ -254,6 +349,23 @@ long jumps you need a different motion model, not a bigger number.
 - **A leaked daemon looks exactly like a window bug.** The same investigation
   first blamed the show path for a 10Hz flap that was really three daemons
   fighting. Check `brainrot doctor`'s `instances` line before theorising.
+- **A blend mode does not stop a draw writing depth**, and the symptom is
+  *missing geometry* with nothing pointing at what removed it. Additive glows
+  stamped their whole quad -- soft, mostly transparent, and at alpha 0 for an
+  orb right at the lens -- into the depth buffer, deleting every block drawn
+  after them and further away. Measured at up to 1,678 px of the frame for the
+  lanterns and **25,589 px (8%) for the landing dust burst**, which nobody had
+  suspected. Everything emissive now goes through `fx.no_depth_write` /
+  `fx.emissive`, and parkour queues its glows and issues them in one pass after
+  all the opaque geometry -- depth writing off is not enough on its own,
+  because a glow drawn between two blocks is still *composited* between them.
+  Both flushes inside those context managers are load-bearing in opposite
+  directions: rlgl issues batched draws late, the depth mask changes at once.
+  Audited the whole class with `tools/depth_probe.py`: glows, bursts, cloud
+  shelves and reef discs were all guilty and are all fixed; the haze band is 2D
+  and writes no depth; islands are solid land and *must* write depth, and
+  cannot reach the course anyway because everything in the world below tops out
+  at least 7 m under the lowest altitude the course may use (now a test).
 - **Numbers the gameplay depends on live in `metrics.json`.** Rebuild an asset
   and you must re-run `python assets/measure.py`; `tests/test_assets.py` fails
   if they drift apart. Moving a hoarding's beam moves whether a slide fits
@@ -267,7 +379,7 @@ long jumps you need a different motion model, not a bigger number.
   never by rejection sampling; invariants live in `tests/test_generation.py`.
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~50s). 399
+- Run `python -m pytest tests/` before committing; it is fast (~60s). 545
   tests. The Win32 suite skips off Windows and the X11 suite skips without a
   display, so a green run means less on the other platform's machine -- check
   the count.

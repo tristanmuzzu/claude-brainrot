@@ -160,6 +160,44 @@ def test_a_batched_plane_is_drawn_before_the_models_above_it() -> None:
     assert tuple(raw[i:i + 3]) == ground, "the ground lost the depth test"
 
 
+def test_an_emissive_draw_does_not_hide_what_is_behind_it() -> None:
+    """A blend mode says how a fragment is combined, not whether it is recorded.
+
+    An additive billboard is a soft radial disc, nearly transparent at its
+    edges and fully transparent outside them -- and it stamps that whole quad
+    into the depth buffer anyway, so anything drawn afterwards and further away
+    is rejected. The symptom is a lamp that deletes the blocks behind it, which
+    from the outside looks exactly like invisible walls in the level, and cost
+    an afternoon of hunting for geometry that was never missing.
+
+    Here the glow is nearer to the camera than the block and drawn first. If it
+    writes depth, the block never appears and the middle of the frame stays
+    green; the block is opaque and drawn second, so with the fix in place it
+    covers the glow entirely and the middle of the frame is red.
+    """
+    from brainrot.engine.fx import glow_billboard
+
+    window = ensure_window()
+    cam = rl.make_camera(60.0)
+    cam.position = (0.0, 0.0, 6.0)
+    cam.target = (0.0, 0.0, 0.0)
+    cam.up = (0.0, 1.0, 0.0)
+    block = voxel.block_model("emissive-probe", (230, 30, 30), seed=11)
+
+    def draw() -> None:
+        rl.BeginMode3D(cam[0])
+        glow_billboard(cam, 0.0, 0.0, 3.0, 4.0, (0, 255, 0), 255)
+        voxel.draw_block(block, 0.0, 0.0, 0.0, (255, 255, 255, 255), 2.0)
+        rl.EndMode3D()
+
+    window.present(draw)
+    raw = rl.capture_frame()
+    width = rl.GetScreenWidth()
+    i = ((rl.GetScreenHeight() // 2) * width + width // 2) * 4
+    r, g, b = raw[i], raw[i + 1], raw[i + 2]
+    assert r > g, f"the glow stamped depth and hid the block: rgb=({r},{g},{b})"
+
+
 def test_capture_frame_returns_the_colours_it_drew() -> None:
     """Every art decision on this project was made by looking at a capture, so
     a capture that swaps red and blue silently invalidates all of them.

@@ -249,6 +249,35 @@ nothing else:
   correctly. A tint *multiplies*, so fogging a dark object toward a dark fog
   colour only makes it darker; anything meant to recede into a night sky or a
   night sea fades on alpha as well.
+- **A blend mode does not stop a draw writing depth.** This is the single
+  most expensive lesson in the renderer, because its symptom is *missing
+  geometry* and nothing about a missing block points at the sprite that
+  removed it. `BeginBlendMode(BLEND_ADDITIVE)` changes how a fragment is
+  combined; the fragment is still recorded in the depth buffer, alpha and all.
+  A glow billboard is a soft radial disc that is nearly transparent at its
+  edges and fully transparent outside them, and it was stamping that whole
+  quad into depth — so every block drawn afterwards and further away was
+  rejected. From the outside that is an invisible wall in the level.
+  `engine/fx.py` owns the fix as two context managers, `no_depth_write` and
+  `emissive`, and nothing draws a translucent overlay without one. Both flush
+  the render batch on the way in *and* on the way out, because rlgl issues
+  batched draws late while the depth mask changes immediately — get either
+  flush wrong and the state that reaches the driver is not the state the code
+  reads as having set.
+
+  Turning the writing off is only half of it. A glow drawn *between* two
+  blocks is still composited between them, so the nearer block paints over the
+  glow that was meant to be in front of it and a lamp flickers as the course
+  goes past. Parkour therefore queues its glows during the geometry pass and
+  issues them all at the end of the frame through `fx.glow_pass`, which is
+  also one blend-mode switch per frame instead of one per lantern.
+
+  `tools/depth_probe.py` is how this is checked rather than argued about. It
+  renders a frame twice — the second time with one draw's depth writing turned
+  off, nothing else changed — and counts the pixels that differ. Zero is proof
+  the draw hides nothing. It also intersects those pixels with a silhouette of
+  the course, because scenery sixty metres below mis-tinting other scenery is
+  not what anybody is looking at.
 - **rlgl has two draw paths and they do not run in call order.**
   `DrawPlane`, `DrawLine3D` and friends queue vertices in the render batch,
   which is not submitted until something forces it (usually `EndMode3D`).
@@ -270,12 +299,28 @@ it, exactly like the reference material.
 The parkour course does not use Blender assets at all. The entire Minecraft
 look is three cheap tricks, baked into 16x16 pixel-art atlas textures at scene
 construction: vanilla's face-shading constants (top 1.0, north/south 0.8,
-east/west 0.6, bottom 0.5), per-texel noise with a darkened 1-px rim that
-separates adjacent blocks the way baked AO would, and a **texel pattern** —
-planks, brick courses, cobble, checker, ore fleck, a glowstone lattice,
-leaves. The pattern is what makes a material legible at a glance without the
-eye having to resolve its edges, and it is the difference between a course of
-coloured cubes and a course of *things*.
+east/west 0.6, bottom 0.5), a baked corner gradient standing in for vanilla's
+smooth lighting, and a **texel pattern** — planks, brick courses, stone
+brick, a Voronoi cobble, wool weave, concrete, quartz striation, ore fleck, a
+glowstone lattice, leaves, sand, dirt. The pattern is what makes a material
+legible at a glance without the eye having to resolve its edges, and it is the
+difference between a course of coloured cubes and a course of *things*.
+
+Two rules about those patterns, both learned by looking at them at the size a
+block actually occupies on the strip (`tools/atlas_sheet.py` renders every one
+at texel scale and at block scale, side by side, which is the only way to
+judge this):
+
+- **Detail lives at the top of the range.** Small amplitude, high frequency.
+  The first version drew four enormous bricks and an eight-texel
+  chequerboard; at block scale that reads as a *stamp on a plastic cube*
+  rather than as a material. The only strong darks left are structural —
+  mortar, plank seams, the gaps between stones.
+- **Corners darken, edges darken less.** There is no neighbour information at
+  texture-build time, so the gradient is baked as if every block had
+  neighbours. The error on a lone floating block is a slightly rounded look,
+  which is the harmless direction; without it a wall of identical cubes reads
+  as one surface rather than as cubes.
 
 One shared unit-cube mesh carries per-face atlas UVs; each style is a material
 wrapping it, and `draw_box` scales it per axis, so slabs, panes, posts, beams
@@ -310,26 +355,76 @@ the same poses the GPU does.
   6 m row from a per-row substream).
 - **parkour** is **first-person**, because the real Minecraft-parkour reels
   are recorded first-person on infinite-parkour servers. The generator starts
-  from the plugin that produces most of that footage — weighted gap (1-4
+  from the plugin that produces most of that footage — weighted gap (2-5
   blocks) and rise (-2..+1) tables, Gaussian lateral drift steered back toward
-  a spine, refusal to overlap recent course, blocks despawning two behind —
-  and then works in **set-pieces** on top of it, because a uniform stream of
-  cubes is only watchable for about ten seconds. `SEGMENT_TABLE` is the
-  vocabulary: staircase, plank causeway, spiral round a brick tower, gate you
-  run *through*, long fall, lantern walk, chasm. A segment never follows
-  itself, and which ones are eligible depends on which way the course has
-  drifted within its altitude band — so verticality comes from steering
-  generation rather than from vetoing it.
+  a spine, blocks despawning two behind — and then works in **set-pieces** on
+  top of it, because a uniform stream of cubes is only watchable for about ten
+  seconds. `SEGMENT_TABLE` is the vocabulary: staircase, plank causeway,
+  spiral round a brick tower, gate you run *through*, long fall, lantern walk,
+  chasm, a field of capped columns, a ruined wall, a run of half-height slab
+  landings, and a squeeze of beams to skim under and columns to clear. A
+  segment never follows itself, and which ones are eligible depends on which
+  way the course has drifted within its altitude band — so verticality comes
+  from steering generation rather than from vetoing it.
 
-  Two consequences worth knowing before changing any of it:
+  **The course also gets harder as it goes.** `difficulty` runs 0 to 1 over
+  the first eighty blocks laid, and every set-piece draws its gap from a pair
+  of tables through `_gap` rather than from a constant — the ramp has to reach
+  the whole vocabulary, because the cruise is only about a fifth of the blocks
+  and ramping it alone moved the median hop by two centimetres. `SEGMENT_RAMP`
+  applies the same idea to which set-pieces get chosen, which is the half a
+  viewer actually reads: a squeeze arriving instead of a plank causeway is a
+  change of subject, where a wider gap is only a number. It is counted in
+  blocks laid and not metres travelled, because generation runs fourteen
+  blocks ahead of the body and because the probes grow a course without ever
+  moving one.
 
-  - **The course knows its own path.** Where the player will stand on each
-    block is drawn when the block is generated, so the exact ballistic arc of
-    every future hop is computable at generation time. Orbs are hung *on* that
-    arc at chest height, which makes "every orb laid down is collected" a
-    property of generation rather than a hope about the simulation.
-  - **Flight time comes from the drop, not only the distance.** A hop covers
-    its gap at running pace; a fall takes as long as a fall takes.
+  **A beam over a gap is built against the arc that will be flown under it.**
+  Where the feet leave and land is known when a block is generated, so the
+  exact flight is a list of points, and a lintel hung a body's height above
+  the highest of them — or a column topped out just below the lowest — is
+  guaranteed to be missed while looking as though it will not be. `HEADROOM`
+  still keeps two cells clear over every *landing*; what the squeeze relaxes
+  is the space over the **gap**, which nothing ever needed. Note the shape of
+  the limit that fell out of this: the arc apexes under a metre above the
+  surface it left, because `flight` solves the take-off for the two endpoints
+  rather than using vanilla's full jump — so a column in a gap tops out level
+  with the course and there is no room for a taller one.
+
+  Four things carry the weight, and all four were rebuilt after the scene came
+  back with "the blocks are inside each other and the running feels scripted":
+
+  - **The course is on an integer lattice.** Headings stay continuous, because
+    a course that may only run along eight compass points looks like a maze;
+    but the *placement* those headings produce is snapped to whole cells, and
+    two cubes at whole cells cannot be inside one another. The previous
+    generator asked only whether the next block's centre was 1.45 m from a
+    recent one, which is not a question about volumes at all: measured over
+    eight thousand blocks, one pair in two interpenetrated, worst case nearly
+    a whole block deep. It is now zero by construction.
+  - **`_solid` is the occupancy map, and it is asked four questions.** Are the
+    block's own cells free; are the two cells above the landing free (a body
+    is 1.8 m tall and has to fit); is the hop one a body can make; does the
+    *arc* pass through anything. Candidates are tried in order of how close
+    they are to what the set-piece asked for, so the first that satisfies all
+    four is also the nearest thing to what was wanted.
+  - **Motion is vanilla's, in vanilla's numbers.** One gravity, one jump
+    impulse, one sprint speed, one sprint-jump speed. `flight()` is now a
+    single line — horizontal speed is *constant*, so a hop's duration is its
+    length over that speed and the take-off is whatever lands you on the far
+    end. Whether that take-off is one a body has is a separate question, asked
+    once, in `_fits`, which is why there is no table of legal gaps: `hop_span`
+    derives them. The body also never stops. It lands on the near edge of a
+    block, runs across it, and leaves from the far edge — so the gap it
+    actually clears is wider than the gap between block centres, and the beat
+    on each block is a run-up rather than a pause.
+  - **The course knows its own path.** Where the feet touch down and leave is
+    decided when the block is generated, so the exact ballistic arc of every
+    future hop is computable at generation time. Orbs are hung *on* that arc
+    at chest height, which makes "every orb laid down is collected" a property
+    of generation rather than a hope about the simulation. A player who jumps
+    early moves the take-off, so the arc is re-solved at that moment and the
+    orbs on it move with it — on autopilot the two are the same numbers.
 
 ## Solvability by construction
 
@@ -345,14 +440,18 @@ loop.
   changes work mid-air, exactly like the game it imitates; with two oncoming
   trains a dodge can be pinned with no legal answer, which is why the limit is
   structural rather than probabilistic).
-- **parkour**: no hop is laid down that the flight solver cannot fly — the
-  test states the invariant against the solver rather than against the tables,
-  because the set-pieces widened what a hop may be. Altitude is clamped to a
-  band that segment choice keeps it away from; candidate headings fan out
-  until one clears the recent course; a hop shorter than `MIN_HOP` is pushed
-  out until there is a real jump to make. Every orb the generator hangs is
-  collected, which is asserted over two minutes of running and again over a
-  minute of being steered by hand.
+- **parkour**: no hop is laid down that a body cannot fly. The invariant is
+  stated against the take-off the hop *needs* — it must be between standing
+  off an edge and vanilla's one jump impulse, and the arc must be on its way
+  down when it arrives, or the body has come up through the side of the block
+  rather than onto it. A set-piece asking for a gap its rise cannot support
+  has that gap widened (`fit_gap`) before placement ever sees it; a drop
+  cannot also be a short hop, because the body keeps its speed all the way
+  down. Placement falls back through nearby rises and then through wider gaps
+  and deeper drops, and the one emergency answer left at the bottom is counted
+  in `scene.stuck`, which the tests hold at zero. Every orb the generator
+  hangs is collected, which is asserted over two minutes of running and again
+  over a minute of being steered by hand.
 
 All of these are asserted directly in `tests/test_generation.py` across many
 runs, rather than being left as comments.
@@ -368,6 +467,18 @@ is also what makes every appearance freshly generated.
 ## Layout
 
 ```
+tools/                offline, never imported by the daemon
+├── parkour_probe.py  measures the parkour course and its motion: block
+│                     interpenetration, grid alignment, emergency hops, the
+│                     hop distribution and its difficulty ramp, and whether
+│                     the body is ever inside a solid block
+├── depth_probe.py    what each translucent draw is hiding, by re-rendering
+│                     the frame with that one draw's depth writing off
+├── frame_cost.py     per-frame cost of each scene, alternated in one process
+│                     so the ratio between them survives a busy machine
+├── atlas_sheet.py    every block pattern at texel scale and at block scale
+└── contact_sheet.py  tile a run's `shoot` frames into one image to look at
+
 assets/
 ├── build.py          rebuild committed .glb files (one bpy subprocess each)
 ├── preview.py        render any asset to PNG with the CI rasteriser

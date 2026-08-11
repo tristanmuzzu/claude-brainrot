@@ -35,7 +35,15 @@ from pathlib import Path
 # Useful when generation logic changes and old seeds would produce stale-looking
 # output that no longer matches the current art direction.
 # Epoch 2: the raylib/3D-asset rebuild.
-GENERATION_EPOCH = 2
+# Epoch 3: parkour moved onto an integer lattice and onto Minecraft's own
+# motion constants. Every course a pre-epoch-3 seed described was a scatter of
+# unit cubes at arbitrary sub-block offsets, so those seeds are not merely
+# stale -- they name layouts the generator can no longer express.
+# Epoch 4: the parkour hop floor went from 1.1 m to 2.0 m, which widened every
+# one-block gap in the vocabulary through fit_gap; the course gained a
+# difficulty ramp and two set-pieces. A pre-epoch-4 seed names a course made of
+# hops the generator would now refuse to lay.
+GENERATION_EPOCH = 4
 
 _STATE_FILENAME = "state.json"
 
