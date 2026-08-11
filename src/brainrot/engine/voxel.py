@@ -16,6 +16,7 @@ mesh with its own atlas texture, drawn per block with a distance-fog tint.
 from __future__ import annotations
 
 import random
+from functools import lru_cache
 
 from PIL import Image
 
@@ -48,50 +49,193 @@ def _hash01(x: int, y: int, salt: int) -> float:
 #: every material has its own *grain* -- courses in brick, boards in wood, a
 #: lattice in glowstone -- so the eye separates the structures without needing
 #: to resolve their edges.
-PATTERNS = ("noise", "planks", "bricks", "checker", "grain", "speck",
-            "lantern", "leaves", "cobble")
+#:
+#: The frequencies matter as much as the shapes. The first version of these
+#: drew four enormous bricks and an eight-texel checkerboard, which at the size
+#: a block actually occupies on the strip read as a *stamp* on a plastic cube
+#: rather than as a material. Vanilla's textures are busy at the texel and calm
+#: at the block, and everything here is now cut to that rule: detail lives in
+#: the top of the range (small amplitude, high frequency), and the only strong
+#: darks are structural -- mortar, seams, the gaps between stones.
+PATTERNS = ("noise", "planks", "bricks", "stonebrick", "checker", "grain",
+            "speck", "lantern", "leaves", "cobble", "wool", "concrete",
+            "sand", "dirt")
+
+
+@lru_cache(maxsize=256)
+def _cobble_face(salt: int) -> tuple[tuple[int, float], ...]:
+    """The whole 16x16 Voronoi for one salt, computed once.
+
+    Cobble is by a long way the most expensive pattern here -- sixteen
+    candidate cells per texel -- and it does not depend on which *face* is
+    being drawn, so the naive call site evaluated the same 256 answers six
+    times per material. Measured: 34 ms for one cobble strip, against about
+    one for every other pattern, and a scene that bakes half a dozen stone
+    materials paid it every time.
+    """
+    # The jitter of a cell centre depends only on which of the four wrapped
+    # cells it is, so the sixteen candidate centres are eight hash calls for
+    # the whole face rather than thirty-two per texel.
+    centres = []
+    for cy in range(-1, 3):
+        for cx in range(-1, 3):
+            gx, gy = cx % 2, cy % 2
+            centres.append((
+                (cx + 0.5 + (_hash01(gx, gy, salt) - 0.5) * 1.1) * 8.0,
+                (cy + 0.5 + (_hash01(gx, gy, salt + 7) - 0.5) * 1.1) * 8.0,
+                gy * 2 + gx))
+    out = []
+    for y in range(16):
+        for x in range(16):
+            px, py = x + 0.5, y + 0.5
+            best, second, which = 9e9, 9e9, 0
+            for jx, jy, cell in centres:
+                d = (px - jx) ** 2 + (py - jy) ** 2
+                if d < best:
+                    best, second, which = d, best, cell
+                elif d < second:
+                    second = d
+            out.append((which, second ** 0.5 - best ** 0.5))
+    return tuple(out)
+
+
+def _cobble_cell(x: int, y: int, salt: int) -> tuple[int, float]:
+    """Which stone of a cobble face a texel belongs to, and how far inside it.
+
+    A Voronoi over jittered cell centres, wrapped so the face tiles with
+    itself. Cobblestone is the one vanilla texture whose whole character is
+    that its cells are *irregular* -- laid out on a 4x4 grid it stops being
+    cobble and becomes tile, which is what the previous version drew.
+    """
+    best, second, which = 9e9, 9e9, 0
+    for cy in range(-1, 3):
+        for cx in range(-1, 3):
+            gx, gy = cx % 2, cy % 2          # 2x2 cells of 8 texels, wrapped
+            jx = (cx + 0.5 + (_hash01(gx, gy, salt) - 0.5) * 1.1) * 8.0
+            jy = (cy + 0.5 + (_hash01(gx, gy, salt + 7) - 0.5) * 1.1) * 8.0
+            d = (x + 0.5 - jx) ** 2 + (y + 0.5 - jy) ** 2
+            if d < best:
+                best, second, which = d, best, gy * 2 + gx
+            elif d < second:
+                second = d
+    return which, second ** 0.5 - best ** 0.5
 
 
 def _pattern_factor(kind: str, face: str, x: int, y: int, salt: int) -> float:
     """Brightness multiplier for one texel of one face."""
     if kind == "planks":
+        # Four boards, a dark seam between them, end joints staggered from
+        # board to board, and grain running *along* the board rather than a
+        # flat fill -- the flat fill is what made these read as painted stripes.
+        board = y // 4
         if y % 4 == 0:
-            return 0.70                      # seam between boards
-        return 0.94 + _hash01(0, y // 4, salt) * 0.14
+            return 0.74
+        if (x + board * 5) % 16 == 0:
+            return 0.80                      # end joint
+        base = 0.93 + _hash01(0, board, salt) * 0.09
+        streak = (_hash01(x, board * 4 + (y % 4), salt) - 0.5) * 0.10
+        knot = 0.90 if _hash01(x // 2, board, salt + 3) > 0.965 else 1.0
+        return base + streak + (knot - 1.0)
     if kind == "bricks":
         row = y // 4
         if y % 4 == 0:
-            return 0.68                      # mortar course
-        if (x + (0 if row % 2 == 0 else 8)) % 8 == 0:
-            return 0.68                      # staggered vertical joint
-        return 0.93 + _hash01(x // 8, row, salt) * 0.12
+            return 0.72                      # mortar course
+        if (x + (0 if row % 2 == 0 else 4)) % 8 == 0:
+            return 0.72                      # staggered vertical joint
+        brick = (x + (0 if row % 2 == 0 else 4)) // 8
+        return (0.92 + _hash01(brick, row, salt) * 0.12
+                + (_hash01(x, y, salt + 11) - 0.5) * 0.05)
+    if kind == "stonebrick":
+        # Two courses of two, offset -- vanilla's stone brick, which is what
+        # makes a tower read as masonry instead of as a grey column.
+        row = y // 8
+        if y % 8 == 0:
+            return 0.76
+        if (x + (0 if row % 2 == 0 else 4)) % 8 == 0:
+            return 0.76
+        return (0.93 + _hash01((x + row * 4) // 8, row, salt) * 0.10
+                + (_hash01(x, y, salt + 5) - 0.5) * 0.06)
     if kind == "checker":
-        return 1.06 if ((x // 8) + (y // 8)) % 2 == 0 else 0.80
+        # Kept for compatibility, but at a fraction of its old contrast: the
+        # 8-texel two-tone chequer was legible from across the room and made
+        # every platform look like a bathroom floor.
+        base = 1.02 if ((x // 4) + (y // 4)) % 2 == 0 else 0.94
+        return base + (_hash01(x, y, salt) - 0.5) * 0.06
     if kind == "grain":
-        if face in ("top", "bottom"):
-            return 0.92 + _hash01(x // 2, y // 2, salt) * 0.16
-        return 0.88 + _hash01(x, 0, salt) * 0.24
+        # Quartz: near-white with the faintest vertical striation.
+        return (0.96 + _hash01(x, 0, salt) * 0.06
+                + (_hash01(x, y, salt + 2) - 0.5) * 0.04)
     if kind == "speck":
-        h = _hash01(x, y, salt)
-        if h > 0.94:
-            return 1.35                      # ore fleck
-        if h < 0.10:
-            return 0.74
-        return 0.96 + h * 0.08
+        # Ore: a handful of flecks in clusters, not salt-and-pepper. Random
+        # per-texel flecks average out to grey the moment a block is small.
+        h = _hash01(x // 3, y // 3, salt)
+        if h > 0.86 and _hash01(x, y, salt + 1) > 0.35:
+            return 1.28
+        return 0.95 + _hash01(x, y, salt + 9) * 0.10
     if kind == "lantern":
-        if min(x, y, 15 - x, 15 - y) <= 1:
-            return 0.72                      # dark frame
-        if 3 <= x <= 12 and 3 <= y <= 12 and (x + y) % 3:
-            return 1.45                      # blown-out core: reads as emissive
-        return 1.05
+        edge = min(x, y, 15 - x, 15 - y)
+        if edge == 0:
+            return 0.66                      # iron frame
+        if edge == 1:
+            return 0.80
+        if 3 <= x <= 12 and 3 <= y <= 12:
+            # a lattice over a blown-out core: reads as emissive without any
+            # lighting, and the lattice is what stops it reading as a flat chip
+            return 1.10 if (x % 4 == 0 or y % 4 == 0) else 1.48
+        return 1.02
     if kind == "leaves":
-        return 0.66 + _hash01(x, y, salt) * 0.62
+        # Dense, with holes you can see sky through in vanilla. Here the holes
+        # are just very dark, which reads the same at this size.
+        h = _hash01(x, y, salt)
+        if h < 0.12:
+            return 0.58
+        return 0.82 + h * 0.34
     if kind == "cobble":
-        cell = _hash01(x // 4, y // 4, salt)
-        if (x % 4 == 0 or y % 4 == 0) and cell > 0.35:
-            return 0.66                      # gap between stones
-        return 0.84 + cell * 0.30
-    return 1.0
+        which, edge = _cobble_face(salt)[y * 16 + x]
+        if edge < 0.85:
+            return 0.70                      # gap between stones
+        return (0.86 + _hash01(which, which * 3, salt) * 0.22
+                + (_hash01(x, y, salt + 13) - 0.5) * 0.07)
+    if kind == "wool":
+        # Fabric: a fine weave, deliberately low contrast. This is what the
+        # course's own colours wear, and vanilla wool is calm at the block.
+        weave = 1.0 - 0.035 * ((x + y) % 3 == 0) + 0.03 * ((x - y) % 4 == 0)
+        return weave + (_hash01(x, y, salt) - 0.5) * 0.07
+    if kind == "concrete":
+        return 0.985 + _hash01(x, y, salt) * 0.03
+    if kind == "sand":
+        return 0.94 + _hash01(x, y, salt) * 0.11
+    if kind == "dirt":
+        h = _hash01(x // 2, y // 2, salt)
+        return 0.86 + h * 0.22 + (_hash01(x, y, salt + 4) - 0.5) * 0.08
+    return 0.96 + _hash01(x, y, salt) * 0.08
+
+
+@lru_cache(maxsize=1)
+def _ao_table() -> tuple[float, ...]:
+    """:func:`_ao` for all 256 texels, computed once for the process.
+
+    It has no salt in it, so every material and every face has always been
+    asking for the same 256 answers."""
+    return tuple(_ao(x, y) for y in range(16) for x in range(16))
+
+
+def _ao(x: int, y: int) -> float:
+    """Baked corner shading for one texel of a face.
+
+    Vanilla's smooth lighting darkens a face toward the edges and harder still
+    into the corners, where two neighbours occlude at once. That gradient is
+    most of why a solid wall of identical cubes still reads as *cubes* rather
+    than as one large surface -- and it is why a course drawn without it looks
+    like coloured card. There is no neighbour information at texture-build
+    time, so it is baked as if every block had them: the error on a lone
+    floating block is a slightly rounded look, which is the harmless direction.
+    """
+    u = min(x, 15 - x) / 7.5               # 0 at the rim, 1 down the middle
+    v = min(y, 15 - y) / 7.5
+    edge = max(0.0, 1.0 - min(u, v) * 2.6)
+    corner = max(0.0, 1.0 - u * 1.9) * max(0.0, 1.0 - v * 1.9)
+    return 1.0 - 0.05 * edge ** 1.6 - 0.045 * corner
 
 
 def _atlas(base: rl.RGB, noise: float, seed: int,
@@ -99,8 +243,14 @@ def _atlas(base: rl.RGB, noise: float, seed: int,
            pattern: str = "noise") -> Image.Image:
     """A 96x16 strip of six 16x16 face tiles, shaded, patterned and noised."""
     rng = random.Random(seed)
-    im = Image.new("RGBA", (96, 16))
-    px = im.load()
+    # Built as a flat RGBA buffer rather than through ``Image.load()``.
+    # Identical pixels -- the loop order, and therefore the jitter sequence, is
+    # unchanged -- but ``px[x, y] = tuple`` costs about two microseconds a
+    # texel, and the tower scene bakes fifty-odd materials at once: measured,
+    # that one call was 280 ms of a 315 ms scene construction, which the
+    # overlay pays as a delay before its first frame.
+    buf = bytearray(96 * 16 * 4)
+    ao = _ao_table()
     for fi, face in enumerate(FACES):
         colour = base
         if top is not None and face == "top":
@@ -109,19 +259,36 @@ def _atlas(base: rl.RGB, noise: float, seed: int,
         for y in range(16):
             for x in range(16):
                 c = colour
-                # side blocks with a distinct top get a 3px cap band (grass)
-                if side_band is not None and face not in ("top", "bottom") and y < 3:
-                    c = side_band
+                # Side blocks with a distinct top get a cap band (grass), and
+                # the band's lower edge is ragged rather than a ruled line --
+                # vanilla's grass overlay dribbles down the side, and a
+                # perfectly straight join is the single most obvious tell that
+                # a texture was drawn by an equation.
+                if side_band is not None and face not in ("top", "bottom"):
+                    if y < 2 + int(_hash01(x, 0, seed + 21) * 3.0):
+                        c = side_band
                 jitter = 1.0 + rng.uniform(-noise, noise)
-                rim = 0.90 if (x in (0, 15) or y in (0, 15)) else 1.0
-                f = shade * jitter * rim * _pattern_factor(pattern, face, x, y, seed)
-                px[fi * 16 + x, y] = (
-                    max(0, min(255, int(c[0] * f))),
-                    max(0, min(255, int(c[1] * f))),
-                    max(0, min(255, int(c[2] * f))),
-                    255,
-                )
-    return im
+                f = (shade * jitter * ao[y * 16 + x]
+                     * _pattern_factor(pattern, face, x, y, seed))
+                i = (y * 96 + fi * 16 + x) * 4
+                buf[i] = max(0, min(255, int(c[0] * f)))
+                buf[i + 1] = max(0, min(255, int(c[1] * f)))
+                buf[i + 2] = max(0, min(255, int(c[2] * f)))
+                buf[i + 3] = 255
+    return Image.frombytes("RGBA", (96, 16), bytes(buf))
+
+
+def face_strip(base: rl.RGB, noise: float = 0.05, seed: int = 0,
+               top: rl.RGB | None = None, side_band: rl.RGB | None = None,
+               pattern: str = "noise") -> Image.Image:
+    """One style's six face tiles, for callers assembling their own atlas.
+
+    :mod:`brainrot.engine.chunk` stacks a whole catalogue of these into a
+    single texture so that a meshed chunk of architecture is one draw call
+    whatever it is made of. Same pixels as a block model's own atlas -- there
+    is exactly one place a material's look is decided.
+    """
+    return _atlas(base, noise, seed, top, side_band, pattern)
 
 
 def _cube_mesh():

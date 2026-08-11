@@ -86,7 +86,7 @@ class Config:
 
     # --- Content ---------------------------------------------------------
     #: Scenes eligible to play. Order is irrelevant; selection is seeded.
-    scenes: list[str] = field(default_factory=lambda: ["runner", "parkour"])
+    scenes: list[str] = field(default_factory=lambda: ["runner", "parkour", "tower"])
     #: Force one scene (debugging). Empty means "pick per run".
     force_scene: str = ""
     #: Replay a specific run number instead of advancing the counter.

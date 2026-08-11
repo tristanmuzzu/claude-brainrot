@@ -1,16 +1,19 @@
 # claude-brainrot — project context
 
 A generated 3D "brainrot" overlay (Subway-Surfers-style runner + first-person
-Minecraft parkour) that appears while Claude Code is thinking. raylib renderer,
-glTF assets built by the Blender scripts in `assets/src/`, worlds generated
-per-seed. Read `docs/ARCHITECTURE.md` for how the pieces fit; it is current.
+Minecraft parkour, flat and up a spiral tower) that appears while Claude Code
+is thinking. raylib renderer, glTF assets built by the Blender scripts in
+`assets/src/`, worlds generated per-seed. Read `docs/ARCHITECTURE.md` for how
+the pieces fit; it is current.
 
-## State of the project (updated 2026-08-09)
+## State of the project (updated 2026-08-11)
 
 Branch `claude/project-visuals-animations-qzbkiq` holds a complete rebuild:
-pygame → raylib + baked-light glTF assets, both scenes rebuilt to match the
-real reel formats, animation overhaul (rig with knees/elbows, world-axis pose
-system, ballistic parkour hops with ground beats).
+pygame → raylib + baked-light glTF assets, both original scenes rebuilt to
+match the real reel formats, animation overhaul (rig with knees/elbows,
+world-axis pose system, ballistic parkour hops with ground beats) — and a
+**third scene, `tower`**, which is spiral-tower parkour and has its own section
+below.
 
 **Now verified on real Windows hardware with a GPU**, which turned up several
 things the software-rasteriser cloud sessions could not have seen — see
@@ -197,6 +200,108 @@ window being dragged. Real geometry lives in `overlay/win32.py`
 (`window_rect`, `work_area`, `move_window` — `SetWindowPos`, never raylib's
 `SetWindowPosition`, which would block off-thread).
 
+## Tower parkour (added 2026-08-11)
+
+A third scene, `tower`, and the other Minecraft reel format rather than a
+reskin of the first: **spiral-tower parkour** -- the Parkour Spiral / Tower of
+Hell genre, where the course winds up the outside of a building that keeps
+going out of the top of the frame. `scenes/towerplan.py` is the whole format
+and none of its rendering (**no raylib import**, deliberately: a sixty-run
+geometry sweep costs four seconds and no window); `scenes/tower.py` draws it.
+
+Four things break if you try to express this as a variation on flat parkour,
+and each of them is why the split exists:
+
+- **Progress is altitude, round a fixed axis.** The course comes back over
+  itself every revolution, so an occupancy map that only grows refuses the
+  world far sooner than the flat scene's would.
+- **Most of what you see is architecture** -- wall, windows, cornices,
+  buttresses, galleries -- which is thousands of static cells. Hence
+  `engine/chunk.py` (below).
+- **Two blocks up is normal and one jump impulse reaches 1.25.** So the scene
+  has the game's other verbs, each checked against its own physics: a ladder at
+  2.35 m/s, a soul-sand bubble column at **eleven** (it really is that fast in
+  Java, and the whoosh is the point), a slime bounce, an ice run-up, cobweb,
+  soul sand. `Move` is a **list of legs** with a speed each rather than a
+  hard-coded parabola, which is what keeps the simulation, the orb solver and
+  the probe to one code path.
+- **Sections, not just set-pieces.** Eleven themed rings out of a shuffled bag,
+  twelve blocks of altitude each, changing **abruptly at the gallery** between
+  them -- the one structural note every spiral map in the reference material
+  agrees on.
+
+Two numbers set the pace and neither is a taste call: a helix cannot climb
+faster than about a block a hop, and two published spiral maps independently
+work out at 0.64 blocks of rise per hop, which at this radius is twelve blocks
+a revolution. Hence `TIER_H = 12`, one ring per turn, about sixteen seconds.
+
+**Slime is not a way to gain height.** Vanilla's restitution is exactly 1.0 and
+holding jump *cancels* the bounce, so there is no way to add the impulse on top
+and no way to chain upward. What a pad is for is spending a drop somewhere else
+-- fall down a shaft, come back up the far side -- and `_seg_slimeshaft` is
+built that way. The obvious design is free energy.
+
+**The climb is governed, not hoped for.** `CLIMB_TARGET` says where the course
+should be by now and `climb_pressure` reweights the set-piece table and then
+floors the rises when it falls behind. Against a high-water mark instead, the
+course climbs until it beats its own record, relaxes, spends the gain on the
+next descending set-piece and comes back to the same mark: measured, one run in
+eight gained **seven centimetres a second** over forty-five seconds that way. A
+spiral tower that does not go up.
+
+**Four reservations, not one occupancy map.** `solid` is the building plus the
+course; `softcells` is what a ladder, bubble column or cobweb is using (drawn,
+never solid); `headroom` is the two cells over every live landing; `pathcells`
+is every cell the body will pass through on a move already solved. The last two
+exist because *checking is not reserving*: head-room is checked when a block is
+placed, and a spiral comes back over itself, so a later block -- or a post
+driven down from a landing twenty blocks further on -- lands in the space an
+earlier one was given to stand in. Both cases measured as the body running for
+a second with three quarters of a metre of masonry through its head, and
+neither is visible any other way. Removing those two reservations takes the
+body-inside-the-building figure from 23 frames in 27,000 to about 150.
+
+`tools/tower_probe.py` is the acceptance test in numbers. Current, over 60 runs
+x 400 blocks for safety and 10 runs x 45 s for the rest:
+
+| | |
+|---|---|
+| cells claimed twice (of 1,010,000) | **0** |
+| blocks off the integer lattice | **0** of 24,960 |
+| emergency placements | **1** in 24,960 |
+| ladders/water inside masonry | **0** |
+| orbs laid but not collected | **0** of 483 |
+| body inside the building | 23 frames of 27,000 (worst 0.60 m) |
+| altitude gained | 0.63 / **0.77** / 1.07 m/s (min/mean/max per run) |
+| seconds on one themed ring | 4.3 / **11.6** / 21.5 s |
+| revolutions per minute | **5.5** |
+| moves per minute | **95** |
+| median idle between moves | **0.55 s** |
+| dead air (idle over 3 s) | **0.1%** |
+| frozen (under 0.05 m/s, 3-D) | **0.0%** of frames |
+| move mix | hop 88%, walk 8%, climb 1.2%, bounce 1.0%, slide 0.7%, bubble 0.7%, web 0.5% |
+| set-piece mix | 16 kinds, none over 15% |
+| per-frame cost | **1.28 ms** against runner 2.10 and parkour 2.18 |
+
+Two of those need a note. **The body figure is not zero** and the residue is
+the same class each time -- structure or a support post built after an arc was
+solved, in a corner the reservations do not quite cover. It is 0.085% of frames
+and the exemptions the probe makes (the block being left and the block being
+arrived on) are exactly the three the generator makes, stated in both files.
+And **the emergency placement is not zero either**: it is one in twenty-five
+thousand blocks, about one every ninety minutes of runtime, and what it can
+break -- interpenetration -- is separately asserted at zero over a million
+cells. `_attempt(strict=False)` is what keeps it that rare: correctness rules
+(empty, head-room, a move the physics has, a clear path) never relax; comfort
+rules (room to stand, clear of a gallery overhang) do, at the last resort.
+
+**Do not chase the spiral by widening the tower.** `RADII` is 5-8 and the
+course band is `wall + 2.6..5.4`. Measured both ways: pull the course in and
+the strip is a portrait window with a wall four metres away filling all of its
+~50 degrees of horizontal field; push the camera's aim a quarter of the way
+toward the axis and it is worse. `AXIS_BIAS = 0.12` puts the building along one
+edge, which is where a player hugging a wall actually sees it.
+
 ## Linux (added 2026-08-09, verified on the owner's Ubuntu box)
 
 Runs on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200% scaling) with the same
@@ -223,6 +328,13 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
+0. **`tools/depth_probe.py` does not know about the tower.** It patches
+   `parkour`'s own draw methods by name. The tower's translucent draws -- cloud
+   shelves, water columns, cobweb, every glow -- all go through
+   `fx.no_depth_write` / `fx.glow_pass`, and `tests/test_tower.py` proves the
+   guard is load-bearing by rendering a frame with it neutered and requiring
+   the frames to differ. What is *not* measured is how many pixels each
+   individual draw would hide, which is what the probe would tell you.
 1. **DPI**: measured 2026-08-07 on the owner's 1920x1080 at 125%. The daemon
    *is* per-monitor DPI aware — GLFW sets that at `InitWindow` — so every
    `GetWindowRect`/`SetWindowPos`/work-area number inside it is in **physical
@@ -249,6 +361,12 @@ touching any of it — the reasoning is there, this is the short list:
    past the ramp costs 2.02 ms against 1.49 ms with `squeeze` and `slabs`
    weighted out, so their geometry is about half a millisecond. The ramp
    itself is free.
+
+   Measured again 2026-08-11 with the tower added: runner 2.10, parkour 2.18,
+   **tower 1.28** ms. The tower being the *cheapest* of the three, while
+   drawing an entire building, is the meshed-chunk renderer doing its job --
+   fifty chunks of face-culled geometry are one draw call each, against one
+   call per cube for a course of a dozen platforms.
 
    The runner's own set-piece rewrite was measured the same way, back to back
    on a busier machine: **1.025 before, 1.005 after**, against a round-to-round
@@ -366,6 +484,15 @@ long jumps you need a different motion model, not a bigger number.
   minute, and "surface pops" — a body teleported upward by a surface, which is
   what a badly built ramp looks like). `--safety-runs 60 --safety-seconds 180`
   is the full sweep the collision model is held to.
+- `python tools/tower_probe.py --runs 60 --blocks 400 --motion-runs 10` is the
+  tower scene's acceptance test in numbers, in three sections: **safety**
+  (cells claimed twice, blocks off the lattice, emergency placements, ladders
+  inside masonry), **the course** (move lengths and their ramp, the move and
+  set-piece mix), and **the climb and pacing** (metres a second gained, seconds
+  on a ring, revolutions a minute, the idle between moves, and whether the body
+  is ever inside the building). `--no-motion` needs no window at all, because
+  `scenes/towerplan.py` imports no renderer -- a sixty-run sweep is four
+  seconds.
 - `python tools/parkour_probe.py --runs 24 --motion-runs 12` is the parkour
   scene's acceptance test in numbers: interpenetration, grid alignment,
   emergency hops, the hop distribution and its ramp, and whether the body ever
@@ -392,6 +519,24 @@ long jumps you need a different motion model, not a bigger number.
 
 ## Landmines that cost hours — do not relearn these
 
+- **A cell's `y` is its floor, its `x` and `z` are its centre.** Everything
+  that reasons about standing on a block (`surface = y + 1`) depends on it, and
+  a cube mesh centred on `y` instead draws a whole building half a block below
+  the world it collides with. `engine/chunk.py` adds the +0.5 explicitly.
+- **A mesh raylib will free must be allocated by raylib.** `UnloadMesh` calls
+  `RL_FREE` on `mesh.vertices`; hand it a cffi buffer and the process dies
+  inside libc. `chunk.py` `MemAlloc`s and memmoves; `voxel.py` takes the other
+  way out and never unloads its one shared cube.
+- **Checking is not reserving.** Head-room is checked when a block is placed;
+  nothing stopped a *later* block, or a support post from a landing twenty
+  blocks on, being built in it. On a course that comes back over itself that is
+  routine, and the symptom is the body running with masonry through its head.
+  See the tower's four reservations above.
+- **A texture pattern that ignores `face` was still being computed six times.**
+  `_cobble_face` and `_ao_table` are cached per salt and per process; before
+  them one cobble strip cost 34 ms, and the tower bakes fifty-odd materials at
+  scene construction. Also: `Image.load()[x, y] = tuple` is about two
+  microseconds a texel -- that one call was 280 ms of a 315 ms build.
 - **Pose-bone axes**: down-pointing bones swing SIDEWAYS on local x. All pose
   code must go through `swing()`/`lift()`/`world_axis_q()` in
   `assets/src/common.py`, which key world-space intentions.
@@ -538,7 +683,7 @@ long jumps you need a different motion model, not a bigger number.
   never by rejection sampling; invariants live in `tests/test_generation.py`.
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~60s). 545
+- Run `python -m pytest tests/` before committing; it is fast (~90s). 560
   tests. The Win32 suite skips off Windows and the X11 suite skips without a
   display, so a green run means less on the other platform's machine -- check
   the count.

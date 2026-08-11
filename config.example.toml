@@ -32,7 +32,7 @@ fade_seconds = 0.35
 hide_on_notification = true
 
 [content]
-scenes = ["runner", "tower", "marbles"]
+scenes = ["runner", "parkour", "tower"]
 # Visual detail vs CPU: "high" (default), "balanced" or "low".
 # `balanced` halves the voxel detail budget and drops chromatic aberration;
 # `low` also turns off per-block texturing and ambient occlusion.

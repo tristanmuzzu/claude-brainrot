@@ -332,6 +332,47 @@ One shared unit-cube mesh carries per-face atlas UVs; each style is a material
 wrapping it, and `draw_box` scales it per axis, so slabs, panes, posts, beams
 and tree trunks all cost one mesh and no new geometry.
 
+### Meshed chunks, for the static half of a world
+
+One cube per draw call is the right answer for a course of a dozen platforms
+that pop in, fade and move. It is the wrong answer for *architecture*. The
+tower scene's building — wall, floors, arches, cornices, buttresses — is
+thousands of cells, and at roughly seven microseconds of Python per
+`DrawModelEx` that is the whole frame budget spent on scenery nobody lands on.
+
+`engine/chunk.py` builds the static half the way the game does:
+
+- **One texture for every material.** Each style's six face tiles
+  (`voxel.face_strip`) are stacked into a single image, so a mesh may mix
+  brick, glass and gold and still be one draw call. Without it a chunk costs
+  one call per material in it, and the interesting chunks are the ones with
+  six.
+- **Only the faces you can see.** A face is emitted where its neighbour cell is
+  empty or see-through, culled against the *whole world* rather than the chunk
+  — so seams are clean, hollowing a tower out costs nothing, and filling it in
+  costs nothing either. A solid cylinder of radius nine is 250 cells a layer
+  and about 40 faces.
+- **Cut into cubic chunks, and that is about fog rather than culling.**
+  Distance fog is a per-draw tint, so everything in one mesh recedes by the
+  same amount; a whole tower in one mesh would fog its near wall and its far
+  wall identically. At eight cells a chunk the error inside one is under a
+  tenth of the fog range.
+
+Building is the expensive half — about 7 µs a face, so a 250-face chunk is
+under two milliseconds — and it happens off the frame that needs it:
+`build_pending` takes a budget and the scene gives it two chunks a frame,
+generating far enough ahead that a mesh is never wanted the frame it is made.
+Drawing is nearly free: measured at 0.78 ms for twenty chunks of 3,600 faces,
+which is forty times more geometry than a tower ever has on screen.
+
+Two raylib details this module owns, because they corrupt memory rather than
+look wrong. **A mesh raylib will free must be allocated by raylib** —
+`UnloadMesh` calls `RL_FREE` on `mesh.vertices`, and handing it a cffi buffer
+kills the process inside libc, so every array is `MemAlloc`'d and filled with a
+memmove. And **the material is process-global with its texture swapped per
+draw**, because `LoadMaterialDefault` allocates and a scene that built one per
+run would leak a map array per run for the life of the daemon.
+
 Because the kit in the player's hand is assembled from those same shared
 models, anything that writes to a model — notably `model.transform` — must put
 it back. It did not, once, and every plank walkway in the world drew tilted.
@@ -459,6 +500,50 @@ the same poses the GPU does.
     early moves the take-off, so the arc is re-solved at that moment and the
     orbs on it move with it — on autopilot the two are the same numbers.
 
+- **tower** is the *other* Minecraft reel format, and a different thing rather
+  than a reskin of the first: **spiral-tower parkour**, the Parkour Spiral /
+  Tower of Hell genre, where the course winds up the outside of a building that
+  keeps going out of the top of the frame. Four things break when you try to
+  express it as a variation on flat parkour, and each of them is why
+  `scenes/towerplan.py` exists:
+
+  - **Progress is altitude, round a fixed axis.** The course comes back over
+    itself every revolution, so an occupancy map that only grows refuses the
+    world within a couple of hundred blocks — far sooner than the flat scene's
+    does — and a generator that only asks "is the next block clear" is climbing
+    through the space it was in twenty seconds ago.
+  - **Most of what you see is not course.** It is a wall, with windows,
+    cornices, buttresses and galleries, and the course is furniture hung on it.
+    That is the meshed-chunk renderer above, and it is what makes the format
+    affordable at all.
+  - **Two blocks up is normal, and one jump impulse reaches 1.25.** A tower has
+    nowhere else to go, so it has to have the game's other verbs: a ladder at
+    2.35 m/s, a soul-sand bubble column at eleven, a slime bounce, an ice
+    run-up, a cobweb, soul sand. `Move` is therefore a **list of legs** with a
+    speed each rather than a hard-coded parabola, so a ladder, a swim, a run
+    round a curved gallery and a sprint-jump are the same kind of object to the
+    simulation, the orb solver and the probe.
+  - **Sections, not just set-pieces.** A spiral map is read as a stack of
+    themed floors with a landing between them, and the theme changes *abruptly*
+    at that landing — the one structural note every map in the reference
+    material agrees on. Eleven themes come out of a shuffled bag, twelve blocks
+    of altitude each, and a ring is about one revolution and about sixteen
+    seconds, which is the length of a thinking turn.
+
+  Two numbers from the reference material set the pace and neither is a taste
+  call. A helix cannot climb faster than about a block a hop, because that is
+  what the jump impulse reaches; and two published spiral maps independently
+  work out at 0.64 blocks of rise per hop, which at this radius is twelve
+  blocks a revolution. Hence `TIER_H = 12`.
+
+  The climb is also *governed* rather than hoped for. `CLIMB_TARGET` says where
+  the course should be by now and `climb_pressure` reweights the set-piece
+  table — and then floors the rises themselves — when it falls behind. Measured
+  against a high-water mark instead, the course climbs until it beats its own
+  record, relaxes, spends the gain on the next descending set-piece and comes
+  back to the same mark: one run in eight gained seven centimetres a second
+  over forty-five seconds that way.
+
 ## Solvability by construction
 
 Both scenes could generate layouts that fail. Neither is allowed to, and
@@ -519,8 +604,30 @@ loop.
   hangs is collected, which is asserted over two minutes of running and again
   over a minute of being steered by hand.
 
-All of these are asserted directly in `tests/test_generation.py` across many
-runs, rather than being left as comments.
+- **tower**: the same discipline, and four reservations rather than one
+  occupancy map, because a tower is built *around* a course that is still being
+  laid. `solid` is the building plus the course; `softcells` holds what a
+  ladder, a bubble column or a cobweb is using, which is drawn and never solid;
+  `headroom` holds the two cells over every live landing; and `pathcells` holds
+  every cell the body will pass through on a move already solved. The last two
+  exist because checking is not the same as reserving: head-room is *checked*
+  when a block is placed, and a spiral comes back over itself, so a later block
+  — or a post driven down from a landing twenty blocks further on — lands in
+  the space an earlier one was given to stand in. Both cases were measured as
+  the body running for a second with three quarters of a metre of masonry
+  through its head, and neither is visible in any other way.
+
+  Placement then separates *correctness* from *comfort*. A landing must be
+  empty, have head-room, be reachable by a move the physics has, and have a
+  clear path — those never relax. That the body also fits comfortably where it
+  lands, all the way across the block, and stays clear of a gallery's overhang
+  are relaxed by the last resort, because a hop that clips the corner of a
+  buttress is better than the one answer nobody checked at all. Measured over
+  60 runs of 400 blocks: zero cells claimed twice out of a million, and one
+  emergency placement.
+
+All of these are asserted directly in `tests/test_generation.py` and
+`tests/test_tower.py` across many runs, rather than being left as comments.
 
 ## Cost while idle
 
@@ -543,6 +650,10 @@ tools/                offline, never imported by the daemon
 │                     interpenetration, grid alignment, emergency hops, the
 │                     hop distribution and its difficulty ramp, and whether
 │                     the body is ever inside a solid block
+├── tower_probe.py    measures the tower: cells claimed twice, the body inside
+│                     the building, emergency placements, the move and
+│                     set-piece mix, how fast the run gains altitude, how long
+│                     a themed ring lasts, and the idle between moves
 ├── depth_probe.py    what each translucent draw is hiding, by re-rendering
 │                     the frame with that one draw's depth writing off
 ├── frame_cost.py     per-frame cost of each scene, alternated in one process
@@ -580,6 +691,8 @@ src/brainrot/
 │   ├── textures.py   PIL -> texture cache with scene/global scopes
 │   ├── sky.py        gradient, sun/moon, stars, parallax clouds
 │   ├── voxel.py      16x16 atlas cube models with vanilla face shading
+│   ├── chunk.py      one atlas for every material, face-culled chunk meshes,
+│   │                 and a volume that builds them a budget at a time
 │   ├── fx.py         weather, blob shadows, glow billboards, bursts
 │   ├── hud.py        shadowed text and caption chips
 │   └── loop.py       frame loop, fades, scene lifecycle
@@ -598,7 +711,11 @@ src/brainrot/
 │                     coordinate spaces meet
 └── scenes/
     ├── runner.py     three-lane chase-cam runner
-    └── parkour.py    first-person infinite parkour
+    ├── runnerplan.py the runner's lane search and take-off planner
+    ├── parkour.py    first-person infinite parkour
+    ├── towerplan.py  the tower's architecture, course, moves and physics --
+    │                 no renderer in it, so a 60-run sweep needs no window
+    └── tower.py      first-person spiral-tower parkour
 ```
 
 ## Adding a scene
