@@ -125,6 +125,14 @@ def test_driving_does_not_disable_the_contact_response() -> None:
     """A player may crash. It still has to read as a hit, not a pass-through."""
     scene = build(11)
     settle(scene, 2.0)
+    # On the ground, explicitly. "Put a barrier on top of the runner" is only
+    # a crash if the runner is standing there -- and two seconds into run 11
+    # it happens to be a metre and a half up in the middle of a jump, which
+    # made this test a statement about the speed ramp rather than about the
+    # contact response.
+    while scene.motion.airborne or scene.motion.rolling:
+        scene.update(DT)
+        scene.elapsed += DT
     scene.control(Intent(right=True))
     scene.entities.append({"kind": "barrier", "lane": scene.lane, "d": 0.0})
     scene.update(DT)

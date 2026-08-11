@@ -25,6 +25,67 @@ across 60 seeds × 180 s of simulated running, at every speed. If you change
 anything in the runner, re-run that sweep — `tests/test_collision.py` covers
 the same ground in a form that fits in the suite.
 
+The runner had the same pass the parkour scene did (2026-08-11), for the same
+complaint — "a bit slow, doesn't feel natural, something missing for it to be
+actually entertaining" — and the same method: turn each complaint into a
+number, write `tools/runner_probe.py` to measure it, then rewrite against the
+probe. Four structural facts came out of it:
+
+- **Content is laid down a set-piece at a time**, not a row at a time.
+  `SEGMENT_TABLE` is the vocabulary — cruise, hurdles, slalom, tunnel, yard,
+  express, roofrun — and each entry decides a stretch of track *and the
+  corridor through it* together, which is the only way to express a weave, a
+  train yard or a ramp onto a roof at all. A set-piece never follows itself,
+  and one that finds the track it wanted occupied declines and is rewound
+  whole (`_mark`/`_rewind`): a segment that wrote a corridor and then gave up
+  used to leave those rows for the next one to overwrite from a different
+  lane, and a corridor that steps two lanes in one row is a promise the body
+  cannot keep.
+- **There is an occupancy ledger, and a separate ledger for *moves*.**
+  `_spans` is per-lane track occupancy in absolute distance and nothing is
+  placed without asking it; `_acts` is the same idea for the stretch a jump or
+  a slide commits the body to. Row counting stood in for both and could see
+  neither: a 25 m train against a 6 m row is a great many rows of nothing
+  being said, and two hurdles either side of a set-piece boundary put the
+  runner's feet through the second while it was still coming down off the
+  first.
+- **The runner rides train roofs** — see below. That is the move the owner
+  asked for by name, and the reason the motion model now has surfaces at all.
+- **It starts quick.** The speed ramp was 8.5–15.5 m/s over 75 s, which is
+  sensible for a game somebody sits down to play and wrong for a strip that is
+  on screen for as long as Claude is thinking: it spent its whole visible life
+  in the bottom third of its own range. 10.5–18.0 over 40 s.
+
+The probe's numbers, before and after, both measured with the *same* probe —
+`tools/runner_probe.py` runs against the old scene too, because a before/after
+tool that only works on "after" measures nothing. Safety over 60 seeds × 180 s
+after and 20 × 180 s before; pacing over 20 × 180 s both sides. Re-run it after
+touching anything in this scene; the first two rows are non-negotiable.
+
+| | before | after |
+|---|---|---|
+| obstacles drawn inside each other | 305,134 frame-pairs, worst 2.18 m | **0** |
+| body inside an obstacle | 6 frames, worst 0.19 m | **0** |
+| required actions per minute | 42.8 | **49.2** |
+| median idle between actions | 1.15 s | **1.00 s** |
+| 95th-percentile idle | 3.48 s | **2.78 s** |
+| worst idle | 9.17 s | **7.48 s** |
+| dead air (idle over 3 s, riding excluded) | 5.8% | **1.8%** |
+| speed at 15 s / 30 s | 9.9 / 11.3 m/s | **13.3 / 16.1 m/s** |
+| slides per minute | 4.6 | **4.5** |
+| mounts onto a train roof per minute | n/a | **1.63** |
+| seconds spent on a roof per minute | n/a | **2.35** |
+| distinct obstacle kinds per 30 s | n/a | **9.1** |
+
+Two of those deserve a note. The 6 body contacts before are the interesting
+one: this file claimed zero interpenetration across 60 seeds × 180 s, and that
+was true of the sweep it was measured on and is not true of `HEAD` — the
+guarantee had quietly lapsed. And **slides per minute did not move**, which is
+the honest reading of a mix that looks much more varied: the slide was always
+about as frequent as it is now, and what changed is that it arrives in a
+*tunnel* of two or three rather than singly. Nothing in the probe measures
+that, and it is the kind of thing only looking at a contact sheet catches.
+
 The overlay is **installed and verified end to end** on the owner's machine:
 hooks registered, daemon running, `brainrot doctor` 12/12. Measured live —
 appears 2.0 s after `UserPromptSubmit`, click-through, never focused, off
@@ -181,25 +242,65 @@ touching any of it — the reasoning is there, this is the short list:
 
    Measured 2026-08-11: parkour **2.02 ms**, runner 1.78 ms, ratio 1.15. Do not
    read that ratio against the old 0.75 without checking the denominator: the
-   runner is being rewritten in a parallel session and now measures 1.78 ms
-   against the 2.6-3.0 ms this file used to record, and 2.02/2.8 = 0.72, which
-   is the old number. What did change on this side is the new set-pieces --
-   parkour past the ramp costs 2.02 ms against 1.49 ms with `squeeze` and
-   `slabs` weighted out, so their geometry is about half a millisecond. The
-   ramp itself is free.
+   runner was rewritten in a parallel session and now measures 1.78 ms against
+   the 2.6-3.0 ms this file used to record, and 2.02/2.8 = 0.72, which is the
+   old number. What did change on this side is the new set-pieces -- parkour
+   past the ramp costs 2.02 ms against 1.49 ms with `squeeze` and `slabs`
+   weighted out, so their geometry is about half a millisecond. The ramp
+   itself is free.
 
-## Tried and reverted: running along train roofs
+   The runner's own set-piece rewrite was measured the same way, back to back
+   on a busier machine: **1.025 before, 1.005 after**, against a round-to-round
+   spread of 0.77 ms. Cost-neutral. Do not compare either of those to the 1.15
+   above -- that was a quiet machine, and only the ratio survives the
+   difference.
 
-Ramps that mount the runner onto a train roof (the signature Subway Surfers
-move) are implemented in full in the history around this commit and were
-**reverted** — not because the riding did not work, it did, but because the
-lane search and the mount decision are made in separate stages. The lane
-search is pulled toward a rideable train; if verification then rejects the
-mount, the runner is already committed to a lane with a train across it, and
-contacts went from zero to thousands. Making it work needs the lane choice and
-the mount to be solved *jointly*, not in sequence. Worth doing; not worth
-shipping half-done, because it regresses the one property the collision work
-exists to guarantee.
+## Running along train roofs, and why it works now
+
+The signature Subway Surfers move. It was written once before, in the history
+around this branch, and **reverted** — not because the riding did not work, it
+did, but because the lane search and the mount decision were made in separate
+stages: the search was pulled toward a rideable train, and when verification
+then rejected the mount the runner was already committed to a lane with a
+train across it. Contacts went from zero to thousands.
+
+They are one decision now, and the shape of it is worth keeping in mind before
+touching any of it:
+
+- **The set-piece commits or declines as a whole.** `_seg_roofrun` lays the
+  ramp, the train, the corridor onto it, the clear lane to bail into and the
+  clear sky over all of it together, and it solves the leap *at generation
+  time* — at both ends of the speed range, because gravity and launch speed
+  are rebuilt as the run accelerates. A ramp whose train is out of reach is
+  not a hard puzzle, it is a promise the track cannot keep, so it is never
+  laid.
+- **The train is one threat with one answer.** It carries `mount_at`: the one
+  moment a take-off can happen, which is when the ramp's lip is under the
+  feet. `classify` reads that and returns `"mount"`; `schedule_vertical` books
+  it; `plan.verify` rolls the lane path and the take-off forward *together*
+  over a world that includes the train. If that fails, the existing machinery
+  marks the threat hard, the search routes around it, and the bail lane is
+  empty by construction. Both outcomes are safe; that is the whole trick.
+- **The offer has a deadline.** `_mount_at` withdraws it as soon as the body
+  can no longer be squarely in the ramp's lane before the foot of the ramp —
+  while there is still track in which to leave that lane. Offering it right up
+  to the ramp is what the reverted version did.
+- **Riding is free to the lane search.** `MOUNT_COST` is 0.0 and has to be:
+  the search already pays `preference` for every step spent outside the
+  guaranteed corridor, so *any* positive cost on the roof makes standing
+  beside the train cheaper than standing on it. At 0.4 against a preference of
+  0.22 the runner stepped one lane clear of every ramp in the scene — 33 ramps
+  laid down, 2 ever taken.
+
+Two motion rules hold it up, and both are in `Motion.advance` so the check and
+the execution cannot disagree: a body **holds its lateral position while it is
+off the rails** (stepping sideways off a roof puts the fall alongside the
+train with the box still overlapping the corner it left), and it is **held up
+while its centre is over a surface but until its back has left it** (a body is
+over a metre deep, and dropping it the moment its centre crosses the far edge
+leaves the rear half hanging over a roof it is no longer standing on). The
+ramp additionally only picks a body up within `RAMP_GRIP` of its lane centre:
+you get onto a ramp by running at it, not by sideswiping it.
 
 ## Known limit: how long a parkour jump can be
 
@@ -232,6 +333,16 @@ long jumps you need a different motion model, not a bigger number.
   **Always follow a rebuild with `python assets/measure.py`.**
 - `python assets/preview.py <asset>` and
   `python assets/animstrip.py character run` render assets/clips for review.
+- `python tools/runner_probe.py --runs 12 --seconds 120` is the runner
+  scene's acceptance test in numbers, and the only way "it feels boring" was
+  ever going to be actionable. Three sections: **safety** (obstacles inside
+  each other, the body inside an obstacle, plans with no answer), **pacing**
+  (how often the runner is forced to act, the distribution of the idle
+  stretches between those moments, the obstacle mix, the set-piece mix, and
+  the speed at 0/15/30/60 s), and **riding** (mounts and seconds on a roof per
+  minute, and "surface pops" — a body teleported upward by a surface, which is
+  what a badly built ramp looks like). `--safety-runs 60 --safety-seconds 180`
+  is the full sweep the collision model is held to.
 - `python tools/parkour_probe.py --runs 24 --motion-runs 12` is the parkour
   scene's acceptance test in numbers: interpenetration, grid alignment,
   emergency hops, the hop distribution and its ramp, and whether the body ever
@@ -366,6 +477,26 @@ long jumps you need a different motion model, not a bigger number.
   and writes no depth; islands are solid land and *must* write depth, and
   cannot reach the course anyway because everything in the world below tops out
   at least 7 m under the lowest altitude the course may use (now a test).
+- **A booked action can only fire on a frame boundary.** The planner solves a
+  take-off window in continuous time and the loop fires it on the next frame,
+  so the body always leaves the ground a little late — and near the ends of an
+  arc the feet move most of a third of a metre in one frame at top speed,
+  against a nine-centimetre clearance margin. `solve_jump`/`solve_roll` take a
+  `late` argument for exactly this and the scene passes it the real `dt`. The
+  margin cannot be asked to absorb it: inflating the required height instead
+  makes the window vanish entirely.
+- **The reflex is a last resort, not a competitor.** It fires at the *edge* of
+  a take-off window; the planner books the middle of one. Letting it fire when
+  a take-off was already booked replaced a good jump with a marginal one, and
+  the feet came down three millimetres inside the hurdle it had cleared.
+- **Gantries are only scenery if a *jumping* body clears them.** The height
+  was typed in, and the test that guarded it asked for half a metre over a
+  standing runner — against an apex of over a metre and a half. `GANTRY_Y` is
+  derived from the apex now, and typing it in is no longer possible.
+- **`id()` is reused.** A probe that counts live entities by identity
+  undercounts by an order of magnitude, because a retired entity's id is
+  handed straight back to the next one. The scene counts spawns itself
+  (`RunnerScene.spawned`).
 - **Numbers the gameplay depends on live in `metrics.json`.** Rebuild an asset
   and you must re-run `python assets/measure.py`; `tests/test_assets.py` fails
   if they drift apart. Moving a hoarding's beam moves whether a slide fits

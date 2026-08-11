@@ -22,7 +22,8 @@ from brainrot import assets
 from brainrot.engine.collide import model_aabb, placed, posed_aabb
 from brainrot.scenes import runnerplan as plan
 from brainrot.scenes.runner import (
-    CHAR_SCALE, GANTRY_Y, RAIL_TOP, TOP_SPEED, _body_profile, _obstacle_boxes,
+    BASE_SPEED, CHAR_SCALE, GANTRY_Y, RAIL_TOP, TOP_SPEED, _body_profile,
+    _obstacle_boxes,
 )
 
 TOL = 1e-3
@@ -81,10 +82,21 @@ def test_a_slide_fits_under_the_hoarding_and_a_run_does_not() -> None:
 
 
 def test_gantries_clear_the_runner_entirely() -> None:
-    """They are scenery. Hung at head height they are scenery that hits you."""
+    """They are scenery. Hung at head height they are scenery that hits you.
+
+    The body to clear is a *jumping* one. Asking only for half a metre over a
+    standing runner is what let this through the first time: an apex is over a
+    metre and a half, and run 2 put its head through the sign bridge on
+    twenty-two frames before anything measured it.
+    """
     body = _body_profile()
     soffit = GANTRY_Y + _obstacle_boxes()["gantry"].y0
-    assert soffit > RAIL_TOP + body.stand_h + 0.5
+    for speed in (BASE_SPEED, 14.0, TOP_SPEED):
+        kin = plan.Kinematics.for_speed(speed)
+        assert soffit > RAIL_TOP + kin.jump_apex + body.stand_h, (
+            f"a jump at {speed} m/s reaches "
+            f"{RAIL_TOP + kin.jump_apex + body.stand_h:.2f} m, "
+            f"soffit is at {soffit:.2f} m")
 
 
 def test_a_jump_clears_the_barrier_with_room() -> None:

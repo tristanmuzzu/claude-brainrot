@@ -34,10 +34,34 @@ def build_car(with_cab: bool):
         box("hull_low", (L, W, 0.95), (0, 0, z0 + 0.475), BODY, 0.09),
         box("hull_up", (L, W, 1.05), (0, 0, z0 + 1.475), CREAM, 0.09),
         box("stripe", (L + 0.04, W + 0.04, 0.14), (0, 0, z0 + 0.99), STRIPE, 0.03),
-        box("roof", (L * 0.92, W * 0.82, 0.18), (0, 0, z0 + HULL + 0.07), BODY, 0.07),
-        box("vent", (L * 0.4, W * 0.4, 0.14), (0, 0, z0 + HULL + 0.2), DARK, 0.04),
+        # The roof is a surface the runner stands on, so it is built as one:
+        # a raised central walkway flanked by lower panels carrying the vents.
+        # It used to be a plain deck with a dark vent box in the middle of it,
+        # and since that box was the tallest thing on the car it was also what
+        # the collision model handed the runner to stand on -- so the signature
+        # move of the whole scene put the body on a 2 x 0.8 m black slab, which
+        # at the size the roof fills a 9:16 frame reads as a hole in the train.
+        box("roofpan", (L * 0.94, W * 0.86, 0.16), (0, 0, z0 + HULL + 0.06),
+            BODY, 0.06),
+        box("walkway", (L * 0.98, W * 0.32, 0.24), (0, 0, z0 + HULL + 0.10),
+            STEEL, 0.03),
         box("frame", (L * 0.98, W * 0.84, 0.30), (0, 0, z0 - 0.15), DARK, 0.04),
     ]
+    # Roof furniture, all of it kept below the walkway's top so the walkway
+    # stays the surface. Ribs on a cadence are what make a roof read as
+    # something moving underneath you rather than a flat orange plane.
+    for side in (-1, 1):
+        parts.append(box(f"vent{side}", (L * 0.30, W * 0.20, 0.10),
+                         (-L * 0.22, side * W * 0.28, z0 + HULL + 0.13),
+                         DARK, 0.02))
+        parts.append(box(f"hatch{side}", (0.42, W * 0.18, 0.07),
+                         (L * 0.26, side * W * 0.28, z0 + HULL + 0.12),
+                         STEEL, 0.02))
+    for i in range(5):
+        parts.append(box(f"rib{i}", (0.10, W * 0.80, 0.06),
+                         (-L * 0.4 + i * L * 0.2, 0, z0 + HULL + 0.13),
+                         STEEL, 0.01))
+
     # side glass bands with mullions
     for side in (-1, 1):
         parts.append(box(f"glass{side}", (L * 0.8, 0.05, 0.6),

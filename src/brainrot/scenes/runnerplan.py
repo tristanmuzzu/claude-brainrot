@@ -34,6 +34,13 @@ from dataclasses import dataclass, field
 
 LANES = (0, 1, 2)
 
+#: Contact shallower than this is two faces meeting rather than one body
+#: inside another. A runner standing on a train roof has its feet at exactly
+#: the roof's height, and "exactly" is not something floating point offers --
+#: without this the check that decides whether a plan survives rejects every
+#: plan that involves standing on anything.
+TOUCH = 0.005
+
 
 # ---------------------------------------------------------------------------
 # Vertical motion
@@ -53,6 +60,11 @@ JUMP_SPAN = 6.4
 #: Track spanned by a slide, and by a lane change. Same argument.
 ROLL_SPAN = 8.4
 LANE_SPAN = 3.1
+#: Apex of a *mount* -- the leap off a ramp's lip onto a train roof -- above
+#: the lip it left from. Big enough that the roof is cleared with obvious room
+#: rather than grazed, because a mount that only just works looks like a bug
+#: even on the frames where it does work.
+MOUNT_APEX = 2.35
 
 
 @dataclass(frozen=True)
@@ -67,8 +79,6 @@ class Kinematics:
     gravity: float = 34.0
     #: launch speed of an ordinary hurdle jump, m/s
     jump_v0: float = 10.3
-    #: launch speed of a ramp mount -- solved against the train roof height
-    mount_v0: float = 14.6
     #: A slide has to stay low for longer than the body is long, at top speed:
     #: the legs go out in front, so the body passing under a hoarding is over
     #: two metres of it, and a snappier roll simply cannot fit underneath.
@@ -119,13 +129,32 @@ class Kinematics:
     def jump_apex(self) -> float:
         return self.jump_v0 ** 2 / (2.0 * self.gravity)
 
+    @property
+    def mount_v0(self) -> float:
+        """Launch speed off a ramp's lip, solved for a fixed apex.
+
+        Derived rather than stored, because gravity changes with the run speed
+        (see :meth:`for_speed`) and a stored launch speed would quietly stop
+        reaching the roof as the run got quicker -- which is exactly the class
+        of bug this module exists to remove.
+        """
+        return math.sqrt(2.0 * self.gravity * MOUNT_APEX)
+
     def height_at(self, tau: float, v0: float | None = None) -> float:
-        """Feet height above the take-off surface ``tau`` seconds into a jump."""
+        """Feet height above the take-off surface ``tau`` seconds into a jump.
+
+        Clamped at zero, which is right for a jump that lands where it left.
+        A body walking off an edge is falling *below* its take-off surface;
+        that is :meth:`offset_at`.
+        """
+        return max(0.0, self.offset_at(tau, v0))
+
+    def offset_at(self, tau: float, v0: float | None = None) -> float:
+        """Signed height relative to the take-off surface, unclamped."""
         v0 = self.jump_v0 if v0 is None else v0
         if tau <= 0.0:
             return 0.0
-        y = v0 * tau - 0.5 * self.gravity * tau * tau
-        return max(0.0, y)
+        return v0 * tau - 0.5 * self.gravity * tau * tau
 
     def clearance_window(self, need: float, v0: float | None = None
                          ) -> tuple[float, float] | None:
@@ -210,6 +239,14 @@ class Motion:
     #: whose clearance was solved for a trajectory it is no longer flying.
     air_kin: "Kinematics | None" = None
     roll_dur: float = 0.0
+    #: Height of the surface under the feet, above the base running surface.
+    #: Zero on the rails, the roof height while riding a train, part-way up
+    #: while running up a ramp. While airborne it holds the height the jump
+    #: *left from*, which is what the closed-form arc is measured against.
+    ground: float = 0.0
+    #: Launch speed of the current jump. A mount leaves the ground harder than
+    #: a hurdle jump, and a body walking off an edge leaves it at zero.
+    air_v0: float = 0.0
 
     @property
     def rolling(self) -> bool:
@@ -230,12 +267,13 @@ class Motion:
         return abs(self.x - lane_x(self.target_lane, self.spacing)) < 0.02
 
     def begin(self, action: str, kin: Kinematics) -> bool:
-        """Start a jump or a slide, if the body is free to. Returns success."""
+        """Start a jump, a mount or a slide, if the body is free to."""
         if self.airborne or self.rolling:
             return False
-        if action == "jump":
+        if action in ("jump", "mount"):
             self.air_t = 0.0
             self.air_kin = kin
+            self.air_v0 = kin.mount_v0 if action == "mount" else kin.jump_v0
         elif action == "roll":
             self.roll_t = 0.0
             self.roll_dur = kin.roll_time
@@ -243,31 +281,65 @@ class Motion:
             return False
         return True
 
-    def advance(self, dt: float, kin: Kinematics, desired_lane: int) -> None:
-        """One step of motion under two commitments.
+    def advance(self, dt: float, kin: Kinematics, desired_lane: int,
+                ground_here: float = 0.0) -> None:
+        """One step of motion under two commitments and one surface.
 
         Finish a crossing before reconsidering -- a body caught halfway by a
         change of mind is in two lanes and safe in neither -- and never start
         one in mid-air, where the jump was solved for the lane it left from.
+
+        ``ground_here`` is the height of whatever the body is over *now*: the
+        rails, a ramp's slope, a train roof. Three rules, and between them
+        they are the whole of riding a train:
+
+        * airborne and the arc has come back down to the surface -> land on it,
+          whatever height that surface is;
+        * on the ground and the surface under the feet has risen -> the feet
+          rise with it, which is what running up a ramp is;
+        * on the ground and the surface has fallen away -> start falling, from
+          a standing height with no upward impulse, which is what running off
+          the back of a train is.
         """
         if self.settled() and not self.airborne:
             self.target_lane = desired_lane
-        goal = lane_x(self.target_lane, self.spacing)
-        rate = self.spacing / kin.lane_time
-        if self.x < goal:
-            self.x = min(goal, self.x + rate * dt)
-        else:
-            self.x = max(goal, self.x - rate * dt)
+        # Anything off the rails holds its lateral position, in the air as
+        # well as on the ground. A body that steps sideways off a train roof
+        # spends the fall beside the train with its box still overlapping the
+        # corner it left, which is a contact; a body still crossing when it
+        # lands on one slides straight off the far side of it. Freezing while
+        # raised makes leaving a roof something that can only happen at the
+        # *end* of the train, which is also what riding one looks like. The
+        # crossing is not cancelled -- it resumes on landing.
+        if self.ground <= 0.0:
+            goal = lane_x(self.target_lane, self.spacing)
+            rate = self.spacing / kin.lane_time
+            if self.x < goal:
+                self.x = min(goal, self.x + rate * dt)
+            else:
+                self.x = max(goal, self.x - rate * dt)
 
         if self.airborne:
             flight = self.flight(kin)
             self.air_t += dt
-            if self.air_t >= flight.jump_air_time:
+            offset = flight.offset_at(self.air_t, self.air_v0)
+            rising = self.air_t < self.air_v0 / flight.gravity
+            y = self.ground + offset
+            if not rising and y <= ground_here:
                 self.air_t = -1.0
                 self.air_kin = None
-                self.y = 0.0
+                self.ground = ground_here
+                self.y = ground_here
             else:
-                self.y = flight.height_at(self.air_t)
+                self.y = y
+        else:
+            if ground_here > self.ground:
+                self.ground = ground_here          # walked up a slope
+            elif ground_here < self.ground:
+                self.air_t = 0.0                   # walked off an edge
+                self.air_kin = kin
+                self.air_v0 = 0.0
+            self.y = self.ground
         if self.rolling:
             self.roll_t += dt
             if self.roll_t >= (self.roll_dur or kin.roll_time):
@@ -279,11 +351,22 @@ class Motion:
         return (self.x - half_w, self.x + half_w,
                 self.y, self.y + body.height(self.rolling))
 
-    def time_to_free(self, kin: Kinematics) -> float:
-        """When the body finishes what it is doing and can act again."""
+    def time_to_free(self, kin: Kinematics, landing: float = 0.0) -> float:
+        """When the body finishes what it is doing and can act again.
+
+        ``landing`` is the height of the surface it will come down on, which
+        for a leap off a train roof is well below the one it left: the fall
+        takes longer than the rise, and a scheduler that assumed otherwise
+        would book the next move while the body was still in the air.
+        """
         busy = 0.0
         if self.airborne:
-            busy = max(busy, self.flight(kin).jump_air_time - self.air_t)
+            flight = self.flight(kin)
+            drop = self.ground - landing
+            # v0*t - g t^2/2 = -drop, taking the descending root
+            disc = self.air_v0 ** 2 + 2.0 * flight.gravity * max(0.0, drop)
+            total = (self.air_v0 + math.sqrt(max(0.0, disc))) / flight.gravity
+            busy = max(busy, total - self.air_t)
         if self.rolling:
             busy = max(busy, (self.roll_dur or kin.roll_time) - self.roll_t)
         return busy
@@ -291,7 +374,8 @@ class Motion:
 
 def verify(motion: Motion, lane_plan: "LanePlan", booked: list[tuple[float, str]],
            threats: list[Threat], body: Body, kin: Kinematics,
-           horizon: float, step: float, surface: float = 0.0
+           horizon: float, step: float, surface: float = 0.0,
+           ground: "callable | None" = None,
            ) -> "tuple[Threat, float] | None":
     """Roll the plan forward; return the first threat it fails to avoid, and
     when. ``None`` means the whole horizon came through clean.
@@ -306,17 +390,25 @@ def verify(motion: Motion, lane_plan: "LanePlan", booked: list[tuple[float, str]
     for a fraction of its horizon before being re-solved from a fresh state,
     so trouble two seconds out is a hint, not a verdict; rejecting a plan for
     it throws away one that was perfectly safe for the part that gets used.
+
+    ``ground`` is ``f(t, x) -> height`` for the surface under the body -- the
+    rails, a ramp, a train roof. It is the same function the scene advances
+    the real body against, which is what makes a mount *verified* rather than
+    merely scheduled: the lane path and the take-off are rolled forward
+    together, over a world that includes the train the plan intends to land
+    on, and either the pair survives or neither is committed.
     """
     sim = Motion(motion.spacing, motion.x, motion.y, motion.air_t,
                  motion.roll_t, motion.target_lane, motion.air_kin,
-                 motion.roll_dur)
+                 motion.roll_dur, motion.ground, motion.air_v0)
     queue = sorted(booked)
     steps = max(1, int(horizon / step))
     t = 0.0
     for _ in range(steps):
         while queue and queue[0][0] <= t:
             sim.begin(queue.pop(0)[1], kin)
-        sim.advance(step, kin, lane_plan.lane_at(t))
+        sim.advance(step, kin, lane_plan.lane_at(t),
+                    0.0 if ground is None else ground(t, sim.x))
         t += step
         x0, x1, y0, y1 = sim.extent(body)
         y0 += surface
@@ -324,9 +416,9 @@ def verify(motion: Motion, lane_plan: "LanePlan", booked: list[tuple[float, str]
         for th in threats:
             if not (th.t_enter <= t <= th.t_exit):
                 continue
-            if x1 <= th.x0 or x0 >= th.x1:
+            if x1 <= th.x0 + TOUCH or x0 >= th.x1 - TOUCH:
                 continue
-            if y1 <= th.y0 or y0 >= th.y1:
+            if y1 <= th.y0 + TOUCH or y0 >= th.y1 - TOUCH:
                 continue
             return (th, t)
     return None
@@ -359,6 +451,12 @@ class Threat:
     hard: bool = False
     #: identity of the source entity, for the scene to cross-reference
     ref: object = None
+    #: For a train with a ramp in front of it: when to leave the ramp's lip.
+    #: A train is otherwise the one obstacle with no answer but a lane change,
+    #: so this is what turns "get out of that lane" into "get on top of it",
+    #: and it is the *whole* of what the planner needs to know about riding.
+    #: The scene solves it; ``verify`` is what decides whether it survives.
+    mount_at: float | None = None
 
     @property
     def duration(self) -> float:
@@ -387,6 +485,8 @@ def classify(threat: Threat, body: Body, kin: Kinematics,
     crouch silhouette fits under it, not because rolling feels like it ought
     to help.
     """
+    if threat.mount_at is not None and not threat.hard:
+        return "mount"
     top = threat.y1 - surface
     bottom = threat.y0 - surface
     margin = kin.clearance_margin
@@ -441,6 +541,15 @@ class LanePlan:
 
 #: How long before a hard obstacle arrives its lane starts feeling expensive.
 APPROACH = 1.1
+#: What a rideable train costs per step of the lane search.
+#:
+#: Zero, and it has to be: the search already pays ``preference`` for every
+#: step spent outside the guaranteed corridor, so *any* positive cost on the
+#: roof makes standing beside the train cheaper than standing on it. Set to
+#: 0.4 against a preference of 0.22, the runner stepped one lane clear of
+#: every ramp in the scene and stayed there -- thirty-three ramps laid down,
+#: two of them ever taken. A train with a way onto it is not an obstacle.
+MOUNT_COST = 0.0
 
 
 def occupancy(threats: list[Threat], horizon: float, step: float,
@@ -476,7 +585,14 @@ def occupancy(threats: list[Threat], horizon: float, step: float,
                     grid[lane][i] += preference
     approach_steps = max(1, int(APPROACH / step))
     for th in threats:
-        weight = 100.0 if th.hard else 1.0
+        if th.mount_at is not None and not th.hard:
+            # A train with a way onto it is not a wall, it is a road. Charging
+            # it the ordinary obstacle cost would make the search treat the
+            # signature move of the genre as damage to be routed around; a
+            # small cost keeps it honest about the risk without refusing it.
+            weight = MOUNT_COST
+        else:
+            weight = 100.0 if th.hard else 1.0
         i0 = max(0, int(math.floor(th.t_enter / step)))
         i1 = min(steps - 1, int(math.ceil(th.t_exit / step)))
         if i1 < 0 or i0 >= steps:
@@ -576,7 +692,8 @@ def choose_lanes(grid: list[list[float]], start_lane: int, step: float,
 
 
 def solve_jump(threat: Threat, body: Body, kin: Kinematics,
-               surface: float = 0.0) -> tuple[float, float] | None:
+               surface: float = 0.0, late: float = 0.0
+               ) -> tuple[float, float] | None:
     """Every take-off time that clears this threat, as ``(earliest, latest)``.
 
     Returning the whole window rather than one ideal instant matters: the
@@ -593,18 +710,51 @@ def solve_jump(threat: Threat, body: Body, kin: Kinematics,
     tau_a, tau_b = window
     # take-off must satisfy  start + tau_a <= t_enter  and  start + tau_b >= t_exit
     earliest = threat.t_exit - tau_b
-    latest = threat.t_enter - tau_a
+    latest = threat.t_enter - tau_a - late
     if earliest > latest:
         return None
     return (earliest, latest)
 
 
-def solve_roll(threat: Threat, kin: Kinematics) -> tuple[float, float] | None:
+def solve_mount(t_face: float, t_back: float, rise: float, from_height: float,
+                kin: Kinematics, margin: float = 0.09
+                ) -> tuple[float, float] | None:
+    """Every take-off time that puts the body on a train roof.
+
+    ``t_face`` is when the train's front face arrives and ``t_back`` when its
+    rear does; ``rise`` is the roof height above the base surface and
+    ``from_height`` the height of the lip being left. Two conditions, and they
+    pull against each other, which is why this is solved rather than tuned:
+
+    * be *above* the roof by the time the front face arrives, or the body
+      arrives inside the front of the train;
+    * come back down to roof height *after* that face and before the rear one,
+      or it lands short of the train, or past the end of it.
+
+    Returns ``(earliest, latest)`` take-off, or None when the leap cannot
+    reach -- which is a real answer, and the reason a ramp too far from its
+    train is never laid down.
+    """
+    need = rise - from_height + margin
+    window = kin.clearance_window(need, kin.mount_v0)
+    if window is None:
+        return None                      # the leap does not reach the roof
+    tau_a, tau_b = window
+    earliest = t_face - tau_b            # land no earlier than the face
+    latest = min(t_face - tau_a,         # be up by the face
+                 t_back - tau_b)         # land no later than the rear
+    if earliest > latest:
+        return None
+    return (earliest, latest)
+
+
+def solve_roll(threat: Threat, kin: Kinematics,
+               late: float = 0.0) -> tuple[float, float] | None:
     """Every start time whose low window spans the contact."""
     low_a = kin.roll_low_from * kin.roll_time
     low_b = kin.roll_low_to * kin.roll_time
     earliest = threat.t_exit - low_b
-    latest = threat.t_enter - low_a
+    latest = threat.t_enter - low_a - late
     if earliest > latest:
         return None
     return (earliest, latest)
@@ -612,7 +762,7 @@ def solve_roll(threat: Threat, kin: Kinematics) -> tuple[float, float] | None:
 
 def schedule_vertical(threats: list[Threat], plan: LanePlan, body: Body,
                       kin: Kinematics, surface: float = 0.0,
-                      not_before: float = 0.0,
+                      not_before: float = 0.0, late: float = 0.0,
                       ) -> tuple[list[tuple[float, str]], list[Threat]]:
     """Walk the chosen lane path and book a jump or roll for what it meets.
 
@@ -649,11 +799,26 @@ def schedule_vertical(threats: list[Threat], plan: LanePlan, body: Body,
         action = classify(th, body, kin, surface)
         if action == "clear":
             continue
+        if action == "mount":
+            # The one moment this can happen is the moment the body leaves the
+            # ramp's lip: earlier it is still climbing and lower than the arc
+            # was solved for, later there is no ramp under it. So there is no
+            # window to search -- either the body is free then, or the mount is
+            # off and the lane search is told to route around the train.
+            start = th.mount_at
+            length = kin.jump_air_time
+            if start < not_before or any(a < start + length and b > start
+                                         for a, b in busy):
+                unsolved.append(th)
+                continue
+            busy.append((start, start + length))
+            booked.append((start, "mount"))
+            continue
         if action == "jump":
-            window = solve_jump(th, body, kin, surface)
+            window = solve_jump(th, body, kin, surface, late)
             length = kin.jump_air_time
         elif action == "roll":
-            window = solve_roll(th, kin)
+            window = solve_roll(th, kin, late)
             length = kin.roll_time
         else:
             unsolved.append(th)

@@ -24,6 +24,7 @@ from brainrot.engine.collide import AABB
 from brainrot.palette import generate as generate_palette
 from brainrot.rng import Seed
 from brainrot.scenes.runner import ROW as RUNNER_ROW
+from brainrot.scenes.runner import SEGMENT_TABLE as RUNNER_SEGMENTS
 from brainrot.scenes.parkour import (
     AIR_MAX, AIR_MIN, AIR_SPEED, BAND, COURSE_ALT, EDGE, FORMS, GRAVITY,
     HEADROOM, MIN_HOP, RAMP_BLOCKS, SEGMENT_TABLE, VY_MAX, VY_MIN, fit_gap,
@@ -131,6 +132,99 @@ def test_runner_always_has_a_train_free_lane(run: int) -> None:
         assert len(blocked) <= 2, f"run {run}: row {row} blocked {blocked}"
         assert scene._lane_clear(row) not in blocked, (
             f"run {run}: row {row} corridor lane is inside a train")
+
+
+@pytest.mark.parametrize("run", range(1, 12))
+def test_runner_obstacles_are_never_inside_each_other(run: int) -> None:
+    """The occupancy ledger, stated as a property of what gets drawn.
+
+    Before it existed, obstacles were spaced by counting rows -- which says
+    nothing about volumes, and a 25 m train against a 6 m row is a great many
+    rows of nothing being said. Measured over four runs of the old generator:
+    9,731 frames in which two obstacles were drawn inside each other, the
+    worst 2.18 m deep, mostly trains through trains and hoardings hung through
+    the middle of them.
+    """
+    scene = generate_runner(run, 160)
+    boxes = []
+    for e in scene.entities:
+        box = scene.solid_box(e)
+        if box is not None:
+            boxes.append((e, box))
+    for i in range(len(boxes)):
+        for j in range(i + 1, len(boxes)):
+            a, b = boxes[i], boxes[j]
+            depth = a[1].penetration(b[1])
+            assert depth < 0.001, (
+                f"run {run}: {a[0]['kind']} inside {b[0]['kind']} by {depth:.3f} m")
+
+
+@pytest.mark.parametrize("run", range(1, 12))
+def test_runner_two_moves_never_overlap(run: int) -> None:
+    """Two obstacles that each demand a move are never closer together than
+    one move takes to finish.
+
+    Volumes and *moves* are different questions, and the second one cannot be
+    answered by counting rows either -- least of all across a set-piece
+    boundary, which is exactly where it went wrong: two hurdles a row apart,
+    one either side of the seam, put the runner's feet through the second
+    while it was still coming down off the first.
+    """
+    from brainrot.scenes.runner import ACTION_SPAN
+
+    scene = generate_runner(run, 160)
+    acts: list[tuple[int, float]] = []
+    for e in scene.entities:
+        if e["kind"] == "barrier":
+            acts.append((e["lane"], e["d"] + scene.travel))
+        elif e["kind"] == "hoarding":
+            acts.append((-1, e["d"] + scene.travel))
+    for i in range(len(acts)):
+        for j in range(i + 1, len(acts)):
+            (la, pa), (lb, pb) = acts[i], acts[j]
+            if la != -1 and lb != -1 and la != lb:
+                continue
+            assert abs(pa - pb) >= 2 * ACTION_SPAN - 0.001, (
+                f"run {run}: two moves {abs(pa - pb):.1f} m apart in lane {la}")
+
+
+def test_runner_uses_its_whole_set_piece_vocabulary() -> None:
+    """A vocabulary of seven that in practice reads as two is no vocabulary.
+
+    The generator this replaced had none at all: measured over twelve minutes
+    it produced 7.6 hurdles a minute, 0.2 hoardings, and the slide -- one of
+    only three moves the runner has -- appeared about once every five minutes.
+    """
+    from collections import Counter
+
+    seen = Counter()
+    for run in range(1, 9):
+        seen.update(generate_runner(run, 200).segments)
+    names = {name for name, *_ in RUNNER_SEGMENTS}
+    assert set(seen) == names, f"never generated: {names - set(seen)}"
+    assert min(seen.values()) >= 3, f"barely generated: {seen}"
+
+
+def test_runner_never_repeats_a_set_piece_back_to_back() -> None:
+    """The cheapest thing that stops seven set-pieces reading like two."""
+    for run in (1, 4, 9, 17):
+        scene = build_runner(run)
+        order: list[str] = []
+        original = scene._begin_segment
+
+        def watched(row0: int, _orig=original, _out=order, _s=scene) -> None:
+            _orig(row0)
+            _out.append(_s._last_segment)
+
+        scene._begin_segment = watched
+        while scene.next_row < 220:
+            scene.travel += RUNNER_ROW
+            for e in scene.entities:
+                e["d"] -= RUNNER_ROW
+            scene._spawn_to_horizon()
+        assert len(order) > 12, f"run {run}: only {len(order)} set-pieces"
+        for a, b in zip(order, order[1:]):
+            assert a != b, f"run {run}: {a} twice running"
 
 
 def test_runner_never_more_than_one_oncoming_train() -> None:

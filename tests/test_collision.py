@@ -24,7 +24,10 @@ from brainrot.engine.collide import AABB, placed, rotate_y
 from brainrot.palette import generate as generate_palette
 from brainrot.rng import Seed
 from brainrot.scenes import runnerplan as plan
-from brainrot.scenes.runner import BASE_SPEED, RAIL_TOP, RAMP_SECONDS, TOP_SPEED
+from brainrot.scenes.runner import (
+    BASE_SPEED, MOUNT_GAP, RAIL_TOP, RAMP_SECONDS, ROW, SOLID_KINDS,
+    TOP_SPEED,
+)
 
 DT = 1 / 60
 
@@ -38,6 +41,17 @@ def build(run: int):
     seed = Seed.for_run(run)
     return scene_api.build(
         "runner", scene_api.SceneContext(W, H, generate_palette(seed), seed))
+
+
+def generate(run: int, rows: int):
+    """Lay track well past the horizon, moving the world as ``update`` does."""
+    scene = build(run)
+    while scene.next_row < rows:
+        scene.travel += ROW
+        for e in scene.entities:
+            e["d"] -= ROW
+        scene._spawn_to_horizon()
+    return scene
 
 
 def simulate(run: int, seconds: float, warm: float = 0.0):
@@ -162,17 +176,134 @@ def test_trackside_dressing_stays_out_of_reach() -> None:
     assert {"lamp", "signal"} <= seen, "trackside dressing was never spawned"
 
 
-def test_generator_leaves_at_most_one_lane_blocked_by_trains() -> None:
-    """Trains cannot be jumped or slid under, so two abreast has no answer."""
+# -- riding a train roof ---------------------------------------------------
+#
+# The signature move of the genre, and the one that was written once before
+# and reverted -- because the lane was chosen in one stage and the mount
+# decided in another, so a mount that failed verification left the runner
+# committed to a lane with a train across it and contacts went from zero to
+# thousands. These are the tests that say it is one decision now.
+
+
+def test_the_runner_actually_gets_onto_trains() -> None:
+    """Zero contacts is also what never trying would score."""
+    ridden = 0
+    seconds = 0.0
+    for run in (2, 4, 7, 13, 21):
+        scene = simulate(run, 60.0)
+        ridden += scene.mounts
+        seconds += scene.ride_time
+    assert ridden >= 5, f"only {ridden} mounts in five minutes of running"
+    assert seconds > 8.0, f"only {seconds:.1f}s spent on a roof"
+
+
+def test_a_body_on_a_roof_is_on_top_of_it_not_inside_it() -> None:
+    """Whenever the runner is up on something, its feet are on a surface that
+    is really there -- and its box is not inside the thing holding it up.
+
+    Counted across runs rather than within one: not every minute of running
+    contains a roof set-piece, and a per-run assertion would be measuring the
+    weights table rather than the physics.
+    """
+    on_roof = 0
+    for run in (2, 6, 14, 27):
+        scene = build(run)
+        for _ in range(int(60 / DT)):
+            scene.update(DT)
+            scene.elapsed += DT
+            if not scene.riding or scene.motion.airborne:
+                continue
+            on_roof += 1
+            body = scene.body_box()
+            floor = RAIL_TOP + scene.motion.ground
+            assert body.y0 == pytest.approx(floor, abs=1e-6)
+            under = [e for e in scene.entities
+                     if e["kind"] == "train"
+                     and scene._ride_top(e, e["d"], scene.x) > 0.0]
+            assert under, f"run {run}: standing on nothing at {scene.elapsed:.2f}"
+            for e in under:
+                box = scene.solid_box(e)
+                assert body.penetration(box) < 0.01
+                assert box.y1 == pytest.approx(floor, abs=1e-6)
+    assert on_roof > 200, f"only {on_roof} frames spent on a roof"
+
+
+def test_a_mount_is_solved_before_the_ramp_is_ever_laid_down() -> None:
+    """A ramp whose train is out of reach is not a hard puzzle, it is a
+    promise the track cannot keep -- so the leap is solved at generation time,
+    at both ends of the speed range, and a set-piece that cannot make it
+    declines instead."""
+    scene = build(3)
+    gap = scene._boxes["train_cab"].x1 * 2 + 20.0
+    assert scene._mount_reaches(MOUNT_GAP, gap, 5), "the standard layout fails"
+    assert not scene._mount_reaches(60.0, gap, 5), "a ramp 60 m short reaches?"
+    assert not scene._mount_reaches(MOUNT_GAP, 1.0, 1), "landed on a 1 m roof?"
+
+
+def test_the_ramp_numbers_are_the_ramp_asset() -> None:
+    """Where the take-off is, and how high the body is when it happens.
+
+    Four numbers typed into the scene, true only while they agree with the
+    model. The last assertion is the one that earns its keep: the ramp has to
+    go on holding the body up *after* the moment the leap is booked, because
+    the leap can only fire on a frame boundary and will therefore always be a
+    little late.
+    """
+    from brainrot import assets
+    from brainrot.scenes.runner import (
+        RAMP_FOOT, RAMP_LIP, RAMP_LIP_H, RAMP_RUN)
+
+    box = assets.bounds("ramp")
+    assert RAMP_FOOT <= box.z1, "the slope starts beyond the near edge"
+    assert RAMP_LIP == pytest.approx(RAMP_RUN - RAMP_FOOT)
+    assert RAMP_LIP_H == pytest.approx(box.y1, abs=0.01)
+    assert -box.z0 - RAMP_LIP > 0.4, (
+        "no flat top: the take-off lands on the frame the ramp disappears")
+
+
+def test_a_train_with_a_ramp_has_a_lane_to_bail_into() -> None:
+    """The lane choice and the mount are one decision, which means the answer
+    to "the mount does not work" has to already exist. It is the adjacent
+    lane, and a roof set-piece leaves it empty for its whole length."""
+    for run in (2, 5, 9, 16):
+        scene = generate(run, 220)
+        for e in scene.entities:
+            if e["kind"] != "train" or not e.get("ride"):
+                continue
+            a, b = scene._train_span(e["d"] + scene.travel, e["cars"])
+            others = [o for o in scene.entities
+                      if o is not e and o["kind"] in SOLID_KINDS
+                      and o.get("lane") != e["lane"]]
+            for o in others:
+                box = scene.solid_box(o)
+                if box is None:
+                    continue
+                lo, hi = -box.z1 + scene.travel, -box.z0 + scene.travel
+                assert hi < a or lo > b, (
+                    f"run {run}: {o['kind']} beside a train being ridden")
+
+
+def test_a_ridden_train_is_the_only_one_the_corridor_runs_into() -> None:
+    """A train the corridor points at must be one there is a way onto.
+
+    The corridor is a promise that the lane is passable. For a roof set-piece
+    the way through is *over the top*, so the train is deliberately in the
+    corridor -- and that is only honest if it has a ramp in front of it. Any
+    other train the corridor runs into is the promise being broken.
+    """
     for run in (3, 12, 25, 31):
         scene = build(run)
         for _ in range(int(60 / DT)):
             scene.update(DT)
             scene.elapsed += DT
-            blocked = {e["lane"] for e in scene.entities
-                       if e["kind"] == "train"
-                       and -e["cars"] * 5.2 < e["d"] < 8.0}
-            assert len(blocked) <= 1, f"run {run}: trains blocking lanes {blocked}"
+            for e in scene.entities:
+                if e["kind"] != "train" or e["vel"]:
+                    continue
+                if not (-e["cars"] * 5.2 < e["d"] < 8.0):
+                    continue
+                if e["lane"] == scene.lane and not scene.motion.ground:
+                    assert e.get("ramp") is not None, (
+                        f"run {run}: train in the runner's lane with no way on")
 
 
 def test_corridor_holds_a_lane_long_enough_to_reach_it() -> None:

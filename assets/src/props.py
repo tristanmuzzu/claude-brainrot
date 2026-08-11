@@ -84,20 +84,38 @@ def hoarding():
 def ramp():
     """A launcher onto a train roof: a hazard-striped wedge one lane wide.
 
-    Rises to 1.15 over 3.4 m. The runner does not physically ride the slope --
-    touching it commits a scripted launch whose arc is solved against the roof
-    height -- but the slope has to look like it could produce that arc.
+    Rises to 1.15 over 3.0 m and then holds that height for a further 0.6 m.
+    The flat top is load-bearing, not decoration: the runner leaves the ground
+    at a time the planner books, and the loop can only fire that on a frame
+    boundary. With the slope running right to the back edge, the moment the
+    take-off is due is the same moment the ramp stops holding the body up, and
+    a single frame of rounding decides between a leap onto the train and a
+    trip off the end of the ramp into the side of it. Measured over 60 seeds x
+    180 s, that coin came down wrong 31 times.
+
+    Banded across the slope rather than one flat orange face: a launcher is the
+    one thing in the scene the runner is meant to *aim* for, and a plain wedge
+    gives the eye nothing to judge its rise by.
     """
     STRIPE = zone("stripe", (0.95, 0.55, 0.08), rough=0.5)
     DARK = zone("dark", (0.13, 0.13, 0.15), rough=0.8)
     STEEL = zone("steel", (0.46, 0.48, 0.52), rough=0.4)
-    parts = [wedge("slope", 2.0, 3.4, 1.15, (0, 0, 0.0), STRIPE)]
-    # side cheeks and a lip so the wedge does not read as a paper triangle
+    RUN, FLAT, H = 3.0, 0.6, 1.15
+    BANDS = 5
+    parts = []
+    for i in range(BANDS):
+        h0, h1 = H * i / BANDS, H * (i + 1) / BANDS
+        parts.append(wedge(f"slope{i}", 2.0, RUN / BANDS, h1,
+                           (0, -(RUN + FLAT) / 2 + (i + 0.5) * RUN / BANDS, 0.0),
+                           STRIPE if i % 2 == 0 else DARK, back_height=h0))
+    parts.append(box("deck", (2.0, FLAT, H), (0, RUN / 2 - FLAT / 2 + FLAT / 2, H / 2),
+                     STEEL, 0.02))
+    # side cheeks and a kick so the wedge does not read as a paper triangle
     for side in (-1, 1):
-        parts.append(box(f"cheek{side}", (0.12, 3.4, 0.1),
+        parts.append(box(f"cheek{side}", (0.12, RUN + FLAT, 0.1),
                          (side * 1.0, 0, 0.05), DARK, 0.02))
-    parts.append(box("lip", (2.1, 0.18, 0.12), (0, 1.7, 1.12), STEEL, 0.03))
-    parts.append(box("kick", (2.1, 0.2, 0.1), (0, -1.7, 0.05), DARK, 0.02))
+    parts.append(box("kick", (2.1, 0.2, 0.1),
+                     (0, -(RUN + FLAT) / 2, 0.05), DARK, 0.02))
     return join(parts, "ramp")
 
 

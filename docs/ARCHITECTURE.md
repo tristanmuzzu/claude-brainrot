@@ -351,8 +351,35 @@ the same poses the GPU does.
 
 - **runner** is third-person chase cam over three locked lanes, because that
   is what Subway Surfers footage is. World streaming follows the industry
-  pattern (segments spawned ahead, destroyed behind, content generated per
-  6 m row from a per-row substream).
+  pattern (spawned ahead, destroyed behind, drawn from a per-row substream so
+  a run replays).
+
+  Content is laid down a **set-piece** at a time, not a row at a time, for the
+  same reason the parkour course is: a uniform stream is watchable for about
+  ten seconds. `SEGMENT_TABLE` is the vocabulary — a cruise, a rhythm of
+  hurdles, a slalom the corridor weaves through, a tunnel of hoardings to
+  slide under, a train yard, an express the other way, and a ramp onto a train
+  roof. A set-piece never follows itself, and each one decides a stretch of
+  track *and the corridor through it together*, which is the only way to
+  express a weave, a yard or a roof run at all: the row-at-a-time generator
+  this replaced could only say "put an obstacle here" and then defend itself
+  with spacing rules. What it produced was safe and repeated itself inside ten
+  seconds — measured over twelve minutes, 7.6 hurdles a minute, 0.2 hoardings,
+  and the slide appearing about once every five minutes.
+
+  A set-piece that finds the track it wanted occupied **declines**, and is
+  rewound whole. Every ledger it writes to is append-only so that rolling one
+  back is a truncation; without that, a segment that wrote a corridor and then
+  gave up left those rows for the next one to overwrite from a different
+  starting lane, and a corridor that steps two lanes in one row is a promise
+  the body cannot keep.
+
+  The runner also **rides train roofs**, which is the one thing in either
+  scene that needed the motion model to grow: `Motion` carries the height of
+  the surface under the feet, lands on whatever the arc comes down to, and
+  starts falling when that surface drops away. A ramp is therefore a floor
+  rather than an obstacle, and appears in `RunnerScene.surface_at` instead of
+  in the threat list.
 - **parkour** is **first-person**, because the real Minecraft-parkour reels
   are recorded first-person on infinite-parkour servers. The generator starts
   from the plugin that produces most of that footage — weighted gap (2-5
@@ -432,14 +459,47 @@ Both scenes could generate layouts that fail. Neither is allowed to, and
 neither checks afterwards — rejection sampling would stall inside a render
 loop.
 
-- **runner**: each row is assigned a guaranteed-clear lane *before* obstacles
-  are placed, and that lane may move by at most one between consecutive rows.
-  Parked trains only occupy lanes the corridor does not. Oncoming trains sweep
-  across rows, which a static corridor cannot answer — so at most **one**
-  oncoming train exists at a time, and the autopilot dodges it live (lane
-  changes work mid-air, exactly like the game it imitates; with two oncoming
-  trains a dodge can be pinned with no legal answer, which is why the limit is
-  structural rather than probabilistic).
+- **runner**: the guaranteed-clear lane is written by whichever set-piece owns
+  the row, never derived afterwards, and may move by at most one lane between
+  consecutive rows and no faster than a body can cross one. Two things are
+  then asked before anything is placed:
+
+  - **`_spans`, the occupancy ledger** — per-lane track occupancy in absolute
+    distance, plus a separate list for what is hung *over* the track. Row
+    counting stood in for this and could not see volumes at all: a 25 m train
+    against a 6 m row is a great many rows of nothing being said, and the
+    result was 9,731 frames per four runs in which two obstacles were drawn
+    inside each other, the worst 2.18 m deep.
+  - **`_acts`, the same idea for *moves*** — the stretch of track a jump or a
+    slide commits the body to, so two obstacles that each demand one are never
+    closer together than one move takes to finish. Volumes and moves are
+    different questions, and the second one goes wrong at set-piece
+    boundaries, where per-segment spacing rules cannot see each other.
+
+  Parked trains only occupy lanes the corridor does not, asked over the
+  train's whole *length* rather than the row it was spawned on. A yard may
+  close two lanes at once — the old generator forbade that and had to, because
+  while the corridor was a random walk it could not see, a second train could
+  land across the only lane left; a set-piece writes the weave itself, so it
+  can close everything the weave does not need and still promise a way
+  through. At most **one** oncoming train exists at a time, and it is placed
+  by solving for where it will *meet* the runner and working backwards: it
+  closes at half as much again as the runner runs, and generation happens a
+  full view-length ahead of the body, so a train laid at the far end of a
+  set-piece passes the runner several rows *before* that set-piece begins, over
+  track somebody else wrote the corridor for.
+
+  A train with a ramp in front of it is the one case where the corridor points
+  *at* an obstacle, because the way through is over the top. The lane choice
+  and the mount are one decision: the train carries the single moment a
+  take-off can happen, `classify` turns that into a `"mount"` action,
+  `schedule_vertical` books it, and `plan.verify` rolls the lane path and the
+  take-off forward together over a world that includes the train. If that
+  fails the threat is marked hard and the search routes around it — into a
+  lane the set-piece left empty for exactly this. Both outcomes are safe by
+  construction, which is what the first attempt at this lacked: it chose the
+  lane in one stage and decided the mount in another, so a rejected mount left
+  the runner committed to a lane with a train across it.
 - **parkour**: no hop is laid down that a body cannot fly. The invariant is
   stated against the take-off the hop *needs* — it must be between standing
   off an edge and vanilla's one jump impulse, and the arc must be on its way
@@ -468,6 +528,11 @@ is also what makes every appearance freshly generated.
 
 ```
 tools/                offline, never imported by the daemon
+├── runner_probe.py   measures the runner's safety and its pacing: obstacles
+│                     inside each other, the body inside an obstacle, how
+│                     often the runner is forced to act and how long the idle
+│                     stretches are, the obstacle and set-piece mix, the speed
+│                     ramp, and how much of a run is spent on a train roof
 ├── parkour_probe.py  measures the parkour course and its motion: block
 │                     interpenetration, grid alignment, emergency hops, the
 │                     hop distribution and its difficulty ramp, and whether
