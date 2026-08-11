@@ -6,18 +6,19 @@ is thinking. raylib renderer, glTF assets built by the Blender scripts in
 `assets/src/`, worlds generated per-seed. Read `docs/ARCHITECTURE.md` for how
 the pieces fit; it is current.
 
-## State of the project (updated 2026-08-11)
+## State of the project (updated 2026-08-12)
 
 Branch `claude/project-visuals-animations-qzbkiq` holds a complete rebuild:
 pygame → raylib + baked-light glTF assets, both original scenes rebuilt to
 match the real reel formats, animation overhaul (rig with knees/elbows,
-world-axis pose system, ballistic parkour hops with ground beats) — and a
-**third scene, `tower`**, which is spiral-tower parkour and has its own section
+world-axis pose system, ballistic parkour hops with ground beats) — a **third
+scene, `tower`**, which is spiral-tower parkour, and a **fourth, `spiral`**,
+which is the same reel format read properly. Both have their own sections
 below.
 
 **Now verified on real Windows hardware with a GPU**, which turned up several
 things the software-rasteriser cloud sessions could not have seen — see
-"Landmines" below. 371 tests green, including a Win32 suite that exercises the
+"Landmines" below. 591 tests green, including a Win32 suite that exercises the
 real window API.
 
 The runner has a real collision model. Obstacles carry hitboxes derived from
@@ -332,6 +333,146 @@ the strip is a portrait window with a wall four metres away filling all of its
 toward the axis and it is worse. `AXIS_BIAS = 0.12` puts the building along one
 edge, which is where a player hugging a wall actually sees it.
 
+## The spiral: platforms, not a wall with blocks round it (added 2026-08-12)
+
+A fourth scene, `spiral`, and the *same* reel format as `tower` read properly.
+The owner's reference screenshot of a Parkour Spiral map settles what the
+format actually is, and the ring version gets it wrong: it is not a cylinder
+with jump blocks hung outside it, it is a **stack of built places** -- a farm
+with crops and fences, a nether cave with lava and lanterns, a rainbow floor --
+each a slab of real world a couple of dozen blocks across, standing on a forest
+of columns, spiralling up. The parkour is two things stitched together:
+*running over actual ground* across a platform, and floating-block parkour out
+over the drop *between* platforms.
+
+`scenes/spiralplan.py` is the format and none of its rendering (**no raylib
+import**, deliberately, exactly as `towerplan` is). `Course` subclasses
+`towerplan.Course`, so the physics, the lattice, the move vocabulary, the four
+reservations and the orb solver are inherited **unchanged**. `scenes/spiral.py`
+is forty lines: `TowerScene` turned out to be a *renderer*, and a renderer does
+not care what shape a building is. `TowerScene.plan` is the seam.
+
+**One rule holds the whole file up, and it was learned twice.** Every node is
+decided from where the body *actually is*, never from where an earlier plan
+assumed it would be. A plan laid several nodes deep is a chain in which the
+first landing that comes down a cell to one side, or a block low because its
+own hop was refused, makes every node after it ask for a step the physics does
+not have. Both halves of the course hand back one node at a time
+(`_cross_node`, `_plan`), and every node carries the runners-up it would have
+accepted -- placement has to answer questions the plan cannot see, and a plan
+that offers one answer turns each of those into a failure.
+
+Placement fell through to its one unchecked answer on **13% of nodes** when
+this work started. It is **0.23%** now, against 0.28% for the ring version that
+ships. Nothing on the way down was found by reading the code: each cause came
+from a counter wrapped round `Course._attempt` recording which check said no.
+**Rebuild that counter before changing anything here.** In order of what they
+were worth:
+
+- **The crossing was planned from `pad.enter`** rather than from the arrival
+  that may have landed a cell to one side. 58% of all failures.
+- **`_band` ignored the heading.** `hop_span` answers in take-off points and a
+  plan chooses cells; the difference is one edge offset at each end, and the
+  feet plant against a block's *face*, so running into a corner they plant 1.41
+  times as far out as into a side. Nearly half a metre against a legal band for
+  a climbing hop that is only a metre wide. 13.04% -> 0.96% together with the
+  fan below.
+- **A bridge under its platform and still low.** One jump reaches 1.25 blocks;
+  the direction "toward the landing" becomes rounding error and every stone
+  goes on top of the last. `_beside` circles the landing instead, and the
+  head-room already reserved over each stone is what forces the flight to
+  *turn* rather than bounce between two cells. It reads as a corkscrew of steps
+  up the outside of a platform.
+- **A fan, not a line.** Cells along a diagonal are 1.41 m apart and the band
+  for a +1 hop is 1.1 m wide, so walking out along one line the distances go
+  2.83, 4.24 and the whole band falls down the gap -- while one cell to either
+  side there are two answers.
+- **`arches` hung a head-hitting lintel on a climbing bridge.** A lintel sits a
+  fixed height above the arc it spans, so a beam the hop it belongs to passes
+  cleanly under is exactly where the head will be three stones later. It is a
+  viaduct now. 12.6% of its own nodes stuck against 2.3%.
+- **A one-cell cave doorway refuses every diagonal entry.** Five cells now, and
+  the same arithmetic (0.6 m body, feet 0.4 m off centre) is why.
+- **No slabs on a bridge.** A slab's surface is half a block up, so every later
+  step is planned off the lattice and the ordinary climb of one cell becomes a
+  rise of 1.5, which `hop_span`'s discriminant has no solution for.
+- **A course block built in a flight already solved.** `pathcells` is consulted
+  by the ring version only for the *building*, because a course that keeps
+  moving forward never lays a block where it has agreed to fly. This one comes
+  back over the same three cells every time it climbs. Body-inside-a-block went
+  from 3.2% of frames to 0.07%.
+- **It steps across onto a platform, never up into it.** A platform's ground is
+  two cells deep, so a landing hop that still has to climb crosses the lower of
+  the two with the body's head. 0.68% -> 0.25%.
+
+**A platform's own climb is built parkour, not terrain.** The way out is one to
+three blocks above the way in and the last landings of a crossing are blocks on
+plinths. Raising the platform's *ground* under the lane instead is the more
+obvious idea, was tried, and puts a step at shoulder height beside every
+landing next to it: unchecked placements went 0.2% -> 5%, unfixably, because
+the offending geometry is the building.
+
+**The proportions are the point, and they are four numbers that move
+together.** Six platforms of 23-29 cells on a radius of 34, climbing 3-6 blocks
+plus the terrace: a gap of 6-12 m, two to four stones of bridge against six or
+seven landings of crossing. The first attempt -- five platforms of 11-15 on a
+radius of 22 -- spent a quarter of the run on a platform in stretches of a
+second and a half, which is the cylinder it replaced wearing a hat.
+
+`tools/spiral_probe.py` is the acceptance test in numbers. It **imports
+`tower_probe`'s safety block** rather than restating it, because a probe that
+measures a new scene by a new definition of "safe" measures nothing you can
+compare. Current, over 40 runs x 400 blocks and 10 runs x 45 s:
+
+| | spiral | ring tower |
+|---|---|---|
+| cells claimed twice (of 3.1M) | **0** | 0 |
+| blocks off the integer lattice | **0** of 16,640 | 0 |
+| ladders/water inside masonry | **0** | 0 |
+| orbs laid but not collected | **0** of 482 | 0 |
+| emergency placements | 38 in 16,640 (**0.23%**) | 0.28% |
+| body inside the building | 19 frames of 27,000 (**0.07%**) | 0.33% |
+| **time on built ground** | **51.7%** | n/a |
+| landings that are real ground | **34.3%** of blocks | n/a |
+| one stretch on a platform / on a bridge | **3.3 s / 3.3 s** | n/a |
+| platforms visited | **8.8 per min** | n/a |
+| seconds on one theme | **6.4** | 11.0 |
+| altitude gained | 0.79 / **0.95** / 1.02 m/s | 0.81 |
+| moves per minute | **114.5** | 102 |
+| median idle between moves | **0.50 s** | 0.53 |
+| dead air (idle over 3 s) | **0.0%** | 0.3% |
+| frozen (under 0.05 m/s, 3-D) | **0.0%** | 0.0% |
+| per-frame cost | **~2.0x the tower** | 1 |
+
+Two of those need a note. The body figure is **not** zero -- 19 frames of
+27,000, worst 0.54 m -- and the residue is the same class the ring version
+has: structure or a support plinth built after an arc was solved. And the
+**per-frame cost is the one number that does not clear the bar it was given**:
+measured alternately in one process, the spiral is 2.8-3.4 ms against the
+tower's 1.4-1.8, so about twice, where the handoff asked for under 2.5 ms
+absolute. Its world is genuinely an order of magnitude wider -- a seventy-metre
+spiral of platforms against a sixteen-metre cylinder -- and three things were
+taken off it already: a **view-cone cull** in `engine/chunk.py` (worth a third
+of the frame, and it helps the tower too), `COLUMN_DEPTH` 30 -> 18, and a sixth
+of a platform dressed rather than a half. It is still comfortably inside a
+16.7 ms budget; if it needs to come down further, the cost is view-limited
+rather than world-limited -- shrinking the platforms buys nothing, measured.
+
+**Platform furniture is models, not cells** (`assets/src/props_mc.py`, new).
+Crops, flowers, fences, lantern posts, sugar cane and chains are the parts of
+Minecraft that are *not* cubes -- two crossed quads, a post and two rails, a
+stalk a few pixels wide -- and as cells they all come out as the same coloured
+box, which is what these platforms were scattered with and what read as
+rubble. Twelve per platform, drawn one call each, distance- and direction-culled
+like the chunks. **The fence is called `mcfence`**: an asset name is a filename,
+`props.py` already exports the runner's trackside `fence`, and building this one
+as `fence` silently replaced it.
+
+**Cave lighting is a grid, not four corners.** Read off a contact sheet rather
+than reasoned about: three consecutive frames of a fourteen-frame run came back
+essentially black, which on a strip that is on screen for fifteen seconds is a
+fifth of it showing nothing.
+
 ## Linux (added 2026-08-09, verified on the owner's Ubuntu box)
 
 Runs on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200% scaling) with the same
@@ -358,16 +499,8 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
-0. **The spiral rebuild** -- `docs/SPIRAL_HANDOFF.md`. The owner's reference
-   screenshot settles that this format is a stack of *built platforms* on a
-   forest of columns, not a cylinder with jump blocks hung round it, and
-   `scenes/spiralplan.py` is the rebuild toward that. It is committed and
-   deliberately **not imported by anything**; one node in eight still falls
-   through to the unchecked answer, against one in three hundred for the ring
-   version that ships. Read the handoff before touching it.
-
-
-0. **`tools/depth_probe.py` does not know about the tower.** It patches
+0. **`tools/depth_probe.py` does not know about the tower or the spiral.**
+   It patches
    `parkour`'s own draw methods by name. The tower's translucent draws -- cloud
    shelves, water columns, cobweb, every glow -- all go through
    `fx.no_depth_write` / `fx.glow_pass`, and `tests/test_tower.py` proves the
@@ -532,6 +665,14 @@ long jumps you need a different motion model, not a bigger number.
   is ever inside the building). `--no-motion` needs no window at all, because
   `scenes/towerplan.py` imports no renderer -- a sixty-run sweep is four
   seconds.
+- `python tools/spiral_probe.py --runs 40 --blocks 400 --motion-runs 10` is
+  the spiral scene's acceptance test in numbers. Three sections: **safety**
+  (imported wholesale from `tower_probe`, so the two scenes are measured by
+  one definition of safe), **the course** (how many landings are the
+  platform's own ground rather than a stone the course put there, plus the
+  move and set-piece mix), and **the climb, the ground-against-drop split and
+  pacing**. `--no-motion` needs no window: `scenes/spiralplan.py` imports no
+  renderer.
 - `python tools/parkour_probe.py --runs 24 --motion-runs 12` is the parkour
   scene's acceptance test in numbers: interpenetration, grid alignment,
   emergency hops, the hop distribution and its ramp, and whether the body ever
@@ -722,7 +863,7 @@ long jumps you need a different motion model, not a bigger number.
   never by rejection sampling; invariants live in `tests/test_generation.py`.
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~90s). 560
+- Run `python -m pytest tests/` before committing; it is fast (~140s). 591
   tests. The Win32 suite skips off Windows and the X11 suite skips without a
   display, so a green run means less on the other platform's machine -- check
   the count.

@@ -352,6 +352,13 @@ thousands of cells, and at roughly seven microseconds of Python per
   — so seams are clean, hollowing a tower out costs nothing, and filling it in
   costs nothing either. A solid cylinder of radius nine is 250 cells a layer
   and about 40 faces.
+- **Drawn only if it could be on screen.** A distance cull keeps a *sphere*
+  around the camera, and this project's window is a tall narrow strip with
+  about fifty degrees of horizontal field -- so most of that sphere is behind
+  the viewer, and every chunk of it was a draw call and a pass over its
+  vertices for nothing. `draw` takes the camera's own direction and drops
+  anything outside a generous cone around it: worth a third of the spiral
+  scene's frame, where a platform has the rest of the spiral behind it.
 - **Cut into cubic chunks, and that is about fog rather than culling.**
   Distance fog is a per-draw tint, so everything in one mesh recedes by the
   same amount; a whole tower in one mesh would fog its near wall and its far
@@ -571,6 +578,68 @@ the same poses the GPU does.
   back to the same mark: one run in eight gained seven centimetres a second
   over forty-five seconds that way.
 
+- **spiral** is the *same reel format read properly*, and it is a separate
+  scene rather than a change to `tower` because the two get a different thing
+  wrong and right. The owner's reference screenshot of a Parkour Spiral map
+  settles it: the format is not a cylinder with jump blocks hung round it, it
+  is a **stack of built places** — a farm with crops and fences, a nether cave
+  with lava and lanterns, a rainbow floor — each a slab of real world a couple
+  of dozen blocks across, standing on a forest of columns, spiralling up. The
+  parkour is two different things stitched together: *running over actual
+  ground* across a platform, and floating-block parkour out over the drop
+  *between* platforms.
+
+  `scenes/spiralplan.py` is the format and none of its rendering; `Course`
+  subclasses `towerplan.Course`, so the physics, the lattice, the move
+  vocabulary, the four reservations and the orb solver are inherited unchanged
+  — that half was never about the shape of the building. `scenes/spiral.py` is
+  forty lines, because `TowerScene` turned out to be a *renderer* and a
+  renderer does not care what shape a building is. It says two things a
+  renderer cannot work out: which way indoors is, and how to draw the
+  furniture that is not made of cells.
+
+  Five things are worth knowing before touching it:
+
+  - **Every node is decided from where the body actually is.** Not from where
+    an earlier plan assumed it would be. Both halves of the course — the
+    crossing and the bridge — hand back one node at a time and re-measure
+    from `blocks[-1]`, and every node carries the runners-up it would have
+    accepted so placement can take a second choice rather than an unchecked
+    one. This is the single rule the file rests on, it was learned twice, and
+    between them the two halves were 82% of every placement failure.
+  - **A plan chooses cells; `hop_span` answers in take-off points.** `_band`
+    converts between them, and it has to know the *heading*: feet plant against
+    a block's face, so running into a corner they plant 1.41 times as far out
+    as running into a side. That is nearly half a metre against a legal band
+    for a climbing hop that is only a metre wide.
+  - **When the bridge is under its platform and low, it climbs beside it.**
+    One jump reaches 1.25 blocks; a bridge that arrives underneath with three
+    still to climb finds that the direction "toward the landing" is made of
+    rounding error and lays every stone on top of the last. `_beside` circles
+    the landing instead — a ring of cells a few out from the rim, each a real
+    hop from the last and each a block higher — and the head-room already
+    reserved over each one is what forces the flight to *turn* rather than
+    bounce between two stones. It reads as a corkscrew of steps up the outside
+    of a platform, which is what a spiral map builds at exactly this moment.
+  - **It steps across onto a platform, never up into it.** A platform's ground
+    is two cells deep, so a landing hop that still has to climb crosses the
+    lower of those two with the body's head.
+  - **A platform's own climb is built parkour, not terrain.** The way out is
+    one to three blocks above the way in, and the last few landings of a
+    crossing are blocks on plinths that go through the same four checks as a
+    bridge stone. Raising the platform's *ground* under the lane instead was
+    tried first and is the more obvious idea; it puts a step at shoulder height
+    beside every landing next to it and takes unchecked placements from 0.2% to
+    5%, unfixably, because the offending geometry is the building.
+
+  The proportions are the point and they are four numbers that move together —
+  six platforms of 23 to 29 cells on a radius of 34, climbing 3 to 6 blocks
+  plus the terrace. That is a gap of six to twelve metres: two to four stones
+  of bridge against six or seven landings of crossing, and **52% of a run's
+  time on built ground**. The first attempt (five platforms of 11 to 15 on a
+  radius of 22) spent a quarter of the run on a platform in stretches of a
+  second and a half — which is the cylinder it replaced, wearing a hat.
+
 ## Solvability by construction
 
 Both scenes could generate layouts that fail. Neither is allowed to, and
@@ -687,6 +756,11 @@ tools/                offline, never imported by the daemon
 │                     the building, emergency placements, the move and
 │                     set-piece mix, how fast the run gains altitude, how long
 │                     a themed ring lasts, and the idle between moves
+├── spiral_probe.py   the same safety block, imported from `tower_probe` rather
+│                     than restated, plus what this format is actually about:
+│                     how much of a run is on built ground against out over
+│                     the drop, how long one platform lasts, and how many
+│                     platforms a minute go by
 ├── depth_probe.py    what each translucent draw is hiding, by re-rendering
 │                     the frame with that one draw's depth writing off
 ├── frame_cost.py     per-frame cost of each scene, alternated in one process
@@ -746,6 +820,11 @@ src/brainrot/
     ├── runner.py     three-lane chase-cam runner
     ├── runnerplan.py the runner's lane search and take-off planner
     ├── parkour.py    first-person infinite parkour
+    ├── spiralplan.py the spiral's platforms, columns, caves and bridges; the
+    │                 course over them subclasses `towerplan.Course`, so the
+    │                 physics and every occupancy rule are inherited unchanged
+    ├── spiral.py     the spiral scene: `TowerScene` against `spiralplan`,
+    │                 plus which way indoors is and the model furniture
     ├── towerplan.py  the tower's architecture, course, moves and physics --
     │                 no renderer in it, so a 60-run sweep needs no window
     └── tower.py      first-person spiral-tower parkour

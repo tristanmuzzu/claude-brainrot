@@ -49,6 +49,7 @@ memory rather than look wrong:
 from __future__ import annotations
 
 import array
+import math
 from typing import Callable, Iterable, Sequence
 
 from PIL import Image
@@ -360,8 +361,10 @@ class ChunkedVolume:
 
     def draw(self, tint: Callable[[float, float, float], rl.RGBA],
              near: "tuple[float, float, float] | None" = None,
-             far: float = 1e9) -> int:
-        """Draw every built chunk, tinted per chunk. Returns chunks drawn.
+             far: float = 1e9,
+             look: "tuple[float, float, float] | None" = None,
+             spread: float = 1.6) -> int:
+        """Draw every built chunk that could be on screen. Returns how many.
 
         ``tint`` is handed a chunk's centre and answers with the colour it
         should be multiplied by -- which is how distance fog reaches meshed
@@ -369,18 +372,40 @@ class ChunkedVolume:
         software rasteriser ignores material colour whenever a colour attribute
         exists, so a vertex-coloured mesh would render differently in CI than
         on a GPU).
+
+        ``look`` is the direction the camera is pointing, and passing it turns
+        on a cone cull. A distance cull alone keeps everything within a
+        *sphere*, and the strip this project draws into is a tall narrow window
+        with about fifty degrees of horizontal field -- so most of that sphere
+        is behind the viewer or off to one side, and every chunk of it is a
+        draw call and a pass over its vertices for nothing. The test is
+        deliberately generous (``spread`` is the tangent of the half-angle it
+        keeps, well past the real one) and each chunk is treated as a sphere
+        around its centre, because the cost of drawing one chunk that turned
+        out to be off screen is nothing and the cost of *not* drawing one that
+        was on screen is a hole in the world.
         """
         material = _shared_material()
         material.maps[rl.MATERIAL_MAP_ALBEDO].texture = self.atlas.texture
         xform = rl.MatrixIdentity()
         drawn = 0
         far2 = far * far
+        radius = self.SIZE * 0.87          # half the diagonal of a chunk
         for mesh in self._meshes.values():
             cx, cy, cz = mesh.centre
             if near is not None:
                 dx, dy, dz = cx - near[0], cy - near[1], cz - near[2]
                 if dx * dx + dy * dy + dz * dz > far2:
                     continue
+                if look is not None:
+                    ahead = dx * look[0] + dy * look[1] + dz * look[2]
+                    if ahead < -radius:
+                        continue
+                    sx, sy, sz = (dx - look[0] * ahead, dy - look[1] * ahead,
+                                  dz - look[2] * ahead)
+                    side = math.sqrt(sx * sx + sy * sy + sz * sz)
+                    if side > ahead * spread + radius * 2.0:
+                        continue
             material.maps[rl.MATERIAL_MAP_ALBEDO].color = tint(cx, cy, cz)
             rl.DrawMesh(mesh.mesh[0], material, xform)
             drawn += 1

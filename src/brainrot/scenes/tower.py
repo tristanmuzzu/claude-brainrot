@@ -99,6 +99,18 @@ WRITE_BUDGET = 900
 
 @register("tower")
 class TowerScene(Scene):
+    #: The module that owns the building and the course. Everything below this
+    #: line is a *renderer* -- meshing, the body, the camera, the weather --
+    #: and none of it knows what shape the building is; the spiral scene is
+    #: this class against :mod:`brainrot.scenes.spiralplan` instead, and the
+    #: only thing it has to say for itself is which way "indoors" is.
+    plan = tp
+    #: How far under the body the world is kept. A ring tower is a few
+    #: metres across and its whole silhouette is what is directly below you;
+    #: a spiral of platforms is seventy metres across, so the same depth is
+    #: several times as many chunks and most of them are behind a platform.
+    below = BELOW
+
     def __init__(self, ctx: SceneContext) -> None:
         super().__init__(ctx)
         pal = ctx.palette
@@ -116,9 +128,9 @@ class TowerScene(Scene):
                                       see_through=tp.SEE_THROUGH)
         self.volume = chunk.ChunkedVolume(self.atlas)
 
-        self.tower = tp.Tower(ctx.stream("tower"), 0)
-        self.course = tp.Course(ctx.stream("course"), self.tower,
-                                hop_rng=ctx.stream("hops"))
+        self.tower = self.plan.Tower(ctx.stream("tower"), 0)
+        self.course = self.plan.Course(ctx.stream("course"), self.tower,
+                                       hop_rng=ctx.stream("hops"))
         self.hop_rng = ctx.stream("hops2")
         self._written = 0
 
@@ -205,7 +217,7 @@ class TowerScene(Scene):
         if writes:
             take = writes[:budget]
             del writes[:budget]
-            floor = int(self.pos[1]) - BELOW
+            floor = int(self.pos[1]) - self.below
             for cell, style in take:
                 if cell[1] >= floor:
                     self.volume.set(cell, style)
@@ -226,6 +238,16 @@ class TowerScene(Scene):
 
     def _block(self) -> dict:
         return self.course.blocks[self.index]
+
+    def _indoor_want(self) -> float:
+        """1 when the body is under a roof, 0 when it is under the sky.
+
+        A ring tower is a cylinder, so the answer is which side of the wall the
+        body is on. The only thing in the whole renderer that depends on the
+        building's shape, which is why it is a method.
+        """
+        wall = self.tower.radius_at(self.pos[1])
+        return 1.0 if math.hypot(self.pos[0], self.pos[2]) < wall - 0.4 else 0.0
 
     def _begin_ground(self) -> None:
         """Set up the run across the block just landed on.
@@ -290,7 +312,7 @@ class TowerScene(Scene):
         dropped = self.course.advance(self.index)
         if dropped:
             self.index -= dropped
-        floor = int(self.pos[1]) - BELOW
+        floor = int(self.pos[1]) - self.below
         self.volume.drop_below(floor)
         if len(self.tower.lamps) > 60:
             self.tower.lamps = [c for c in self.tower.lamps if c[1] >= floor]
@@ -317,8 +339,7 @@ class TowerScene(Scene):
             if self.phase_t >= move.dur:
                 self._land()
         self.climbed = self.pos[1] - self.base_y
-        wall = self.tower.radius_at(self.pos[1])
-        want = 1.0 if math.hypot(self.pos[0], self.pos[2]) < wall - 0.4 else 0.0
+        want = self._indoor_want()
         # Eased over about a third of a second, because the transition happens
         # in one stride through an archway and a step change in the whole
         # frame's exposure reads as a rendering fault rather than as going
@@ -536,7 +557,11 @@ class TowerScene(Scene):
         def tint(x: float, y: float, z: float) -> rl.RGBA:
             return self._fog(self._depth(eye, (x, y, z)))
 
-        self.volume.draw(tint, near=eye, far=FOG_FAR * 1.6)
+        aim = self.camera.target
+        dx, dy, dz = aim.x - eye[0], aim.y - eye[1], aim.z - eye[2]
+        n = math.sqrt(dx * dx + dy * dy + dz * dz) or 1.0
+        self.volume.draw(tint, near=eye, far=FOG_FAR * 1.6,
+                         look=(dx / n, dy / n, dz / n))
 
     def _depth(self, eye, at) -> float:
         """Fog distance, with everything below the body pushed further away.
