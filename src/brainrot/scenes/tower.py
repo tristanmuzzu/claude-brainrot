@@ -42,6 +42,7 @@ from ..engine.fx import Burst, Weather, glow_pass, no_depth_write
 from ..engine.hud import chip, text
 from ..engine.scene import Scene, SceneContext, register
 from ..engine.sky import SkyDome
+from ..engine import textures
 from ..engine.textures import cloud_blob
 
 #: Vertical field of view. A touch wider than the flat scene's, because the
@@ -52,7 +53,7 @@ FOV = 78.0
 FOG_FAR = 110.0
 #: How far below the body the tower is still drawn. Beyond this it is a smudge
 #: in the fog and every chunk of it is a draw call for nothing.
-BELOW = 46
+BELOW = 62
 #: ...and how far above. Generation runs sixteen blocks ahead of the body, but
 #: the *building* is worth seeing a long way further than that -- a tower whose
 #: top is fourteen blocks up is a chimney.
@@ -65,7 +66,7 @@ SEA_Y = -90.0
 #: How much further away everything below the body is treated as being. The
 #: tower is only built fifty blocks down, and without this its bottom edge is a
 #: crisply lit stub hanging in mid-air.
-UNDER_FOG = 2.1
+UNDER_FOG = 2.6
 
 #: How far the look-at point is pulled back toward the tower's axis, and how
 #: much further down the camera aims than the next landing.
@@ -460,9 +461,19 @@ class TowerScene(Scene):
         # cannot be true.
         rl.DrawPlane((self.pos[0], SEA_Y, self.pos[2]), (5000, 5000),
                      rl.rgba(rl.mix_rgb(self.deep, pal.fog,
-                                        min(0.62, (self.pos[1] - SEA_Y) / 320.0)),
+                                        min(0.82, (self.pos[1] - SEA_Y) / 240.0)),
                              255))
         rl.flush()
+        rl.EndMode3D()
+
+        # Aerial perspective over the sea *only*. It is a screen-space band, so
+        # it goes in the gap between the world below and everything you are
+        # actually looking at -- drawn after the tower instead, it bleaches the
+        # wall three metres away as hard as the water a hundred metres down,
+        # which is not haze, it is a wash laid over the middle of the frame.
+        self._draw_haze(pal)
+
+        rl.BeginMode3D(self.camera[0])
         self._draw_tower()
         self._draw_course()
         self._draw_orbs()
@@ -606,6 +617,51 @@ class TowerScene(Scene):
                 self._glows.append((orb["x"], orb["y"] + hover, orb["z"], 1.1,
                                     ORB_COLOR, 150))
 
+    def _horizon_y(self) -> int:
+        """Screen row the sea's horizon falls on, this frame.
+
+        A point at eye height and effectively infinite distance projects to it
+        exactly, whatever the camera is doing -- and the camera here pitches a
+        long way, so a fixed fraction of the frame is wrong most of the time.
+        """
+        cam = self.camera
+        far = (cam.position.x + math.sin(self.yaw) * 1e5, cam.position.y,
+               cam.position.z - math.cos(self.yaw) * 1e5)
+        try:
+            y = int(rl.GetWorldToScreen(far, cam[0]).y)
+        except Exception:
+            y = int(self.height * 0.5)
+        return max(int(self.height * 0.05), min(int(self.height * 0.95), y))
+
+    def _draw_haze(self, pal) -> None:
+        """Aerial perspective at the horizon, in two directions.
+
+        The sea is one flat plane a hundred metres down with no distance
+        shading of its own, so without this it meets the sky along a *drawn
+        line* and the whole drop reads as a pale plate ten metres under your
+        feet rather than as the ground a long way below. The band therefore has
+        to be strongest exactly where the water ends.
+
+        It starts a little *above* the true horizon and fades in, because the
+        eye finds a hard edge in a clear sky instantly and a band that begins at
+        full strength draws exactly the line it was meant to hide, a few rows
+        higher up.
+
+        Where the horizon falls is projected rather than guessed: the camera
+        pitches a long way in this scene, and a fixed fraction of the frame
+        leaves a strip of unhazed water above the haze every time the head goes
+        up.
+
+        A 2D draw, in the gap between the sea and everything else: it writes no
+        depth at all, and nothing drawn after it is touched by it.
+        """
+        band = textures.alpha_band(f"tower-haze-{self.ctx.seed.run}", pal.fog,
+                                   205, 1.7, ramp=0.24)
+        horizon = self._horizon_y()
+        rl.DrawTexturePro(band, (0, 0, 4, 128),
+                          (0, horizon - int(self.height * 0.07), self.width,
+                           int(self.height * 0.5)), (0, 0), 0.0, rl.WHITE4)
+
     def _draw_clouds(self) -> None:
         """Sheets of cloud at absolute altitudes, drawn after the tower.
 
@@ -657,8 +713,8 @@ class TowerScene(Scene):
         bob = math.sin(self.stride * STRIDE_RATE) * 0.02
         swing = math.sin(self.swing * math.pi) * 0.12 + self.mine * 0.22
         for part in self.kit["parts"]:
-            u = 0.52 + part["u"]
-            v = -0.44 + part["v"] + bob + swing * 0.5
+            u = 0.44 + part["u"]
+            v = -0.38 + part["v"] + bob + swing * 0.5
             f = 1.10 + part["f"] - swing * 0.34
             x = cam.position.x + right[0] * u + up[0] * v + fwd[0] * f
             y = cam.position.y + right[1] * u + up[1] * v + fwd[1] * f

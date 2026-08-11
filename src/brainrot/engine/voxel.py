@@ -230,12 +230,19 @@ def _ao(x: int, y: int) -> float:
     like coloured card. There is no neighbour information at texture-build
     time, so it is baked as if every block had them: the error on a lone
     floating block is a slightly rounded look, which is the harmless direction.
+
+    Turned up from 5% to 9% when the tower arrived, and that is about scale
+    rather than taste. A course is a dozen separate cubes with sky between them
+    and the eye separates those without help; a *wall* is forty cubes meeting
+    edge to edge, and at the old amplitude a ring of gold or quartz -- materials
+    whose texel pattern is deliberately almost flat -- read as one extruded
+    plastic surface with no blocks in it at all.
     """
     u = min(x, 15 - x) / 7.5               # 0 at the rim, 1 down the middle
     v = min(y, 15 - y) / 7.5
     edge = max(0.0, 1.0 - min(u, v) * 2.6)
     corner = max(0.0, 1.0 - u * 1.9) * max(0.0, 1.0 - v * 1.9)
-    return 1.0 - 0.05 * edge ** 1.6 - 0.045 * corner
+    return 1.0 - 0.09 * edge ** 1.6 - 0.075 * corner
 
 
 def _atlas(base: rl.RGB, noise: float, seed: int,

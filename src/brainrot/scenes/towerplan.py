@@ -442,11 +442,17 @@ def body_cells(x: float, y: float, z: float):
 # that will not fit inside its own building.
 
 #: name -> (base colour, texel pattern, colour noise)
+#:
+#: Note how few entries use the near-flat ``concrete`` pattern. A material
+#: with no grain in it is fine for a jump block with sky around it and wrong
+#: for a *wall*: forty cubes meeting edge to edge with nothing to separate
+#: them read as one extruded surface. Anything a ring is built out of has
+#: courses, seams or stones in it.
 MATERIALS: dict[str, tuple[tuple[int, int, int], str, float]] = {
     # -- the keep
     "stonebrick": ((136, 136, 142), "stonebrick", 0.02),
     "cobble": ((128, 128, 134), "cobble", 0.03),
-    "stone": ((146, 146, 150), "concrete", 0.02),
+    "stone": ((146, 146, 150), "stonebrick", 0.02),
     "mossy": ((104, 122, 96), "cobble", 0.04),
     "andesite": ((150, 150, 148), "speck", 0.02),
     # -- timber
@@ -468,7 +474,7 @@ MATERIALS: dict[str, tuple[tuple[int, int, int], str, float]] = {
     # -- desert
     "sandstone": ((222, 208, 150), "sand", 0.02),
     "chiselled": ((214, 198, 140), "stonebrick", 0.02),
-    "terracotta": ((172, 106, 74), "concrete", 0.03),
+    "terracotta": ((172, 106, 74), "bricks", 0.03),
     # -- nether
     "netherrack": ((116, 54, 54), "dirt", 0.04),
     "netherbrick": ((84, 44, 52), "bricks", 0.02),
@@ -478,23 +484,23 @@ MATERIALS: dict[str, tuple[tuple[int, int, int], str, float]] = {
     # -- ice
     "packedice": ((156, 192, 232), "grain", 0.02),
     "blueice": ((116, 164, 228), "grain", 0.02),
-    "snow": ((238, 244, 250), "concrete", 0.02),
+    "snow": ((238, 244, 250), "sand", 0.02),
     "frost": ((186, 210, 232), "stonebrick", 0.02),
     # -- the laboratory
     "slime": ((128, 200, 108), "leaves", 0.03),
     "honey": ((232, 172, 60), "grain", 0.03),
-    "copper": ((188, 120, 88), "concrete", 0.02),
+    "copper": ((188, 120, 88), "bricks", 0.02),
     # -- the deep
     "prismarine": ((92, 152, 146), "stonebrick", 0.03),
-    "darkprismarine": ((62, 108, 102), "concrete", 0.02),
+    "darkprismarine": ((62, 108, 102), "stonebrick", 0.02),
     "sealantern": ((198, 226, 216), "lantern", 0.02),
     # -- the end
     "purpur": ((166, 128, 172), "stonebrick", 0.02),
     "endstone": ((216, 214, 156), "speck", 0.03),
-    "obsidian": ((56, 46, 78), "concrete", 0.02),
+    "obsidian": ((56, 46, 78), "stonebrick", 0.02),
     # -- the summit
     "quartz": ((228, 226, 218), "grain", 0.02),
-    "gold": ((234, 198, 84), "concrete", 0.02),
+    "gold": ((234, 198, 84), "stonebrick", 0.02),
     "glowstone": ((250, 214, 130), "lantern", 0.02),
     # -- furniture and fittings, shared by every theme
     "lantern": ((255, 212, 128), "lantern", 0.02),
