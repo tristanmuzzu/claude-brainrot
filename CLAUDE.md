@@ -358,6 +358,15 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
+0. **The spiral rebuild** -- `docs/SPIRAL_HANDOFF.md`. The owner's reference
+   screenshot settles that this format is a stack of *built platforms* on a
+   forest of columns, not a cylinder with jump blocks hung round it, and
+   `scenes/spiralplan.py` is the rebuild toward that. It is committed and
+   deliberately **not imported by anything**; one node in eight still falls
+   through to the unchecked answer, against one in three hundred for the ring
+   version that ships. Read the handoff before touching it.
+
+
 0. **`tools/depth_probe.py` does not know about the tower.** It patches
    `parkour`'s own draw methods by name. The tower's translucent draws -- cloud
    shelves, water columns, cobweb, every glow -- all go through
