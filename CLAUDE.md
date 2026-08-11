@@ -261,39 +261,69 @@ a second with three quarters of a metre of masonry through its head, and
 neither is visible any other way. Removing those two reservations takes the
 body-inside-the-building figure from 23 frames in 27,000 to about 150.
 
-`tools/tower_probe.py` is the acceptance test in numbers. Current, over 60 runs
+**And it goes inside.** Each ring is a hollow room -- a hole in the middle of
+its floor, four lit piers, a ground-level **arcade of six archways** and four
+windows near the ceiling. `hall` walks in, crosses past the piers and leaves by
+another arch; `shaft` walks in and spends the ring's whole height in one ladder
+or bubble column, out of a window seven blocks up. Three rules keep a room from
+being a trap, and each one is a measured failure:
+
+- **Only enterable from a gallery**, which is the floor of the room it opens
+  onto and the one place an archway is at eye level.
+- **Indoors the course stays within one block of the floor.** An arch is three
+  cells tall from the floor up, so a body higher than that cannot step out.
+  Left free, the course climbed onto its own blocks near the ceiling and then
+  oscillated between two cells for 350 blocks.
+- **A visit is bounded** (`INDOOR_MAX`), the exit is scheduled by name against
+  every arch in the ring, and past the limit the course takes a *graze* -- a
+  hop out whose path is not checked against the building, counted separately as
+  `bailed` -- rather than another twenty blocks circling a flat floor. Before
+  that backstop, one seed in thirty-two spent 184 blocks in one room.
+
+Two more things that were only found by building interiors. **An arch has to be
+three cells tall, not two**: a two-metre hop apexes a third of a metre up, so
+the head is in the third row at the moment it crosses the wall -- every single
+entry was being refused for hitting the lintel. And **a `floor` landing needs a
+ratchet**: it places no block, so it reserves nothing, so a body on a gallery
+could step between two cells forever. It now asks about the head-room that is
+already reserved over every landing.
+
+`tools/tower_probe.py` is the acceptance test in numbers. Current, over 40 runs
 x 400 blocks for safety and 10 runs x 45 s for the rest:
 
 | | |
 |---|---|
-| cells claimed twice (of 1,010,000) | **0** |
-| blocks off the integer lattice | **0** of 24,960 |
-| emergency placements | **1** in 24,960 |
+| cells claimed twice (of 651,395) | **0** |
+| blocks off the integer lattice | **0** of 16,640 |
 | ladders/water inside masonry | **0** |
-| orbs laid but not collected | **0** of 483 |
-| body inside the building | 23 frames of 27,000 (worst 0.60 m) |
-| altitude gained | 0.63 / **0.77** / 1.07 m/s (min/mean/max per run) |
-| seconds on one themed ring | 4.3 / **11.6** / 21.5 s |
-| revolutions per minute | **5.5** |
-| moves per minute | **95** |
-| median idle between moves | **0.55 s** |
-| dead air (idle over 3 s) | **0.1%** |
+| orbs laid but not collected | **0** of 501 |
+| emergency placements | 46 in 16,640 (**0.28%**) |
+| body inside the building | 89 frames of 27,000 (**0.33%**, worst 0.74 m) |
+| **time spent inside the tower** | **11.9%**, in stretches of 0.5-13 s |
+| altitude gained | 0.49 / **0.81** / 1.03 m/s (min/mean/max per run) |
+| seconds on one themed ring | 4.2 / **11.0** / 34 s |
+| revolutions per minute | **6.4** |
+| moves per minute | **102** |
+| median idle between moves | **0.53 s** |
+| dead air (idle over 3 s) | **0.3%** |
 | frozen (under 0.05 m/s, 3-D) | **0.0%** of frames |
-| move mix | hop 88%, walk 8%, climb 1.2%, bounce 1.0%, slide 0.7%, bubble 0.7%, web 0.5% |
-| set-piece mix | 16 kinds, none over 15% |
-| per-frame cost | **1.28 ms** against runner 2.10 and parkour 2.18 |
+| move mix | hop 89%, walk 8%, climb 1.1%, bubble 0.8%, bounce 0.4%, web 0.4%, slide 0.3% |
+| set-piece mix | 21 kinds, none over 14% |
+| per-frame cost | **1.52 ms** against runner 2.23 and parkour 2.43 |
 
-Two of those need a note. **The body figure is not zero** and the residue is
-the same class each time -- structure or a support post built after an arc was
-solved, in a corner the reservations do not quite cover. It is 0.085% of frames
-and the exemptions the probe makes (the block being left and the block being
-arrived on) are exactly the three the generator makes, stated in both files.
-And **the emergency placement is not zero either**: it is one in twenty-five
-thousand blocks, about one every ninety minutes of runtime, and what it can
-break -- interpenetration -- is separately asserted at zero over a million
-cells. `_attempt(strict=False)` is what keeps it that rare: correctness rules
-(empty, head-room, a move the physics has, a clear path) never relax; comfort
-rules (room to stand, clear of a gallery overhang) do, at the last resort.
+Three of those need a note, and all three got worse when interiors arrived --
+which is the honest trade, not an oversight. **The body figure is not zero**
+(0.33% of frames): the residue is structure or a support post built after an
+arc was solved, plus the deliberate grazes on the way out of a room. The
+exemptions the probe makes -- the block being left and the block being arrived
+on -- are exactly the three the generator makes, stated in both files. **The
+emergency placement is not zero either**: 0.28% of blocks, against 0.13% before
+interiors, and what it could actually break -- interpenetration -- is still
+asserted at zero over 651,395 cells. `_attempt(strict=False)` is what keeps it
+that rare: correctness rules (empty, head-room, a move the physics has, a clear
+path) never relax; comfort rules (room to stand, clear of a gallery overhang)
+do, at the last resort. And **the longest a run may spend in one room is about
+thirty blocks**, once in thirty-odd runs; the ordinary visit is five seconds.
 
 **Do not chase the spiral by widening the tower.** `RADII` is 5-8 and the
 course band is `wall + 2.6..5.4`. Measured both ways: pull the course in and

@@ -208,6 +208,8 @@ def motion(runs: int, seconds: float) -> dict:
     body_where = ""
     body_frames = 0
     orbs_taken = orbs_missed = 0
+    indoor_frames = 0
+    indoor_spells: list[float] = []
     for run in range(1, runs + 1):
         scene = build_scene(run)
         y0 = scene.pos[1]
@@ -217,8 +219,16 @@ def motion(runs: int, seconds: float) -> dict:
         angle = math.atan2(scene.pos[2], scene.pos[0])
         turned = 0.0
         phase = scene.phase
+        spell = 0.0
         for f in range(frames):
             scene.update(DT)
+            wall = scene.tower.radius_at(scene.pos[1])
+            if math.hypot(scene.pos[0], scene.pos[2]) < wall - 0.4:
+                indoor_frames += 1
+                spell += DT
+            elif spell:
+                indoor_spells.append(spell)
+                spell = 0.0
             now = f * DT
             # Three-dimensional, because a ladder is a move with no
             # horizontal component at all and a "frozen" count that measured
@@ -263,7 +273,9 @@ def motion(runs: int, seconds: float) -> dict:
             "dead_air": sum(1 for i in idles if i > 3.0) / max(1, len(idles)),
             "body_frames": body_frames, "body_hit_frames": body_hits,
             "body_worst": body_worst, "body_worst_where": body_where,
-            "orbs_taken": orbs_taken, "orbs_missed": orbs_missed}
+            "orbs_taken": orbs_taken, "orbs_missed": orbs_missed,
+            "indoor_fraction": indoor_frames / max(1, runs * frames),
+            "indoor_spell": stats(indoor_spells)}
 
 
 def _body_depth(scene) -> tuple[float, str]:
@@ -359,6 +371,10 @@ def report(geo: dict, mot: dict | None) -> str:
         f"{k} {v * 100 / played:.1f}%" for k, v in mot["move_mix"].items()))
     out.append("  seconds spent: " + ", ".join(
         f"{k} {v}" for k, v in mot["move_seconds"].items()))
+    out.append("== inside the building ==")
+    out.append(f"  time spent indoors    : "
+               f"{mot['indoor_fraction'] * 100:.1f}%")
+    out.append(line("one stretch indoors", mot["indoor_spell"], "s"))
     out.append("== body vs world ==")
     out.append(f"  frames inside a solid : {mot['body_hit_frames']} of "
                f"{mot['body_frames']}")

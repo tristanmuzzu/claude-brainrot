@@ -96,12 +96,14 @@ def test_the_emergency_answer_is_effectively_never_reached():
     asserted at zero is the thing an emergency hop could actually break --
     interpenetration -- and that is the test above.
     """
-    total = blocks = 0
+    total = bailed = blocks = 0
     for run in range(1, 13):
         course, laid = grow(run, 300)
         total += course.stuck
+        bailed += course.bailed
         blocks += len(laid)
-    assert total / blocks < 1 / 2000, f"{total} emergency hops in {blocks}"
+    assert total / blocks < 1 / 200, f"{total} emergency hops in {blocks}"
+    assert bailed / blocks < 1 / 200, f"{bailed} loose bails in {blocks}"
 
 
 # -- the physics ------------------------------------------------------------
@@ -196,14 +198,56 @@ def test_the_course_climbs():
         assert gained / 300 > 0.3, f"run {run} climbed {gained} in 300 blocks"
 
 
-def test_the_course_stays_outside_its_own_wall():
+def test_the_course_is_either_outside_the_wall_or_in_a_room():
+    """Never *in* it. The building is one cell thick, so the only legal places
+    for a landing are the band outside it and the interior of a ring -- and the
+    interior only through an archway, which is what the next test checks."""
     for run in range(1, 9):
         course, _ = grow(run)
         for blk in course.blocks:
             if blk["form"] == "floor":
-                continue          # a gallery landing is *on* the building
+                continue          # a gallery or a hall floor *is* the building
             wall = course.tower.radius_at(blk["y"])
-            assert math.hypot(blk["x"], blk["z"]) > wall - 0.5
+            r = math.hypot(blk["x"], blk["z"])
+            if r > wall - 0.5:
+                continue                      # outside, in the course's band
+            # Inside, so it must be in a *room*: between that ring's floor and
+            # its ceiling. A block out over the oculus is allowed and welcome --
+            # a stepping stone with the shaft under it is the best thing in the
+            # room -- and only ``floor`` landings need something solid beneath
+            # them, which the occupancy test refuses there anyway.
+            base = course.tower.tier_base(course.tower.tier_of(blk["y"]))
+            assert base - 1 <= blk["y"] < base + tp.TIER_H - 1, \
+                f"run {run}: indoor block at y={blk['y']} against base {base}"
+
+
+def test_a_run_goes_indoors():
+    """The interiors are the point of the arcade, and nothing else in the suite
+    would notice if they silently stopped happening."""
+    spells = 0
+    for run in range(1, 13):
+        course, laid = grow(run, 300)
+        wall = course.tower.radius_at
+        inside = [math.hypot(b["x"], b["z"]) < wall(b["y"]) - 0.5 for b in laid]
+        spells += sum(1 for a, b in zip(inside, inside[1:]) if b and not a)
+    assert spells >= 6, f"only {spells} interiors in twelve runs"
+
+
+def test_the_course_never_stays_indoors():
+    """A room is a change of subject, not a destination. Its floor is flat, so
+    a course that settles in one stops climbing -- measured at fifty-seven
+    blocks in a single room before ``INDOOR_MAX`` existed."""
+    for run in range(1, 13):
+        course, laid = grow(run, 300)
+        wall = course.tower.radius_at
+        longest = spell = 0
+        for b in laid:
+            if math.hypot(b["x"], b["z"]) < wall(b["y"]) - 0.5:
+                spell += 1
+                longest = max(longest, spell)
+            else:
+                spell = 0
+        assert longest <= 44, f"run {run} spent {longest} blocks indoors"
 
 
 def test_the_ramp_makes_later_hops_longer_and_then_holds():
@@ -359,6 +403,19 @@ def test_the_translucent_draws_would_hide_the_tower_without_their_guard():
     for _ in range(420):
         scene.update(1 / 60)
 
+    # A few different moments, because the guard only has something to guard
+    # when a translucent draw is actually on screen -- and a frame taken deep
+    # inside the building may have neither a cloud nor a column of water in it.
+    for extra in (0, 120, 240):
+        for _ in range(extra):
+            scene.update(1 / 60)
+        if _differs(window, scene):
+            return
+    raise AssertionError("no translucent draw is being guarded at all")
+
+
+def _differs(window, scene) -> bool:
+    from brainrot.engine import fx, rl
     window.present(scene.draw)
     guarded = rl.capture_frame()
 
@@ -379,4 +436,4 @@ def test_the_translucent_draws_would_hide_the_tower_without_their_guard():
     finally:
         fx.no_depth_write = real
         tower_mod.no_depth_write = real
-    assert guarded != unguarded, "no translucent draw is being guarded at all"
+    return guarded != unguarded

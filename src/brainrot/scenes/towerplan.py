@@ -357,6 +357,15 @@ def fall_speed(drop: float) -> float:
 # Lattice helpers
 # ---------------------------------------------------------------------------
 
+def _wrap(a: float) -> float:
+    """An angle folded into -pi..pi."""
+    while a > math.pi:
+        a -= 2 * math.pi
+    while a < -math.pi:
+        a += 2 * math.pi
+    return a
+
+
 def _round(v: float) -> int:
     return int(math.floor(v + 0.5))
 
@@ -420,9 +429,21 @@ def body_cells(x: float, y: float, z: float):
     it straddles two cells whenever it is not dead centre, and a corridor test
     blind to the cell a shoulder is in clears arcs that visibly graze walls.
     """
-    for cy in range(_floor(y + 0.05), _floor(y + BODY_H - 0.05) + 1):
-        for cx in (_round(x - BODY_HALF_W), _round(x + BODY_HALF_W)):
-            for cz in (_round(z - BODY_HALF_W), _round(z + BODY_HALF_W)):
+    floor = math.floor
+    x0 = int(floor(x - BODY_HALF_W + 0.5))
+    x1 = int(floor(x + BODY_HALF_W + 0.5))
+    z0 = int(floor(z - BODY_HALF_W + 0.5))
+    z1 = int(floor(z + BODY_HALF_W + 0.5))
+    # Hoisted and de-duplicated on purpose. This is the hottest function in the
+    # module by a wide margin -- placement asks it for every sample of every
+    # candidate path -- and the naive form recomputed both roundings inside the
+    # height loop and yielded the same cell four times whenever the body sat
+    # near the middle of one.
+    xs = (x0,) if x0 == x1 else (x0, x1)
+    zs = (z0,) if z0 == z1 else (z0, z1)
+    for cy in range(int(floor(y + 0.05)), int(floor(y + BODY_H - 0.05)) + 1):
+        for cx in xs:
+            for cz in zs:
                 yield (cx, cy, cz)
 
 
@@ -571,7 +592,7 @@ THEMES = (
           {"beams": 2.6, "ladderrun": 2.2, "balcony": 1.5}, (196, 186, 156)),
     Theme("mine", "deepslate", "tuff", "deepslate", "goldore", "torch",
           ("candy0", "coalore", "tuff"),
-          {"interior": 3.0, "webwalk": 2.2, "pillars": 1.6}, (96, 92, 104), 0.72),
+          {"hall": 3.4, "shaft": 2.2, "webwalk": 2.0}, (96, 92, 104), 0.72),
     Theme("overgrown", "mossy", "cobble", "moss", "leaves", "lantern",
           ("candy2", "moss", "candy0"),
           {"vinerun": 2.6, "pillars": 1.8, "corbel": 1.4}, (150, 190, 140)),
@@ -589,7 +610,7 @@ THEMES = (
           {"slimeshaft": 3.4, "bubblelift": 1.8, "beams": 1.4}, (168, 176, 168)),
     Theme("deep", "prismarine", "darkprismarine", "prismarine", "sealantern",
           "sealantern", ("candy2", "prismarine", "sealantern"),
-          {"bubblelift": 3.0, "plunge": 2.4, "interior": 1.4},
+          {"bubblelift": 3.0, "shaft": 2.4, "hall": 1.6},
           (72, 132, 148), 0.35),
     Theme("end", "purpur", "endstone", "endstone", "obsidian", "lantern",
           ("candy0", "purpur", "endstone"),
@@ -635,6 +656,25 @@ OCULUS = 3
 BALCONY_OUT = 2
 #: Buttresses per ring, and how far they stand proud of the wall.
 BUTTRESSES = 6
+#: The ground-level arcade: how many ways there are into a ring, and how tall
+#: they are. Regular and known, because a course that has to find a randomly
+#: placed door is a course that mostly does not -- and the alternative is a
+#: renderer that can take meshed cells away again.
+ARCHES = 6
+#: Three, not two. A doorway you *walk* through is two tall; the course hops
+#: through this one, and even a two-metre hop apexes a third of a metre up, so
+#: the head is in the third row at the moment it crosses the wall. Measured as
+#: every single entry into every interior being refused for hitting the lintel.
+ARCH_H = 3
+#: Windows near the top of a ring, and the height they start at. These are the
+#: way *out* of an interior: an arcade is at floor level, so a stretch inside
+#: that only ever used arches would come out at the height it went in.
+WINDOWS = 4
+WINDOW_Y = 7
+#: Piers standing inside a ring. Four is what turns a hollow cylinder into a
+#: room -- something to weave past, something for a ladder to hang on, and
+#: something to carry the only light in there.
+PIERS = 4
 #: The wall radii a ring may have. Kept narrow -- the reference towers are
 #: around ten to one, tall and thin, and a wide one stops reading as a tower at
 #: all in a portrait strip.
@@ -658,8 +698,12 @@ class Tower:
         self.built_to = base_y
         self._radius: dict[int, int] = {}
         self._theme: dict[int, Theme] = {}
-        self._windows: dict[int, list[tuple[int, int]]] = {}
+        self._windows: dict[int, set[tuple[int, int, int]]] = {}
         self._bag: list[Theme] = []
+        #: Every lamp cell the building has placed, in order. The scene reads
+        #: this to hang a glow on each: the tower is drawn as meshed chunks, and
+        #: you cannot pick one emissive block out of a mesh.
+        self.lamps: list[tuple[int, int, int]] = []
 
     # -- what a ring is ----------------------------------------------------
 
@@ -708,20 +752,51 @@ class Tower:
     def radius_at(self, y: float) -> int:
         return self.radius(self.tier_of(y))
 
-    def windows(self, tier: int) -> list[tuple[int, int]]:
-        """``(angle_step, height_offset)`` of each opening in a ring.
+    def arch_angles(self, tier: int) -> tuple[float, ...]:
+        """The ground-level arcade: where you can walk *into* a ring.
 
-        Angles are in whole sixteenths of a turn so two windows cannot end up
-        one cell apart, which at this radius is a wall with a slot in it rather
-        than a wall with windows in it.
+        Regular and known rather than scattered, and that is what makes an
+        interior reachable at all. A course that has to find a randomly placed
+        door is a course that mostly does not, and the alternative -- carving a
+        hole in a wall that has already been built and meshed -- means a
+        renderer that can take cells away as well as add them.
+
+        Offset half a step from the buttresses so an arch never lands under a
+        rib, and rotated a little each ring so a stack of them is not a slot cut
+        down the whole tower.
         """
-        got = self._windows.get(tier)
-        if got is None:
-            rng = self.rng
-            slots = rng.sample(range(16), rng.randint(3, 5))
-            got = [(s, rng.choice((2, 3, 4, 8, 9, 10))) for s in slots]
-            self._windows[tier] = got
-        return got
+        step = 2 * math.pi / ARCHES
+        return tuple((k + 0.5 + 0.37 * tier) * step for k in range(ARCHES))
+
+    def window_angles(self, tier: int) -> tuple[float, ...]:
+        """...and where you can get back *out*, near the top of the room.
+
+        An arcade is at floor level, so a stretch inside that only ever used
+        arches would come out at the height it went in and the ring would climb
+        nothing. The windows are the exit that costs the shaft its height.
+        """
+        step = 2 * math.pi / WINDOWS
+        return tuple((k + 0.25 + 0.61 * tier) * step for k in range(WINDOWS))
+
+    def next_opening(self, tier: int, angle: float, wind: int,
+                     kind: str = "arch") -> float:
+        """The next opening round from ``angle``, going the way the course
+        winds. An absolute angle, which may be outside -pi..pi.
+
+        ``lead`` keeps it from picking the one it is standing in: an opening a
+        tenth of a radian ahead is one the body has already gone past by the
+        time the set-piece is expanded.
+        """
+        angles = (self.arch_angles(tier) if kind == "arch"
+                  else self.window_angles(tier))
+        lead = 0.35
+        best, gap = None, 1e9
+        for a in angles:
+            for turn in (-2, -1, 0, 1, 2):
+                d = (a + turn * 2 * math.pi - angle) * wind
+                if lead <= d < gap:
+                    best, gap = a + turn * 2 * math.pi, d
+        return best if best is not None else angle + wind * 1.0
 
     # -- generation --------------------------------------------------------
 
@@ -762,6 +837,8 @@ class Tower:
 
         if local == 0:
             self._floor(y, tier, theme, radius, place)
+        if local < TIER_H - 1:
+            self._interior(y, tier, theme, radius, local, place)
         # Buttresses stand proud of the wall and flare where they meet the ring
         # above, which is the cheapest thing that makes a cylinder read as a
         # building. They start two blocks up, *above* the gallery: a rib
@@ -802,16 +879,58 @@ class Tower:
                     place((x, y - 2, z), theme.trim)
 
     def _openings(self, tier: int, radius: int) -> set[tuple[int, int, int]]:
-        """The cells a ring's windows take out of its wall."""
+        """The cells the arcade and the windows take out of a ring's wall.
+
+        Cached per ring, because ``_layer`` asks once per layer and the answer
+        is the same twelve times running.
+        """
+        got = self._windows.get(tier)
+        if got is not None:
+            return got
         out: set[tuple[int, int, int]] = set()
-        for slot, height in self.windows(tier):
-            a = slot * (2 * math.pi / 16)
-            for da in (-0.5, 0.0, 0.5):
-                x = _round(math.cos(a + da / radius) * radius)
-                z = _round(math.sin(a + da / radius) * radius)
-                for dy in range(3):
-                    out.add((x, z, height + dy))
+        for a in self.arch_angles(tier):
+            for step in (-1, 0, 1):
+                x = _round(math.cos(a + step / radius) * radius)
+                z = _round(math.sin(a + step / radius) * radius)
+                for dy in range(ARCH_H):
+                    out.add((x, z, dy))
+        for a in self.window_angles(tier):
+            for step in (-0.5, 0.5):
+                x = _round(math.cos(a + step / radius) * radius)
+                z = _round(math.sin(a + step / radius) * radius)
+                for dy in range(WINDOW_Y, WINDOW_Y + 3):
+                    out.add((x, z, dy))
+        self._windows[tier] = out
         return out
+
+    def _interior(self, y: int, tier: int, theme: Theme, radius: int,
+                  local: int, place) -> None:
+        """What is inside a ring: piers, and a lamp on top of each.
+
+        A hollow cylinder is a hollow cylinder. Four piers turn it into a room
+        -- something for the course to weave past, something for a ladder to
+        hang on, and something to carry the only light in there. The lamp cells
+        are also handed back through :attr:`lamps`, because the building is
+        meshed and the scene cannot pick a glow out of a mesh.
+        """
+        inner = radius - 2
+        if inner <= OCULUS:
+            return          # a ring this narrow is a corridor, not a room
+        arches = self.arch_angles(tier)
+        for k in range(PIERS):
+            a = (k + 0.5 + 0.29 * tier) * (2 * math.pi / PIERS)
+            # Never in the mouth of a doorway. A pier one cell in from the wall
+            # in front of an arch closes it completely, and a ring whose arches
+            # are all closed is a room the course walks into and cannot leave.
+            if min(abs(_wrap(a - w)) for w in arches) < 0.5:
+                a += 0.5
+            x = _round(math.cos(a) * inner)
+            z = _round(math.sin(a) * inner)
+            if local == TIER_H - 3:
+                place((x, y, z), theme.glow)
+                self.lamps.append((x, y, z))
+            else:
+                place((x, y, z), theme.accent)
 
 
 _RING_CACHE: dict[int, tuple[tuple[int, int], ...]] = {}
@@ -912,7 +1031,26 @@ SEGMENTS = {
     "soulwalk": 4.0,
     "gap": 6.0,
     "headhitter": 6.0,
+    # Weighted far above everything else, and the reason is that they are the
+    # only two entries here that are not always available. An interior can only
+    # be entered from a gallery, which comes round once a ring -- so a weight
+    # that competes evenly with the cruise means an interior about once every
+    # two minutes, and the scene was measured spending 3.4% of its time inside
+    # a building that is most of what it draws.
+    "hall": 40.0,
+    "shaft": 24.0,
 }
+#: Set-pieces that go *inside* the building. Only eligible when the body is
+#: standing on a gallery -- which is the floor of the room they walk into, and
+#: the one place in a run where an archway is at eye level rather than eight
+#: blocks below it.
+INDOORS = frozenset(("hall", "shaft"))
+#: How many blocks a run may spend inside a ring before the way out is
+#: scheduled for it. An interior is a change of subject, not a destination: the
+#: floor of a room is flat, so a course that settles in one stops climbing, and
+#: the longest stretch measured before this existed was fifty-seven blocks in a
+#: single room while the altitude went nowhere.
+INDOOR_MAX = 9
 #: How the difficulty ramp reweights it. The reference is explicit that a
 #: course should escalate by *mechanic class* rather than by gap width -- and
 #: equally explicit that five hard sections in a row is what makes people quit,
@@ -988,6 +1126,9 @@ class Course:
         self.segment = ""
         self.laid = 0
         self.stuck = 0
+        #: Hops out of a room laid without the path check. See
+        #: :meth:`_bail_outdoors`.
+        self.bailed = 0
         #: Orbs that fell off the back of the course without being taken. The
         #: generation tests hold this at zero: every orb is hung *on* a path the
         #: body is about to be carried through, so a miss is a bug in the path
@@ -1003,6 +1144,16 @@ class Course:
         self.high = 0
         #: Where the course *should* be by now. See :data:`CLIMB_TARGET`.
         self.expected = 0.0
+        #: How many fillers have been spent walking round to a bearing.
+        self._approach = 0
+        #: Consecutive blocks laid inside the building. See :data:`INDOOR_MAX`.
+        self._indoor = 0
+        #: When the course last came out of a room. Leaving one puts the body
+        #: back on the gallery, which is the one place an interior is eligible
+        #: from -- so without a cooling-off period a run goes hall, out, hall,
+        #: out, and spends forty blocks indoors in what is nominally three
+        #: separate visits.
+        self._left_at = -99
 
         # Start six blocks under a floor, so the first checkpoint -- the loudest
         # thing this scene does -- arrives inside the first ten seconds. The
@@ -1129,7 +1280,21 @@ class Course:
         # would put the course inside the next ring the moment it appeared.
         self.tower.build_to(prev["y"] + 24, self._place_struct)
 
-        got = self._try_node(prev, node) or self._last_resort(prev)
+        if self._indoor > INDOOR_MAX * 3:
+            # Long past arguing about it. The emergency answer below lands
+            # outside the wall by construction -- its candidates are clamped
+            # into the course's own band -- so reaching it is itself the way
+            # out, and it is a better outcome than another twenty blocks of
+            # circling a floor. Without this backstop one seed in thirty-two
+            # spent sixty-one blocks in one room.
+            got = self._bail_outdoors(prev)
+        else:
+            got = self._try_node(prev, node) or self._last_resort(prev)
+            if got is None and self._indoor:
+                # Any failure at all while indoors is worth a graze rather than
+                # an unchecked hop: a room is small, and the thing that usually
+                # cannot be placed in one is the way out of it.
+                got = self._bail_outdoors(prev)
         if got is None:
             self.stuck += 1
             got = self._emergency(prev, node)
@@ -1153,6 +1318,9 @@ class Course:
         got rejected for asking the physics to rise two.
         """
         node = self._pending[0]
+        filler = self._walk_round(prev, node)
+        if filler is not None:
+            return filler
         if self.climb_pressure > 0.35 and node.get("to_y") is None \
                 and node["kind"] in ("hop", "slide", "walk"):
             # Behind schedule, so nothing goes down. Reweighting the set-piece
@@ -1178,12 +1346,25 @@ class Course:
             return self._next_node(prev) if self._pending else \
                 self._node(style=self.tower.theme_at(prev["y"]).course[0])
         need = target - prev["y"]
+        if node["kind"] in ("climb", "bubble"):
+            # A ride can be any height between two and nine, so a target
+            # altitude is simply the rise -- no approach to build, and asking
+            # for one would put a staircase in front of every ladder.
+            want = max(2, min(9, need))
+            self._pending.pop(0)
+            return dict(node, rise=want, rises=[want])
+        if node["form"] != "floor":
+            self._pending.pop(0)
+            return dict(node, rise=need,
+                        rises=[need] + [r for r in (need - 1, need + 1)
+                                        if abs(r) <= 4])
         # Level with the gallery, not one under it. A hop that *climbs* onto a
         # balcony has its feet in the balcony's own row of cells for the first
         # half of the arc, so it is refused for flying through the thing it is
         # aiming at -- correctly, and the answer is to arrive from beside it
         # rather than from below it.
-        if need > 0 and node["form"] == "floor":
+        if need > 0 and node["form"] == "floor" and self._approach < 12:
+            self._approach += 1
             theme = self.tower.theme_at(prev["y"])
             # Three cells out from the wall, which is one clear of the gallery
             # overhang and no further. Both halves of that matter: inside the
@@ -1201,8 +1382,50 @@ class Course:
                               gap=self._gap(self.rng, (2, 2, 3), (2, 3, 3)),
                               rise=1, radius=out, spread=1, orbs=1,
                               label="approach")
+        # Whether it got there or not, the node is now taken: a climb that
+        # cannot make ground -- a body boxed into a room, most likely -- would
+        # otherwise generate approach fillers for the rest of the run.
+        self._approach = 0
         self._pending.pop(0)
-        return dict(node, rise=need, rises=[need])
+        return dict(node, rise=need,
+                    rises=sorted({need, max(-4, min(1, need))}, reverse=True))
+
+    def _walk_round(self, prev: dict, node: dict) -> "dict | None":
+        """Get to a node's bearing before trying to land on it.
+
+        A node with an absolute ``angle`` is aimed at something two cells wide
+        -- an archway, a window -- and the next one round can be anything up to
+        a sixth of a revolution away, which at this radius is nine metres. That
+        is not a hop; it is three. So the gap is walked off a hop at a time,
+        with fillers that inherit the target's *radius* and form, which on a
+        gallery is exactly "run round the balcony to the door".
+
+        Bounded, because a filler that fails to make ground would otherwise
+        loop: past the bound the bearing is abandoned and the set-piece takes
+        whatever placement gives it.
+        """
+        want = node["angle"]
+        if want is None:
+            self._approach = 0
+            return None
+        radius = max(3.0, self.radius_of(prev))
+        gap = _wrap((want - self.angle_of(prev)) * self.wind)
+        if gap < 0.0:
+            gap += 2 * math.pi
+        stride = 3.3 / radius
+        if gap <= stride * 1.35 or self._approach >= 16:
+            if self._approach >= 16:
+                self._pending[0] = dict(node, angle=None)
+            self._approach = 0
+            return None
+        self._approach += 1
+        theme = self.tower.theme_at(prev["y"])
+        return self._node(
+            style=node["style"] or theme.course[self.laid % len(theme.course)],
+            gap=2, rise=0, form=node["form"], spread=0 if node["form"] == "floor" else 1,
+            radius=node["radius"], to_y=node["to_y"],
+            angle=self.angle_of(prev) + self.wind * stride,
+            orbs=1 if self._approach % 2 else 0, label="approach-angle")
 
     def _try_node(self, prev: dict, node: dict):
         got = self._place(prev, node)
@@ -1228,23 +1451,29 @@ class Course:
         # only move in the module nobody has checked.
         theme = self.tower.theme_at(prev["y"])
         style = theme.course[self.laid % len(theme.course)]
+        if self.radius_of(prev) < self.tower.radius_at(prev["y"] + 1) - 0.5:
+            # Inside the building, where every radius the outdoor sweep tries is
+            # on the far side of a wall. Running it from in here is eleven
+            # thousand rejected candidates for landings that cannot exist, and
+            # it is what took generation from 0.14 ms a block to 16.
+            return self._indoors(prev, style)
         # Swept in *absolute* distance from the wall rather than as a nudge,
         # and deliberately past the band the course normally keeps to. By the
         # time it gets here the body is usually already outside that band --
         # which is how it got boxed in -- and a nudge that is then clamped back
         # into the band only ever offers cells further into the trouble.
-        for rise in (0, -4, -8):
+        for rise in (0, -4):
             # And if going along will not do it, go *down*. A drop always has
             # more room in it than a step: falling takes time, the body keeps
             # its speed the whole way, so a descent reaches further and lands
             # in a part of the tower nothing has been built in yet. It costs
             # the run some altitude and it is never the shape anybody asked
             # for, which is why it is the last thing tried and not the first.
-            for radius in (3.0, 4.0, 2.2, 5.0, 6.0, 7.0, 1.8):
-                for gap in (2, 3, 4):
+            for radius in (3.0, 4.2, 2.2, 5.4):
+                for gap in (2, 4):
                     got = self._place(prev, self._node(
                         style=style, gap=gap, rise=rise, radius=radius,
-                        spread=3))
+                        spread=2))
                     if got is not None:
                         return got
         # Nothing along and nothing down: go straight up a ladder. It needs one
@@ -1261,11 +1490,42 @@ class Course:
                     return got
         return None
 
-    def _place(self, prev: dict, node: dict, strict: bool = True):
+    def _place(self, prev: dict, node: dict, strict: bool = True,
+               loose: bool = False):
         for rise in node["rises"]:
             for cell in self._targets(prev, node, rise):
-                got = self._attempt(prev, node, cell, strict)
+                got = self._attempt(prev, node, cell, strict, loose)
                 if got is not None:
+                    return got
+        return None
+
+    def _bail_outdoors(self, prev: dict):
+        """Get out of a room the ordinary way has failed to leave, at a cost.
+
+        Everything is still checked except the *path*: the landing is a real
+        gallery cell with head-room over it and the hop is one the physics has,
+        but the body may clip an archway's jamb on the way through. That is a
+        few frames of shoulder inside masonry.
+
+        The alternative is not "a slightly worse hop", it is a run that never
+        comes out: measured before this existed, one seed in sixteen spent a
+        hundred and eighty blocks circling one room while its altitude went
+        nowhere, which is every second of that appearance wasted. Counted
+        separately from ``stuck`` because it is a different bargain -- that one
+        gives up the physics, this one gives up a graze.
+        """
+        tier = self.tower.tier_of(prev["y"] + 2)
+        floor_y = self.tower.tier_base(tier) - 1
+        here = self.angle_of(prev)
+        for arch in sorted(self.tower.arch_angles(tier),
+                           key=lambda a: abs(_wrap(a - here))):
+            for radius in (1.7, 2.7, -1.3):
+                got = self._place(prev, self._node(
+                    style="", gap=2, rise=0, radius=radius, form="floor",
+                    spread=0, angle=arch, to_y=floor_y, label="bail"),
+                    strict=False, loose=True)
+                if got is not None:
+                    self.bailed += 1
                     return got
         return None
 
@@ -1287,7 +1547,10 @@ class Course:
             radius = min(max(self.radius_of(prev) + node["radial"],
                              wall + COURSE_MIN), wall + COURSE_MAX)
         step = node["gap"] + 1
-        angle = self.angle_of(prev) + self.wind * step / max(3.0, radius)
+        if node["angle"] is not None:
+            angle = node["angle"]
+        else:
+            angle = self.angle_of(prev) + self.wind * step / max(3.0, radius)
         ix, iz = math.cos(angle) * radius, math.sin(angle) * radius
         bx, bz = _round(ix), _round(iz)
         # A landing on the building searches wider, because what it is looking
@@ -1305,7 +1568,8 @@ class Course:
         scored.sort()
         return [(x, y, z) for _, x, z in scored[:26]]
 
-    def _attempt(self, prev: dict, node: dict, cell, strict: bool = True):
+    def _attempt(self, prev: dict, node: dict, cell, strict: bool = True,
+                 loose: bool = False):
         """Everything that has to be true, in the order that rejects soonest.
 
         ``strict`` separates the two kinds of requirement. Without it, a
@@ -1330,6 +1594,15 @@ class Course:
             # A landing on the building itself: the cell has to be *solid*,
             # which is the exact opposite of every other form's test.
             if (cx, cy, cz) not in self.solid:
+                return None
+            # ...and it has to be one nothing has stood on yet. A floor landing
+            # places no block, so it reserves nothing, so on its own it gives
+            # the course no *ratchet* at all: a body on a gallery could step
+            # between two cells for the rest of the run, and one seed in
+            # twenty-four did exactly that -- three hundred and sixty blocks at
+            # the same altitude. The head-room over a landing is already
+            # reserved; this is simply asking about it.
+            if (cx, cy + 1, cz) in self.headroom:
                 return None
             cells = ((cx, cy, cz),)
         elif not self._free(cells):
@@ -1381,9 +1654,10 @@ class Course:
         exempt = _standing_cells(prev) | _standing_cells(
             {"x": cx, "y": cy, "z": cz, "form": form})
         exempt |= set(soft)
-        if not self._path_clear(move, exempt,
-                                _footprint(prev["x"], prev["y"], prev["z"],
-                                           prev["form"]), support):
+        if not loose and not self._path_clear(
+                move, exempt,
+                _footprint(prev["x"], prev["y"], prev["z"], prev["form"]),
+                support):
             return None
         return {"cell": (cx, cy, cz), "step": step, "form": form,
                 "move": move, "soft": soft, "support": support}
@@ -1418,6 +1692,12 @@ class Course:
         """
         boundary = self.tower.tier_base(self.tower.tier_of(cy + 2))
         if not (boundary - 2 <= cy <= boundary - 1):
+            return True
+        # Inside the building there is no overhang to be under -- the gallery
+        # *is* the floor you are standing on. The rule is about the skirt that
+        # sticks out past the wall, and applying it indoors would refuse the
+        # whole of every interior.
+        if math.hypot(cx, cz) < self.tower.radius_at(cy + 2) - 0.5:
             return True
         return math.hypot(cx, cz) > self.gallery_outer(boundary) + 0.75
 
@@ -1618,6 +1898,64 @@ class Course:
                 return False
         return True
 
+    def _indoors(self, prev: dict, style: str, strict: bool = True):
+        """Somewhere to go that is still in this room.
+
+        A body in an interior gets offered the interior: the floor it is
+        standing on, and blocks hanging over it. Every radius here is measured
+        *inward* from the wall, which is the whole difference from the outdoor
+        sweeps -- and the reason those are not run from in here at all.
+        """
+        tier_here = self.tower.tier_of(prev["y"] + 2)
+        floor_y = self.tower.tier_base(tier_here) - 1
+        if self._indoor > INDOOR_MAX + 6:
+            got = self._bail_outdoors(prev)
+            if got is not None:
+                return got
+        if self._indoor > INDOOR_MAX:
+            # Overstayed. Every archway in the ring is tried by name, nearest
+            # first -- a step to the inside of one, then a step out through it.
+            # Without this the room is a trap: the indoor sweep below keeps
+            # finding somewhere to stand *in* it, so the course never leaves,
+            # and the longest stretch measured was forty-nine blocks on a flat
+            # floor with the altitude going nowhere.
+            here = self.angle_of(prev)
+            # Outward first. Aiming at the inside of the archway is the polite
+            # step and it is also a step that stays in the room, so a course
+            # that keeps taking it never actually leaves.
+            for arch in sorted(self.tower.arch_angles(tier_here),
+                               key=lambda a: abs(_wrap(a - here))):
+                for radius in (1.7, 2.7, -1.3):
+                    got = self._place(prev, self._node(
+                        style="", gap=2, rise=0, radius=radius, form="floor",
+                        spread=0, angle=arch, to_y=floor_y, label="leave"),
+                        strict=False)
+                    if got is not None:
+                        return got
+            # Still in. Take the graze rather than the room -- the sweep below
+            # would find somewhere perfectly good to stand *in here*, and that
+            # is exactly how a run comes to spend a hundred and eighty blocks
+            # circling one floor while its altitude goes nowhere.
+            got = self._bail_outdoors(prev)
+            if got is not None:
+                return got
+        # Everything indoors is pinned to the floor or one block over it, and
+        # that is a structural rule rather than a preference: the archways are
+        # three cells tall starting at the floor, so a body more than a block
+        # above it *cannot* step out of the room at all. Left free, the course
+        # climbed onto its own blocks near the ceiling and then oscillated
+        # between two cells for three hundred and fifty blocks.
+        for radius in (-1.4, -2.4, -3.4, -1.0, -4.4):
+            for form, lift in (("floor", 0), ("full", 0), ("full", 1)):
+                got = self._place(prev, self._node(
+                    style="" if form == "floor" else style,
+                    gap=2, rise=0, radius=radius, form=form, spread=0,
+                    to_y=floor_y + lift,
+                    label="scramble"), strict=strict)
+                if got is not None:
+                    return got
+        return None
+
     def _last_resort(self, prev: dict):
         """Every shape, everywhere, with the comfort rules switched off.
 
@@ -1629,6 +1967,14 @@ class Course:
         """
         theme = self.tower.theme_at(prev["y"])
         style = theme.course[self.laid % len(theme.course)]
+        if self.radius_of(prev) < self.tower.radius_at(prev["y"] + 1) - 0.5:
+            got = self._indoors(prev, style, strict=False)
+            if got is not None:
+                return got
+            # ...and if the room has nothing left either, the outdoor sweep
+            # below is still worth the cost here, where it is the last thing
+            # between this and an unchecked hop. It is skipped from indoors in
+            # the *first* fallback, which is the one that runs constantly.
         for rise in (0, 1, -2, -5):
             for radius in (3.0, 4.0, 2.2, 5.0, 6.0, 1.8):
                 for gap in (2, 3, 4, 5):
@@ -1704,6 +2050,8 @@ class Course:
         for cell in got["support"]:
             self._place_struct(cell, node["support_style"] or theme.trim)
         self.blocks.append(blk)
+        self._indoor = (self._indoor + 1 if math.hypot(cx, cz)
+                        < self.tower.radius_at(cy + 1) - 0.5 else 0)
         self.headroom.update(
             (x, y + h, z)
             for x, y, z in _footprint(cx, cy, cz, got["form"]) or ((cx, cy, cz),)
@@ -1766,7 +2114,7 @@ class Course:
               deco: str | None = None, orbs: int = 0, support: int = 0,
               support_style: str | None = None, spread: int = 2,
               to_y: int | None = None, radius: float | None = None,
-              label: str | None = None) -> dict:
+              angle: float | None = None, label: str | None = None) -> dict:
         """One entry in a set-piece's expansion.
 
         ``spread`` is how many neighbouring rises placement may fall back
@@ -1788,6 +2136,12 @@ class Course:
                 #: gallery two cells deep -- a nudge from an unknown starting
                 #: radius arrives at an unknown finishing one.
                 "radius": radius,
+                #: An *absolute* bearing round the tower, when a set-piece has
+                #: to arrive at a particular place rather than merely further
+                #: on. Only the interior needs it, and it needs it badly: an
+                #: archway is two cells wide and there are six of them in a
+                #: revolution, so "a bit further round" misses every time.
+                "angle": angle,
                 #: What the probe should call this block. Only set where a
                 #: node is manufactured mid-set-piece -- the approach to a
                 #: gallery is not a checkpoint, and counting it as one made
@@ -1810,12 +2164,29 @@ class Course:
             self._pending = self._seg_checkpoint(self.rng, boundary)
             return
         theme = self.tower.theme_at(y + 2)
+        if self._indoor > INDOOR_MAX or (self._indoor
+                                         and self.climb_pressure > 0.85):
+            self.segment = "leave"
+            self._left_at = self.laid
+            self._pending = self._seg_leave(self.rng, theme)
+            return
+        # An interior can only be entered from the gallery it opens onto.
+        # An interior can only be entered from the gallery it opens onto, and
+        # only where there is a room to enter: the floor of a narrow ring is an
+        # annulus two cells wide between the wall and the hole.
+        tier_here = self.tower.tier_of(y + 2)
+        indoors_ok = (prev["form"] == "floor"
+                      and y == self.tower.tier_base(tier_here) - 1
+                      and self.tower.radius(tier_here) >= OCULUS + 3
+                      and self.laid - self._left_at > 16)
         hard = self.difficulty
         push = self.climb_pressure
         rng = self.rng
         weights = []
         for name, base in SEGMENTS.items():
             if name == self.segment and name in NO_REPEAT:
+                continue
+            if name in INDOORS and not indoors_ok:
                 continue
             w = base * theme.weights.get(name, 1.0)
             w *= max(0.05, 1.0 + SEGMENT_RAMP.get(name, 0.0) * hard)
@@ -1833,6 +2204,8 @@ class Course:
                 name = candidate
                 break
         self.segment = name
+        if name in INDOORS:
+            self._left_at = self.laid
         self._pending = getattr(self, f"_seg_{name}")(rng, theme)
 
     def _gap(self, rng, easy, hard) -> int:
@@ -2107,6 +2480,121 @@ class Course:
                                   deco="banner" if i == 0 else None,
                                   orbs=1 if i % 2 else 0))
         return out
+
+    def _seg_hall(self, rng, theme) -> list[dict]:
+        """Through the arcade, across the room, and out the other side.
+
+        The interior is the one part of a spiral tower that is not a spiral,
+        and it is the change of subject the format most needs: a dark columned
+        room with a hole in the middle of the floor, lit only by the lamps on
+        its own piers, entered and left through arches that are two cells wide.
+
+        Every node here is aimed at an *absolute bearing* rather than "a bit
+        further round", because that is what an archway needs. And the whole
+        set-piece is only offered when the body is already standing on the
+        gallery -- which is the floor of the room it is about to walk into, and
+        the one place in a run where an arch is at eye level rather than eight
+        blocks below it.
+        """
+        prev = self.blocks[-1]
+        tier = self.tower.tier_of(prev["y"] + 2)
+        floor_y = self.tower.tier_base(tier) - 1
+        wall = self.tower.radius(tier)
+        a_in = self.tower.next_opening(tier, self.angle_of(prev), self.wind)
+        a_out = self.tower.next_opening(tier, a_in, self.wind)
+        # How far in the jump blocks may hang. Clamped against the oculus, so a
+        # narrow ring gets a shallow loop rather than a course over the hole.
+        deep = min(3.4, max(1.8, wall - OCULUS - 1.2))
+        out = [
+            self._node(style="", form="floor", spread=0, gap=2, rise=0,
+                       radius=1.6, angle=a_in - self.wind * 0.22, to_y=floor_y,
+                       label="hall"),
+            self._node(style="", form="floor", spread=0, gap=2, rise=0,
+                       radius=-1.3, angle=a_in, to_y=floor_y, deco="lantern",
+                       orbs=1, label="hall"),
+        ]
+        span = a_out - a_in
+        count = rng.randint(3, 4)
+        for i in range(count):
+            f = (i + 1) / (count + 1)
+            # At most one block over the floor, always. An archway is three
+            # cells tall from the floor up, so a course that climbs higher
+            # inside a room is a course that cannot get out of it.
+            out.append(self._node(
+                style=theme.course[i % len(theme.course)],
+                gap=self._gap(rng, (2, 2, 3), (2, 3, 3)),
+                rise=0, spread=0, to_y=floor_y + (1 if i % 2 == 0 else 0),
+                radius=-(1.5 + (deep - 1.5) * math.sin(math.pi * f)),
+                angle=a_in + span * f,
+                deco="lantern" if i % 2 == 0 else None,
+                orbs=1 if rng.random() < 0.6 else 0, label="hall"))
+        out.append(self._node(style="", form="floor", spread=0, gap=2, rise=0,
+                              radius=-1.3, angle=a_out, to_y=floor_y,
+                              deco="lantern", label="hall"))
+        out.append(self._node(style="", form="floor", spread=0, gap=2, rise=0,
+                              radius=1.6, angle=a_out + self.wind * 0.22,
+                              to_y=floor_y, label="hall"))
+        return out
+
+    def _seg_leave(self, rng, theme) -> list[dict]:
+        """Out of the room, whatever it was doing in there.
+
+        Scheduled rather than rolled, for the same reason the checkpoint is: an
+        archway is two cells wide at one bearing, and "somewhere further round"
+        never finds it. Down to the floor first if the course had climbed onto
+        blocks, then round to the nearest arch, then through it.
+        """
+        prev = self.blocks[-1]
+        tier = self.tower.tier_of(prev["y"] + 2)
+        floor_y = self.tower.tier_base(tier) - 1
+        arch = self.tower.next_opening(tier, self.angle_of(prev), self.wind)
+        return [
+            self._node(style="", form="floor", spread=0, gap=2, rise=0,
+                       radius=-1.3, angle=arch, to_y=floor_y, label="leave"),
+            self._node(style="", form="floor", spread=0, gap=2, rise=0,
+                       radius=1.6, angle=arch + self.wind * 0.22,
+                       to_y=floor_y, deco="lantern", orbs=1, label="leave"),
+        ]
+
+    def _seg_shaft(self, rng, theme) -> list[dict]:
+        """In at the arcade, up the inside, out of a window near the ceiling.
+
+        The other half of what an interior is for. A hall crosses a ring and
+        leaves at the height it entered; a shaft *spends* the ring's whole
+        height in one move -- eight blocks of ladder or three quarters of a
+        second of bubble column, in the dark, against a lit pier -- and comes
+        out of a window seven blocks up with the drop suddenly underneath
+        again. It is the one moment in a run where the camera has time to look
+        around, which is why ``_look`` pitches up during a ride.
+        """
+        prev = self.blocks[-1]
+        tier = self.tower.tier_of(prev["y"] + 2)
+        base = self.tower.tier_base(tier)
+        floor_y = base - 1
+        wall = self.tower.radius(tier)
+        a_in = self.tower.next_opening(tier, self.angle_of(prev), self.wind)
+        a_win = self.tower.next_opening(tier, a_in, self.wind, "window")
+        sill = base + WINDOW_Y - 1
+        kind = "bubble" if rng.random() < 0.45 else "climb"
+        inside = -min(2.6, max(1.6, wall - OCULUS - 1.6))
+        return [
+            self._node(style="", form="floor", spread=0, gap=2, rise=0,
+                       radius=1.6, angle=a_in - self.wind * 0.22, to_y=floor_y,
+                       label="shaft"),
+            self._node(style="", form="floor", spread=0, gap=2, rise=0,
+                       radius=-1.3, angle=a_in, to_y=floor_y, deco="lantern",
+                       orbs=1, label="shaft"),
+            self._node(style=theme.accent, gap=2, rise=1, spread=1,
+                       radius=inside, angle=a_win - self.wind * 0.30,
+                       orbs=1, label="shaft"),
+            self._node(style=theme.accent, gap=1, rise=4, kind=kind, spread=0,
+                       radius=inside, angle=a_win, to_y=sill,
+                       support=TIER_H, support_style=theme.wall,
+                       deco="lantern", orbs=2, label="shaft"),
+            self._node(style=theme.course[0], gap=2, rise=0, spread=1,
+                       radius=2.4, angle=a_win + self.wind * 0.16, to_y=sill,
+                       orbs=1, label="shaft"),
+        ]
 
     # -- decoration and pickups -------------------------------------------
 

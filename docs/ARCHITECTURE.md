@@ -530,6 +530,33 @@ the same poses the GPU does.
     of altitude each, and a ring is about one revolution and about sixteen
     seconds, which is the length of a thinking turn.
 
+  **And the course goes inside.** A ring is a hollow room with a hole in the
+  middle of its floor, four lit piers, and a *ground-level arcade* of six
+  archways — regular and known, because a course that has to find a randomly
+  placed door is a course that mostly does not, and the alternative is a
+  renderer that can take meshed cells away again. Four windows near the ceiling
+  are the way back out higher up. Two set-pieces use them: `hall` walks in,
+  crosses the room past the piers and leaves by another arch; `shaft` walks in
+  and spends the whole ring's height in one ladder or bubble column, coming out
+  of a window seven blocks up.
+
+  Three rules make interiors safe rather than a trap, and each answers a
+  measured failure:
+
+  - **They are only entered from a gallery.** That is the floor of the room
+    they open onto, and the one place in a run where an archway is at eye level
+    rather than eight blocks below it.
+  - **Indoors the course stays within one block of the floor.** An archway is
+    three cells tall from the floor up, so a body higher than that cannot step
+    out at all. Left free, the course climbed onto its own blocks near the
+    ceiling and then oscillated between two cells for three hundred and fifty
+    blocks.
+  - **A visit is bounded.** `INDOOR_MAX` blocks in, and the way out is
+    scheduled by name against every arch in the ring; past that the course will
+    take a *graze* — a hop out whose path is not checked against the building,
+    counted separately as `bailed` — rather than another twenty blocks of
+    circling a flat floor while the altitude goes nowhere.
+
   Two numbers from the reference material set the pace and neither is a taste
   call. A helix cannot climb faster than about a block a hop, because that is
   what the jump impulse reaches; and two published spiral maps independently
@@ -616,6 +643,12 @@ loop.
   the space an earlier one was given to stand in. Both cases were measured as
   the body running for a second with three quarters of a metre of masonry
   through its head, and neither is visible in any other way.
+
+  A `floor` landing places no block, so on its own it reserves nothing and
+  gives the course no *ratchet*: a body on a gallery could step between two
+  cells for the rest of a run, and one seed in twenty-four did exactly that.
+  The head-room over every landing is already reserved, so a floor landing
+  simply asks about it.
 
   Placement then separates *correctness* from *comfort*. A landing must be
   empty, have head-room, be reachable by a move the physics has, and have a

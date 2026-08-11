@@ -157,6 +157,11 @@ class TowerScene(Scene):
         self.ring = self.tower.theme(self.tier).name
         self.ring_flash = 0.0
         self.ring_light = (255, 255, 255)
+        #: 0 outside the wall, 1 well inside it, eased. Drives how dark the
+        #: world goes and how hard the building's own lamps read -- which is
+        #: the whole difference between "a room" and "the same course with a
+        #: wall round it".
+        self.indoor = 0.0
 
         # -- weather below -------------------------------------------------
         # Cloud shelves at absolute altitudes, so the climb goes *through*
@@ -285,7 +290,10 @@ class TowerScene(Scene):
         dropped = self.course.advance(self.index)
         if dropped:
             self.index -= dropped
-        self.volume.drop_below(int(self.pos[1]) - BELOW)
+        floor = int(self.pos[1]) - BELOW
+        self.volume.drop_below(floor)
+        if len(self.tower.lamps) > 60:
+            self.tower.lamps = [c for c in self.tower.lamps if c[1] >= floor]
         self._begin_ground()
 
     def update(self, dt: float) -> None:
@@ -309,6 +317,13 @@ class TowerScene(Scene):
             if self.phase_t >= move.dur:
                 self._land()
         self.climbed = self.pos[1] - self.base_y
+        wall = self.tower.radius_at(self.pos[1])
+        want = 1.0 if math.hypot(self.pos[0], self.pos[2]) < wall - 0.4 else 0.0
+        # Eased over about a third of a second, because the transition happens
+        # in one stride through an archway and a step change in the whole
+        # frame's exposure reads as a rendering fault rather than as going
+        # indoors.
+        self.indoor += (want - self.indoor) * min(1.0, dt * 3.2)
         self.land_dip = max(0.0, self.land_dip - dt * 4.6)
         self.swing = max(0.0, self.swing - dt * 3.0)
         self.mine = max(0.0, self.mine - dt * 3.2)
@@ -426,6 +441,26 @@ class TowerScene(Scene):
 
     # -- drawing -----------------------------------------------------------
 
+    def _lamp_glows(self) -> None:
+        """A glow on every lamp the building has placed near the camera.
+
+        The tower is drawn as meshed chunks, so there is no per-block draw to
+        hang an emissive billboard on -- the generator hands the cells back
+        instead. Indoors this is the only light there is, which is why it
+        brightens as ``indoor`` rises rather than being a constant.
+        """
+        eye = (self.camera.position.x, self.camera.position.y,
+               self.camera.position.z)
+        colour = self._colour(self.tower.theme_at(self.pos[1]).glow)
+        alpha = int(80 + 150 * self.indoor)
+        for x, y, z in self.tower.lamps:
+            if abs(y - eye[1]) > 26:
+                continue
+            if math.dist(eye, (x, y + 0.5, z)) > 42.0:
+                continue
+            self._glows.append((x, y + 0.5, z, 3.8 + 2.2 * self.indoor,
+                                colour, alpha))
+
     def _fog(self, dist: float, alpha: int = 255) -> rl.RGBA:
         """Distance fog as a draw tint, tinted by the ring you are in.
 
@@ -437,6 +472,12 @@ class TowerScene(Scene):
         f = min(1.0, max(0.0, dist / FOG_FAR)) ** 0.85
         c = rl.mix_rgb(self.ring_light, self.palette.fog, 0.35)
         tint = rl.mix_rgb((255, 255, 255), c, f * 0.82)
+        if self.indoor > 0.01:
+            # Indoors the sky is not lighting anything. Everything goes down
+            # together and the lamps come up to meet it, which is what makes a
+            # hall read as a hall rather than as an outdoor course with a wall
+            # in front of it.
+            tint = rl.scale_rgb(tint, 1.0 - 0.32 * self.indoor)
         return rl.rgba(tint, alpha)
 
     def draw(self) -> None:
@@ -479,6 +520,7 @@ class TowerScene(Scene):
         self._draw_orbs()
         self.burst.draw(self.camera)
         self._draw_clouds()
+        self._lamp_glows()
         self._draw_held()
         glow_pass(self.camera, self._glows)
         rl.EndMode3D()
