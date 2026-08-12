@@ -222,6 +222,26 @@ crimson nylium and wart block, pumpkin, raw gold, calcite already exists.
 New props: lantern pole, windmill blades, bell, candle cluster, coral fans,
 scarecrow. All built by `assets/src/` scripts like everything else.
 
+## What the real map measures as (2026-08-12, from the map file itself)
+
+The owner supplied the actual Parkour Spiral world save (1.2M downloads).
+Parsed block-by-block; the numbers below are this project's targets and the
+scripts live beside the session that produced them.
+
+- **485 distinct block types** against this tower's ~60. The gap is mostly
+  sub-block detail: fences, walls, slabs, trapdoors, snow layers, six kinds
+  of flower, cave vines, froglights, dirt paths.
+- **44 checkpoints** (gold pressure plates), y 52 → 230, tower centred on
+  the origin. Course radius min/mean/max **28.5 / 44.5 / 51.7** — the real
+  course wanders more than twenty blocks radially, where ours holds a
+  five-block lane. Radial freedom is a large part of why its levels read as
+  places rather than a corridor.
+- **No checkpoint leg is walkable end to end.** A no-jump walker (step up
+  one, drop three) covers a **mean 46%** of a leg before the ground ends.
+  This is the islands-not-a-ribbon rule, measured; the in-level floor
+  breaks exist to hold this tower to the same standard, and the probe's
+  `runnable` metric prints both numbers side by side.
+
 ## What "difficult" can mean here, honestly
 
 Unchanged from the 24-level tower and still binding — one jump impulse, one

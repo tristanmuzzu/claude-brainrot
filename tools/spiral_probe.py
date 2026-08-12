@@ -460,6 +460,65 @@ def mix(c: Counter, total: int, top: int = 12) -> str:
                      for k, v in c.most_common(top))
 
 
+def runnable(runs: int, levels: int = 8, reach: int = 30000) -> dict:
+    """How far along a level a no-jump walker gets: the islands metric.
+
+    The owner's second complaint, measured: you could run most of a level's
+    ground in a straight line and only jump if you felt like it. The end
+    chasm makes levels unwalkable *between*; this asks whether one is
+    walkable *along*. The target comes from the real map, measured with the
+    same walker: none of its 43 checkpoint legs walk end to end, and the
+    mean distance covered without a jump is 46%.
+
+    Cone alone, no course blocks: start a fifth into a level on its own
+    floor, step up one, drop up to three, and report how much of the arc to
+    the chasm lip was covered.
+    """
+    from brainrot.scenes import spiralplan as base_sp
+    covers = []
+    full = 0
+    for run in range(1, runs + 1):
+        cone = sp.Cone(random.Random(run * 431 + 7), 0)
+        for li in range(base_sp.START_LEVEL,
+                        base_sp.START_LEVEL + levels):
+            lv = cone.level(li)
+            span = lv.u1 - lv.u0
+            start_u = lv.u0 + span * 0.16
+            radius = sum(cone.floor_range(start_u)) / 2
+            th = start_u * cone.wind
+            start = (round(math.cos(th) * radius), lv.y,
+                     round(math.sin(th) * radius))
+            if not cone.rock((start[0], start[1] - 1, start[2])):
+                continue
+            seen = {start}
+            edge = [start]
+            far = start_u
+            while edge and len(seen) < reach:
+                x, y, z = edge.pop()
+                u = cone.unwrap(x, z, y)
+                if lv.u0 <= u <= lv.u_edge:
+                    far = max(far, u)
+                for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, nz = x + dx, z + dz
+                    for ny in range(y + 1, y - 4, -1):
+                        if not cone.rock((nx, ny - 1, nz)):
+                            continue
+                        if cone.rock((nx, ny, nz)) \
+                                or cone.rock((nx, ny + 1, nz)):
+                            break
+                        cell = (nx, ny, nz)
+                        if cell not in seen:
+                            seen.add(cell)
+                            edge.append(cell)
+                        break
+            cover = (far - start_u) / max(1e-9, lv.u_edge - start_u)
+            covers.append(min(1.0, cover))
+            full += cover >= 0.999
+    return {"legs": len(covers), "full": full,
+            "mean": sum(covers) / max(1, len(covers)),
+            "worst": max(covers) if covers else 0.0}
+
+
 def report(geo: dict, mot: dict | None, walk: dict | None = None) -> str:
     out = [f"SAFETY   ({geo['runs']} runs x {geo['blocks'] // geo['runs']}"
            f" landings)"]
@@ -488,6 +547,12 @@ def report(geo: dict, mot: dict | None, walk: dict | None = None) -> str:
                    f"{walk['gain']['max']:.0f} m at worst,"
                    f" {walk['gain']['mean']:.1f} m mean"
                    f"  ({walk['runs']} runs)")
+        run = walk.get("runnable")
+        if run:
+            out.append(f"  runnable along a level (no jumps) "
+                       f"{run['mean']:.0%} mean, {run['worst']:.0%} worst,"
+                       f" {run['full']}/{run['legs']} fully"
+                       f"  (real map: 46% mean, 0 fully)")
     n = geo["ground"] + geo["built"] + geo["floating"]
     out.append("")
     out.append("THE COURSE")
@@ -567,6 +632,7 @@ def main() -> None:
 
     geo = geometry(args.runs, args.blocks)
     walk = walkability(args.walk_runs)
+    walk["runnable"] = runnable(max(2, args.walk_runs // 2))
     mot = None if args.no_motion else motion(args.motion_runs, args.seconds)
     if args.json:
         print(json.dumps({"geometry": geo, "motion": mot, "walk": walk},

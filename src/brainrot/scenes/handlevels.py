@@ -56,13 +56,14 @@ class Level:
     is recognised by. ``skin`` re-skins the base theme.
     """
 
-    __slots__ = ("beats", "exit", "exit_beats", "filler", "gap", "landmark",
-                 "name", "profile", "rise", "shelf", "skin", "theme")
+    __slots__ = ("beats", "breaks", "exit", "exit_beats", "filler", "gap",
+                 "landmark", "name", "profile", "rise", "shelf", "skin",
+                 "theme")
 
     def __init__(self, name: str, theme: str, rise: int, gap: float,
                  exit: str, beats, filler=(), profile: str = "ledge",
                  shelf: float = 4.0, landmark: str = "",
-                 exit_beats=(), **skin) -> None:
+                 exit_beats=(), breaks: int | None = None, **skin) -> None:
         self.name = name
         self.theme = theme
         self.rise = rise
@@ -74,6 +75,12 @@ class Level:
         self.shelf = shelf
         self.landmark = landmark
         self.exit_beats = tuple(exit_beats)
+        #: In-level floor gaps -- the islands-not-a-ribbon rule. Measured on
+        #: the real map: no checkpoint leg is walkable end to end and a
+        #: no-jump walker covers 46% on average. Three breaks for a ledge,
+        #: two for a full floor, unless the level says otherwise.
+        self.breaks = breaks if breaks is not None else \
+            (3 if profile == "ledge" else 2)
         self.skin = skin
 
 

@@ -97,13 +97,15 @@ class Cone(sp.Cone):
         # the top -- and how far a body can jump does not care how wide the
         # tower is.
         radius = max(6.0, self.rim_at(y))
-        self.sections.append(Section(
+        section = Section(
             i, THEME_BY_NAME[design.name], u0, u0 + sp.LEVEL_ARC, y, rise,
             min(design.gap / radius, sp.LEVEL_ARC * 0.45),
             # The design *is* the difficulty here, so nothing is scaled by a
             # pitch drawn per level. Held at one so that the exit climb and the
             # dressing behave as they do at the top of the generated range.
-            1.0, "", design.profile, design.shelf, design.landmark))
+            1.0, "", design.profile, design.shelf, design.landmark)
+        section.breaks = design.breaks
+        self.sections.append(section)
 
 
 def _skin(design: Level) -> Theme:

@@ -729,8 +729,8 @@ class Section:
     floor. Those two are the whole reason the parkour is not optional.
     """
 
-    __slots__ = ("gap", "hard", "index", "landmark", "profile", "rise",
-                 "shelf", "signature", "theme", "u0", "u1", "y")
+    __slots__ = ("breaks", "gap", "hard", "index", "landmark", "profile",
+                 "rise", "shelf", "signature", "theme", "u0", "u1", "y")
 
     def __init__(self, index: int, theme: Theme, u0: float, u1: float,
                  y: int, rise: int, gap: float, hard: float = 1.0,
@@ -778,6 +778,14 @@ class Section:
         #: remember needs one thing to remember it by, and no amount of good
         #: parkour is that thing. Painted during dressing, off the course.
         self.landmark = landmark
+        #: How many breaks the level's own floor has: short mini-chasms cut
+        #: *inside* the level, so the ground is islands rather than a ribbon.
+        #: The owner's complaint, verbatim: you could run ninety per cent of
+        #: a level in a straight line and only jump if you felt like it. The
+        #: end chasm makes levels unwalkable *between*; the breaks make them
+        #: unwalkable *along*. Zero for generated levels (their contract is
+        #: unchanged); the hand-built ones choose.
+        self.breaks = 0
 
     @property
     def u_edge(self) -> float:
@@ -827,6 +835,8 @@ class Cone:
         self._w3 = rng.uniform(0, 6.283)
         self.built_to = base_y
         self.built_from = base_y
+        #: Per-level cache of :meth:`floor_breaks`, which ``rock`` asks for.
+        self._breaks_cache: dict[int, tuple] = {}
         #: ``(cell, kind, yaw)`` for sub-block furniture, drawn as models.
         self.props: list[tuple[tuple[int, int, int], str, float]] = []
         #: Cells the renderer should hang a glow on. A dark section lit only by
@@ -900,9 +910,57 @@ class Cone:
         return (self.level(i + LEVELS_PER_TURN).y - self.level(i).y) - FLOOR_T
 
     def has_floor(self, u: float) -> bool:
-        """Is there any ground at this bearing, or is this the chasm?"""
+        """Is there any ground at this bearing, or is this a hole?
+
+        Two kinds of hole and they earn their keep differently. The end
+        chasm makes levels unwalkable *between* -- that was the original
+        walkability rebuild. The breaks make a level unwalkable *along*:
+        short mini-chasms cut inside the level so its ground is islands
+        rather than a ribbon. Measured on the real map with the same walker
+        we hold ourselves to: not one of its 43 checkpoint legs can be
+        walked end to end, and the mean distance covered without a jump is
+        46%. A course whose ground carries you nine tenths of the way is a
+        course the parkour is optional on, which was the owner's complaint
+        in both towers.
+        """
         lv = self.level(self.level_index(u))
-        return u < lv.u_edge
+        if u >= lv.u_edge:
+            return False
+        for b0, b1 in self.floor_breaks(lv):
+            if b0 <= u < b1:
+                return False
+        return True
+
+    def floor_breaks(self, lv: Section) -> tuple:
+        """The level's own floor gaps, in unwrapped angle. Deterministic off
+        the level index, kept off the entry stretch, the exit reserve and
+        the landmark's apron, and sized so an ordinary hop crosses them.
+        Cached: this sits inside ``has_floor``, which sits inside ``rock``,
+        the hottest predicate in the module."""
+        n = lv.breaks
+        if not n:
+            return ()
+        cached = self._breaks_cache.get(lv.index)
+        if cached is not None:
+            return cached
+        radius = max(6.0, self.rim_at(lv.y))
+        span = lv.u1 - lv.u0
+        au = self.apron_u(lv)
+        out = []
+        for k in range(n):
+            h = (math.sin((lv.index * 7 + k * 3 + 1) * 12.9898)
+                 * 43758.5453) % 1.0
+            # Spread across the first two thirds of the level: entry landing
+            # zone ends at 0.14, the exit reserve begins past ~0.66.
+            f = 0.14 + (k + h) * (0.52 / n)
+            c = lv.u0 + span * f
+            if abs(c - au) * radius < 5.5:
+                continue                # never under the landmark's apron
+            w = (2.2 + 1.0 * ((h * 7.13) % 1.0)) / radius
+            out.append((c - w / 2, c + w / 2))
+        got = tuple(out)
+        self._breaks_cache[lv.index] = got
+        return got
 
     def rim_at(self, y: float) -> float:
         """The cone's outer radius at a height. The flare, and nothing else."""
