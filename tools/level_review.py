@@ -186,6 +186,53 @@ def walk(name: str, runs: int, blocks: int) -> dict:
             "full": full, "n": len(covers)}
 
 
+def held(index: int, seed: int, seconds: float) -> dict:
+    """How long this level's structure is held at readable size. **Approach
+    included**, which is the whole point and is why it gets its own process.
+
+    ``motion`` below counts only frames spent *on* the level, and a pinned run
+    opens a fifth of the way along it -- so a structure standing at the apron
+    is measured from beside it and never from the run-up. ``landmark_probe``,
+    which is where the tower-wide figure comes from, counts a section from the
+    moment it enters the horizon. Measured the first way a level can read 0.0 s
+    while the tower-wide number says half the levels hold theirs, and an agent
+    chasing the difference is chasing nothing. So: pin the level **before**,
+    and watch this one from the approach in.
+    """
+    import landmark_probe
+    import spiral_probe as spp
+
+    spp.SCENE = "tower"
+    spp.sp = hp
+    spp.ensure_window()
+    scene = spp.build_scene(seed)
+    name = hp.LEVELS[index].name
+    best = {25.0: 0.0, 40.0: 0.0}
+    run = {25.0: 0.0, 40.0: 0.0}
+    for _ in range(int(seconds / spp.DT)):
+        scene.update(spp.DT)
+        mine = [i for i in range(scene.tier, scene.tier + 3)
+                if scene.cone.design(i).name == name]
+        for deg in (25.0, 40.0):
+            if any(landmark_probe.look(scene, i, deg)[0] for i in mine):
+                run[deg] += spp.DT
+                best[deg] = max(best[deg], run[deg])
+            else:
+                run[deg] = 0.0
+    return {"hold25": best[25.0], "hold40": best[40.0]}
+
+
+def _held_from_before(index: int, seed: int, seconds: float) -> dict:
+    r = subprocess.run(
+        [sys.executable, str(ROOT / "tools/level_review.py"), "--level",
+         str(index + 1), "--landmark-json", "--seed", str(seed),
+         "--seconds", str(seconds)], capture_output=True, text=True, cwd=ROOT)
+    for line in r.stdout.splitlines():
+        if line.startswith("{"):
+            return json.loads(line)
+    return {"hold25": 0.0, "hold40": 0.0}
+
+
 def _walk_unpinned(index: int, runs: int, blocks: int) -> dict:
     """``walk`` in a fresh process, because this one is pinned and it must not
     be."""
@@ -341,7 +388,11 @@ def report(index: int, runs: int, blocks: int, seed: int,
                 f"{100 * m['empty']:.0f}% of the view on average"
                 "   (the rule is under 55%)",
                 f"  structure held at 25 degrees for "
-                f"{m['landmark_hold']:.1f} s   (the rule is 1.5 s)"]
+                f"{m['landmark_hold']:.1f} s   (on the level itself)"]
+        hb = _held_from_before(index, seed, seconds + 12.0)
+        out += [f"  ...and {hb['hold25']:.1f} s at 25 / {hb['hold40']:.1f} s"
+                f" at 40, counted from the approach in"
+                "   <-- this is the one the 1.5 s rule means"]
     return "\n".join(out) + "\n"
 
 
@@ -736,6 +787,8 @@ def main() -> int:
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--walk-json", action="store_true",
                     help="internal: the unpinned walk, as one JSON line")
+    ap.add_argument("--landmark-json", action="store_true",
+                    help="internal: structure visibility from the approach in")
     args = ap.parse_args()
 
     if args.list:
@@ -748,6 +801,10 @@ def main() -> int:
     index = resolve(args.level)
     if args.walk_json:              # no pin: see walk()'s docstring
         print(json.dumps(walk(hp.LEVELS[index].name, args.runs, args.blocks)))
+        return 0
+    if args.landmark_json:          # pin the level BEFORE: see held()
+        pin((index - 1) % len(hp.LEVELS))
+        print(json.dumps(held(index, args.seed, args.seconds)))
         return 0
     slug = hp.LEVELS[index].name.lower().replace(" ", "_").replace("the_", "")
     out = Path(args.out or ROOT / "shots/review" / f"l{index + 1:02d}_{slug}")
