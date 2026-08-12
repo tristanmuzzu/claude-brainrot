@@ -578,6 +578,29 @@ class SpiralScene(Scene):
         if flat_r < near:
             aim[0] *= near / max(1e-6, flat_r)
             aim[2] *= near / max(1e-6, flat_r)
+        # The glance: while running -- never in flight -- the head leans
+        # toward the level's own landmark when it stands roughly ahead and
+        # near. Structures placed and never framed may as well not exist,
+        # which is exactly what the owner reported after watching five
+        # minutes of strip: the aim rode the landings and the tangent, and
+        # a windmill on the apron went by in the blind spot every time.
+        if self.phase == "ground" and lock < 0.7:
+            for ti in (self.tier, self.tier + 1):
+                mark = self.cone.marks.get(ti)
+                if mark is None:
+                    continue
+                mx, my, mz = mark
+                dist = math.hypot(mx - x, mz - z)
+                if not 4.0 < dist < 24.0:
+                    continue
+                want_yaw = math.atan2(mx - x, -(mz - z))
+                if abs(_wrap(want_yaw - self.yaw)) > 0.75:
+                    continue
+                g = 0.35 * (1.0 - lock)
+                aim[0] += (mx - aim[0]) * g
+                aim[1] += (my - aim[1]) * g
+                aim[2] += (mz - aim[2]) * g
+                break
         # The lock happens *after* the tangent pull and both radial clamps:
         # they are corridor framing, and the landing is the course itself --
         # clamping the head off the block it is jumping to is how the old

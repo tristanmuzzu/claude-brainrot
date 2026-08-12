@@ -862,6 +862,11 @@ class Cone:
         #: its own lamps is most of what makes it read as a different place
         #: from the one below it.
         self.lamps: list[tuple[int, int, int]] = []
+        #: Section index -> world centroid of its placed landmark. The camera
+        #: glances at these while running: a structure that stands on the
+        #: apron and is never framed may as well not exist -- the owner
+        #: watched five minutes of strip and saw one.
+        self.marks: dict[int, tuple[float, float, float]] = {}
         self._extend_section()
 
     # -- the helix ---------------------------------------------------------
@@ -3114,6 +3119,13 @@ class Course:
                 self.cone.lamps.append(cell)
         for at, kind, yaw in prop_at:
             self.cone.props.append((at, kind, yaw))
+        if placed:
+            xs = [c[0] for c, _ in placed]
+            ys = [c[1] for c, _ in placed]
+            zs = [c[2] for c, _ in placed]
+            self.cone.marks[section.index] = (
+                sum(xs) / len(xs), sum(ys) / len(ys) + 1.0,
+                sum(zs) / len(zs))
 
     def _pour(self, section: Section) -> None:
         """A column of the theme's liquid falling down the core face.
