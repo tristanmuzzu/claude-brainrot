@@ -19,8 +19,46 @@ Two kinds of rule, and the difference matters:
 A level is six to ten seconds of screen: a themed terrace on the outside of an
 inverted cone, ended by a chasm with no floor in it, with the next level four
 to eight blocks higher. You get in off the level below's exit climb and out by
-your own. Eighty to a hundred metres of arc, ten to fifteen authored landings,
-one filler beat that repeats if the terrace outlasts the script.
+your own. Eighty to a hundred metres of arc, and a filler beat that repeats if
+the terrace outlasts the script.
+
+### **A level is nine to twelve landings, and two to five of them are yours**
+
+Measured over 8 runs on all twenty levels, counting what actually gets laid.
+This is the most important number in this document and nothing in the level
+table says it:
+
+| level | landings | authored | exit climb | lock | landmark |
+|---|---|---|---|---|---|
+| THE CRUCIBLE | 9.8 | **1.2** | **7.0** | 0.9 | 0.6 |
+| ROPE BRIDGE | 10.1 | 1.9 | 4.9 | 1.6 | 1.5 |
+| THE VAULT | 9.2 | 2.2 | 3.8 | 1.6 | 1.5 |
+| WOOLWORKS | 7.2 | 2.9 | 2.0 | 1.2 | 1.1 |
+| MARKET STREET | 9.9 | 3.4 | 3.9 | 1.8 | 0.9 |
+| GLACIER SHELF (`breaks=0`) | 11.2 | **6.4** | 3.8 | **0.0** | 1.0 |
+| CANOPY WALK | 25.8 | 13.4 | 7.6 | 2.0 | 2.6 |
+| THE CISTERN | 26.2 | 16.2 | 6.5 | 3.2 | 0.0 |
+
+**Everything past your fifth authored beat is never laid.** Seventeen of the
+twenty levels lay five or fewer; a table that writes twelve landings is writing
+twelve and showing four. Only CANOPY WALK, THE CISTERN and THE BALCONIES are
+long enough to show a real script.
+
+Three consequences, and they change how a level is written:
+
+1. **Put the level's identity in the first two or three beats and in the
+   filler.** The filler repeats; the tail of your script does not. This inverts
+   the "showpiece at 60% of the way through" advice — that is what the
+   *reference* does, and this engine cannot express it on most levels.
+2. **The exit climb is the biggest single consumer of a level**, three to seven
+   landings of every nine to twelve, and 71% of THE CRUCIBLE. `Level.exit_beats`
+   writes it landing by landing with the generated climb still underneath as the
+   fallback. Taking it back is the largest lever a level author has.
+3. **`breaks=0` removes the lock.** Any `breaks >= 1` forces it — a level's
+   first floor break is always 5.5–6.7 m wide — and it costs one to three
+   landings. Legitimate whenever moats and the shelf's own wobble already hold
+   the walk number down: GLACIER SHELF measures 27% covered with no breaks at
+   all, against a 55% limit.
 
 It is **one place**, not a stretch of corridor. The reference's levels are a
 windmill farm, a market street, a mine gallery, a flooded cistern — you could
