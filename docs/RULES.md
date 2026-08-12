@@ -47,6 +47,19 @@ Minecraft's own numbers converted from ticks, in `parkourkit`:
     GRAVITY 28.0    JUMP_V 8.4     AIR_SPEED 7.10 (in flight)
     RUN_SPEED 5.612 WALK_SPEED 4.317   MIN_HOP 2.0 m
 
+**Three metres is the jump you are writing.** Measured off the real map's own
+solved routes (`docs/RESEARCH.md` §3): 122 jumps, **modal 3.0 m, median 3.16,
+mean 3.20, p90 4.12, max 5.10** — and 60% of them are level or up one. This is
+the single most useful number here, because the temptation with an envelope in
+front of you is to sit at the top of it, and the reference does not. Write your
+ordinary jump at **3.0–3.5 m**, let the level's harder beats run to 4.0–4.3,
+and keep anything past that for one showpiece.
+
+The reference also **almost never jumps down**: 2 of 122 jumps drop more than
+one block. Our envelope is *more* generous below the horizontal than the real
+map ever needs. Levels descend by **falling off an edge**, which costs nothing
+and is free variety — see §3.
+
 **The jump envelope.** `hop_span(rise)` computes it; no design may sit outside
 it and `tools/tower_probe.py --design-only` refuses one that does. Distances
 are stand-point to stand-point, which is `hypot(arc, radial)` minus both
@@ -121,10 +134,48 @@ around it thinking it is sticky.
   fidelity table. A beat under 98% is a design to look at; a beat at 0% never
   happened.
 
-**Design rule — the verb quota.** No level may be more than **70% plain hop**,
-and every level uses **at least two** non-hop verbs, one of which is its
-*signature*: the thing you would name the level's parkour after. Printed by
-`level_review --report` as `hop share`.
+### What the reference actually uses — and it is not a zoo of gadgets
+
+Measured over the whole real map (`docs/RESEARCH.md` §2), because the honest
+answer changes the rule:
+
+| | on the walking line | legs using it |
+|---|---|---|
+| **lava** | 1,562 cells | **26 / 43** |
+| **water** | 1,069 | **20 / 43** |
+| **slime** | 155 | **26 / 43** — but only 189 cells in the entire map, in 46 clusters, **34 of them exactly 2×2** |
+| magma | 442 | 10 / 43 |
+| soul sand / soil | 355 | 7 / 43 |
+| ice, packed and blue | 557 | **3 / 43** |
+| ladder / vine | 52 / 84 | 7 / 43 each |
+| **cobweb** | **0 in the entire map** | 0 |
+| honey / scaffolding / powder snow | 2 / 3 / 25 cells, whole map | ~0 |
+
+**Lava and water are the mechanic**; slime is *one 2×2 bounce pad per level*;
+ice is a two-or-three-level speciality; cobweb, honey and scaffolding do not
+exist. The median leg spends **15% of its walking band** on or beside a physics
+block, and only two legs of forty-three have none at all.
+
+And on the reference's own solved routes, **slime bounces are 16.4% of all
+jumps** — because a real level only has **4.7 jumps in forty metres**. One pad,
+used once, is a sixth of the level's parkour.
+
+**Design rules — the verb quota, grounded in that:**
+
+- **≤ 80% plain hop**, and at least **two** non-hop verbs firing. (Not the 70%
+  a first draft of this document asked for: the reference's variety comes from
+  terrain, hazard and falling far more than from move types, and a rule that
+  forces gadgets produces a level made of gadgets.)
+- **One slime bounce pad**, roughly 2×2, in most levels. It is the reference's
+  own ration and it is the only way this engine gains two blocks.
+- **Liquid on or beside the walking line in at least one beat** — `moat=True`,
+  `profile="channel"`, a lava or water cut through the level's own ground.
+  This is the single most-used mechanic in the reference and this tower barely
+  has it.
+- **Ice is a speciality, not a staple.** Three levels of forty-three. If your
+  level is the ice level, lean on it hard; otherwise leave it alone.
+- **Cobweb and honey: don't.** Cobweb appears nowhere in the real map and honey
+  has no physics here at all.
 
 ---
 
@@ -163,6 +214,22 @@ The levers, in the order they are worth reaching for:
 **Design rule.** No more than three consecutive `form="floor"` landings, and
 never a whole beat of them.
 
+### A level goes down as well as up
+
+Measured on the real map: **36 of 43 legs descend somewhere, and 22 dip below
+their own starting checkpoint.** A leg travels eleven blocks vertically to gain
+four — a ratio of **3.36 to 1**. Every level in this tower is a monotonic
+climb, and that alone makes them feel like a corridor rather than a place.
+
+The reference does not *jump* down — 2 of 122 jumps drop more than one block.
+It **falls off an edge**, which costs nothing and needs no jump at all. In this
+vocabulary that is a lower `lift` on the next landing, a `step_y` descent, a
+drop into a pit or a channel and a climb back out. Use it: it is free variety,
+free exposure, and it is how you get a view back down over where you have been.
+
+**Design rule.** A level descends somewhere. Net rise across the level is the
+frozen `rise`, but the *path* need not be monotonic and should not be.
+
 **The corridor.** `band` is the level's own width, core face to rim: 7.5 is a
 gallery whose walls press in, 13.0 is a court. Both are levels; a tower where
 every level is 9.5 is a corridor. The course itself keeps 2.0 off each edge.
@@ -174,8 +241,29 @@ and that is much of why its levels read as places.
 
 ## 4. Structures
 
-Failure (3). A level needs one thing you would recognise it by, and — this is
-the part that took a probe to learn — **placing it is not the same as it being
+**First, the awkward measurement: the real map has no landmark per level.** The
+median biggest thing standing on a real terrace is **12 cells and 4 blocks
+tall**, the median leg has **zero** masses over 20 cells, and the few big ones
+are a tree, a wooded knoll, a rock outcrop — terrain, not architecture. The
+biggest genuinely *built* thing found anywhere in forty-three levels is 9×4×7.
+
+That does **not** mean delete the landmarks. It means know what they are for.
+The reference tells levels apart by their **floor palette** (§5), and this
+tower has never done that; the landmark was added because the owner could not
+tell our levels apart, and it measurably helped — running the course *through*
+a structure took levels holding one at readable size from 20% to 52%. So:
+
+- **The level's identity is its ground.** Fourteen materials, a committed
+  dominant colour, detail underfoot. Do this first.
+- **Then one structure, kept honest.** One thing you would name the place
+  after, sized to be seen, and ideally passed through rather than admired from
+  outside.
+- **And several small ones.** The reference's terraces are covered in
+  four-block furniture — a tree, a fence, a cart, an outcrop. A level with one
+  big object and nothing else is not what the reference looks like either.
+
+The rest of this section is about making the big one work, and — this is the
+part that took a probe to learn — **placing it is not the same as it being
 seen.** 97% of landmarks were built; 18% were ever held at readable size.
 
 - `landmark=` names a blueprint. Twelve of the fourteen have a **gated**
@@ -201,18 +289,80 @@ seconds, and `level_review --report` shows it held at 25° for **≥ 1.5 s**.
 
 ## 5. Rhythm, light and palette
 
-The reference alternates exposed ledge and enclosed interior every ten to
-twenty seconds, and the old tower was 100% open corridor.
+**The tower's own design doc says the reference alternates exposed ledge and
+enclosed interior every ten to twenty seconds. Measured, that is false**, and
+it is worth knowing before you build a level around it. Over 1,662 metre-samples
+of the real map: fully enclosed **6.1%** of the way, **0 of 43** legs enclosed
+more than half, and an enclosed run lasts a **median of two metres**. Twenty of
+forty-three legs are essentially never enclosed.
 
-- **Design rule.** A level is not one state throughout. Either it is enclosed
-  and opens out, or it is exposed and passes through something. At least one
-  `shell=` beat in any level that is not deliberately an open ledge run, and
-  never more than about fifteen seconds in one state.
-- **Design rule — palette.** Three to five materials naming real value
-  contrast, and any single frame shows at least three of distinct value. A
-  level that is one colour of box is failure (3) in miniature. `skin` re-skins
-  the base theme; the roles are `ground`, `sub`, `rock`, `accent`, `glow`,
-  `liquid`, and only those six may be given a material name.
+What it does instead is uniform, and better:
+
+| | |
+|---|---|
+| a wall within 4 m on at least one side | **71%** of samples (median distance **3 m**) |
+| a rock lid somewhere overhead | **98%** of samples (median **8 blocks** up) |
+| roof within 6 | 25% |
+| open runs | median **13 m** |
+
+**The real shape is a groove**: a shelf with rock a few metres away on one
+side, the open drop on the other, and a lid eight blocks overhead. Almost
+always half-enclosed; almost never fully enclosed; **almost never actually open
+to the sky.**
+
+- **Design rule.** The groove is the default and you should be building it:
+  something solid within about 4 m on the core side, the drop outboard, and
+  something overhead. An interior is a **two-metre pinch** — a doorway, an
+  overhang, a short tunnel — not a fifteen-second room. One or two `shell=`
+  beats in a level is right; a level that is a tunnel throughout is as wrong as
+  one that is an open plate throughout.
+
+### The composition rule — read the reference sheet before you argue with this
+
+Put `docs/reference/sheets/ps1_sheet_a.jpg` beside a contact sheet of any level
+in this tower and the difference is not the parkour, it is **what is in the top
+half of the frame**.
+
+In the real map, nearly every frame is built the same way: the **overhanging
+rock brow fills the top third**, ragged and dark; the **level's own coloured
+ground fills the bottom third** — grass, terracotta, gold, cherry pink, nether
+red; and the sky is a bright *slot* between the two. In this tower, the top of
+the frame is sky in almost every frame of almost every level, the bottom is
+grey cone stone, and the level's colour is two isolated cubes floating in it.
+Measured: **43–77% of the view is empty sky, sea or drop**, and half the levels
+are unidentifiable from a still.
+
+Three things follow, and they are the level designer's, not the renderer's:
+
+1. **Build upward.** Something must be over the body — a `shell` roof, a
+   `ceiling=` lid, a canopy, a gantry, the underside of a structure the course
+   passes beneath. A level with nothing above head height will always frame as
+   sky.
+2. **Commit to a colour.** The reference's frames are *one strong hue* plus
+   dark rock: a whole frame of gold, a whole frame of pink, a whole frame of
+   red. Not a grey plate with a red cube on it. Skin the level's `ground` and
+   `sub` as well as its `rock` — the ground is a third of every frame and it is
+   currently the cone's own stone in most levels.
+3. **Fill the near ground.** The reference is never a bare plate: there is
+   always small detail underfoot at the bottom of the frame. Props, fences,
+   lamps, path materials, a liquid channel.
+
+**Design rule.** Empty frame **under 55%** on average, printed by
+`level_review --report`. Under 45% is where the reference sits.
+- **Design rule — palette. Fourteen materials, not three.** This is the rule
+  that changed most on measuring the real map, and it is probably the single
+  biggest reason its levels read as places and ours read as boxes. A real leg
+  uses a **median 14 distinct floor materials** (min 7, max 26), **no material
+  owns more than half** of any level (median dominant share **26%**), and it
+  takes a **median 7 kinds to cover 80%** of what you see. The theme is one
+  strong material at about a quarter with a long tail underneath — sand 44%,
+  or podzol 24%, or honeycomb 25% — never a two-tone plate.
+
+  This tower gives a level six roles (`ground`, `sub`, `rock`, `accent`,
+  `glow`, `liquid`) and most levels set two or three. Use all six, vary
+  `style` per node rather than naming the same role every time, and let the
+  props and the `deco` carry more kinds on top. **Identity comes from the
+  floor**, not from the one big structure — see §4.
 - **Light is a level's own.** Interiors carry their own lamps; the `glow` role
   and `deco="lamp"` are what make a dark level legible rather than black.
 
@@ -263,10 +413,14 @@ A level is done when **all** of these hold:
 | every authored jump legal on paper | `--design-only` clean |
 | designed landings placed as authored | ≥ 90%, and no beat under 98% with ≥ 6 samples |
 | unchecked emergency placements | 0 |
-| plain hop | ≤ 70% of moves, ≥ 2 non-hop verbs used |
+| plain hop | ≤ 80% of moves, ≥ 2 non-hop verbs firing |
+| a slime bounce pad, and liquid on the line | one of each |
+| the level descends somewhere | not a monotonic climb |
+| distinct materials named | ≥ 6 across roles, nodes and props |
 | covered by a no-jump walker | ≤ 55% mean, never end to end |
 | designed content | ≥ 45% of the level's landings (the rest is the exit climb and machinery) |
 | body inside the world | 0 frames |
+| frame empty (sky, sea, drop) | **< 55% of the view**; the reference sits nearer 45% |
 | its structure held at 25° | ≥ 1.5 s |
 | **the contact sheet** | **it looks like a place, and you would not confuse it with the level before it** |
 
