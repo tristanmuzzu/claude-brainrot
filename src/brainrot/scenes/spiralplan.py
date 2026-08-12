@@ -1,1440 +1,2209 @@
-"""The spiral proper: themed *platforms* winding up, and the parkour between.
+"""The spiral tower: one solid cone, one helical trough, and the climb up it.
 
-This replaces the first tower's architecture, and the difference is the whole
-point of the format rather than a detail of it.
+This module is the whole of the *Parkour Spiral* format and none of its
+rendering. There is no raylib import on purpose -- the geometry, the physics
+and every guarantee the scene makes are testable in a plain interpreter with
+no window, which is what makes a sweep of forty runs something you can afford
+after every change.
 
-The first version was a cylinder with jump blocks hung outside it: a course of
-floating cubes that happened to go round something. What the reference maps
-actually are -- and what a screenshot of one taken from underneath makes
-obvious -- is a **stack of built places**. A farm with crops and fences. A
-nether cave with lava and lanterns. A rainbow floor. A honey ledge. Each is a
-small piece of *world*, a dozen blocks across, standing on a forest of stone
-columns that runs down out of the shot; they spiral round an axis, each a
-little higher and a little further round than the last, and the parkour is two
-different things stitched together:
+What the format actually is
+---------------------------
 
-* **crossing a platform** -- running over real ground, past its own scenery,
-  ducking under a beam, over a fence, across an ice patch;
-* **the bridge between two platforms** -- the classic floating-block parkour,
-  out over the drop, which is where the set-piece vocabulary lives.
+Two earlier attempts in this project got the shape wrong, in opposite
+directions, and it is worth writing down what settled it. The first built a
+cylinder with jump blocks hung round the outside. The second read the owner's
+reference screenshot -- a view of the tower's underside, showing what looks
+like a forest of grey columns -- as *platforms standing on stilts*, and built a
+stack of hexagonal plates.
 
-Making the platforms first-class changes the generator's shape as well as its
-look. The old one *rolled* for a set-piece and then argued with placement about
-where it would fit. This one is **scheduled**: the spiral decides where the
-platforms are, each platform decides where you come in and where you go out,
-and the course is the sequence "cross, bridge, cross, bridge". Nothing has to
-search for a doorway, because every platform states its own; nothing can circle
-a room for two hundred blocks, because there is nowhere to circle.
+Hielke's own screenshots of Parkour Spiral 1-3 say it is neither:
 
-The physics, the lattice, the move vocabulary and every occupancy rule are
-:mod:`brainrot.scenes.towerplan`'s, unchanged -- that half was never about the
-shape of the building.
+* The tower is **one solid mass**, and it is an **inverted cone** -- narrow at
+  the waterline, flaring as it rises. Every wide shot shows it.
+* The "column forest" is the **skin**, not the structure: vertical one-cell
+  ribs alternating in and out for the tower's whole height, a corduroy
+  surface. Full-resolution crops of the underside show them running unbroken
+  from the themed lip down into the sea with nothing behind them.
+* The parkour is a **continuous helical trough** cut round the outside. You
+  are always in a corridor: the drop on your outboard side, the flank of the
+  revolution above on your inboard side, and its floor slab as a ceiling
+  eighteen blocks over your head.
+* **Several themed sections fit in one revolution**, not one -- a single band
+  in the reference runs end, farm, village, plains, mesa in one arc -- and the
+  seam between two is *hard*, with no blending.
+* **The parkour is built into the theme's own ground.** You run over the
+  desert's dunes and across its pond on lily pads. Floating blocks over the
+  void are the minority, and they are a *theme* (the wool section) rather than
+  the default.
 
-**One rule holds the whole file up**, and it was learned twice, once on each
-half of the course: *every node is decided from where the body actually is*,
-never from where an earlier plan assumed it would be. A plan laid several
-nodes deep is a chain in which the first landing that comes down a cell to one
-side, or a block low because its own hop was refused, makes every node after
-it ask for a step the physics does not have. Both halves are reactive now --
-:meth:`Course._cross_node` and :meth:`Course._plan` return one node each -- and
-each node carries the runners-up it would have accepted, because placement has
-to answer questions the plan cannot see.
+Which is why the generation order here is the opposite of the last attempt's,
+and that inversion is the single most important thing in the file:
 
-Placement fell through to its one unchecked answer on **13% of nodes** when
-this file was handed over. It is 0.23% now, against 0.28% for the ring version
-that shipped, and every step of the way down is recorded at the line that
-fixed it. Nothing on that list was found by reading the code: each one came
-from a counter wrapped round ``Course._attempt`` that records which check said
-no. Rebuild that counter before changing anything here -- guessing cost the
-previous session several rounds and it found each cause in one.
+**The course is laid first, and the terrain is painted around it afterwards.**
+
+The old order -- build the world, then negotiate a course through it --
+started at thirteen per cent of nodes falling through to an unchecked
+emergency hop and took a long session of counters to get down. Terrain that is
+laid *second* cannot block a course, because it is simply not written into the
+cells the course has already reserved. A human map-maker builds this way too.
+
+The building is analytic
+------------------------
+
+:meth:`Cone.rock` answers "is this cell inside the tower" in closed form, for
+any cell, at any time, with no memory. Nothing has to be generated ahead of the
+course and nothing can appear behind it. The previous version's building was
+streamed into an occupancy map as the course advanced, which meant a wall
+could be built through a jump that had already been solved -- and the four
+reservations existed largely to defend against that. Three of them are still
+here, because terrain and course blocks are still written; the class of bug
+where the *building* grows into a solved arc is gone by construction.
 """
 
 from __future__ import annotations
 
 import math
 
-from .towerplan import (  # noqa: F401  (re-exported for the scene and probes)
-    AIR_MIN, AIR_MAX, AIR_SPEED, BODY_H, BODY_HALF_W, BUBBLE_SPEED, CANDY,
-    CHEST, CLIMB_SPEED, EDGE, EYE, FORMS, GRAVITY, HEADROOM, ICE_AIR, ICE_RUN,
-    JUMP_V, MATERIALS, MIN_HOP, Move, RUN_SPEED, SEE_THROUGH, SOUL_SPEED,
-    SPREAD, SURFACE_SPEED, VY_MAX, VY_MIN, WALK_SPEED, WEB_SPEED, Theme,
-    arc_leg, body_cells, bounce_launch, fall_speed, fit_gap, hop_move,
-    hop_span, land_point, line_leg, quantise, takeoff_point, _deco, _floor,
-    _footprint, _line_cells, _round, _standing_cells, _wrap,
+from .parkourkit import (  # noqa: F401
+    AIR_MAX,
+    AIR_MIN,
+    AIR_SPEED,
+    ARC_SAMPLES,
+    BODY_H,
+    BUBBLE_SPEED,
+    CHEST,
+    CLIMB_SPEED,
+    EDGE,
+    EYE,
+    FORMS,
+    GRAVITY,
+    HEADROOM,
+    ICE_AIR,
+    ICE_RUN,
+    JUMP_V,
+    MATERIALS,
+    MIN_HOP,
+    ORB_FRACTIONS,
+    RUN_SPEED,
+    SCAFFOLD_SPEED,
+    SEE_THROUGH,
+    SOUL_SPEED,
+    SPREAD,
+    SPRINGY,
+    VY_MAX,
+    VY_MIN,
+    WALK_SPEED,
+    WEB_SPEED,
+    Move,
+    arc_leg,
+    body_cells,
+    bounce_launch,
+    cells_of,
+    deco,
+    fall_speed,
+    fit_gap,
+    footprint,
+    hop_span,
+    ifloor,
+    iround,
+    land_point,
+    line_cells,
+    line_leg,
+    quantise,
+    standing_cells,
+    takeoff_point,
+    unit,
+    wrap_angle,
 )
 
 # ---------------------------------------------------------------------------
-# The shape of the spiral
+# Materials this format adds
+# ---------------------------------------------------------------------------
+#
+# The kernel ships the ones every scene in the project shares. These are the
+# ground cover, and the reason there are so many is the one thing the reference
+# is loudest about: the tower is a **grey mass with saturated stripes on it**.
+# Neutral architecture, loud terrain. A theme whose ground is another shade of
+# stone is a theme nobody will notice going past at seven metres a second.
+MATERIALS.update({
+    # -- overworld ground
+    "grass": ((104, 168, 70), "dirt", 0.04),
+    "podzol": ((110, 82, 48), "dirt", 0.04),
+    "coarse": ((136, 106, 76), "dirt", 0.03),
+    "gravel": ((136, 132, 128), "speck", 0.04),
+    "farmland": ((104, 74, 46), "dirt", 0.03),
+    "hay": ((214, 176, 46), "grain", 0.03),
+    "sand": ((238, 226, 168), "sand", 0.02),
+    "redsand": ((208, 118, 56), "sand", 0.03),
+    "clay": ((166, 170, 180), "concrete", 0.02),
+    # -- mesa
+    "terra_orange": ((198, 106, 50), "bricks", 0.03),
+    "terra_white": ((214, 200, 190), "bricks", 0.02),
+    "terra_red": ((150, 60, 42), "bricks", 0.03),
+    "terra_yellow": ((216, 168, 68), "bricks", 0.03),
+    # -- village
+    "brick": ((160, 84, 68), "bricks", 0.02),
+    "plaster": ((226, 218, 200), "stonebrick", 0.02),
+    "roof": ((150, 72, 56), "bricks", 0.03),
+    # -- jungle
+    "junglelog": ((110, 84, 46), "grain", 0.03),
+    "jungleleaf": ((58, 140, 44), "leaves", 0.05),
+    "bamboo": ((150, 176, 62), "grain", 0.03),
+    # -- nether, both flavours
+    "crimson": ((136, 44, 56), "grain", 0.03),
+    "crimsonnylium": ((132, 40, 44), "dirt", 0.04),
+    "warped": ((44, 122, 118), "grain", 0.03),
+    "warpednylium": ((30, 108, 104), "dirt", 0.04),
+    "shroomlight": ((248, 168, 74), "lantern", 0.02),
+    "lava": ((236, 132, 32), "lantern", 0.05),
+    # -- the end
+    "chorus": ((136, 96, 148), "grain", 0.03),
+    # -- the deep
+    "sculk": ((28, 40, 48), "speck", 0.04),
+    "sculkvein": ((44, 92, 96), "leaves", 0.05),
+    "dripstone": ((150, 120, 104), "grain", 0.03),
+    "calcite": ((222, 222, 216), "speck", 0.02),
+    "amethyst": ((156, 116, 204), "grain", 0.04),
+    # -- mushroom
+    "mushroomred": ((196, 66, 58), "speck", 0.05),
+    "mushroomstem": ((224, 218, 202), "grain", 0.03),
+    # -- the wool section, which is the one place floating parkour is on-theme
+    "wool_red": ((176, 62, 58), "wool", 0.02),
+    "wool_orange": ((222, 132, 48), "wool", 0.02),
+    "wool_yellow": ((232, 202, 68), "wool", 0.02),
+    "wool_lime": ((124, 196, 62), "wool", 0.02),
+    "wool_cyan": ((44, 168, 178), "wool", 0.02),
+    "wool_blue": ((60, 96, 190), "wool", 0.02),
+    "wool_purple": ((136, 62, 178), "wool", 0.02),
+    "wool_pink": ((228, 132, 176), "wool", 0.02),
+    # -- the neutral mass everything else is set against
+    "conestone": ((156, 156, 161), "stonebrick", 0.02),
+    "conerib": ((138, 138, 144), "stonebrick", 0.02),
+    # The soffit is its own material and its base is deliberately far brighter
+    # than the stone beside it. Vanilla shades a downward face to 0.50 and this
+    # project keeps that constant honestly, so a mid-grey ceiling measured
+    # RGB 62 against a bright sky -- a black lid over every frame. Minecraft
+    # gets away with 0.50 because its smooth lighting carries skylight in under
+    # an overhang; this renderer has no such thing, so the compensation goes
+    # into the material. The soffit is the single largest surface in the format
+    # and it has to read as stone.
+    "conesoffit": ((228, 229, 235), "stonebrick", 0.02),
+})
+
+#: Props whose origin is at the *top* of the model, so they hang from the cell
+#: they are given rather than stand on it. Getting this wrong buries them.
+HANGING = frozenset(("vinehang", "dripstone", "chain"))
+
+#: Every furniture model the scene has to load. Derived from the themes rather
+#: than typed out again, because a theme that names a prop nobody loaded draws
+#: nothing and says nothing about it.
+PROP_KINDS: tuple[str, ...] = ()
+
+#: The eight wools, in the order a rainbow section lays them.
+WOOLS = ("wool_red", "wool_orange", "wool_yellow", "wool_lime",
+         "wool_cyan", "wool_blue", "wool_purple", "wool_pink")
+
+
+# ---------------------------------------------------------------------------
+# The cone
 # ---------------------------------------------------------------------------
 
-#: Platforms in one revolution, how far out from the axis they stand, and how
-#: big they are. These four numbers are one decision, and the thing they decide
-#: is the only one the format is actually about: **how much of a run happens on
-#: built ground rather than out on floating stones.**
+#: Rim radius at the world's base, and how much of it a block of height buys.
 #:
-#: The first version of this file had five platforms of eleven to fifteen cells
-#: on a radius of twenty-two, which puts them twenty-six metres apart and
-#: leaves a gap of fourteen -- eight or nine stones of bridge against four
-#: landings of crossing. Measured with ``tools/spiral_probe.py``: **a quarter**
-#: of the run was spent on a platform, in stretches of a second and a half,
-#: against four and a half seconds at a time out over the drop. That is the
-#: cylinder this file replaced, wearing a hat.
+#: The flare is the reference's whole silhouette and it is not a free
+#: parameter: measured off ``parkour-spiral-3_pic_0`` the tower is about 1.7
+#: times as wide at the crown as at the waterline over roughly fourteen
+#: revolutions, which is a shade under a twentieth of a block of radius per
+#: block of height.
+BASE_R = 24.0
+FLARE = 0.05
+
+#: Altitude gained in one revolution.
 #:
-#: Six platforms of seventeen to twenty-three cells on a radius of twenty-eight
-#: are twenty-eight metres apart with a gap of six to twelve -- two to four
-#: stones of bridge against six or seven landings of crossing, and the ratio
-#: comes out the other way up. A gap under about five metres would be a
-#: staircase of touching islands; over about fifteen and the bridge is the
-#: scene again.
-PADS_PER_TURN = 6
-SPIRAL_R = 34.0
-PAD_HALF = (11, 14)
-#: What each platform climbs over the last, and it falls out of the gap rather
-#: than being chosen: a bridge gains at most one block a stone, and there are
-#: two to four stones. Ask for more and the difference is made up by the flight
-#: of steps beside the rim, which is a fine answer once and a spiral staircase
-#: with a platform on top of it three times a minute. Six a platform at six
-#: platforms a turn is still thirty-six blocks a revolution.
-PAD_RISE = (3, 6)
-#: How far the columns under a platform run down before they are simply not
-#: built. They are the whole silhouette of the thing from outside, and they are
-#: also the cheapest geometry in the scene: one style, no faces where they
-#: touch -- but there are a great many of them, and at these platform sizes
-#: they are most of the cells in the world. Eighteen still leaves every one of
-#: them running out of the bottom of a portrait frame, and it is a fifth off
-#: the per-frame cost.
-COLUMN_DEPTH = 18
-#: How far the columns lean in as they descend, per block. This is where the
-#: cone comes from -- the reference screenshot's whole shape is columns that
-#: converge, not platforms that shrink.
-COLUMN_LEAN = 0.006
-#: Height of the walls and the ceiling on an enclosed platform -- a cave.
-ROOF_H = 5
-#: How far the course is generated and kept, in platforms.
-PADS_AHEAD = 3
-#: How wide a corridor the bridges are given, and columns are kept out of.
-BRIDGE_CLEAR = 4.0
-#: Blocks laid before a run is at full difficulty.
-RAMP_BLOCKS = 80
-AHEAD = 16
-TRAIL = 3
+#: This is the pacing decision, and it is set by the strip rather than by the
+#: reference: at ``BASE_R`` the trough is a hundred and seven blocks round, a
+#: body makes four to five metres a second of *arc* progress once hops and
+#: radial wandering are paid for, so a revolution is twenty-two to twenty-six
+#: seconds. Eighteen blocks over that is a shade under 0.8 m/s of climb, which
+#: is what the previous two versions of this scene were held to and what makes
+#: the drop below visibly deepen inside one thinking turn.
+TURN_RISE = 22
+#: Rise per radian. The helix's handedness is applied to the *bearing* rather
+#: than to this, so that ``floor_at`` stays monotonic in ``u`` either way.
+RPR = TURN_RISE / (2 * math.pi)
+
+#: How deep the walkable trough is, radially.
+#:
+#: The reference's band is ten to twenty blocks and this is at the bottom of
+#: that range, for a reason that is pure geometry and cost an afternoon to see.
+#: The body runs *outside* a convex core, so a camera looking along the trough
+#: is looking down a tangent -- and a tangent to a circle you are outside of
+#: never meets it. Measured at a thirteen-block band: the core wall sits fifty
+#: to ninety degrees off the direction of travel at every bearing, and the
+#: strip's horizontal field is fifty-two. The wall was drawn, correctly, on
+#: every frame, and appeared on none of them; every frame was ground, sky and
+#: soffit, which reads as floating islands rather than as a tower.
+#:
+#: What brings it back is not aiming at it -- aiming at it means running
+#: sideways -- it is standing nearer to it. At four and a half metres the wall
+#: enters the frame about nine metres ahead, which is inside the distance over
+#: which the trough's own curvature carries it away again.
+BAND = 9.5
+BAND = 9.5
+#: Cells of terrace floor slab -- which is also, seen from the trough below,
+#: the thickness of your ceiling.
+#:
+#: This number and ``TURN_RISE`` are one decision and it is the decision that
+#: makes the tower read as a *mass* rather than as a screw thread. Solid
+#: fraction is ``FLOOR_T / TURN_RISE``: at three in sixteen the ledges came out
+#: as thin plates with daylight between them from every angle, which is not
+#: what any reference shot looks like. At nine in twenty-two it is over forty
+#: per cent solid, the soffit overhead has real depth to it, and the open gap
+#: is still thirteen blocks -- taller than the band is wide, so the sky and the
+#: drop are both still there on your outboard side.
+#:
+#: A thick slab is not expensive: only its top cell (walked on) and its bottom
+#: cell (the soffit) are ever seen across the whole band, and :meth:`Cone._slab`
+#: emits the rest of it as a rim only.
+FLOOR_T = 9
+#: How many cells deep the flank and the core are actually built. The inside
+#: of a solid cone is never seen; :meth:`Cone.rock` still says it is rock.
+SKIN = 2
+#: Ribs round the circumference. At the base that is a rib every 1.9 cells,
+#: which is what the reference's corduroy measures.
+RIBS = 56
+#: How far a rib stands proud.
+RIB_D = 1
+
+#: How far below the body the world is drawn.
+BUILD_BELOW = 46
+#: ...and how far above. One trough's ceiling is ``TURN_RISE`` up, and you must
+#: be able to see the one above that or the tower stops at the top of the frame.
+BUILD_ABOVE = 40
+
+#: Arc length of one themed section, in blocks. Three to four to a revolution,
+#: which is the reference's density and about six seconds of strip each.
+SECTION_ARC = (26.0, 38.0)
 
 
-class Pad:
-    """One themed platform: where it is, what it is made of, and the way
-    through it.
+class Theme:
+    """One themed section: what its ground is made of and what happens on it.
 
-    ``enter`` and ``leave`` are cells on opposite rims, chosen from the
-    directions of the neighbouring platforms, and ``lane`` is the straight run
-    of cells between them. Nothing is decorated within a cell of that lane, so
-    the way across is clear by construction rather than by the generator
-    negotiating with its own scenery.
+    ``features`` is the multiplier table on the shared feature vocabulary. A
+    theme is a change of *emphasis* rather than a different game -- every
+    feature stays available to every theme -- except where a feature names a
+    material only one theme has, and those carry a weight of zero everywhere
+    else.
     """
 
-    __slots__ = ("index", "theme", "angle", "cx", "cz", "y", "half",
-                 "enclosed", "enter", "leave", "lane", "features", "lift")
+    __slots__ = (
+        "accent",
+        "candy",
+        "dark",
+        "features",
+        "glow",
+        "ground",
+        "liquid",
+        "name",
+        "props",
+        "rock",
+        "sky",
+        "sub",
+    )
 
-    def __init__(self, index: int, theme: Theme, angle: float, cx: int,
-                 cz: int, y: int, half: int, enclosed: bool,
-                 lift: int = 0) -> None:
+    def __init__(self, name: str, ground: str, sub: str, rock: str,
+                 accent: str, liquid: str | None, glow: str,
+                 props: tuple[str, ...], features: dict[str, float],
+                 sky: tuple[int, int, int], dark: float = 0.0,
+                 candy: tuple[str, ...] = ()) -> None:
+        self.name = name
+        #: The top cell of the terrace floor: what you are standing on.
+        self.ground = ground
+        #: The two cells under it, seen in the cut face at the rim.
+        self.sub = sub
+        #: What this theme's own built parkour -- humps, pillars, steps -- is
+        #: made of. Usually a harder version of its ground.
+        self.rock = rock
+        self.accent = accent
+        #: What pools on it, if anything. Water, lava, or nothing.
+        self.liquid = liquid
+        self.glow = glow
+        #: Sub-block furniture, drawn as models by the scene.
+        self.props = props
+        self.features = features
+        self.sky = sky
+        #: 0 for a section lit by the sky, 1 for one lit only by its own lamps.
+        self.dark = dark
+        #: Materials this theme's *floating* jump blocks use, where it has any.
+        self.candy = candy or (accent, rock)
+
+
+THEMES = (
+    Theme("plains", "grass", "dirt", "cobble", "oak", "water", "lantern",
+          ("grasstuft", "flower", "mcfence", "sugarcane"),
+          {"pond": 2.4, "fencehop": 2.0, "treestump": 1.8,
+           "slimebounce": 1.6},
+          (150, 200, 240)),
+    Theme("farm", "farmland", "dirt", "hay", "oak", "water", "lantern",
+          ("crop", "mcfence", "sugarcane", "grasstuft"),
+          {"haystack": 3.0, "channel": 2.4, "fencehop": 2.2, "croprow": 2.0},
+          (176, 202, 226)),
+    Theme("desert", "sand", "sandstone", "sandstone", "terracotta", "water",
+          "lantern", ("deadbush", "cactus", "mcfence"),
+          {"dune": 3.0, "pond": 2.0, "cactusrun": 2.4, "headhitter": 1.6},
+          (240, 216, 168)),
+    Theme("mesa", "redsand", "terra_orange", "terra_red", "terra_white", None,
+          "lantern", ("deadbush", "pebbles"),
+          {"spire": 3.0, "dune": 1.8, "slabline": 1.8, "corner": 1.6},
+          (232, 168, 112)),
+    Theme("jungle", "moss", "podzol", "junglelog", "jungleleaf", "water",
+          "lantern", ("bamboo", "grasstuft", "vinehang", "flower"),
+          {"vineclimb": 3.2, "canopy": 2.4, "logstep": 2.0, "pond": 1.4},
+          (128, 190, 132)),
+    Theme("mushroom", "mycelium", "dirt", "mushroomstem", "mushroomred", None,
+          "shroomlight", ("mushroomcap", "grasstuft", "flower"),
+          {"capstep": 3.4, "slimebounce": 2.0, "slabline": 1.6,
+           "vineclimb": 1.4},
+          (196, 176, 208)),
+    Theme("village", "gravel", "coarse", "plaster", "brick", "water", "torch",
+          ("mcfence", "lanternpost", "grasstuft", "torch"),
+          {"rooftop": 3.2, "doorway": 2.4, "fencehop": 1.8, "corner": 1.8},
+          (188, 196, 208)),
+    Theme("mine", "gravel", "deepslate", "deepslate", "goldore", None, "torch",
+          ("rail", "torch", "pebbles"),
+          {"railrun": 3.0, "ladderrun": 2.6, "webwalk": 2.2, "headhitter": 2.0},
+          (86, 84, 96), 0.74),
+    Theme("deepdark", "sculk", "deepslate", "deepslate", "sculkvein", None,
+          "amethyst", ("pebbles", "torch"),
+          {"voidgap": 2.6, "slabline": 2.0, "corner": 2.0, "webwalk": 1.6},
+          (34, 44, 56), 0.86),
+    Theme("dripstone", "dripstone", "tuff", "dripstone", "calcite", "water",
+          "lantern", ("dripstone", "pebbles", "chain"),
+          {"spire": 2.6, "pond": 1.8, "headhitter": 2.2, "bubblelift": 2.0},
+          (108, 100, 96), 0.55),
+    Theme("ice", "snow", "packedice", "packedice", "blueice", "water",
+          "lantern", ("pebbles",),
+          {"iceline": 3.4, "slabline": 1.8, "voidgap": 1.8, "hump": 1.4},
+          (206, 226, 248)),
+    Theme("nether", "netherrack", "netherbrick", "netherbrick", "magma",
+          "lava", "magma", ("netherfungus", "deadbush"),
+          {"lavaleap": 3.2, "soulwalk": 2.4, "headhitter": 2.0, "spire": 1.6},
+          (176, 66, 48), 0.6),
+    Theme("warped", "warpednylium", "warped", "warped", "shroomlight", "lava",
+          "shroomlight", ("netherfungus", "grasstuft"),
+          {"capstep": 2.4, "lavaleap": 2.0, "vineclimb": 2.0, "soulwalk": 1.8,
+           "bubblelift": 1.6},
+          (36, 128, 130), 0.5),
+    Theme("end", "endstone", "endstone", "purpur", "obsidian", None, "lantern",
+          ("chorus", "endrod"),
+          {"endpillar": 3.2, "voidgap": 2.6, "rodline": 2.4, "corner": 1.8},
+          (46, 38, 66), 0.62),
+    Theme("rainbow", "wool_cyan", "quartz", "quartz", "wool_pink", None,
+          "glowstone", (),
+          {"woolcheck": 4.0, "slimebounce": 2.6, "slabline": 2.0,
+           "voidgap": 1.6},
+          (240, 220, 250), 0.0, WOOLS),
+)
+THEME_BY_NAME = {t.name: t for t in THEMES}
+PROP_KINDS = tuple(sorted({k for t in THEMES for k in t.props} | {"lilypad"}))
+MATERIALS.setdefault("mycelium", ((150, 132, 146), "dirt", 0.04))
+
+
+class Section:
+    """One themed arc of the trough.
+
+    ``u0``/``u1`` are *unwrapped* angles: they keep increasing for the whole
+    run, so a section is a half-open interval on a line rather than an arc that
+    has to be compared modulo anything. Everything about the helix is easier in
+    that coordinate and this is why it exists.
+    """
+
+    __slots__ = ("index", "theme", "u0", "u1")
+
+    def __init__(self, index: int, theme: Theme, u0: float, u1: float) -> None:
         self.index = index
         self.theme = theme
-        self.angle = angle
-        self.cx, self.cz = cx, cz
-        #: The height the feet stand at. The top cell of the platform is
-        #: ``y - 1``, exactly as everywhere else in this project.
-        self.y = y
-        self.half = half
-        self.enclosed = enclosed
-        #: How much higher the way out is than the way in. The platform is
-        #: terraced, so the crossing climbs part of what the spiral has to
-        #: climb and the bridge is only asked for the rest -- which is what
-        #: keeps a bridge two to four stones long while a platform still gains
-        #: six blocks a turn. It is also what the reference maps look like:
-        #: their platforms have terrain on them, not a flat plate.
-        self.lift = lift
-        self.enter: tuple[int, int, int] = (cx, y - 1, cz)
-        self.leave: tuple[int, int, int] = (cx, y - 1, cz)
-        self.lane: tuple[tuple[int, int, int], ...] = ()
-        self.features: list[dict] = []
-
-    def centre_cell(self) -> tuple[int, int, int]:
-        return (self.cx, self.y - 1, self.cz)
-
-    def holds(self, x: int, z: int) -> bool:
-        return abs(x - self.cx) <= self.half and abs(z - self.cz) <= self.half
+        self.u0 = u0
+        self.u1 = u1
 
 
-class Spiral:
-    """Every platform, its scenery, and the columns underneath.
+class Cone:
+    """The building: a fluted inverted cone with a helical trough cut round it.
 
-    Generated a platform at a time and *written* a slice at a time: a platform
-    with its columns is a few thousand cells, which is tens of milliseconds of
-    Python, and the scene pays for it out of a per-frame budget rather than in
-    one frame.
+    Answers three questions and owns no memory of having answered them:
+
+    * :meth:`rock` -- is this cell inside the tower?
+    * :meth:`floor_of` -- what height is the trough's floor at this bearing?
+    * :meth:`section_at` -- which theme is this stretch of trough?
+
+    Drawing is separate (:meth:`emit`), because what is *drawn* is only the
+    skin: a solid cone's interior is never seen, and building it would be a
+    hundred thousand cells nobody looks at.
     """
 
     def __init__(self, rng, base_y: int = 0) -> None:
         self.rng = rng
         self.base = base_y
-        self.pads: list[Pad] = []
-        self.lamps: list[tuple[int, int, int]] = []
-        #: ``(cell, kind, yaw)`` for every piece of sub-block furniture. Handed
-        #: to the scene to draw as models -- see :meth:`_plant`.
-        self.props: list[tuple[tuple[int, int, int], str, float]] = []
+        #: Which way round the helix climbs. Both handednesses look right and
+        #: a run that always turns the same way is a run you recognise.
+        self.wind = 1 if rng.random() < 0.5 else -1
+        self.sections: list[Section] = []
         self._bag: list[Theme] = []
-        self._built = 0            # platforms whose cells have been emitted
-        #: The straight run between one platform's exit and the next one's
-        #: entrance, with the height band the bridge over it occupies. Columns
-        #: are not built through these. See :meth:`_clear_of_bridges`.
-        self.corridors: list[tuple[float, float, float, float, int, int]] = []
+        #: Where the themed sections begin. A revolution and a half below the
+        #: base, because the world is drawn ``BUILD_BELOW`` under the body from
+        #: the very first frame and an unthemed stretch of it is visible.
+        self._u_lo = -3.0 * math.pi
+        #: Phases for the rim wobble. Analytic, so the rim is jagged in a way
+        #: that costs no memory and cannot disagree with itself between the
+        #: collision test and the drawing.
+        self._w1 = rng.uniform(0, 6.283)
+        self._w2 = rng.uniform(0, 6.283)
+        self._w3 = rng.uniform(0, 6.283)
+        self.built_to = base_y
+        self.built_from = base_y
+        #: ``(cell, kind, yaw)`` for sub-block furniture, drawn as models.
+        self.props: list[tuple[tuple[int, int, int], str, float]] = []
+        #: Cells the renderer should hang a glow on. A dark section lit only by
+        #: its own lamps is most of what makes it read as a different place
+        #: from the one below it.
+        self.lamps: list[tuple[int, int, int]] = []
+        self._extend_section()
 
-    # -- laying out the spiral ---------------------------------------------
+    # -- the helix ---------------------------------------------------------
+
+    def unwrap(self, x: float, z: float, y: float) -> float:
+        """The unwrapped angle of the terrace at or below ``y`` under ``(x, z)``.
+
+        This is the one piece of arithmetic the whole shape rests on. A bearing
+        on its own is ambiguous -- the trough passes over every bearing once a
+        revolution -- so it is resolved against a height, by asking which turn
+        of the helix is the last one at or below it.
+
+        Resolved against the *quantised* floor (:meth:`floor_at`) and not
+        against the continuous one, so that the answer agrees with the shape
+        exactly rather than to within a rounding. Because one turn is a whole
+        number of blocks, ``floor_at(u + 2*pi*k)`` is ``floor_at(u) + k *
+        TURN_RISE`` on the nose, and the division below is therefore exact.
+        """
+        theta = math.atan2(z, x) * self.wind
+        y0 = ifloor(self.base + theta * RPR)
+        return theta + 2 * math.pi * ifloor((y - y0) / TURN_RISE)
+
+    def floor_at(self, u: float) -> int:
+        """The ``y`` a body's feet stand at, at unwrapped angle ``u``.
+
+        **Quantised, and it has to be.** Everything in this project that
+        reasons about standing on a block depends on a cell's ``y`` being its
+        floor and a surface being an integer; a helix that climbs continuously
+        puts the walking surface three quarters of the way up a cell, and every
+        hop off it is then solved against a height no block has. So the trough
+        is a *staircase* -- one block every ``1 / RPR`` radians, which at the
+        base is a step every six blocks of arc. That is also what a helical
+        ramp in Minecraft actually is, so nothing is lost by it.
+        """
+        return ifloor(self.base + u * RPR)
+
+    def rim_at(self, y: float) -> float:
+        """The cone's outer radius at a height. The flare, and nothing else."""
+        return BASE_R + FLARE * (y - self.base)
+
+    def wobble(self, u: float) -> float:
+        """How far the rim strays from the perfect circle at ``u``.
+
+        A perfectly circular rim reads as a machined part. Two sines and a
+        third of a cell of ripple is enough to make the outer edge look bitten
+        into, and being a closed form it can never disagree with itself between
+        the collision test and the mesh.
+        """
+        return (0.9 * math.sin(u * 0.9 + self._w1)
+                + 0.6 * math.sin(u * 2.3 + self._w2)
+                + 0.3 * math.sin(u * 5.1 + self._w3))
+
+    def outer_at(self, u: float) -> float:
+        """The trough's outer edge: the last radius with ground under it."""
+        return self.rim_at(self.floor_at(u)) + self.wobble(u)
+
+    def inner_at(self, u: float) -> float:
+        """The trough's inner edge: the foot of the flank above."""
+        return self.outer_at(u) - BAND
+
+    def rib_out(self, x: float, z: float) -> float:
+        """How far the flute stands proud at this bearing. Either 0 or 1.
+
+        Taken from the bearing alone rather than from arc length, so the ribs
+        stay strictly vertical all the way up a cone whose circumference is
+        growing. Arc-length ribs drift and read as a barber's pole.
+        """
+        theta = math.atan2(z, x)
+        return float(int((theta / (2 * math.pi) + 0.5) * RIBS) % 2) * RIB_D
+
+    # -- the solid test ----------------------------------------------------
+
+    def rock(self, cell) -> bool:
+        """Is this cell inside the tower? Closed form, no memory, always true
+        of the same cell whenever it is asked.
+
+        There are exactly two rules, and it is worth saying why there are not
+        more. :meth:`unwrap` answers with the turn of the helix *at or below*
+        the cell, so ``y`` is never less than that turn's floor -- a first
+        draft of this method had three branches and the two that dealt with
+        heights below the floor were unreachable, which produced a smooth
+        cylinder with the themes painted on it as stripes and nothing to run
+        along at all. Every height belongs to some turn's trough, and within
+        one trough a cell is either the core behind you or the floor slab of
+        the turn above, which is your ceiling.
+        """
+        x, y, z = cell
+        r = math.hypot(x, z)
+        # Cheap rejection first: nothing this far out is ever rock, and this is
+        # the hottest predicate in the module by a distance.
+        if r > BASE_R + FLARE * (y - self.base) + 6.0:
+            return False
+        u = self.unwrap(x, z, y)
+        if y - self.floor_at(u) >= TURN_RISE - FLOOR_T:
+            # The floor slab of the turn above: the full width of the band,
+            # cantilevered off the core with nothing under it. That overhang is
+            # the reference's stepped underside and the trough's ceiling at the
+            # same time.
+            return r <= self.outer_at(u + 2 * math.pi)
+        return r <= self.outer_at(u) - BAND     # the core, behind your back
+
+    def surface_y(self, x: float, z: float, y_hint: float) -> int:
+        """The ``y`` a body standing at this bearing has its feet at."""
+        return self.floor_at(self.unwrap(x, z, y_hint))
+
+    # -- themed sections ---------------------------------------------------
 
     def _next_theme(self) -> Theme:
         if not self._bag:
             self._bag = list(THEMES)
             self.rng.shuffle(self._bag)
-            if self.pads and self._bag[0] is self.pads[-1].theme \
+            if self.sections and self._bag[0] is self.sections[-1].theme \
                     and len(self._bag) > 1:
                 self._bag[0], self._bag[1] = self._bag[1], self._bag[0]
         return self._bag.pop(0)
 
-    def pad(self, index: int) -> Pad:
-        """The platform at ``index``, generated on demand."""
-        while len(self.pads) <= index:
-            self._extend()
-        return self.pads[index]
+    def section_at(self, u: float) -> Section:
+        """The section covering unwrapped angle ``u``, generated on demand.
 
-    def _extend(self) -> None:
-        rng = self.rng
-        i = len(self.pads)
-        step = 2 * math.pi / PADS_PER_TURN
-        angle = i * step
-        radius = SPIRAL_R + rng.uniform(-1.5, 1.5)
-        half = rng.randint(*PAD_HALF)
-        theme = self._next_theme()
-        # A cave every so often, and never two running. The reference maps put
-        # a roofed section between open ones for exactly the reason this scene
-        # wants one: coming out of a dark room into the sky is the strongest
-        # beat either has.
-        enclosed = (theme.dark > 0.3 and rng.random() < 0.75
-                    and not (self.pads and self.pads[-1].enclosed))
-        # A cave's terrace is capped at one, because the roof is five above the
-        # floor and a body needs two over its feet: a three-step terrace under
-        # it leaves a metre of head-room and every landing on the top step is
-        # refused for want of it.
-        lift = rng.randint(0, 1) if enclosed else rng.randint(1, 3)
-        # The bridge climbs what the platform did not, so what is rolled here
-        # is the *bridge's* share and the terrace is added to it. Rolling the
-        # total instead makes a tall platform and a long climb the same event,
-        # and the seed that draws both hands the bridge a rise it has no room
-        # for -- which is the shape of the defect this file was written to fix.
-        if self.pads:
-            y = (self.pads[-1].y + self.pads[-1].lift
-                 + rng.randint(*PAD_RISE))
-        else:
-            y = self.base
-        pad = Pad(i, theme, angle,
-                  _round(math.cos(angle) * radius), _round(math.sin(angle) * radius),
-                  y, half, enclosed, lift)
-        self.pads.append(pad)
-        self._route(pad)
-        if len(self.pads) > 1:
-            before = self.pads[-2]
-            self.corridors.append((before.leave[0], before.leave[2],
-                                   pad.enter[0], pad.enter[2],
-                                   before.y - 3, pad.y + 4))
-
-    def _route(self, pad: Pad) -> None:
-        """Where the course comes in, where it goes out, and the lane between.
-
-        Both are rim cells aimed at the neighbouring platforms -- in toward the
-        one before, out toward the one after -- so the bridge at either end is
-        a straight run and the crossing is a straight line through the middle.
-        A platform whose entrance and exit were chosen independently of its
-        neighbours is one the course has to double back across.
+        Sections begin a revolution and a half *below* where a run starts, so
+        that the world drawn under the body's feet on the first frame is
+        already themed. Asking for one below that is a bug rather than a case
+        to paper over: the first version quietly manufactured one-radian
+        sections going backwards, and the whole bottom of the tower came out
+        as ten copies of the same theme.
         """
-        step = 2 * math.pi / PADS_PER_TURN
-        back = pad.angle - step
-        fwd = pad.angle + step
-        pad.enter = self._rim(pad, math.cos(back) * SPIRAL_R - pad.cx,
-                              math.sin(back) * SPIRAL_R - pad.cz)
-        leave = self._rim(pad, math.cos(fwd) * SPIRAL_R - pad.cx,
-                          math.sin(fwd) * SPIRAL_R - pad.cz)
-        pad.leave = (leave[0], leave[1] + pad.lift, leave[2])
-        # The lane is flat ground until near the far rim and then a flight of
-        # steps, rather than one long ramp from one side to the other.
-        #
-        # Interpolating the whole way is the obvious thing and it is wrong
-        # twice over. It makes two thirds of a platform's landings *built
-        # blocks* rather than its own ground, which is the one thing this
-        # format exists to avoid -- measured, landings on real ground went from
-        # 44% to 20%. And it puts a step every cell or two, while landings are
-        # a hop apart, so consecutive landings differ by two blocks: a rise
-        # nothing in the game can make.
-        #
-        # Three cells of run-up per step is therefore not a look, it is the
-        # spacing at which each landing climbs exactly one.
-        dx, dz = leave[0] - pad.enter[0], leave[2] - pad.enter[2]
-        n = math.hypot(dx, dz) or 1.0
-        back = min(n - 1.0, 3.0 * pad.lift + 1.0)
-        knee = (_round(leave[0] - dx / n * back), pad.y - 1,
-                _round(leave[2] - dz / n * back))
-        run = list(_line_cells(pad.enter, knee))
-        if pad.lift:
-            run += list(_line_cells(knee, pad.leave))
-        # One cell per column, highest wins. A run interpolated onto the
-        # lattice can put the same column in twice at two heights, and the
-        # lower of those is a landing with the next step sitting on its head.
-        seen: dict[tuple[int, int], tuple[int, int, int]] = {}
-        for cell in run:
-            at = (cell[0], cell[2])
-            if at not in seen or cell[1] > seen[at][1]:
-                seen[at] = cell
-        pad.lane = tuple(seen.values())
-
-    def _rim(self, pad: Pad, dx: float, dz: float) -> tuple[int, int, int]:
-        """The furthest cell toward ``(dx, dz)`` that is still *on* the pad.
-
-        Walked outward and stopped at the last footprint cell rather than
-        computed: a platform has its corners cut off, so the point half a width
-        along a diagonal is outside it, and a way in that is not on the ground
-        is a landing the course is told to make onto thin air.
-        """
-        n = math.hypot(dx, dz) or 1.0
-        ux, uz = dx / n, dz / n
-        shape = set(_pad_cells(pad.half))
-        best = (0, 0)
-        for step in range(1, pad.half + 1):
-            cell = (_round(ux * step), _round(uz * step))
-            if cell in shape:
-                best = cell
-        return (pad.cx + best[0], pad.y - 1, pad.cz + best[1])
-
-    def theme_at(self, y: float) -> Theme:
-        return self.pad_at(y).theme
-
-    def theme(self, index: int) -> Theme:
-        return self.pad(index).theme
-
-    def tier_of(self, y: float) -> int:
-        """Which platform's height band ``y`` is in. Named for the ring
-        version's method so the scene's caption and lighting need no change."""
-        return self.pad_at(y).index
-
-    def radius_at(self, y: float) -> float:
-        """There is no wall. Zero, because the inherited placement code asks
-        this to work out which side of one a cell is on, and on a spiral of
-        platforms the answer is always "outside"."""
-        return 0.0
-
-    def roofed(self, x: float, y: float, z: float) -> bool:
-        """Is this point under a platform's roof?
-
-        The spiral's answer to the ring tower's "which side of the wall am I
-        on". There is no wall, so the question is which platform's footprint
-        the body is standing in and whether that one has a lid -- and it has to
-        be answered against the *height band* as well, or a body on the bridge
-        thirty blocks under a cave is told it is indoors.
-        """
-        for pad in self.pads:
-            if not pad.enclosed:
-                continue
-            if pad.y - 1 <= y <= pad.y + ROOF_H and pad.holds(_round(x),
-                                                              _round(z)):
-                return True
-        return False
-
-    def pad_at(self, y: float) -> Pad:
-        """The platform whose height band contains ``y``. Used for lighting and
-        for the ring caption, both of which want "where am I" rather than
-        "which one am I standing on"."""
-        best = self.pads[0] if self.pads else self.pad(0)
-        for pad in self.pads:
-            if pad.y <= y + 2:
-                best = pad
-        return best
-
-    # -- emitting cells -----------------------------------------------------
-
-    def build_to(self, index: int, place) -> int:
-        """Emit every platform up to and including ``index``. Returns how many.
-
-        ``place(cell, style)`` is the caller's, so the same generator feeds a
-        probe that only counts cells and a scene that meshes them.
-        """
-        built = 0
-        while self._built <= index:
-            self._emit(self.pad(self._built), place)
-            self._built += 1
-            built += 1
-        return built
-
-    def _emit(self, pad: Pad, place) -> None:
-        theme = pad.theme
-        top = pad.y - 1
-        cells = _pad_cells(pad.half)
-        keep = {(pad.cx + c[0], pad.cz + c[1]) for c in cells}
-        # -- the ground, two deep. One layer reads as a sheet of paper from
-        # underneath, which is the angle this whole format is looked at from.
-        for dx, dz in cells:
-            x, z = pad.cx + dx, pad.cz + dz
-            rim = max(abs(dx), abs(dz)) >= pad.half - 0
-            place((x, top, z), theme.trim if rim else theme.floor)
-            place((x, top - 1, z), theme.wall)
-        # -- the columns. Every rim cell, leaning in as they go down, which is
-        # where the cone in the reference screenshot comes from: the platforms
-        # do not shrink, the legs converge.
-        #
-        # Except under the way in and the way out. A bridge arrives at the rim
-        # from below and outside, so a leg hanging under the cell it lands on
-        # is a leg in the two cells the body's head needs -- and the landing is
-        # refused for want of head-room on a platform it is standing next to.
-        doors = ((pad.enter[0], pad.enter[2]), (pad.leave[0], pad.leave[2]))
-        for dx, dz in cells:
-            if max(abs(dx), abs(dz)) < pad.half:
-                continue
-            x0, z0 = pad.cx + dx, pad.cz + dz
-            if any(abs(x0 - dx0) <= 2 and abs(z0 - dz0) <= 2
-                   for dx0, dz0 in doors):
-                continue
-            for depth in range(2, COLUMN_DEPTH):
-                lean = 1.0 - COLUMN_LEAN * depth
-                cx = pad.cx + _round(dx * lean)
-                cy = top - depth
-                cz = pad.cz + _round(dz * lean)
-                if self._clear_of_bridges(cx, cy, cz):
-                    place((cx, cy, cz), "stone")
-        if pad.enclosed:
-            self._roof(pad, place, keep)
-        self._dress(pad, place, keep)
-
-    def _clear_of_bridges(self, x: int, y: int, z: int) -> bool:
-        """Is this column cell out of the way of a bridge further down?
-
-        A spiral comes back over itself: five platforms a revolution means the
-        one directly above is thirty-odd blocks up, and legs that hang
-        twenty-four deep from it reach into the exact stretch of air the bridge
-        below climbs through. Measured before this existed, that one collision
-        was most of a placement failure rate of twenty-three per cent -- the
-        bridge could not be built because the building above it was in the way.
-
-        Both are laid out by the spiral from the same geometry, so it can
-        simply be asked. Nothing here depends on the course.
-        """
-        for ax, az, bx, bz, lo, hi in self.corridors:
-            if not (lo <= y <= hi):
-                continue
-            if _seg_dist(x, z, ax, az, bx, bz) < BRIDGE_CLEAR:
-                return False
-        return True
-
-    def _roof(self, pad: Pad, place, keep) -> None:
-        """Walls and a ceiling: the cave.
-
-        Openings are punched at the two rim cells the course actually uses, and
-        only there, so a cave is a room with a way in and a way out rather than
-        a box the generator has to find a hole in.
-        """
-        theme = pad.theme
-        top = pad.y - 1
-        doors = ((pad.enter[0], pad.enter[2]), (pad.leave[0], pad.leave[2]))
-        for dx, dz in _pad_cells(pad.half):
-            x, z = pad.cx + dx, pad.cz + dz
-            if max(abs(dx), abs(dz)) == pad.half:
-                # Three cells wide, not one. A body is 0.6 m across and plants
-                # its feet 0.4 m from a block's centre along the way it is
-                # going, so on a diagonal approach it occupies 0.58 m either
-                # side of the middle of the cell it is standing in -- past the
-                # cell wall, into whatever is next to the doorway. A one-cell
-                # opening therefore refuses every diagonal entry, and every
-                # platform's way in and way out is diagonal more often than
-                # not: measured, that and the lifts beside it were 34 of the
-                # 88 remaining placement failures.
-                #
-                # Widened again to five, once the platforms grew: a bridge
-                # arrives at a rim cell from three cells out and a couple
-                # below, so the arc crosses the wall line a metre or two to one
-                # side of the doorway it is aiming at, and the last stretch of
-                # a crossing leaves the same way. Caves on their own were half
-                # of everything the course could not place.
-                if any(abs(x - dx0) <= 2 and abs(z - dz0) <= 2
-                       for dx0, dz0 in doors):
-                    continue
-                for h in range(1, ROOF_H):
-                    place((x, top + h, z), theme.wall)
-            place((x, top + ROOF_H, z), theme.trim)
-        # ...and it needs light, or it is a black hole in the middle of a
-        # bright sky. The cells are handed back so the scene can hang a glow on
-        # each: the building is meshed, and you cannot pick one emissive block
-        # out of a mesh.
-        #
-        # On a grid, not one in each corner. Four lamps lit a room eleven cells
-        # across; these are twenty-nine, so the corners are fourteen metres from
-        # the middle and the middle is where the course runs. Read off a contact
-        # sheet rather than reasoned about: three consecutive frames of a
-        # fourteen-frame run came back essentially black, which on a strip that
-        # is on screen for fifteen seconds is a fifth of it showing nothing.
-        step = max(4, pad.half // 2)
-        for dx in range(-pad.half + 1, pad.half, step):
-            for dz in range(-pad.half + 1, pad.half, step):
-                x, z = pad.cx + dx, pad.cz + dz
-                if (x, z) not in keep:
-                    continue
-                place((x, top + ROOF_H - 1, z), theme.glow)
-                self.lamps.append((x, top + ROOF_H - 1, z))
-
-    def _dress(self, pad: Pad, place, keep) -> None:
-        """The scenery that makes a platform a *place* rather than a floor.
-
-        Everything here keeps a cell clear of the lane, which is the run
-        between the way in and the way out -- so the course never has to
-        negotiate with the platform's own decoration, and the decoration never
-        has to know the course exists.
-        """
-        rng = self.rng
-        theme = pad.theme
-        top = pad.y - 1
-        # Two cells clear of the lane, not one. One is enough for the cell the
-        # body *stands* in and not for the one it flies over: placement is
-        # allowed to land a cell to either side of the lane when the middle of
-        # it is occupied, and from there a lamp post two cells out is one cell
-        # out, and the arc clips it. It is also the cheapest of the fixes,
-        # because a platform is twenty-five cells across and the lane is one.
-        lane = {(c[0], c[2]) for c in pad.lane}
-        for c in list(lane):
-            for ox in range(-2, 3):
-                for oz in range(-2, 3):
-                    lane.add((c[0] + ox, c[1] + oz))
-        free = [(pad.cx + dx, pad.cz + dz) for dx, dz in _pad_cells(pad.half - 1)
-                if (pad.cx + dx, pad.cz + dz) not in lane]
-        rng.shuffle(free)
-        # A sixth of the free ground, not a half. The fraction was chosen when a
-        # platform was eleven cells across and a hundred and twenty free cells;
-        # at twenty-nine it is six hundred, and half of that is three hundred
-        # separate one-cell decorations on one platform -- which is both more
-        # scenery than a farm has and, because each of them is an isolated cube
-        # with six visible faces, several times the meshing cost of the ground
-        # it is standing on.
-        budget = len(free) // (5 if pad.enclosed else 6)
-        kit = DRESSING.get(theme.name, DRESSING["_default"])
-        self._plant(pad, free[budget:], rng)
-        for x, z in free[:budget]:
-            what = kit[rng.randrange(len(kit))]
-            if what == "lamp":
-                place((x, top + 1, z), theme.glow)
-                self.lamps.append((x, top + 1, z))
-            elif what == "post":
-                for h in (1, 2):
-                    place((x, top + h, z), theme.trim)
-                place((x, top + 3, z), theme.glow)
-                self.lamps.append((x, top + 3, z))
-            elif what == "block":
-                place((x, top + 1, z), theme.accent)
-            elif what == "pool":
-                place((x, top, z), "water")
-            elif what == "hollow":
-                place((x, top, z), theme.wall)
+        while self.sections[-1].u1 <= u:
+            self._extend_section()
+        if u < self.sections[0].u0:
+            return self.sections[0]
+        lo, hi = 0, len(self.sections) - 1
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if self.sections[mid].u0 <= u:
+                lo = mid
             else:
-                place((x, top + 1, z), what)
+                hi = mid - 1
+        return self.sections[lo]
 
-    def _plant(self, pad: Pad, spare, rng) -> None:
-        """The thin furniture: crops, flowers, fences, lantern posts, cane.
+    def _extend_section(self) -> None:
+        u0 = self.sections[-1].u1 if self.sections else self._u_lo
+        radius = self.rim_at(self.floor_at(u0))
+        arc = self.rng.uniform(*SECTION_ARC)
+        self.sections.append(Section(len(self.sections), self._next_theme(),
+                                     u0, u0 + arc / max(6.0, radius)))
 
-        Not cells, and that is the point of it. Everything else in this scene
-        is whole cells because everything else is a *building*; a platform is
-        a place, and what makes a farm read as a farm is exactly the parts of
-        the game that are not cubes -- wheat and flowers are two crossed quads,
-        a fence is a post and two rails, cane is a stalk a few pixels wide. As
-        cells they all come out as the same coloured box, which is what these
-        platforms used to be scattered with and what read as rubble.
+    def theme_at(self, y: float, x: float = 0.0, z: float = 0.0) -> Theme:
+        """The theme of the trough under a point. The scene asks this for the
+        sky tint and the fog, so it has to answer for the body's own position
+        rather than for a height alone -- one revolution holds three or four
+        themes and a height alone cannot tell them apart."""
+        return self.section_at(self.unwrap(x, z, y)).theme
 
-        Handed to the scene rather than placed, for the same reason the lamps
-        are: the building is meshed, and a mesh has no room in it for a model.
+    # -- drawing -----------------------------------------------------------
 
-        A fixed count rather than a fraction of the platform, and a small one.
-        These are drawn one model at a time -- against a whole platform of
-        ground that is a handful of draw calls -- so the budget is set by what
-        the frame can afford rather than by how much room there is.
+    def emit(self, y_lo: int, y_hi: int, place) -> None:
+        """Hand every *visible* cell between two heights to ``place``.
+
+        Visible means the skin: the outer few cells of the flank, the outer few
+        of the core, and the floor slab, which is the only part of the mass a
+        body ever stands on. Iterated by bearing rather than by cell, because
+        a disc of radius twenty-five is two thousand cells of which forty are
+        wanted.
         """
-        kit = PLANTS.get(pad.theme.name)
-        if not kit or not spare:
-            return
-        top = pad.y - 1
-        for x, z in spare[:PLANT_BUDGET]:
-            what = kit[rng.randrange(len(kit))]
-            if what == "mcfence":
-                # A fence is a run or it is a post standing on its own in a
-                # field. Three or four cells along one axis, which is also why
-                # it carries a heading: the rails have to line up.
-                step = (1, 0) if rng.random() < 0.5 else (0, 1)
-                for i in range(rng.randint(3, 5)):
-                    at = (x + step[0] * i, top + 1, z + step[1] * i)
-                    if not pad.holds(at[0], at[2]):
-                        break
-                    self.props.append((at, what, 0.0 if step[0] else HALF_PI))
-                continue
-            self.props.append(((x, top + 1, z), what,
-                               rng.uniform(0.0, 2.0 * math.pi)))
+        for y in range(y_lo, y_hi + 1):
+            self.emit_layer(y, place)
+        self.built_to = max(self.built_to, y_hi)
+        self.built_from = min(self.built_from, y_lo)
 
+    def emit_layer(self, y: int, place) -> None:
+        seen: set[tuple[int, int, int]] = set()
+        rough = self.rim_at(y)
+        steps = max(48, int(2 * math.pi * (rough + 4)) * 2)
+        for i in range(steps):
+            theta = (i / steps) * 2 * math.pi - math.pi
+            ct, st = math.cos(theta), math.sin(theta)
+            u = self.unwrap(ct, st, y)
+            h = y - self.floor_at(u)
+            inner = self.outer_at(u) - BAND
+            # The core, at every height: the wall at the back of the trough,
+            # fluted. Its lowest two cells carry the theme's own subsoil, so
+            # the wall reads as a cut bank through the section rather than as
+            # bare masonry meeting grass.
+            here = self.section_at(u).theme
+            self._ring(ct, st, inner - SKIN, inner, y,
+                       here.sub if h < 2 else "conerib", seen, place, rib=True)
+            if h >= TURN_RISE - FLOOR_T:
+                self._slab(ct, st, u + 2 * math.pi, y, TURN_RISE - 1 - h,
+                           seen, place)
 
-#: What grows, stands or pools on each theme's platform. Sub-block furniture --
-#: crops, flowers, fences -- is drawn by the scene from these same names; the
-#: entries here are the *materials*, and how they are shaped is a drawing
-#: question rather than a generation one.
-#: The sub-block furniture each theme grows, drawn as models by the scene from
-#: ``assets/src/props_mc.py``. A theme with no entry simply has none -- the end
-#: and the nether are not places anything grows, and a rainbow floor with a
-#: hedge on it is worse than a rainbow floor.
-PLANTS = {
-    "overgrown": ("crop", "crop", "flower", "sugarcane", "mcfence"),
-    "timber": ("mcfence", "mcfence", "crop", "lanternpost"),
-    "keep": ("lanternpost", "mcfence", "flower"),
-    "desert": ("sugarcane", "mcfence", "lanternpost"),
-    "mine": ("lanternpost", "chain", "chain"),
-    "ice": ("lanternpost", "chain"),
-    "deep": ("chain", "chain", "lanternpost"),
-    "summit": ("lanternpost", "flower", "chain"),
-}
-#: How many of them one platform gets. Each is its own draw call against a
-#: whole platform of ground that costs a handful, so this is set by the frame
-#: budget rather than by how much room there is: at twelve the scene measures
-#: within noise of no props at all, and it is already the difference between a
-#: field and a floor.
-PLANT_BUDGET = 12
-HALF_PI = math.pi / 2
+    def _slab(self, ct: float, st: float, up: float, y: int, depth: int,
+              seen: set, place) -> None:
+        """The floor slab of the turn above: this trough's ceiling, and the
+        next one's ground.
 
-DRESSING = {
-    "_default": ("block", "post", "hollow"),
-    "keep": ("post", "block", "hollow", "hollow"),
-    "timber": ("post", "block", "block", "hollow"),
-    "mine": ("lamp", "block", "hollow", "hollow", "block"),
-    "overgrown": ("leaves", "leaves", "moss", "post", "pool"),
-    "desert": ("block", "post", "sandstone", "hollow"),
-    "nether": ("lamp", "magma", "magma", "block", "hollow"),
-    "ice": ("snow", "packedice", "block", "post"),
-    "lab": ("slime", "honey", "block", "post"),
-    "deep": ("pool", "pool", "sealantern", "block"),
-    "end": ("block", "post", "obsidian", "hollow"),
-    "summit": ("post", "lamp", "block", "gold"),
-}
+        ``depth`` counts down from the walking surface. Only the top cell and
+        the bottom one are ever *seen* across the whole band -- the top is what
+        you stand on, the bottom is the soffit over the trough below -- so
+        everything between them is emitted as a rim only. That is what lets the
+        slab be nine cells thick, which is what makes the tower a mass rather
+        than a stack of plates, for the price of two.
+        """
+        theme = self.section_at(up).theme
+        out = self.outer_at(up)
+        if depth == 0:
+            style, r0 = theme.ground, out - BAND - SKIN
+        elif depth == 1:
+            # The cut face under the ground: a slice through the place, which
+            # is what stops the rim reading as a painted line.
+            style, r0 = theme.sub, out - BAND - SKIN
+        elif depth == FLOOR_T - 1:
+            style, r0 = "conesoffit", out - BAND - SKIN
+        else:
+            style, r0 = "conestone", out - 2.0
+        self._ring(ct, st, r0, out, y, style, seen, place)
 
-#: The scene builds its world as ``plan.Tower(rng, 0)``. Naming the spiral's
-#: building class after the one it replaces is what lets one renderer draw
-#: both -- ``scenes/tower.py`` is a renderer, and it has no business knowing
-#: whether the thing it is drawing is a cylinder or a stack of platforms.
-Tower = Spiral
-
-
-def _out(pad: Pad, cell) -> tuple[float, float]:
-    """The outward direction at a rim cell: away from the platform's middle."""
-    dx, dz = cell[0] - pad.cx, cell[2] - pad.cz
-    n = math.hypot(dx, dz) or 1.0
-    return dx / n, dz / n
-
-
-def _seg_dist(px: float, pz: float, ax: float, az: float,
-              bx: float, bz: float) -> float:
-    """Distance from a point to a line *segment*, in the ground plane."""
-    dx, dz = bx - ax, bz - az
-    n = dx * dx + dz * dz
-    t = 0.0 if n <= 1e-9 else max(0.0, min(1.0, ((px - ax) * dx
-                                                 + (pz - az) * dz) / n))
-    return math.hypot(px - (ax + dx * t), pz - (az + dz * t))
-
-
-_PAD_CACHE: dict[int, tuple[tuple[int, int], ...]] = {}
-
-
-def _pad_cells(half: int) -> tuple[tuple[int, int], ...]:
-    """A platform's footprint: a square with the corners taken off, which from
-    a distance reads as a rounded plate rather than as a tile."""
-    got = _PAD_CACHE.get(half)
-    if got is None:
-        cut = max(1, half // 2)
-        got = tuple((dx, dz)
-                    for dx in range(-half, half + 1)
-                    for dz in range(-half, half + 1)
-                    if abs(dx) + abs(dz) <= half + cut)
-        _PAD_CACHE[half] = got
-    return got
-
-
-# Imported late: THEMES is a list of Theme instances built in towerplan, and
-# importing it at the top would be a cycle only if towerplan grew a dependency
-# the other way. It has not, and this keeps the two lists in one place.
-from .towerplan import THEMES  # noqa: E402
+    def _ring(self, ct: float, st: float, r0: float, r1: float, y: int,
+              style: str, seen: set, place, rib: bool = False) -> None:
+        if rib:
+            r1 += self.rib_out(ct, st)
+        r0 = max(0.0, r0)
+        r = r0
+        while r <= r1 + 1e-9:
+            cell = (iround(ct * r), y, iround(st * r))
+            if cell not in seen:
+                seen.add(cell)
+                place(cell, style)
+            r += 0.5
+        cell = (iround(ct * r1), y, iround(st * r1))
+        if cell not in seen:
+            seen.add(cell)
+            place(cell, style)
 
 
 # ---------------------------------------------------------------------------
 # The course
 # ---------------------------------------------------------------------------
 
-from .towerplan import Course as _RingCourse  # noqa: E402
+#: How far ahead of the body the course is generated, and how far behind it is
+#: kept. Both are the flat scene's numbers and for the flat scene's reasons: a
+#: dozen-odd landings ahead is what the camera can see, and three behind is
+#: what an orb the body has not quite reached yet needs.
+AHEAD = 16
+TRAIL = 3
+#: Blocks laid before a run is at full difficulty.
+RAMP_BLOCKS = 70
+#: How much wider every gap gets between the start of a run and full
+#: difficulty. Applied centrally in :meth:`Course._node` rather than left to
+#: each feature's own tables, because most features want a *fixed* shape -- a
+#: staircase, a ladder approach -- and would otherwise sit out the ramp
+#: entirely. Measured before this existed: mean hop 2.62 m at the start of a
+#: run and 2.67 m two hundred landings in, which is a flat line with noise on
+#: it, in a scene whose whole pacing story is that it gets harder.
+GAP_RAMP = 0.26
+#: How far into the band from each edge the course may go. The rim is ragged
+#: by construction (:meth:`Cone.wobble`) and the core wall is round, so a
+#: landing right against either is a landing whose neighbours are sometimes
+#: rock and sometimes sky.
+BAND_MARGIN = 2.0
+#: Where in the band the course would rather be, as a fraction from the inner
+#: edge. Mid-lane: far enough out that the drop is beside you rather than a
+#: cliff you are hard against, near enough in that the core wall is in shot.
+#: A pull rather than a clamp, so a feature can still send the body right up to
+#: either edge and be brought back afterwards.
+COURSE_OUT = 0.5
+#: How hard. Gentle -- this competes with every feature's own radial intent.
+COURSE_PULL = 0.34
 
-#: What a bridge between two platforms is made of. Every entry lays the same
-#: line of stepping stones and dresses it differently, because the geometry of
-#: a bridge is fixed by where the two platforms are and only its *character* is
-#: a choice. Weighted, and reweighted by the difficulty ramp.
-BRIDGES = {
-    "stones": 22.0,
-    "pillars": 14.0,
-    "lanterns": 10.0,
-    "beams": 9.0,
-    "arches": 9.0,
-    "ice": 7.0,
-    "slime": 6.0,
-    "ladder": 6.0,
-    "webs": 5.0,
+#: The tallest a feature may stand above the terrace's own ground. Six, because
+#: the trough is thirteen blocks of open air and a body needs two over its
+#: head -- and because a landing higher than this has the next section's floor
+#: slab for a ceiling before it has anywhere to jump to.
+LIFT_MAX = 6
+
+#: Kinds whose rise is bounded by one jump impulse. Everything else in the
+#: vocabulary exists precisely because it is not.
+BALLISTIC = frozenset(("hop", "slide", "walk"))
+
+#: Ground materials a body moves across at something other than sprint pace.
+SURFACE_SPEED = {
+    "soulsand": SOUL_SPEED,
+    "packedice": ICE_RUN,
+    "blueice": ICE_RUN,
+    "web": WEB_SPEED,
 }
-BRIDGE_RAMP = {"arches": 1.6, "slime": 1.4, "ice": 1.2,
-               "stones": -0.5, "lanterns": -0.4}
-#: Metres between consecutive stepping stones. Under the 3.10 m a hop that
-#: climbs a block can reach, because most of a bridge climbs: five platforms a
-#: revolution at seven blocks each has to gain that height somewhere, and it
-#: gains it out over the drop rather than on the flat.
-STONE_STEP = 2.8
-#: How far a bridge may be from the platform it is aiming at before the flight
-#: of steps beside the rim is worth looking for. Six metres is two hops.
-BESIDE_R = 6.0
-#: Rings of cells the flight of steps is drawn from, out from the landing cell.
-#: Three is clear of the platform's own ground and its columns; six is as far
-#: out as a staircase can wander and still read as belonging to the platform.
-BESIDE_RINGS = (3, 4, 5, 6)
 
 
-def _band(from_form: str, to_form: str, rise: float,
-          dx: float = 1.0, dz: float = 0.0) -> tuple[float, float]:
-    """The **cell-centre** distances a hop of this rise and heading may cover.
-
-    :func:`hop_span` answers in take-off and landing *points*, and a plan
-    chooses *cells*; the difference is one edge offset at each end. Two thirds
-    of a metre does not sound like a difference worth a function until you
-    notice that the whole legal band for a hop that climbs a block is only a
-    metre wide -- so a plan that measures cells against a span measured in feet
-    asks for steps the physics does not have, roughly one time in three.
-
-    And the offset depends on which way the body is going, because a block is
-    square and a radius is round: the feet plant against the block's *face*, so
-    running into a corner they plant 1.41 times as far out as running into a
-    side. Ignoring that is worth nearly half a metre on a diagonal, which is
-    half the width of the band.
-    """
-    lo, hi = hop_span(rise)
-    m = max(abs(dx), abs(dz)) or 1.0
-    n = math.hypot(dx, dz) or 1.0
-    pad = (EDGE.get(from_form, 0.34) + EDGE.get(to_form, 0.34)) / (m / n)
-    return lo + pad, hi + pad
+def _pick(rng, table: dict) -> str:
+    """One weighted key. Shared by the feature table and the theme tables."""
+    total = sum(table.values())
+    roll = rng.random() * total
+    upto = 0.0
+    name = next(iter(table))
+    for key, w in table.items():
+        upto += w
+        if roll <= upto:
+            return key
+    return name
 
 
-class Course(_RingCourse):
-    """Cross a platform, bridge to the next, cross that one.
+class Course:
+    """The parkour: features, landings, moves, and the reservations.
 
-    Everything about *how a body moves* -- the moves, the lattice, the
-    occupancy rules, the reservations, the orb solver -- is inherited
-    unchanged. What is replaced is the layer above it: where the course is
-    trying to go and why. The ring version rolled for a set-piece and then
-    negotiated with placement; this one is told by the spiral, so a node is
-    aimed at a *cell* rather than at a bearing and a radius.
+    The order everything happens in is the point of this class, so it is worth
+    stating once:
+
+    1. A **feature** is chosen from the current section's theme and expands
+       into a list of *nodes*. A node says how far along the trough to go, how
+       far in or out, how high above the terrace's own ground to land, and what
+       shape the landing is.
+    2. Each node is resolved against the world **one at a time**, never in
+       advance. A plan several nodes deep is a chain in which the first landing
+       that comes down a cell to one side makes every node after it ask for a
+       step the physics does not have.
+    3. The landing is placed, its **pedestal** is built down to the ground
+       under it, and the arc that reaches it, the run across it and the two
+       cells over it are all **reserved**.
+    4. Only *then* is the terrain around it painted -- and painted around what
+       is reserved, never through it.
+
+    Step four is the whole difference from the previous attempt, which built
+    the world first and then negotiated with it.
     """
 
-    def __init__(self, rng, spiral: Spiral, hop_rng=None) -> None:
+    def __init__(self, rng, cone: Cone, hop_rng=None) -> None:
         self.rng = rng
         self.hop_rng = hop_rng or rng
-        self.tower = spiral
+        self.cone = cone
+        #: cell -> style for everything *drawn* that is not the cone: pedestals,
+        #: terrain dressing, liquids. Handed to the renderer as a stream.
         self.struct: dict[tuple[int, int, int], str] = {}
         self.writes: list[tuple[tuple[int, int, int], str]] = []
+        #: Everything solid that the cone does not already account for.
         self.solid: set[tuple[int, int, int]] = set()
+        #: Cells dug *out* of the cone -- a pond, a lava channel, a doorway.
+        #: Consulted by :meth:`blocked`, which is why a carved pond is water
+        #: you fall into rather than a hole painted on a floor.
+        self.carved: set[tuple[int, int, int]] = set()
+        #: The two cells over every live landing. Checking head-room when a
+        #: block is placed is not the same as reserving it: a spiral comes back
+        #: over itself, so something laid later lands in the space an earlier
+        #: landing was given to stand in.
         self.headroom: set[tuple[int, int, int]] = set()
-        self.softcells: set[tuple[int, int, int]] = set()
+        #: Every cell the body will pass through on a move already solved.
         self.pathcells: set[tuple[int, int, int]] = set()
+        #: Ladders, vines, water columns, cobweb. Drawn, never solid, but
+        #: reserved -- a wall built through a ladder is a ladder in a wall.
+        self.softcells: set[tuple[int, int, int]] = set()
+        #: Cells that are load-bearing *under* a landing. Head-room reserves
+        #: what is over a landing and the path reserves what the body passes
+        #: through; neither covers the ground a ``floor`` landing stands on,
+        #: which places no block of its own. Without this a pond dug during
+        #: dressing takes the floor out from under a landing already committed.
+        self.ground: set[tuple[int, int, int]] = set()
         self.blocks: list[dict] = []
         self._pending: list[dict] = []
-        self.segment = "start"
+        self.segment = ""
         self.laid = 0
+        #: Landings that fell through to the one unchecked answer. Held near
+        #: zero by the probe; it is the only hop in the module nothing verified.
         self.stuck = 0
-        self.bailed = 0
         self.orbs_missed = 0
-        self.wind = 1
-        self.high = 0
-        self.expected = 0.0
-        self._approach = 0
-        self._indoor = 0
-        self._left_at = -99
-        self._checked: set[int] = set()
+        #: :meth:`Cone.rock` is six transcendental operations and placement asks
+        #: it a few thousand times per landing. Memoised, and pruned in
+        #: :meth:`advance` along with everything else that falls off the back.
+        self._rock: dict[tuple[int, int, int], bool] = {}
+        #: Populated only while :data:`TRACE` is on. See there.
+        self.rejects: dict[str, int] = {}
+        #: The band of heights whose cone cells have been handed to the
+        #: renderer. See :meth:`build_world`.
+        self._drawn_lo: int | None = None
+        self._drawn_hi: int | None = None
+        #: The section whose terrain has been painted, so a section is dressed
+        #: once and only after the course has finished crossing it.
+        self._painted = -1
+        #: Where the last feature left the body, in unwrapped angle. The
+        #: course's own progress coordinate.
+        self.u = 0.0
 
-        #: Which platform the course is on, and whether it is crossing it or
-        #: bridging off it. The whole plan is these two.
-        self.pad_i = 0
-        self.stage = "cross"
-        self.bridge = "stones"
-        self.stone = 0
-        #: How far along the current platform's lane the crossing has got, and
-        #: how many landings it has laid. Both are state rather than a list of
-        #: planned nodes on purpose -- see :meth:`_cross_node`.
-        self._lane_i = 0
-        self._cross_n = 0
-
-        spiral.build_to(PADS_AHEAD, self._place_struct)
-        first = spiral.pad(0)
-        self.high = first.y
-        self.expected = float(first.y)
-        blk = self._block(first.enter[0], first.enter[1], first.enter[2],
-                          style=first.theme.floor, form="floor",
-                          step=_toward(first.enter, first.leave),
-                          segment="start", theme=first.theme.name)
-        self.blocks.append(blk)
-        self.headroom.update((blk["x"], blk["y"] + h, blk["z"])
-                             for h in range(1, HEADROOM + 1))
+        start_u = cone.sections[0].u1 + 1.2
+        y = cone.floor_at(start_u)
+        cone.built_to = y + BUILD_ABOVE
+        cone.built_from = y - BUILD_BELOW
+        r = (cone.outer_at(start_u) + cone.outer_at(start_u) - BAND) / 2
+        th = start_u * cone.wind
+        first = self._block(iround(math.cos(th) * r), y - 1,
+                            iround(math.sin(th) * r),
+                            style=cone.section_at(start_u).theme.ground,
+                            form="floor", step=(1, 0), segment="start")
+        self.u = start_u
+        self.blocks.append(first)
+        self.headroom.update((first["x"], y + h, first["z"])
+                             for h in range(HEADROOM))
+        self.ground.add((first["x"], y - 1, first["z"]))
         while len(self.blocks) < AHEAD:
             self.spawn()
 
-    # -- the plan -----------------------------------------------------------
+    # -- the world ---------------------------------------------------------
+
+    def build_world(self, y_lo: int, y_hi: int) -> None:
+        """Hand the renderer every cone cell between two heights, once.
+
+        Drawn cells only. The cone is *analytic* -- :meth:`Cone.rock` already
+        answers every collision question about it without any of this existing
+        -- so what is emitted here is a picture and nothing depends on it. That
+        is why it can be a one-way frontier that never re-emits and never has
+        to be taken back: the body only ever climbs.
+        """
+        if self._drawn_hi is None:
+            self._drawn_lo = y_lo
+            self._drawn_hi = y_lo - 1
+        while self._drawn_hi < y_hi:
+            self._drawn_hi += 1
+            self.cone.emit_layer(self._drawn_hi, self._draw_only)
+        while self._drawn_lo > y_lo:
+            self._drawn_lo -= 1
+            self.cone.emit_layer(self._drawn_lo, self._draw_only)
+
+    def _draw_only(self, cell, style: str) -> None:
+        """A cone cell: drawn, and deliberately not written into ``struct``.
+
+        ``struct`` is what the dressing pass consults to know whether a cell is
+        already spoken for, and every cell of the terrace is a cone cell -- put
+        them in and nothing may ever be planted anywhere.
+        """
+        self.writes.append((cell, style))
+
+    def blocked(self, cell) -> bool:
+        """Is this cell something a body cannot pass through?
+
+        Three sources and one answer: what the course has built, what the cone
+        is made of, and what has been dug out of the cone since.
+        """
+        if cell in self.solid:
+            return True
+        if cell in self.carved:
+            return False
+        hit = self._rock.get(cell)
+        if hit is None:
+            hit = self.cone.rock(cell)
+            self._rock[cell] = hit
+        return hit
+
+    def free(self, cells) -> bool:
+        return not any(self.blocked(c) for c in cells)
+
+    def reserved(self, cells) -> bool:
+        soft = self.softcells
+        return any(c in soft for c in cells)
+
+    def band(self, u: float) -> tuple[float, float]:
+        """The radial range a landing may stand in at this bearing."""
+        out = self.cone.outer_at(u)
+        return out - BAND + BAND_MARGIN, out - BAND_MARGIN
 
     @property
     def difficulty(self) -> float:
+        """0 at the start of a run, 1 once it is up to speed.
+
+        Counted in blocks laid rather than in metres travelled, because
+        generation runs sixteen landings ahead of the body and half the tests
+        grow a course without ever moving one.
+        """
         return min(1.0, self.laid / RAMP_BLOCKS)
 
-    @property
-    def climb_pressure(self) -> float:
-        """Always zero. The spiral *is* the climb: every platform is higher
-        than the last by construction, so there is nothing to correct and no
-        way for a run to wander downhill."""
-        return 0.0
+    # -- blocks ------------------------------------------------------------
+
+    def _block(self, x: int, y: int, z: int, style: str, form: str,
+               step: tuple[int, int], segment: str, theme: str = "",
+               lift: int = 0) -> dict:
+        if not theme:
+            theme = self.cone.theme_at(y + 1, x, z).name
+        return {"x": x, "y": y, "z": z, "style": style, "form": form,
+                "step": step, "out": None, "segment": segment, "theme": theme,
+                "yaw": math.atan2(step[0], -step[1]), "laid": self.laid,
+                "lift": lift, "born": -1e9,
+                "deco": [], "soft": [], "orbs": [], "move": None,
+                "path": (), "unchecked": False, "impact": 0.0,
+                "pedestal": (), "footing": ()}
+
+    def surface(self, blk: dict) -> float:
+        return blk["y"] + FORMS[blk["form"]]
+
+    def land_point(self, blk: dict):
+        return land_point(blk["x"], self.surface(blk), blk["z"], blk["form"],
+                          blk["step"])
+
+    def takeoff_point(self, blk: dict):
+        return takeoff_point(blk["x"], self.surface(blk), blk["z"],
+                             blk["form"], blk["out"] or blk["step"])
+
+    def ground_speed(self, blk: dict) -> float:
+        return SURFACE_SPEED.get(blk["style"], RUN_SPEED)
+
+    def radius_of(self, blk: dict) -> float:
+        return math.hypot(blk["x"], blk["z"])
+
+    def u_of(self, blk: dict) -> float:
+        return self.cone.unwrap(blk["x"], blk["z"], blk["y"] + 1)
+
+    def _no(self, why: str):
+        """Refuse a candidate, and say why if anyone is listening."""
+        if TRACE:
+            self.rejects[why] = self.rejects.get(why, 0) + 1
+
+    def _u_at(self, u_ref: float, x: float, z: float) -> float:
+        """The unwrapped angle of a point, resolved against one already known.
+
+        Hint-free, and deliberately so. The obvious alternative -- unwrap the
+        point against a nearby height -- picks the turn *at or below* that
+        height, so a candidate whose terrace floor is a block or two above the
+        hint resolves to the turn twenty-two blocks below the right one. Taking
+        the small angular difference from a reference angle cannot do that.
+        """
+        th = math.atan2(z, x) * self.cone.wind
+        return u_ref + wrap_angle(th - u_ref)
+
+    def floor_at_cell(self, u_ref: float, x: int, z: int) -> int:
+        """The ``y`` a body stands at on the trough's own ground, here."""
+        return self.cone.floor_at(self._u_at(u_ref, x, z))
+
+    # -- laying a landing --------------------------------------------------
 
     def spawn(self) -> dict:
+        """Lay the next landing. Never fails, and counts it when it nearly
+        does."""
         if not self._pending:
-            self._plan()
+            self._plan_feature()
         prev = self.blocks[-1]
         node = self._pending.pop(0)
         self.laid += 1
-        self.tower.build_to(self.pad_i + PADS_AHEAD, self._place_struct)
-        got = self._try(prev, node)
+        got = self._try_node(prev, node) or self._last_resort(prev)
         if got is None:
             self.stuck += 1
             got = self._emergency(prev, node)
             node = dict(node, label="stuck")
-        return self._commit(prev, node, got)
+        blk = self._commit(prev, node, got)
+        self.u = self.u_of(blk)
+        self._paint_behind()
+        return blk
 
-    def _plan(self) -> None:
-        """The next node, and the next node only.
+    def _try_node(self, prev: dict, node: dict):
+        """The node as asked for, then its runners-up, then its fallbacks.
 
-        Everything here is decided from ``self.blocks[-1]`` -- where the body
-        actually is -- rather than from where an earlier plan assumed it would
-        be. That is the single structural rule of this file and it was learned
-        twice, once on each half of the course: a plan laid several nodes
-        deep is a chain in which the first landing that comes down a cell to
-        one side or a block low makes every node after it ask for a step the
-        physics does not have.
+        Every node carries alternatives it would have accepted, because
+        placement has to answer questions the feature cannot see -- a rim that
+        wobbled in, a pedestal that met the section below -- and a plan that
+        offers exactly one answer turns each of those into a failure.
         """
-        if self.stage == "cross":
-            pad = self.tower.pad(self.pad_i)
-            node = self._cross_node(pad)
-            if node is not None:
-                self.segment = "cave" if pad.enclosed else "cross"
-                self._pending = [node]
-                return
-            self.stage = "bridge"
-            self.bridge = self._roll_bridge()
-            self.stone = 0
-        prev = self.blocks[-1]
-        there = self.tower.pad(self.pad_i + 1)
-        target = there.enter
-        self.segment = self.bridge
-        # The landing is a hop like any other, so what decides that the bridge
-        # is *finished* is the same question placement will ask: is the rim
-        # cell a step this body can make from here? Against a fixed radius it
-        # is not -- the old "within 4.4 m" fired on stones two metres from the
-        # rim, which is under ``MIN_HOP``, and the landing was then refused for
-        # being too close rather than too far.
-        rise = target[1] + 1.0 - (prev["y"] + FORMS[prev["form"]])
-        lo, hi = _band(prev["form"], "floor", rise,
-                       target[0] - prev["x"], target[2] - prev["z"])
-        flat = math.dist((prev["x"], prev["z"]), (target[0], target[2]))
-        need = target[1] - prev["y"]
-        # ...and it steps *across* onto the platform, never up into it. A
-        # landing hop that still has to climb comes in under the rim, and a
-        # platform's ground is two cells deep -- so the body's head crosses the
-        # lower of those two on the way in and the arc is refused for hitting
-        # the thing it is landing on. The bridge climbs to the platform's own
-        # height first, beside it, and then walks in: that one condition took
-        # the unchecked answer from 0.68% of nodes to 0.25%, and it is also
-        # exactly what a player does.
-        if (lo <= flat <= hi and need <= 0) or self.stone > 30:
-            land = self._node(style=there.theme.floor, form="floor",
-                              spread=1, cell=target, orbs=1, label=self.bridge)
-            # A doorway is a cell wide and a platform is twenty-five. The way
-            # in is where the *route* wants to arrive, not the only ground
-            # there is, and a landing with no alternative was the last group of
-            # failures left: a third of them, every one a perfectly ordinary
-            # arrival refused because something the bridge could not see was
-            # standing beside that one cell.
-            land["alts"] = tuple(self._rim_alts(there, target, prev))
-            self._pending = [land]
-            self.pad_i += 1
-            self.stage = "cross"
-            self._lane_i = 0
-            self._cross_n = 0
-            return
-        self.stone += 1
-        # Every legal cell, best first, rather than one cell and an argument.
-        # Placement has to answer questions the plan cannot see -- what a
-        # column driven down from a landing twenty blocks further on is
-        # standing in, whether the body can run across the block it is leaving
-        # -- and a plan that offers one answer turns each of those into a
-        # failure. Offering the runners-up costs a list and takes the same
-        # checks; it is the difference between 2.2% of nodes unchecked and
-        # 0.3%.
-        stairs = self._beside(prev, there, target, need)
-        runs = self._run_cells(prev, there, target)
-        cands = (stairs + runs) if (need > 0 or flat < lo) else (runs + stairs)
-        if not cands:
-            # Nothing legal anywhere: hand placement the honest thing it was
-            # asked for and let it count the miss, rather than inventing a cell
-            # that only looks like an answer.
-            ux, uz = _out(there, target)
-            cands = [(target[0] + _round(ux * 4), prev["y"] + 1,
-                      target[2] + _round(uz * 4))]
-        node = self._bridge_node(self.bridge, there.theme, self.stone,
-                                 cands[0], self.rng)
-        node["alts"] = tuple(cands[1:12])
-        self._pending = [node]
+        for lift in node["lifts"]:
+            trial = node if lift == node["lift"] else dict(node, lift=lift)
+            for cell in self._targets(prev, trial):
+                got = self._place(prev, trial, cell)
+                if got is not None:
+                    return got
+        # Nothing at any height. Relax the comfort rules -- never the
+        # correctness ones -- before giving up on the feature entirely.
+        for cell in self._targets(prev, node):
+            got = self._place(prev, node, cell, strict=False)
+            if got is not None:
+                return got
+        return None
 
-    def _rim_alts(self, there: Pad, target, prev: dict) -> list:
-        """Other ground on the far platform a bridge could arrive on.
+    def _place(self, prev: dict, node: dict, cell, strict: bool = True):
+        return self._attempt(prev, node, cell, strict=strict)
 
-        Only the platform's own top cells, only ones a body can stand on, and
-        only ones the hop from here is one the physics has -- so an alternative
-        landing is a landing, not a relaxation.
+    def _last_resort(self, prev: dict):
+        """A plain hop along the trough, at whatever height will take it.
+
+        Reached when a feature asks for something the world cannot give. The
+        feature is abandoned rather than argued with: the remaining nodes of a
+        set-piece whose first landing could not be placed describe a shape that
+        no longer exists.
         """
-        out = []
-        surface = prev["y"] + FORMS[prev["form"]]
-        for cell in _near(target, 2)[1:]:
-            if cell not in self.solid or not self._standable(cell):
-                continue
-            dx, dz = cell[0] - prev["x"], cell[2] - prev["z"]
-            lo, hi = _band(prev["form"], "floor",
-                           cell[1] + 1.0 - surface, dx, dz)
-            if lo <= math.hypot(dx, dz) <= hi:
-                out.append(cell)
-        return out
+        self._pending = []
+        theme = self.cone.section_at(self.u).theme
+        for arc in (3, 4, 2, 5, 6):
+            for lift in (1, 0, 2, 3, 4):
+                for radial in (0.0, 2.0, -2.0, 4.0, -4.0):
+                    node = self._node(theme.rock, arc=arc, lift=lift,
+                                      radial=radial,
+                                      form="floor" if lift == 0 else "full",
+                                      label="recover")
+                    for cell in self._targets(prev, node):
+                        got = self._attempt(prev, node, cell, strict=False)
+                        if got is not None:
+                            return got
+        return None
 
-    def _run_cells(self, prev: dict, there: Pad, target) -> list:
-        """A stone further along the bridge: nearer, and a block higher.
+    def _emergency(self, prev: dict, node: dict):
+        """The one unchecked answer in the module.
 
-        Aimed at a point a few cells *outside* the rim, not at the rim cell
-        itself. A bridge that heads straight for its landing spends its last
-        two or three stones inside the platform it is aiming at -- the cells
-        are that platform's own ground, so they are occupied, and the stone is
-        refused. Approaching from outside and stepping up onto the rim is both
-        placeable and what it should look like.
-
-        Walked out along the line until the *cell* is a real hop away, not
-        placed at a distance and rounded. Rounding a 2.8 m step onto the
-        lattice can land it 1.4 m out, which is under ``MIN_HOP`` -- and the
-        next stone is then measured from a body that never moved.
+        Clamped into the band and onto the trough's own ground, so that even
+        unchecked it is somewhere a body could stand. ``stuck`` counts these
+        and the probe holds it near zero.
         """
-        ux, uz = _out(there, target)
-        aim = (target[0] + _round(ux * 3), target[1], target[2] + _round(uz * 3))
-        span = math.dist((prev["x"], prev["z"]), (aim[0], aim[2]))
-        if span < 1e-3:
-            return []              # already there; this is the stairs' job
-        ux, uz = (aim[0] - prev["x"]) / span, (aim[2] - prev["z"]) / span
-        y = prev["y"]
-        if y < target[1]:
-            y += 1
-        elif y > target[1] + 1:
-            y -= 1
-        rise = y + 1.0 - (prev["y"] + FORMS[prev["form"]])
-        # A fan of whole cells, not the points along one line rounded.
-        #
-        # The band a hop that climbs a block may cover is about 1.1 m wide, and
-        # cells along a *diagonal* are 1.41 m apart: walk out along a
-        # north-easterly line and the distances go 2.83, 4.24, and the whole
-        # legal band falls down the gap between them. Nothing is wrong with
-        # either number and there is no answer on that line at all -- while one
-        # cell to either side of it there are two. Measured: that gap alone was
-        # 13 of the last 23 nodes the scene could not place, every one of them
-        # on the first or second stone of a bridge leaving on a diagonal.
-        out = []
-        for dx in range(-6, 7):
-            for dz in range(-6, 7):
-                if dx == 0 and dz == 0:
-                    continue
-                d = math.hypot(dx, dz)
-                lo, hi = _band(prev["form"], "full", rise, dx, dz)
-                if not (lo <= d <= hi):
-                    continue
-                # Straightest first, then longest: a bridge that wanders is a
-                # bridge that arrives under its platform without the height.
-                cos = (dx * ux + dz * uz) / d
-                if cos < 0.55:
-                    continue
-                out.append((-cos, -d, (prev["x"] + dx, y, prev["z"] + dz)))
-        out.sort()
-        return [c for _, _, c in out]
+        pu = self.u_of(prev)
+        u = pu + 3.5 / max(6.0, self.radius_of(prev))
+        lo, hi = self.band(u)
+        r = min(max(self.radius_of(prev), lo), hi)
+        th = u * self.cone.wind
+        cx, cz = iround(math.cos(th) * r), iround(math.sin(th) * r)
+        cy = self.floor_at_cell(u, cx, cz)
+        # A tuple is truthy whether or not it is (0, 0), so this cannot be
+        # written as ``step or (1, 0)`` -- which is what it said until ruff
+        # pointed out that the fallback was unreachable. A zero step gives a
+        # direction of no length, and the take-off point then lands exactly on
+        # the landing point.
+        step = (cx - prev["x"], cz - prev["z"])
+        if step == (0, 0):
+            step = (self.cone.wind, 0)
+        frm = takeoff_point(prev["x"], self.surface(prev), prev["z"],
+                            prev["form"], step)
+        to = land_point(cx, cy + 1.0, cz, "full", step)
+        return {"cell": (cx, cy, cz), "step": step, "form": "full",
+                "move": Move("hop", [arc_leg(frm, to)]), "soft": (),
+                "pedestal": (), "footing": ()}
 
-    def _beside(self, prev: dict, there: Pad, target, need: int) -> list:
-        """Steps up the flight of stairs beside the rim, nearest the rim first.
+    def _targets(self, prev: dict, node: dict):
+        """Candidate landing cells, nearest first to where the helix wants one.
 
-        This is the case the whole scene used to fall over on. A bridge has to
-        gain the entire rise of a platform -- five to nine blocks -- across
-        about nine stones, and one jump impulse reaches 1.25; on the seeds
-        where the rise is at the top of its range and the platforms happen to
-        sit close together, the bridge arrives *under* the platform with three
-        or four blocks still to climb. From there the direction "toward the
-        landing" is made of rounding error, the step comes out as no step at
-        all, and every stone after it is laid on top of the last. Measured with
-        a counter round ``_attempt``: that one geometry was 3% of every node in
-        the scene and the single largest cause of placement failing.
-
-        So when the course is under its landing and low, it stops stepping
-        *toward* it and circles it instead: a ring of cells a few out from the
-        rim, each a real hop from the last and each a block higher. The cells
-        it may not use are the ones already spoken for -- and that is what
-        makes the flight turn rather than bounce between two stones, because
-        coming back to a column two blocks up lands in the head-room reserved
-        over it, so the third step is forced somewhere new.
-
-        What it reads as is a corkscrew of steps up the outside of a platform,
-        which is what a spiral map builds at exactly this moment and for
-        exactly this reason.
+        The ideal point is worked out in the trough's own coordinates -- go
+        this far along the arc, this far in or out of the band, this high above
+        the ground -- and the *cells* near it are then ranked by how close they
+        come. So the course curves continuously along a helix and still lands
+        on whole cells, which cannot interpenetrate.
         """
-        if math.dist((prev["x"], prev["z"]),
-                     (target[0], target[2])) > BESIDE_R + 4.0:
-            return []
-        y = prev["y"] + (1 if need > 0 else 0)
-        ux, uz = _out(there, target)
-        tx, tz = -uz, ux
-        rise = y + 1.0 - (prev["y"] + FORMS[prev["form"]])
-        found = {}
-        for along in range(-5, 6):
-            for out in BESIDE_RINGS:
-                cx = target[0] + _round(ux * out + tx * along)
-                cz = target[2] + _round(uz * out + tz * along)
-                if there.holds(cx, cz):
+        pu = self.u_of(prev)
+        prev_surface = self.surface(prev)
+        form = node["form"]
+        radius = self.radius_of(prev) + node["radial"]
+        u = pu + node["arc"] / max(6.0, radius)
+        lo, hi = self.band(u)
+        radius += (lo + (hi - lo) * COURSE_OUT - radius) * COURSE_PULL
+        radius = min(max(radius, lo), hi)
+        th = u * self.cone.wind
+        ix, iz = math.cos(th) * radius, math.sin(th) * radius
+        bx, bz = iround(ix), iround(iz)
+        span = 3
+        scored = []
+        for dz in range(-span, span + 1):
+            for dx in range(-span, span + 1):
+                x, z = bx + dx, bz + dz
+                if x == prev["x"] and z == prev["z"]:
                     continue
-                dx, dz = cx - prev["x"], cz - prev["z"]
-                lo, hi = _band(prev["form"], "full", rise, dx, dz)
-                if not (lo <= math.hypot(dx, dz) <= hi):
+                cu = self._u_at(u, x, z)
+                if cu <= pu + 1e-6:
+                    continue            # never backwards along the trough
+                clo, chi = self.band(cu)
+                r = math.hypot(x, z)
+                if not (clo - 1.0 <= r <= chi + 1.0):
                     continue
-                if (cx, y, cz) in self.solid or (cx, y, cz) in self.headroom:
-                    continue
-                # Nearest the landing first, so the flight stays beside the rim
-                # instead of wandering off round the drop.
-                found[(cx, y, cz)] = math.hypot(cx - target[0],
-                                                cz - target[2])
-        return [c for c, _ in sorted(found.items(), key=lambda kv: kv[1])]
+                ground = self.cone.floor_at(cu)
+                y = ground + node["lift"] - 1
+                if form != "floor" and node["kind"] in BALLISTIC:
+                    # **Nothing rises two blocks**, here or in the game -- the
+                    # discriminant in ``hop_span`` has no solution for it. On a
+                    # helix that is itself a staircase this bites in a way a
+                    # flat course never sees: the trough steps up a block every
+                    # eight of arc, so a landing one above the ground, reached
+                    # from a landing *on* the ground across a step, asks for
+                    # two. Measured before this clamp, every single candidate
+                    # at two thirds of the stuck cases had a rise of exactly
+                    # +2.0, and the feature's own fallback lifts could not
+                    # reach below one to fix it.
+                    #
+                    # Only the ballistic kinds. A ladder, a bubble column and a
+                    # slime bounce all rise several blocks by design and that
+                    # is the entire reason a map builds one -- clamping those
+                    # too took climbs and lifts from three per cent of moves to
+                    # none at all.
+                    over = (y + FORMS[form]) - (prev_surface + 1.0)
+                    if over > 0.0:
+                        y -= int(math.ceil(over - 1e-6))
+                    if y < ground:
+                        continue        # clamped into the floor itself
+                scored.append((math.hypot(x - ix, z - iz), x, y, z))
+        scored.sort()
+        return [(x, y, z) for _, x, y, z in scored[:24]]
 
-    def _roll_bridge(self) -> str:
-        hard = self.difficulty
-        rng = self.rng
-        weights = [(name, base * max(0.05, 1.0 + BRIDGE_RAMP.get(name, 0.0) * hard))
-                   for name, base in BRIDGES.items() if name != self.segment]
-        roll = rng.random() * sum(w for _, w in weights)
-        upto = 0.0
-        for name, w in weights:
-            upto += w
-            if roll <= upto:
-                return name
-        return weights[-1][0]
+    def _attempt(self, prev: dict, node: dict, cell, strict: bool = True):
+        """Everything that has to be true, in the order that rejects soonest.
 
-    # -- crossing a platform ------------------------------------------------
-
-    def _cross_node(self, pad: Pad) -> "dict | None":
-        """The next landing on this platform, or ``None`` when it is crossed.
-
-        Landings are on the ground itself -- ``floor`` nodes, which place no
-        block and stand on what the spiral already built -- so a crossing is
-        the body running over real terrain rather than over a line of cubes
-        somebody floated there. Not every cell: a course that lands on every
-        cell is a walk, so each landing is a genuine hop from the last.
-
-        One at a time, measured from the block the body is actually on. The
-        whole crossing used to be chosen in advance from ``pad.enter``, which
-        is where the *arrival* was supposed to land -- and an arrival that came
-        down a cell to one side, or a block low because its own last hop was
-        refused, turns the first hop of the crossing into one the physics does
-        not have. Measured with a counter round ``_attempt``, that alone was
-        58% of every placement failure in this scene: the largest single cause,
-        and invisible from the crossing's own code, because nothing there was
-        wrong.
-
-        The style carried on each landing is the platform's own floor material,
-        which is what makes an ice platform slide and a soul-sand one drag:
-        ``ground_speed`` reads it, and that one number is most of what makes a
-        theme feel like what it is made of.
-        """
-        rng = self.rng
-        prev = self.blocks[-1]
-        lane = pad.lane
-        end = len(lane) - 1
-        if self._lane_i >= end:
-            return None
-        px, pz = prev["x"], prev["z"]
-        surface = prev["y"] + FORMS[prev["form"]]
-        # Where the body *is* on the lane, not where the last node aimed it.
-        # Placement is free to take one of the alternatives below, and a
-        # crossing that kept counting from its own first choice would then
-        # offer the body a cell it has already run past.
-        here = min(range(len(lane)),
-                   key=lambda i: math.hypot(lane[i][0] - px, lane[i][2] - pz))
-        self._lane_i = max(self._lane_i, here)
-        if self._lane_i >= end:
-            return None
-
-        floor_y = pad.y - 1
-
-        def form_at(cell) -> str:
-            # Above the platform's own ground, a landing has to *build* -- the
-            # lane climbs to a way out that is one to three blocks up, and a
-            # ``floor`` landing needs the cell it names to be solid already.
-            return "floor" if cell[1] <= floor_y else "full"
-
-        def reach(cell, form):
-            dx, dz = cell[0] - px, cell[2] - pz
-            lo, hi = _band(prev["form"], form,
-                           cell[1] + FORMS[form] - surface, dx, dz)
-            return lo, hi, math.hypot(dx, dz)
-
-        # The best next landing is not the first legal one but the one nearest
-        # a comfortable hop. A crossing made of the shortest legal steps is a
-        # shuffle, and one made of the longest leaves no margin at all for an
-        # arrival that came in short.
-        # Room to stand is a *preference*, not a requirement, and the
-        # difference is a whole class of failure. On a terrace the cells beside
-        # a step are the ones the body overhangs, and there are stretches of
-        # lane where every cell within a hop is one of them -- so a filter
-        # leaves the crossing with no candidate at all and it falls back on the
-        # far rim, twenty metres away. Ranked instead, the awkward cell is
-        # tried after the comfortable ones and before the answer nobody
-        # checked.
-        ranked = []
-        for i in range(self._lane_i + 1, end + 1):
-            lo, hi, d = reach(lane[i], form_at(lane[i]))
-            if lo <= d <= hi:
-                ranked.append((0 if self._standable(lane[i]) else 1,
-                               abs(d - 3.2), i))
-        ranked.sort()
-        best = ranked[0] if ranked else None
-        if best is None:
-            self._lane_i = end
-            lo, _, d = reach(lane[end], form_at(lane[end]))
-            if d < lo:
-                return None    # already at the far rim; the bridge starts here
-            i = end
-        else:
-            i = best[-1]
-        self._lane_i = i
-        self._cross_n += 1
-        cell = lane[i]
-        # The steps up to the way out. The lane climbs ``pad.lift`` blocks
-        # before it reaches the rim, and above the ground those landings are
-        # *built* -- a short flight of blocks on a plinth, which is what a
-        # parkour map puts on a platform anyway.
-        #
-        # Built rather than terraced, and that is the whole of the reasoning.
-        # Raising the platform's own ground under the lane was tried first and
-        # it is the more obvious idea: it gives the same climb and it looks
-        # like terrain. What it also gives is a step at shoulder height beside
-        # every landing next to it, and an arc that clips the step it is
-        # climbing -- emergency placements went from 0.2% of blocks to 5%, and
-        # they are unfixable from the crossing's side because the offending
-        # geometry is the *building*. Placed as blocks, every one of them goes
-        # through the same four checks as a bridge stone and cannot be laid at
-        # all unless the body can make it.
-        above = cell[1] - floor_y
-        if above > 0:
-            node = self._node(style=pad.theme.accent, form="full", spread=0,
-                              cell=cell, support=above,
-                              support_style=pad.theme.wall,
-                              orbs=1 if rng.random() < 0.55 else 0,
-                              label="cave" if pad.enclosed else "cross")
-            node["alts"] = tuple(lane[r[-1]] for r in ranked[1:6])
-            return node
-        # A feature every so often: a block on the ground to hop up onto, which
-        # on a farm is a hay bale and in a cave is a fallen rock. It is the same
-        # node either way -- what changes is the material. Only where the hop
-        # onto it is one a body has, which is a narrower band than the flat hop
-        # it replaces.
-        # ...and never within two cells of the rim. Standing a block higher
-        # puts the body's shoulders level with a cave's wall rather than under
-        # it, and one cell of clearance is not one cell of clearance to a body
-        # 0.6 m wide standing 0.4 m off centre.
-        lift = 0
-        inner = max(abs(cell[0] - pad.cx), abs(cell[2] - pad.cz)) <= pad.half - 2
-        if i < end and inner and rng.random() < 0.30:
-            lo, hi, d = reach((cell[0], cell[1] + 1, cell[2]), "full")
-            lift = 1 if lo <= d <= hi else 0
-        node = self._node(
-            style=pad.theme.accent if lift else pad.theme.floor,
-            form="full" if lift else "floor", spread=0 if lift else 1,
-            cell=(cell[0], cell[1] + lift, cell[2]),
-            deco="lantern" if pad.enclosed and self._cross_n % 3 == 1 else None,
-            orbs=1 if rng.random() < 0.55 else 0,
-            label="cave" if pad.enclosed else "cross")
-        # The other lane cells that are also a hop away, in case this one is
-        # standing under something the crossing cannot see -- a column driven
-        # down from the platform above, most often.
-        if not lift:
-            node["alts"] = tuple(self._lane_alts(pad, lane, ranked))
-        return node
-
-    def _standable(self, cell) -> bool:
-        """Is this piece of ground clear of anything a *shoulder* would hit?
-
-        The landing's own head-room says nothing about the cell next door, and
-        a body is 0.6 m wide standing 0.4 m off the middle of the block along
-        the way it is going -- so on a terrace it overhangs the step in front
-        of it every time. That is not a hop being refused, it is a run across a
-        block being refused, which reads as the course inexplicably declining
-        perfectly ordinary flat ground. It was 87 of the 148 failures the
-        terraces introduced.
+        ``strict`` separates the two kinds of requirement, and the split is
+        load-bearing. Without it a landing must be empty, have head-room, sit
+        on something, be reachable by a move the physics has, and have a clear
+        path -- those are **correctness** and they never relax. With it the
+        body must also fit comfortably where it lands and all the way across
+        it -- those are **comfort**, and a course that cannot satisfy them
+        anywhere is better off grazing a bank than falling through to the one
+        answer nothing checked.
         """
         cx, cy, cz = cell
-        for ox in (-1, 0, 1):
-            for oz in (-1, 0, 1):
-                if ox == oz == 0:
+        step = (cx - prev["x"], cz - prev["z"])
+        if step == (0, 0) and node["kind"] not in ("climb", "bubble"):
+            return self._no("same cell")
+        form = node["form"]
+        cells = footprint(cx, cy, cz, form)
+        if form == "floor":
+            # Standing on the trough's own ground: the cell has to be *solid*,
+            # which is the exact opposite of every other form's test.
+            if not self.blocked((cx, cy, cz)):
+                return self._no("floor: no ground")
+            # ...and it has to be one nothing has stood on yet. A floor landing
+            # places no block, so on its own it gives the course no ratchet at
+            # all and a body can shuffle between two cells forever. The
+            # head-room over every landing is already reserved; this is simply
+            # asking about it.
+            if (cx, cy + 1, cz) in self.headroom:
+                return self._no("floor: stood on already")
+            cells = ((cx, cy, cz),)
+        elif not self.free(cells):
+            return self._no("landing occupied")
+        if not self.free((x, y + h, z)
+                         for x, y, z in cells for h in range(1, HEADROOM + 1)):
+            return self._no("no head-room")
+        if self.reserved(cells) or any(c in self.headroom for c in cells):
+            return self._no("reserved")
+        if any(c in self.pathcells for c in cells):
+            return self._no("in a solved arc")
+        got_pedestal = self._pedestal(node, cx, cy, cz, form)
+        if got_pedestal is None:
+            return self._no("pedestal will not stand")
+        pedestal, footing = got_pedestal
+        surface = cy + FORMS[form]
+        if strict and not self._body_fits(
+                land_point(cx, surface, cz, form, step), cells):
+            return self._no("body does not fit on landing")
+        if strict:
+            # The same question about the block being *left*. Which edge the
+            # feet leave from is not known until the next landing is chosen --
+            # it is chosen here -- and the run across a block toward that edge
+            # is a stretch of walking nothing else checks.
+            here = self.land_point(prev)
+            own = set(footprint(prev["x"], prev["y"], prev["z"], prev["form"]))
+            own |= set(body_cells(*here))
+            gone = takeoff_point(prev["x"], self.surface(prev), prev["z"],
+                                 prev["form"], step)
+            for f in (0.34, 0.67, 1.0):
+                at = tuple(here[i] + (gone[i] - here[i]) * f for i in range(3))
+                if not self._body_fits(at, own):
+                    return self._no("body does not fit leaving")
+        built = self._move_for(prev, node, cx, cy, cz, form, step, pedestal)
+        if built is None:
+            return self._no("no move: " + node["kind"])
+        move, soft = built
+        exempt = standing_cells(prev) | standing_cells(
+            {"x": cx, "y": cy, "z": cz, "form": form})
+        exempt |= set(soft)
+        if not self._path_clear(
+                move, exempt,
+                footprint(prev["x"], prev["y"], prev["z"], prev["form"]),
+                pedestal):
+            return self._no("path blocked")
+        return {"cell": (cx, cy, cz), "step": step, "form": form,
+                "move": move, "soft": soft, "pedestal": pedestal,
+                "footing": footing}
+
+    def _pedestal(self, node: dict, cx: int, cy: int, cz: int, form: str):
+        """The stack of terrain under a landing, down to the trough's ground.
+
+        This is what makes the parkour read as *built into the place* rather
+        than as cubes hung in the air: a landing three blocks up is the top of
+        a three-block dune, a mushroom cap has a stem under it, a wool block
+        over the drop has nothing. Returns ``None`` when the stack cannot be
+        built, which is a rejection and not a silent drop -- a mushroom cap
+        with no stem is a cube floating over a field.
+        """
+        if not node["pedestal"] or form == "floor":
+            return (), ()
+        out = []
+        #: The cells the stack came to rest *on*. Reserved with it, because a
+        #: pond dug during the dressing pass will otherwise happily carve away
+        #: the ground a dune is standing on -- the stack itself is protected and
+        #: the cell under it was not. Caught by the test that asks whether every
+        #: pedestal still reaches something.
+        feet = []
+        for x, _y, z in footprint(cx, cy, cz, form) or ((cx, cy, cz),):
+            for y in range(cy - 1, cy - 1 - LIFT_MAX - 2, -1):
+                c = (x, y, z)
+                if self.blocked(c):
+                    feet.append(c)
+                    break               # it has reached the ground
+                if c in self.headroom or c in self.pathcells \
+                        or c in self.softcells:
+                    # It has reached the air over a landing somewhere below,
+                    # or a jump already solved. Neither is free space even
+                    # though nothing is drawn in it, and a column driven
+                    # through one is a body running with rock through its head.
+                    return None
+                out.append(c)
+            else:
+                return None             # never found ground: it is a stilt
+        return tuple(out), tuple(feet)
+
+    def _body_fits(self, at, own) -> bool:
+        """Can a body stand at ``at`` without being inside anything?"""
+        floor = ifloor(at[1] + 0.05)
+        own = set(own)
+        for cell in body_cells(*at):
+            if cell[1] < floor or cell in own:
+                continue
+            if self.blocked(cell):
+                return False
+        return True
+
+    def _path_clear(self, move: Move, exempt, leaving=(), extra=()) -> bool:
+        """Nothing solid along the path, except what the body is already in.
+
+        That last clause is the difference between a check that works and one
+        that deadlocks: a body is 0.6 m wide and takes off from a block's far
+        edge, so on the lattice it routinely straddles the cell next door, and
+        which edge it leaves from is not known when the block it stands on is
+        placed. The exemption is bounded to the first third of the path, so a
+        move that arcs back into what it started beside is still refused.
+
+        ``extra`` is the pedestal this landing is *about* to build. It is not
+        in the occupancy map yet and it must still be checked, because a column
+        driven down from the block you are jumping to is a column built through
+        the arc that gets you there.
+        """
+        extra = set(extra)
+        leaving = set(leaving)
+        points = move.points(ARC_SAMPLES)
+        early = len(points) // 3
+        for i, (x, y, z) in enumerate(points):
+            for cell in body_cells(x, y, z):
+                if cell in exempt:
                     continue
-                for h in (1, 2):
-                    if (cx + ox, cy + h, cz + oz) in self.solid:
+                if cell not in extra and not self.blocked(cell):
+                    continue
+                if i <= early and cell in leaving:
+                    continue
+                return False
+        return True
+
+    # -- the move vocabulary -----------------------------------------------
+
+    def _move_for(self, prev: dict, node: dict, cx: int, cy: int, cz: int,
+                  form: str, step, pedestal):
+        """The move that gets from ``prev`` to this cell, or ``None``.
+
+        Every kind answers the same question -- is this a thing a body can
+        actually do -- against vanilla's numbers rather than against a table of
+        gaps somebody chose. Adding the next verb is an entry here and a
+        feature that asks for it, never a branch in a state machine.
+        """
+        kind = node["kind"]
+        frm = takeoff_point(prev["x"], self.surface(prev), prev["z"],
+                            prev["form"], step)
+        to = land_point(cx, cy + FORMS[form], cz, form, step)
+        if kind in ("hop", "slide"):
+            speed = ICE_AIR if kind == "slide" else AIR_SPEED
+            leg = arc_leg(frm, to, speed)
+            if math.dist((frm[0], frm[2]), (to[0], to[2])) < MIN_HOP:
+                return None
+            if not (VY_MIN <= leg["vy0"] <= VY_MAX):
+                return None
+            if not (AIR_MIN <= leg["dur"] <= AIR_MAX):
+                return None
+            # You have to be on the way *down* when you arrive, or the body has
+            # come up through the side of the block rather than onto it.
+            if leg["dur"] < leg["vy0"] / GRAVITY:
+                return None
+            return Move(kind, [leg]), ()
+        if kind == "bounce":
+            vy0 = bounce_launch(prev["impact"])
+            if vy0 < JUMP_V * 0.8:
+                return None             # the drop that fed it was not enough
+            disc = vy0 * vy0 - 2.0 * GRAVITY * (to[1] - frm[1])
+            if disc < 0.0:
+                return None             # the bounce cannot reach that high
+            dur = (vy0 + math.sqrt(disc)) / GRAVITY
+            speed = math.dist((frm[0], frm[2]), (to[0], to[2])) / dur
+            # A bounce gives no sprint momentum, so what a body can steer to in
+            # the air is a band rather than one speed.
+            if not (2.6 <= speed <= AIR_SPEED * 1.1):
+                return None
+            return Move("bounce", [{"kind": "arc", "frm": tuple(frm),
+                                    "to": tuple(to), "dur": dur,
+                                    "vy0": vy0}]), ()
+        if kind in ("climb", "bubble"):
+            return self._climb_move(prev, node, cx, cy, cz, form, step, frm,
+                                    to, pedestal)
+        if kind == "web":
+            dist = math.dist(frm, to)
+            if not (1.4 <= dist <= 3.6) or abs(to[1] - frm[1]) > 1.01:
+                return None
+            webs = line_cells(frm, to)
+            if not self.free(webs) or self.reserved(webs):
+                return None
+            return Move("web", [line_leg(frm, to, WEB_SPEED)]), tuple(
+                (c, "web") for c in webs)
+        if kind == "walk":
+            dist = math.dist((frm[0], frm[2]), (to[0], to[2]))
+            if dist > 2.4 or abs(to[1] - frm[1]) > 0.55:
+                return None
+            return Move("walk", [line_leg(frm, to, RUN_SPEED)]), ()
+        return None
+
+    def _climb_move(self, prev, node, cx, cy, cz, form, step, frm, to,
+                    pedestal):
+        """A ladder, a vine or a bubble column: grab it, ride it, step off.
+
+        The column stands beside the stack the landing caps, on the side the
+        body arrives from, which is the only arrangement where all three legs
+        are things a body can do: a short hop onto it, a vertical ride, and a
+        step off onto the block at the top. Put the column *under* the landing
+        and the last leg has to pass through the block it is aiming at.
+        """
+        fx, fz = quantise(*step)
+        lx, lz = cx - fx, cz - fz
+        foot = self.surface(prev)
+        top = cy + FORMS[form]
+        if not 1.5 <= top - foot <= 9.5:
+            return None                 # not worth one, or a ride nobody sits
+        column = [(lx, y, lz) for y in range(ifloor(foot), int(top) + 1)]
+        if not self.free(column) or self.reserved(column):
+            return None
+        if any(c in self.pathcells or c in self.headroom for c in column):
+            return None
+        if not self.free(((lx, int(top) + 1, lz),)):
+            return None
+        # A ladder has to hang on something: the stack under the landing is the
+        # usual answer, and the core wall behind will do just as well.
+        pedset = set(pedestal)
+        anchored = any(self.blocked((lx + ax, y, lz + az))
+                       or (lx + ax, y, lz + az) in pedset
+                       for ax, az in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                       for y in (column[len(column) // 2][1], column[-1][1]))
+        if not anchored:
+            return None
+        grab = (lx, foot, lz)
+        reach = math.dist((frm[0], frm[2]), (grab[0], grab[2]))
+        if not (0.9 <= reach <= 4.2):
+            return None
+        speed = BUBBLE_SPEED if node["kind"] == "bubble" else CLIMB_SPEED
+        legs = [arc_leg(frm, grab, AIR_SPEED),
+                line_leg(grab, (lx, top, lz), speed),
+                line_leg((lx, top, lz), to, WALK_SPEED)]
+        if not (VY_MIN <= legs[0]["vy0"] <= VY_MAX):
+            return None
+        style = "water" if node["kind"] == "bubble" else node["climb_style"]
+        soft = tuple((c, style) for c in column)
+        if node["kind"] == "bubble":
+            # Soul sand under the column is what makes it push upward. One
+            # invisible cell at the bottom of a shaft, skipped rather than
+            # forced when the floor is already something else.
+            base = (lx, ifloor(foot) - 1, lz)
+            if not self.blocked(base):
+                soft += ((base, "soulsand"),)
+        return Move(node["kind"], legs), soft
+
+    # -- committing --------------------------------------------------------
+
+    def write(self, cell, style: str) -> None:
+        """Draw a cell of terrain, and make it solid unless it is see-through.
+
+        Terrain only. The cone streams itself to the renderer separately and is
+        never written here -- it is analytic, and a hundred thousand cells of
+        it in a dictionary is the memory this format was rewritten to stop
+        spending.
+        """
+        if cell in self.softcells or cell in self.pathcells \
+                or cell in self.headroom or cell in self.ground:
+            return
+        self.struct[cell] = style
+        self.writes.append((cell, style))
+        if style not in SEE_THROUGH:
+            self.solid.add(cell)
+        self._rock.pop(cell, None)
+
+    def carve(self, cell) -> None:
+        """Dig a cell out of the cone: a pond, a lava channel, a doorway."""
+        if cell in self.pathcells or cell in self.headroom \
+                or cell in self.ground:
+            return
+        self.carved.add(cell)
+        self.solid.discard(cell)
+        self.struct[cell] = "air"
+        self.writes.append((cell, "air"))
+        self._rock.pop(cell, None)
+
+    def _commit(self, prev: dict, node: dict, got: dict) -> dict:
+        cx, cy, cz = got["cell"]
+        theme = self.cone.theme_at(cy + 1, cx, cz)
+        blk = self._block(cx, cy, cz, style=node["style"], form=got["form"],
+                          step=got["step"],
+                          segment=node.get("label") or self.segment,
+                          theme=theme.name, lift=node["lift"])
+        prev["out"] = got["step"]
+        prev["move"] = got["move"]
+        # A move belongs to the block it *leaves*, so the emergency answer's
+        # label has to be written back one block.
+        prev["unchecked"] = node.get("label") == "stuck"
+        # The run *across* prev as well as the jump off it. Both are only known
+        # now -- which edge the feet leave from is decided by where the course
+        # goes next -- and both are corridors terrain must not be painted into.
+        run = self.land_point(prev), self.takeoff_point(prev)
+        walk = [tuple(run[0][i] + (run[1][i] - run[0][i]) * f
+                      for i in range(3)) for f in (0.0, 0.25, 0.5, 0.75, 1.0)]
+        prev["path"] = tuple({
+            c for x, y, z in list(got["move"].points(ARC_SAMPLES)) + walk
+            for c in body_cells(x, y, z)})
+        self.pathcells.update(prev["path"])
+        last = got["move"].legs[-1]
+        blk["impact"] = (abs(last["vy0"] - GRAVITY * last["dur"])
+                         if last["kind"] == "arc" else 0.0)
+        for cell, style in got["soft"]:
+            self._place_soft(blk, cell, style)
+        blk["pedestal"] = got["pedestal"]
+        blk["footing"] = got["footing"]
+        for cell in got["pedestal"]:
+            self.write(cell, node["pedestal_style"] or node["style"])
+        self.blocks.append(blk)
+        self.headroom.update(
+            (x, y + h, z)
+            for x, y, z in footprint(cx, cy, cz, got["form"]) or ((cx, cy, cz),)
+            for h in range(1, HEADROOM + 1))
+        self.solid.update(cells_of(blk))
+        self.ground.update((x, y - 1, z) for x, y, z in
+                           footprint(cx, cy, cz, got["form"])
+                           or ((cx, cy, cz),))
+        self.ground.update(got["pedestal"])
+        self.ground.update(got["footing"])
+        if node["moat"]:
+            self._moat(blk, theme, node)
+        if got["form"] != "floor":
+            for cell in footprint(cx, cy, cz, got["form"]):
+                self.struct.setdefault(cell, node["style"])
+        if node["deco"]:
+            self._decorate(blk, node, theme, got["move"])
+        if node["orbs"]:
+            self._hang_orbs(prev, blk, node["orbs"])
+        return blk
+
+    def _place_soft(self, blk: dict, cell, style: str) -> None:
+        """Ladders, vines, water and webs: drawn, never solid, owned by the
+        landing they belong to, and gone when it falls off the back."""
+        self.softcells.add(cell)
+        self.solid.discard(cell)
+        blk["soft"].append({"dx": cell[0] - blk["x"], "dy": cell[1] - blk["y"],
+                            "dz": cell[2] - blk["z"], "style": style})
+
+    def _decorate(self, blk: dict, node: dict, theme: Theme,
+                  move: Move) -> None:
+        """The trim on a landing: a lantern, a lintel, a rail, a post."""
+        kind = node["deco"]
+        fx, fz = quantise(*(blk["out"] or blk["step"]))
+        if kind == "lamp":
+            blk["deco"].append(deco(0.0, 1.0, 0.0, 0.62, 0.62, 0.62,
+                                    theme.glow, glow=True))
+        elif kind == "lintel":
+            # A beam over the arc, forcing the jump flat. Its height comes from
+            # the arc it spans rather than from a number: a beam a fixed
+            # distance over the *landing* is either scenery or a wall.
+            apex = max(p[1] for p in move.points(9))
+            dy = apex - blk["y"] + 0.35
+            if dy < 3.6:
+                blk["deco"].append(deco(-fx * 1.5, dy, -fz * 1.5,
+                                        1.0, 1.0, 1.0, theme.rock))
+        elif kind == "post":
+            blk["deco"].append(deco(0.0, 1.0, 0.0, 0.22, 1.0, 0.22,
+                                    theme.accent))
+
+    def _hang_orbs(self, prev: dict, blk: dict, count: int) -> None:
+        """Strung *on* the path that is about to be flown, at chest height,
+        which makes "every orb laid down is collected" a property of
+        generation rather than a hope about the simulation."""
+        move = prev["move"]
+        if move is None:
+            return
+        spread = ORB_FRACTIONS.get(count)
+        if spread is None:
+            return
+        for f in spread:
+            x, y, z = move.at(move.dur * f)
+            blk["orbs"].append({"x": x, "y": y + CHEST, "z": z, "taken": False})
+
+    def advance(self, index: int) -> int:
+        """Drop what is behind the body. Returns how many landings went.
+
+        Cells are released here and nowhere else. This course comes back over
+        itself every revolution, so an occupancy map that only grew would
+        refuse the tower after two turns of it.
+        """
+        if index <= TRAIL:
+            return 0
+        drop = index - TRAIL
+        for blk in self.blocks[:drop]:
+            self.orbs_missed += sum(1 for o in blk["orbs"] if not o["taken"])
+            for cell in cells_of(blk):
+                self.solid.discard(cell)
+            for cell in blk["pedestal"] + blk.get("footing", ()):
+                self.solid.discard(cell)
+                self.ground.discard(cell)
+            for x, y, z in footprint(blk["x"], blk["y"], blk["z"],
+                                     blk["form"]) or ((blk["x"], blk["y"],
+                                                       blk["z"]),):
+                self.ground.discard((x, y - 1, z))
+            for s in blk["soft"]:
+                self.softcells.discard((blk["x"] + s["dx"], blk["y"] + s["dy"],
+                                        blk["z"] + s["dz"]))
+            for x, y, z in footprint(blk["x"], blk["y"], blk["z"],
+                                     blk["form"]) or ((blk["x"], blk["y"],
+                                                       blk["z"]),):
+                for h in range(1, HEADROOM + 1):
+                    self.headroom.discard((x, y + h, z))
+            self.pathcells.difference_update(blk["path"])
+        self.blocks = self.blocks[drop:]
+        if len(self._rock) > 90000:
+            floor = self.blocks[0]["y"] - BUILD_BELOW
+            self._rock = {c: v for c, v in self._rock.items() if c[1] >= floor}
+        return drop
+
+    # -- features ----------------------------------------------------------
+
+    def _node(self, style: str, arc: float = 3.0, lift: int = 1,
+              radial: float = 0.0, kind: str = "hop", form: str = "full",
+              deco: str | None = None, orbs: int = 0, pedestal: bool = True,
+              pedestal_style: str | None = None, climb_style: str = "ladder",
+              spread: int = 2, moat: bool = False,
+              label: str | None = None) -> dict:
+        """One entry in a feature's expansion.
+
+        ``lift`` is the height of the landing's walking surface above the
+        trough's own ground, and it is the coordinate this whole format is
+        expressed in. Saying "three blocks up" rather than "three blocks above
+        the last landing" is what keeps the course glued to a helix that is
+        itself climbing: the terrace does the climbing, and a feature only says
+        how far off the floor it stands.
+
+        ``spread`` is how many neighbouring lifts placement may fall back
+        through. Two is generous and right for a free hop; a staircase wants
+        zero, because a stair whose steps are sometimes two blocks apart is not
+        a staircase.
+        """
+        arc *= 1.0 + GAP_RAMP * self.difficulty
+        top = 0 if form == "floor" else LIFT_MAX
+        low = 0 if form == "floor" else 1
+        lift = min(max(lift, low), top)
+        lifts = [lift]
+        for d in range(1, spread + 1):
+            for cand in (lift - d, lift + d):
+                if low <= cand <= top:
+                    lifts.append(cand)
+        return {"style": style, "arc": arc, "lift": lift, "lifts": lifts,
+                "radial": radial, "kind": kind, "form": form, "deco": deco,
+                "orbs": orbs, "pedestal": pedestal,
+                "pedestal_style": pedestal_style, "climb_style": climb_style,
+                #: Dig the ground away round this landing and fill it with the
+                #: theme's liquid. A pond you cross on stepping stones is the
+                #: reference's signature overworld beat and it cannot be a
+                #: decoration -- the water has to be *under* the jump.
+                "moat": moat, "label": label}
+
+    def _gap(self, easy, hard) -> float:
+        """A feature's gap, ramped between two of its own tables.
+
+        Two tables per feature rather than one shared pair, because "harder"
+        does not mean the same thing for all of them: a staircase with a
+        four-block gap is not a staircase. Both lean short on purpose -- a
+        course of nothing but its longest jump reads as a stunt reel rather
+        than as running.
+        """
+        table = hard if self.rng.random() < self.difficulty else easy
+        return table[self.rng.randrange(len(table))]
+
+    def _plan_feature(self) -> None:
+        section = self.cone.section_at(self.u)
+        theme = section.theme
+        weights = {}
+        for name, base in FEATURES.items():
+            if name in theme.features:
+                weights[name] = base * theme.features[name]
+            elif name in THEMED:
+                continue                # a verb only one theme owns
+            elif name == self.segment:
+                weights[name] = base * 0.15     # never twice running
+            else:
+                weights[name] = base
+        name = _pick(self.rng, weights)
+        self.segment = name
+        self._pending = getattr(self, f"_feat_{name}")(self.rng, theme)
+
+    # -- painting the place ------------------------------------------------
+
+    def _paint_behind(self) -> None:
+        """Dress every section the *generator* has finished crossing.
+
+        Never the one it is still in. Terrain painted ahead of the course is
+        terrain the course then has to negotiate with, which is the whole
+        failure mode this file was written the other way round to avoid; and
+        because generation runs sixteen landings ahead of the body, a section
+        the frontier has left is still a long way in front of the camera.
+        """
+        here = self.cone.section_at(self.u).index
+        while self._painted < here - 1:
+            self._painted += 1
+            if self._painted >= 0:
+                self._paint(self.cone.sections[self._painted])
+
+    def _paint(self, section: Section) -> None:
+        rng = self.rng
+        theme = section.theme
+        cone = self.cone
+        span = section.u1 - section.u0
+        if span <= 0:
+            return
+        steps = max(6, int(span * cone.outer_at(section.u0) * 1.6))
+        pool_at = rng.uniform(0.2, 0.8) if theme.liquid else -1.0
+        budget = PROP_BUDGET
+        for i in range(steps):
+            f = i / steps
+            u = section.u0 + span * f
+            yf = cone.floor_at(u)
+            out = cone.outer_at(u)
+            th = u * cone.wind
+            ct, st = math.cos(th), math.sin(th)
+            for _ in range(4):
+                r = out - BAND * rng.uniform(0.12, 0.92)
+                x, z = iround(ct * r), iround(st * r)
+                cell = (x, yf, z)
+                if not self._dressable(cell):
+                    continue
+                if theme.liquid and abs(f - pool_at) < 0.06 \
+                        and rng.random() < 0.6:
+                    self._pool(theme, x, yf, z)
+                    break
+                if theme.dark > 0.35 and rng.random() < 0.10:
+                    # A dark section has to light itself, and a lamp on the
+                    # floor of a trough thirteen blocks deep is the only thing
+                    # that reaches the walls.
+                    self.write((x, yf, z), theme.glow)
+                    cone.lamps.append((x, yf, z))
+                    break
+                if budget > 0 and theme.props and rng.random() < 0.5:
+                    budget -= 1
+                    kind = theme.props[rng.randrange(len(theme.props))]
+                    at = (x, yf, z)
+                    if kind in HANGING:
+                        # It hangs from its own origin, so it belongs under the
+                        # ceiling and not on the floor. Dropped on the floor it
+                        # is simply buried, which is the sort of thing that
+                        # costs an hour to notice from a contact sheet.
+                        at = (x, yf + TURN_RISE - FLOOR_T, z)
+                        if self.blocked(at) or not self.blocked(
+                                (x, at[1] + 1, z)):
+                            break
+                    cone.props.append((at, kind, rng.uniform(0, 6.283)))
+                    break
+                if rng.random() < 0.22:
+                    # A one- or two-block outcrop of the theme's own rock:
+                    # what stops a terrace reading as a painted plate.
+                    for h in range(rng.randint(1, 2)):
+                        if self._dressable((x, yf + h, z)):
+                            self.write((x, yf + h, z), theme.rock)
+                    break
+
+    def _dressable(self, cell, margin: int = 1) -> bool:
+        """Is this a cell dressing may be put in, or dug out of?
+
+        ``margin`` widens the test around the running line, and it is not
+        optional. ``pathcells`` is exactly body-width, so a cell merely
+        *adjacent* to a jump is free by that test -- and a block face half a
+        metre from an eighty-degree lens is most of the frame. Measured without
+        it: a fifth of a contact sheet was solid green, which reads as the
+        camera being inside the world and is really the camera standing beside
+        a boulder nobody meant to put there.
+        """
+        if (cell in self.headroom or cell in self.ground
+                or cell in self.softcells or cell in self.struct):
+            return False
+        x, y, z = cell
+        for dx in range(-margin, margin + 1):
+            for dz in range(-margin, margin + 1):
+                for dy in (0, 1):
+                    if (x + dx, y + dy, z + dz) in self.pathcells:
                         return False
         return True
 
-    def _lane_alts(self, pad: Pad, lane, ranked) -> list:
-        """Other ground a crossing could land on: further along the lane, and
-        a cell either side of it.
+    def _pool(self, theme: Theme, cx: int, cy: int, cz: int) -> None:
+        """A pond, or a lava pool: dug one cell into the ground and filled.
 
-        The lane is one cell wide and a platform is eleven to fifteen, so
-        insisting on the middle of it turns any single obstruction -- a column
-        driven down from the platform above, most often -- into a node nothing
-        can place. A step to one side is the same ground, and it stops a
-        crossing reading as a painted line.
+        Dug rather than drawn, so it is genuinely a hole -- the reference's
+        desert terrace has a pond you cross, and a blue square painted on sand
+        is not one.
         """
+        rad = self.rng.randint(2, 3)
+        for dx in range(-rad, rad + 1):
+            for dz in range(-rad, rad + 1):
+                if dx * dx + dz * dz > rad * rad:
+                    continue
+                cell = (cx + dx, cy - 1, cz + dz)
+                if not self._dressable(cell) or not self.blocked(cell):
+                    continue
+                if not self.blocked((cx + dx, cy - 2, cz + dz)):
+                    continue            # over the rim: it would drain away
+                self.carve(cell)
+                self.write(cell, theme.liquid)
+
+    def _moat(self, blk: dict, theme: Theme, node: dict) -> None:
+        """Dig the ground away round a landing and fill it with the theme's
+        liquid, so the jump onto it is a jump over water or lava rather than
+        over a coloured patch of floor."""
+        liquid = node["pedestal_style"] or theme.liquid
+        if not liquid:
+            return
+        gy = self.floor_at_cell(self.u_of(blk), blk["x"], blk["z"]) - 1
+        rad = 3
+        for dx in range(-rad, rad + 1):
+            for dz in range(-rad, rad + 1):
+                if dx * dx + dz * dz > rad * rad:
+                    continue
+                cell = (blk["x"] + dx, gy, blk["z"] + dz)
+                if not self._dressable(cell) or not self.blocked(cell):
+                    continue
+                if not self.blocked((cell[0], gy - 1, cell[2])):
+                    continue
+                self.carve(cell)
+                self.write(cell, liquid)
+
+    # -- the shared grammar ------------------------------------------------
+
+    def _feat_hump(self, rng, theme) -> list[dict]:
+        """The bread and butter: two or three raised bits of the theme's own
+        rock, jumped between. Every landing is the top of something that goes
+        down to the ground, which is the whole difference between this format
+        and floating-block parkour."""
         out = []
-        for r in ranked[1:6]:
-            out.append(lane[r[-1]])
-        fx, fz = _toward(lane[0], lane[-1])
-        rx, rz = -fz, fx
-        for r in ranked[:4]:
-            cell = lane[r[-1]]
-            for side in (1, -1):
-                aside = (cell[0] + rx * side, cell[1], cell[2] + rz * side)
-                if aside in self.solid and aside not in out:
-                    out.append(aside)
+        for _ in range(rng.randint(2, 3)):
+            out.append(self._node(theme.rock, arc=self._gap((2.8, 3.2, 3.6),
+                                                            (3.2, 3.8, 4.4)),
+                                  lift=rng.randint(2, 4),
+                                  radial=rng.uniform(-2.0, 2.0),
+                                  orbs=1 if rng.random() < 0.5 else 0))
         return out
 
-    # -- the bridge between two platforms -----------------------------------
+    def _feat_stairs(self, rng, theme) -> list[dict]:
+        """A flight cut into the bank: short hops, each exactly one higher.
+        ``spread`` is zero on purpose -- a staircase whose steps are sometimes
+        two blocks apart is not a staircase."""
+        lift = rng.randint(1, 2)
+        out = []
+        for i in range(rng.randint(3, 4)):
+            out.append(self._node(theme.rock, arc=2.7, lift=lift + i,
+                                  radial=rng.uniform(-0.6, 0.6), spread=0,
+                                  form="stair"))
+        return out
 
-    def _bridge_node(self, style: str, theme: Theme, i: int, cell,
-                     rng) -> dict:
-        """One stepping stone, dressed according to the bridge's style.
+    def _feat_corner(self, rng, theme) -> list[dict]:
+        """The around-the-block jump, which the reference playthroughs name as
+        the hardest recurring type in these maps: out toward the drop and then
+        hard back in, so the second take-off is at right angles to the first."""
+        swing = rng.choice((1.0, -1.0)) * rng.uniform(3.0, 4.5)
+        lift = rng.randint(1, 3)
+        return [self._node(theme.rock, arc=3.4, lift=lift, radial=swing,
+                           orbs=1),
+                self._node(theme.rock, arc=3.4, lift=lift + rng.randint(0, 1),
+                           radial=-swing * rng.uniform(0.9, 1.3))]
 
-        The geometry is already decided by the time this is called -- where the
-        two platforms are is the only sensible place for a bridge -- so what a
-        style chooses is character: what holds the stone up, what hangs over it,
-        what it is made of. That separation is why there are nine of them and
-        an argument with placement in none of them.
+    def _feat_slabline(self, rng, theme) -> list[dict]:
+        """Half-height landings. Half a block is under the resolution of the
+        lattice, so a slab is the one way this format gets a step that is not a
+        whole block."""
+        return [self._node(theme.accent, arc=self._gap((2.8, 3.2), (3.2, 3.8)),
+                           lift=rng.randint(1, 3), form="slab",
+                           radial=rng.uniform(-1.5, 1.5))
+                for _ in range(rng.randint(2, 3))]
+
+    def _feat_headhitter(self, rng, theme) -> list[dict]:
+        """A beam over the arc, so the jump has to stay flat. The beam's height
+        is taken from the arc it spans rather than from a number -- see
+        :meth:`_decorate`, where getting that wrong put a lintel exactly where
+        the head would be."""
+        return [self._node(theme.rock, arc=3.2, lift=rng.randint(1, 2),
+                           deco="lintel", spread=1),
+                self._node(theme.rock, arc=3.4, lift=rng.randint(1, 3))]
+
+    def _feat_voidgap(self, rng, theme) -> list[dict]:
+        """One long jump out over the drop, bought with a drop of its own.
+
+        The furthest a body can reach is fixed by one jump impulse and one
+        horizontal speed -- about 4.3 m level. Reaching further is only
+        available by *descending*, because falling takes longer and the body
+        does not slow down while it does. So this feature steps down, exactly
+        as a player clears a gap they cannot make level.
         """
-        common = dict(cell=cell, label=style,
-                      orbs=1 if rng.random() < 0.5 else 0)
-        candy = CANDY[i % len(CANDY)]
-        if style == "pillars":
-            return self._node(style=candy, support=rng.randint(6, 14),
-                              support_style=theme.wall, **common)
-        if style == "lanterns":
-            return self._node(style=theme.glow if i % 2 else candy,
-                              deco="lantern" if i % 2 else None, **common)
-        if style == "beams":
-            return self._node(style=theme.accent, deco="beam", **common)
-        if style == "arches":
-            # A viaduct: piers under every other stone, and a rail along the
-            # whole of it. Deliberately *not* the head-hitting lintel the ring
-            # version hangs over a jump, and this is the one place where the
-            # shape of the format forbids a set-piece outright. A bridge here
-            # climbs a block a stone in a straight line, and a lintel is hung
-            # at a fixed height above the arc it spans -- so a beam that the
-            # hop it belongs to passes cleanly under is sitting exactly where
-            # the body's head will be three stones later. Measured: arches were
-            # 12.6% of their own nodes stuck against 2.3% without the lintel,
-            # five times every other style in the table.
-            return self._node(style=candy, deco="rail",
-                              support=rng.randint(4, 10) if i % 2 else 0,
-                              support_style=theme.wall, **common)
-        if style == "ice":
-            return self._node(style="packedice", form="ice", **common)
-        if style == "slime":
-            if i % 3 == 2:
-                return self._node(style="slime", form="slime", **common)
-            return self._node(style=candy, **common)
-        if style == "ladder" and i == 2:
-            return self._node(style=theme.accent, kind="climb",
-                              support=rng.randint(6, 10),
-                              support_style=theme.wall, deco="lantern",
-                              orbs=2, cell=(cell[0], cell[1] + rng.randint(3, 5),
-                                            cell[2]), label=style)
-        if style == "webs" and i % 4 == 3:
-            return self._node(style=theme.trim, kind="web", **common)
-        # No half-height landings out here, and this is arithmetic rather than
-        # taste. A slab's walking surface is half a block above its own cell,
-        # so a body standing on one is off the lattice every later step is
-        # planned against: the ordinary climb of one cell becomes a rise of
-        # 1.5, and ``hop_span``'s discriminant has no solution at 1.5 -- here
-        # or in the game. Measured, that alone was a quarter of what was left
-        # unchecked. Slabs belong where the course is not obliged to climb.
-        return self._node(style=candy,
-                          deco="rail" if rng.random() < 0.15 else None,
-                          **common)
+        drop = rng.randint(1, 3)
+        return [self._node(theme.rock, arc=rng.uniform(3.4, 4.0),
+                           lift=min(LIFT_MAX, 2 + drop),
+                           radial=rng.uniform(1.0, 2.5), orbs=1),
+                self._node(theme.rock, arc=self._gap((4.2, 4.6), (4.6, 5.4)),
+                           lift=max(1, 2 + drop - drop), radial=-1.0, orbs=3)]
 
-    # -- placement ----------------------------------------------------------
+    def _feat_pillars(self, rng, theme) -> list[dict]:
+        """Three narrow columns, tight together and tall. The one shape in the
+        shared grammar that is genuinely vertical."""
+        lift = rng.randint(3, 5)
+        return [self._node(theme.rock, arc=2.9, lift=lift + rng.randint(-1, 1),
+                           radial=rng.uniform(-1.8, 1.8), spread=1,
+                           pedestal_style=theme.sub)
+                for _ in range(3)]
 
-    def _node(self, style: str, cell, gap: int = 2, rise: int = 0,
-              kind: str = "hop", form: str = "full", deco: str | None = None,
-              orbs: int = 0, support: int = 0, support_style: str | None = None,
-              spread: int = 1, label: str | None = None) -> dict:
-        """One entry in a plan. Aimed at a *cell*, which is the whole
-        difference from the ring version: the spiral knows where everything is,
-        so nothing has to be searched for."""
-        return {"style": style, "cell": cell, "gap": gap, "rise": rise,
-                "rises": [rise], "kind": kind, "form": form, "radial": 0.0,
-                "deco": deco, "orbs": orbs, "support": support,
-                "support_style": support_style, "to_y": None, "radius": None,
-                "angle": None, "label": label, "spread": spread}
+    def _feat_spire(self, rng, theme) -> list[dict]:
+        """A climb onto something tall, in two hops because one cannot rise
+        two blocks -- here or in the game."""
+        top = rng.randint(4, LIFT_MAX)
+        return [self._node(theme.rock, arc=3.4, lift=top - 2, spread=1),
+                self._node(theme.accent, arc=3.4, lift=top - 1, spread=1),
+                self._node(theme.accent, arc=3.2, lift=top, spread=1,
+                           deco="lamp" if theme.dark > 0.4 else None)]
 
-    def _try(self, prev: dict, node: dict):
-        """The wanted cell, then its neighbours, then a shorter reach.
+    def _feat_flat(self, rng, theme) -> list[dict]:
+        """A beat of running on the terrace's own ground. Rare on purpose: it
+        is the rest between two phrases, and a course made of it is the "walk a
+        bit, jump, jump, walk a bit" this format was rebuilt to stop being."""
+        # The walk leg goes *between* two ground landings and not onto the
+        # first of them: a walk is capped at 2.4 m and half a block of rise, so
+        # a walk node arriving from a landing three blocks up is a walk that
+        # never once succeeds. Measured at 0.3% of moves before this order.
+        out = [self._node(theme.ground, arc=rng.uniform(2.4, 3.0), lift=0,
+                          form="floor", radial=rng.uniform(-2.0, 2.0))]
+        for _ in range(rng.randint(1, 2)):
+            out.append(self._node(theme.ground, arc=rng.uniform(1.5, 2.0),
+                                  lift=0, form="floor", kind="walk",
+                                  radial=rng.uniform(-1.2, 1.2)))
+        return out
 
-        Far less machinery than the ring version needed, and that is the point
-        of scheduling rather than rolling: the answer is nearly always the
-        first cell tried, because the spiral chose it knowing where everything
-        else is.
+    # -- water, lava and the things you cross them on ----------------------
+
+    def _feat_pond(self, rng, theme) -> list[dict]:
+        """Stepping stones across a pond dug into the terrace.
+
+        ``moat`` is what makes it a pond: the ground round each stone is dug
+        out and filled, so the jump is genuinely over water. A blue patch
+        painted on the floor is not a pond and does not read as one.
         """
-        alts = node.get("alts") or ()
-        for cell in _near(node["cell"], node["spread"]):
-            got = self._attempt(prev, node, cell)
-            if got is not None:
-                return got
-        # The plan's runners-up, before anything is relaxed. A second cell the
-        # plan itself vouched for beats the first cell with a rule switched
-        # off, every time.
-        for cell in alts:
-            got = self._attempt(prev, node, cell)
-            if got is not None:
-                return got
-        # Then the same stone with its costume off. A web, a ladder or a bounce
-        # is chosen by the *style* after the plan has already picked a cell for
-        # an ordinary hop, and each of those has its own physics -- a web is
-        # only crossable between 1.4 and 3.6 m, a ladder wants a post it can
-        # hang on. When the costume is what fails, an ordinary stone in the
-        # same place is a better answer than an unchecked one somewhere else.
-        if node["kind"] != "hop" or node["form"] != "full":
-            plain = dict(node, form="full", kind="hop", deco=None, support=0,
-                         support_style=None)
-            for cell in (node["cell"],) + tuple(alts):
-                got = self._attempt(prev, plain, cell)
-                if got is not None:
-                    return got
-        for cell in _near(node["cell"], node["spread"]):
-            got = self._attempt(prev, node, cell, strict=False)
-            if got is not None:
-                return got
-        for cell in alts:
-            got = self._attempt(prev, node, cell, strict=False)
-            if got is not None:
-                return got
-        # Still nothing: take the same step at whatever height fits, which for
-        # a bridge stone is a stone one lower and for a landing is the next cell
-        # of the platform along.
-        loose = dict(node, form="full", kind="hop", deco=None, support=0)
-        for dy in (-1, 1, -2, 2):
-            for cell in _near((node["cell"][0], node["cell"][1] + dy,
-                               node["cell"][2]), 2):
-                got = self._attempt(prev, loose, cell, strict=False)
-                if got is not None:
-                    return got
-        return None
+        return [self._node(theme.rock, arc=self._gap((2.8, 3.2), (3.2, 3.8)),
+                           lift=1, radial=rng.uniform(-1.5, 1.5), moat=True,
+                           orbs=1)
+                for _ in range(rng.randint(2, 4))]
 
-    def _attempt(self, prev: dict, node: dict, cell, strict: bool = True,
-                 loose: bool = False):
-        """Everything the ring version checks, plus: not in a flight already
-        promised.
+    def _feat_channel(self, rng, theme) -> list[dict]:
+        """One irrigation channel, jumped in one go."""
+        return [self._node(theme.rock, arc=3.4, lift=1, moat=True),
+                self._node(theme.rock, arc=self._gap((3.8, 4.2), (4.2, 4.8)),
+                           lift=1, orbs=2)]
 
-        ``pathcells`` is the corridor a solved move flies through, and the ring
-        version consults it only when the *building* wants to grow -- a course
-        that keeps moving forward is never going to lay a block where it has
-        already agreed to fly. This one does, every time it climbs: the flight
-        of steps beside a rim comes back over the same three cells a block
-        higher each time, so the stone three ahead is built in the arc that
-        reaches the stone one ahead. The arc was checked when it was solved and
-        the stone did not exist yet; nothing later asks.
+    def _feat_lavaleap(self, rng, theme) -> list[dict]:
+        """The nether's pond: the same shape, and it reads completely
+        differently because of what is under it."""
+        return [self._node(theme.accent, arc=self._gap((3.0, 3.4), (3.4, 4.2)),
+                           lift=rng.randint(1, 2),
+                           radial=rng.uniform(-2.0, 2.0), moat=True,
+                           pedestal_style=theme.liquid, orbs=1)
+                for _ in range(rng.randint(2, 3))]
 
-        Measured before this check: the body was inside a course block on 3.2%
-        of frames, and every single one of them was a block two, three or four
-        ahead of the one it was standing on.
+    # -- the verbs ---------------------------------------------------------
+
+    def _feat_iceline(self, rng, theme) -> list[dict]:
+        """Packed ice: the body carries its speed off the end of it.
+
+        What ice buys is *carried momentum*, not a longer arc -- the flight
+        time of a jump is fixed by its height -- so the jumps *off* ice are the
+        long ones and the run onto it is ordinary.
         """
-        if node["form"] != "floor" and any(
-                c in self.pathcells for c in _footprint(*cell, node["form"])):
-            return None
-        return super()._attempt(prev, node, cell, strict=strict, loose=loose)
+        out = [self._node("packedice", arc=3.4, lift=rng.randint(1, 2))]
+        for _ in range(rng.randint(1, 2)):
+            out.append(self._node("packedice", arc=rng.uniform(3.6, 4.4),
+                                  lift=rng.randint(1, 2), kind="slide",
+                                  orbs=2))
+        out.append(self._node(theme.rock, arc=rng.uniform(4.0, 5.0),
+                              lift=rng.randint(1, 3), kind="slide", orbs=3))
+        return out
 
-    def _targets(self, prev: dict, node: dict, rise: int):
-        return [node["cell"]]
+    def _feat_soulwalk(self, rng, theme) -> list[dict]:
+        """Soul sand: two fifths of walking pace, and the slowest ground in the
+        scene. Everything either side of it reads faster for it."""
+        return [self._node("soulsand", arc=2.9, lift=rng.randint(1, 2),
+                           radial=rng.uniform(-1.2, 1.2))
+                for _ in range(rng.randint(2, 3))]
 
-    def _clear_of_gallery(self, cx: int, cy: int, cz: int) -> bool:
-        return True
+    def _feat_webwalk(self, rng, theme) -> list[dict]:
+        """A clump of cobweb, waded through. Vanilla divides horizontal
+        movement by four, which is three seconds for two metres; the kernel
+        leaves the game behind here and says so, because the strip is on screen
+        for fifteen seconds and cannot spend a fifth of it in one web."""
+        out = [self._node(theme.rock, arc=2.9, lift=rng.randint(1, 2))]
+        for _ in range(rng.randint(1, 2)):
+            out.append(self._node(theme.rock, arc=3.4, lift=rng.randint(1, 2),
+                                  kind="web"))
+        out.append(self._node(theme.rock, arc=3.2, lift=rng.randint(1, 3)))
+        return out
 
-    def _emergency(self, prev: dict, node: dict):
-        """The one unchecked answer. Aimed at the cell that was wanted, at
-        whatever height there is room at.
+    def _feat_ladderrun(self, rng, theme) -> list[dict]:
+        """A ladder up the side of something. The trade a ladder makes is time
+        for height, and one that climbs at running pace is a lift."""
+        out = [self._node(theme.rock, arc=2.7, lift=1, spread=1)]
+        for _ in range(rng.randint(1, 2)):
+            out.append(self._node(theme.rock, arc=2.5,
+                                  lift=rng.randint(4, LIFT_MAX), kind="climb",
+                                  climb_style="ladder", spread=1,
+                                  pedestal_style=theme.sub, orbs=1))
+            out.append(self._node(theme.rock, arc=3.2, lift=1, spread=1))
+        out.append(self._node(theme.rock, arc=3.4, lift=rng.randint(2, 4)))
+        return out
 
-        Reached far less often than the ring version's, because there is no
-        searching to fail: the spiral says where the next landing is and the
-        platform under it already exists.
+    def _feat_vineclimb(self, rng, theme) -> list[dict]:
+        """The jungle's ladder. Same physics, and the reference playthroughs
+        are unanimous that vines are the part everyone remembers."""
+        return [self._node(theme.rock, arc=2.7, lift=1, spread=1),
+                self._node("junglelog", arc=2.5,
+                           lift=rng.randint(4, LIFT_MAX), kind="climb",
+                           climb_style="vine", spread=1,
+                           pedestal_style="junglelog", orbs=1),
+                self._node(theme.rock, arc=3.4, lift=rng.randint(2, 4))]
+
+    def _feat_bubblelift(self, rng, theme) -> list[dict]:
+        """A soul-sand bubble column: eleven blocks a second, twice sprinting,
+        and by a distance the fastest way up anything in the game. Not a number
+        worth softening -- arriving six blocks higher in half a second is the
+        whole reason a map builds one."""
+        return [self._node(theme.rock, arc=2.7, lift=1, spread=1),
+                self._node(theme.accent, arc=2.5,
+                           lift=rng.randint(4, LIFT_MAX), kind="bubble",
+                           spread=1, pedestal_style=theme.sub, orbs=2),
+                self._node(theme.rock, arc=3.4, lift=rng.randint(2, 4))]
+
+    def _feat_slimebounce(self, rng, theme) -> list[dict]:
+        """Fall onto slime, come back up somewhere else.
+
+        Vanilla's restitution is exactly 1.0 and holding jump *cancels* a
+        bounce, so slime is **not** a way to gain height: a bounce can never
+        reach past the fall that fed it. What it is for is spending a drop
+        somewhere else, which is what the drop below sets up.
         """
-        for dy in (0, 1, -1, 2, -2, -4):
-            for cell in _near((node["cell"][0], node["cell"][1] + dy,
-                               node["cell"][2]), 2):
-                cells = _footprint(*cell, "full")
-                if not self._free(cells):
-                    continue
-                if not self._free((x, y + h, z) for x, y, z in cells
-                                  for h in range(1, HEADROOM + 1)):
-                    continue
-                step = (cell[0] - prev["x"], cell[2] - prev["z"])
-                if step == (0, 0):
-                    continue
-                frm = takeoff_point(prev["x"], self.surface(prev), prev["z"],
-                                    prev["form"], step)
-                to = land_point(cell[0], cell[1] + 1.0, cell[2], "full", step)
-                return {"cell": cell, "step": step, "form": "full",
-                        "move": hop_move(frm, to), "soft": (), "support": ()}
-        cell = (prev["x"], prev["y"] + 1, prev["z"] + 1)
-        step = (0, 1)
-        frm = takeoff_point(prev["x"], self.surface(prev), prev["z"],
-                            prev["form"], step)
-        to = land_point(cell[0], cell[1] + 1.0, cell[2], "full", step)
-        return {"cell": cell, "step": step, "form": "full",
-                "move": hop_move(frm, to), "soft": (), "support": ()}
+        high = rng.randint(4, LIFT_MAX)
+        return [self._node(theme.accent, arc=3.4, lift=high, spread=1),
+                self._node("slime", arc=rng.uniform(3.0, 3.8), lift=1,
+                           pedestal_style=theme.sub),
+                self._node(theme.rock, arc=rng.uniform(3.0, 4.0),
+                           lift=rng.randint(2, high - 1), kind="bounce",
+                           orbs=3)]
+
+    # -- places ------------------------------------------------------------
+
+    def _feat_haystack(self, rng, theme) -> list[dict]:
+        """Hay bales, stacked. The farm's staircase."""
+        return [self._node("hay", arc=2.7, lift=1 + i, spread=0,
+                           pedestal_style="hay")
+                for i in range(rng.randint(2, 3))]
+
+    def _feat_rooftop(self, rng, theme) -> list[dict]:
+        """Two cottages, jumped roof to roof. ``wide`` because a roof you land
+        on the corner of is a chimney."""
+        lift = rng.randint(4, 5)
+        return [self._node("roof", arc=self._gap((3.2, 3.6), (3.6, 4.4)),
+                           lift=lift + rng.randint(-1, 0), form="wide",
+                           pedestal_style="plaster",
+                           radial=rng.uniform(-2.0, 2.0), orbs=1)
+                for _ in range(2)]
+
+    def _feat_doorway(self, rng, theme) -> list[dict]:
+        """Through a house rather than over it: a lintel at head height and a
+        landing the far side."""
+        return [self._node("plaster", arc=3.4, lift=1, deco="lintel",
+                           pedestal_style="plaster", spread=1),
+                self._node("brick", arc=3.4, lift=rng.randint(1, 2))]
+
+    def _feat_capstep(self, rng, theme) -> list[dict]:
+        """Giant mushroom caps: a wide flat top on a thin stem, which is the
+        one silhouette in the game that is genuinely a platform."""
+        cap = "mushroomred" if theme.name == "mushroom" else theme.accent
+        stem = "mushroomstem" if theme.name == "mushroom" else theme.sub
+        return [self._node(cap, arc=self._gap((3.0, 3.4), (3.4, 4.2)),
+                           lift=rng.randint(3, 5), form="wide",
+                           pedestal_style=stem,
+                           radial=rng.uniform(-2.0, 2.0), orbs=1)
+                for _ in range(rng.randint(2, 3))]
+
+    def _feat_canopy(self, rng, theme) -> list[dict]:
+        """Leaf platforms on log trunks."""
+        return [self._node("jungleleaf", arc=self._gap((3.0, 3.6), (3.6, 4.2)),
+                           lift=rng.randint(4, LIFT_MAX), form="wide",
+                           pedestal_style="junglelog",
+                           radial=rng.uniform(-2.5, 2.5), orbs=2)
+                for _ in range(2)]
+
+    def _feat_logstep(self, rng, theme) -> list[dict]:
+        """Fallen logs across the floor."""
+        return [self._node("junglelog", arc=3.4, lift=rng.randint(1, 2),
+                           radial=rng.uniform(-2.0, 2.0),
+                           pedestal_style="podzol")
+                for _ in range(rng.randint(2, 3))]
+
+    def _feat_endpillar(self, rng, theme) -> list[dict]:
+        """Obsidian columns capped in purpur, with a rod on top. The End's
+        whole visual grammar is vertical."""
+        return [self._node("purpur", arc=self._gap((3.0, 3.4), (3.4, 4.2)),
+                           lift=rng.randint(4, LIFT_MAX), spread=1,
+                           pedestal_style="obsidian", deco="post", orbs=1)
+                for _ in range(rng.randint(2, 3))]
+
+    def _feat_rodline(self, rng, theme) -> list[dict]:
+        """End rods: thin, bright, and floating, because in the End nothing
+        needs holding up."""
+        return [self._node("quartz", arc=2.7, lift=rng.randint(2, 4),
+                           form="slab", pedestal=False,
+                           radial=rng.uniform(-1.6, 1.6), deco="lamp",
+                           orbs=1)
+                for _ in range(rng.randint(2, 3))]
+
+    def _feat_woolcheck(self, rng, theme) -> list[dict]:
+        """The wool section: the one place floating parkour is on-theme.
+
+        Every other section's landings are the tops of things. These are cubes
+        hung over the drop in sixteen colours, which is the reference's
+        signature abstract band -- and it only reads as deliberate because
+        nothing else in the tower does it.
+        """
+        i = rng.randrange(len(WOOLS))
+        out = []
+        for n in range(rng.randint(3, 4)):
+            out.append(self._node(WOOLS[(i + n) % len(WOOLS)],
+                                  arc=self._gap((3.0, 3.4), (3.4, 4.2)),
+                                  lift=rng.randint(2, 5), pedestal=False,
+                                  radial=(2.2 if n % 2 else -2.2)
+                                  * rng.uniform(0.6, 1.2), orbs=1))
+        return out
+
+    def _feat_dune(self, rng, theme) -> list[dict]:
+        """Wide sandy humps, which is what the desert terrace in the reference
+        is almost entirely made of."""
+        return [self._node(theme.rock, arc=self._gap((3.0, 3.4), (3.4, 4.2)),
+                           lift=rng.randint(2, 4), form="wide",
+                           pedestal_style=theme.ground,
+                           radial=rng.uniform(-2.5, 2.5))
+                for _ in range(2)]
+
+    def _feat_railrun(self, rng, theme) -> list[dict]:
+        """Sleepers along a mine floor, with the rail drawn on them."""
+        return [self._node("oak", arc=2.9, lift=1, radial=rng.uniform(-1, 1),
+                           pedestal_style="deepslate",
+                           deco="lamp" if rng.random() < 0.4 else None)
+                for _ in range(rng.randint(3, 4))]
+
+    def _feat_croprow(self, rng, theme) -> list[dict]:
+        """Low hops along the furrows."""
+        return [self._node("farmland", arc=2.9, lift=1,
+                           radial=rng.uniform(-2.5, 2.5),
+                           pedestal_style="dirt")
+                for _ in range(rng.randint(2, 3))]
+
+    def _feat_fencehop(self, rng, theme) -> list[dict]:
+        """Fence posts, which are the narrowest thing anybody stands on in
+        these maps. Slabs, because a fence post is not a whole block."""
+        return [self._node("oak", arc=3.4, lift=2, form="slab",
+                           radial=rng.uniform(-2.0, 2.0),
+                           pedestal_style="oak")
+                for _ in range(rng.randint(2, 3))]
+
+    def _feat_cactusrun(self, rng, theme) -> list[dict]:
+        """Low sand hops with the cactus scattered round them by the dressing
+        pass, which is the only reason this is not just ``hump``: the props go
+        in afterwards and go round what is reserved."""
+        return [self._node(theme.rock, arc=3.4, lift=rng.randint(1, 2),
+                           radial=rng.uniform(-2.5, 2.5),
+                           pedestal_style=theme.ground)
+                for _ in range(rng.randint(2, 3))]
+
+    def _feat_treestump(self, rng, theme) -> list[dict]:
+        """Cut stumps: wide, low, and the plains' only vertical furniture."""
+        return [self._node("oak", arc=self._gap((2.8, 3.2), (3.2, 3.8)),
+                           lift=rng.randint(2, 3), form="wide",
+                           pedestal_style="oak",
+                           radial=rng.uniform(-2.0, 2.0))
+                for _ in range(2)]
 
 
-def _toward(a, b) -> tuple[int, int]:
-    dx, dz = b[0] - a[0], b[2] - a[2]
-    n = max(abs(dx), abs(dz)) or 1
-    return (_round(dx / n), _round(dz / n))
+# ---------------------------------------------------------------------------
+# The feature vocabulary
+# ---------------------------------------------------------------------------
+#
+# Every feature is a stretch of trough decided *whole* -- its landings and the
+# terrain those landings are the tops of, together -- because that is the only
+# way to express "three sandstone dunes with a pond between them" at all. A
+# feature that only chose landings would be laying cubes in the air and
+# hoping the dressing agreed with them afterwards.
+#
+# The base weight is what a feature is worth to a theme that has not asked for
+# it. Anything in :data:`THEMED` is worth nothing to such a theme -- those are
+# the verbs a place owns, and an ice run in a nether section is how a themed
+# tower stops reading as themed.
 
+#: Record *which* check refused each candidate landing.
+#:
+#: Off by default because placement asks these questions a few thousand times
+#: per landing and a counter on that path is measurable. Turn it on and the
+#: answer to "why is the course falling through to its emergency hop" stops
+#: being a guess: every reduction this format has had -- from thirteen per cent
+#: of nodes to a fraction of one -- came from reading this table, and not one
+#: of them was found by reading the code.
+TRACE = False
 
-def _near(cell, spread: int = 1):
-    """The cell itself, then the ones around it, nearest first."""
-    cx, cy, cz = cell
-    out = [(cx, cy, cz)]
-    for r in range(1, spread + 1):
-        ring = []
-        for dx in range(-r, r + 1):
-            for dz in range(-r, r + 1):
-                if max(abs(dx), abs(dz)) != r:
-                    continue
-                ring.append((math.hypot(dx, dz), cx + dx, cy, cz + dz))
-        ring.sort()
-        out += [(x, y, z) for _, x, y, z in ring]
-    return out
+#: How many pieces of sub-block furniture one section gets. Each is its own
+#: draw call against a whole terrace that costs a handful, so this is set by
+#: the frame budget rather than by how much room there is.
+PROP_BUDGET = 14
+
+# The shared grammar is deliberately worth *less* than a theme's own verbs.
+# Measured at the first weights that worked at all, the move mix came out 96.6%
+# plain hop -- which is precisely the "jump, jump, jump, then walk a bit" this
+# rebuild exists to stop being. A section has to be mostly the thing it is: the
+# ice section mostly slides, the mine mostly climbs, the nether mostly leaps
+# lava. The shared features are the connective tissue between those, not the
+# substance.
+FEATURES: dict[str, float] = {
+    # -- the shared grammar, available everywhere
+    "hump": 1.9, "stairs": 1.0, "corner": 1.2, "slabline": 0.8,
+    "headhitter": 0.7, "voidgap": 0.9, "pillars": 0.9, "spire": 0.7,
+    "flat": 0.5,
+    # -- verbs a place owns
+    "pond": 2.4, "channel": 2.4, "lavaleap": 2.4, "iceline": 1.6,
+    "soulwalk": 2.4, "webwalk": 2.4, "ladderrun": 2.4, "vineclimb": 1.6,
+    "bubblelift": 2.4, "slimebounce": 2.4, "haystack": 2.4, "rooftop": 1.6,
+    "doorway": 2.4, "capstep": 2.4, "canopy": 2.4, "logstep": 1.6,
+    "endpillar": 2.4, "rodline": 2.4, "woolcheck": 2.4, "dune": 1.6,
+    "railrun": 2.4, "croprow": 2.4, "fencehop": 2.4, "cactusrun": 1.6,
+    "treestump": 2.4,
+}
+
+#: Features that appear only in a theme that names them.
+THEMED = frozenset((
+    "pond", "channel", "lavaleap", "iceline", "soulwalk", "webwalk",
+    "ladderrun", "vineclimb", "bubblelift", "slimebounce", "haystack",
+    "rooftop", "doorway", "capstep", "canopy", "logstep", "endpillar",
+    "rodline", "woolcheck", "dune", "railrun", "croprow", "fencehop",
+    "cactusrun", "treestump",
+))

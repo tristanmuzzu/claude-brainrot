@@ -1,8 +1,25 @@
-"""Render a committed asset to PNG for eyeballing, using the same software
-rasteriser CI uses.
+"""Render a committed asset to PNG for eyeballing.
 
     python assets/preview.py character            # rest + each anim mid-pose
     python assets/preview.py train --yaw 30
+
+Two things here are not obvious and both of them produced silently wrong
+pictures for the whole life of this script:
+
+* **The window has to be an X11 one.** On a Wayland session GLFW opens a
+  Wayland surface, and ``LoadImageFromScreen`` reads nothing back off one --
+  every preview came out solid black, roughly one run in four at first and
+  then always. ``brainrot.overlay.x11.prepare()`` is the project's own lever
+  for this and it has to be pulled before ``InitWindow``.
+* **The capture correction is measured, not assumed.** This script used to
+  flip vertically and swap red for blue unconditionally, which is right for the
+  software rasteriser and wrong for a GPU build: brown assets came back dark
+  blue and the grid was above the model. ``engine/rl.save_frame`` already draws
+  marker frames at window creation and reads back where they landed, so it
+  knows which corrections this backend actually needs. Use it rather than
+  guessing -- this is the same landmine ``docs/ARCHITECTURE.md`` records for
+  ``brainrot shoot``, still live here because this file had its own copy of the
+  capture path.
 """
 
 from __future__ import annotations
@@ -13,6 +30,7 @@ import sys
 from pathlib import Path
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 DATA = Path(__file__).parent.parent / "src" / "brainrot" / "assets" / "data"
 OUT = Path(__file__).parent / "previews"
@@ -29,14 +47,27 @@ def main() -> int:
     import math
 
     from raylib import (
-        ffi, BeginDrawing, BeginMode3D, ClearBackground, CloseWindow,
-        DrawGrid, DrawModel, EndDrawing, EndMode3D, GetModelBoundingBox,
-        InitWindow, LoadModel, LoadModelAnimations, SetTraceLogLevel,
-        UpdateModelAnimation, WHITE, CAMERA_PERSPECTIVE,
+        CAMERA_PERSPECTIVE,
+        WHITE,
+        BeginDrawing,
+        BeginMode3D,
+        ClearBackground,
+        CloseWindow,
+        DrawGrid,
+        DrawModel,
+        EndDrawing,
+        EndMode3D,
+        GetModelBoundingBox,
+        InitWindow,
+        LoadModel,
+        LoadModelAnimations,
+        SetTraceLogLevel,
+        UpdateModelAnimation,
+        ffi,
     )
-    from PIL import Image
 
-    from raylib import LoadImageFromScreen, ImageFlipVertical, ExportImage
+    from brainrot.engine import rl as engine_rl
+    from brainrot.overlay import x11
 
     path = DATA / f"{args.name}.glb"
     if not path.exists():
@@ -45,7 +76,9 @@ def main() -> int:
     OUT.mkdir(exist_ok=True)
 
     SetTraceLogLevel(4)
+    x11.prepare()
     InitWindow(args.size, args.size, b"preview")
+    engine_rl.calibrate_capture()
     model = LoadModel(str(path).encode())
     count = ffi.new("int *")
     anims = LoadModelAnimations(str(path).encode(), count)
@@ -77,14 +110,10 @@ def main() -> int:
             DrawGrid(8, max(0.25, radius / 6))
             EndMode3D()
             EndDrawing()
-        img = LoadImageFromScreen()
-        ImageFlipVertical(ffi.addressof(img))
-        tmp = str(fname.with_suffix(".raw.png")).encode()
-        ExportImage(img, tmp)
-        im = Image.open(fname.with_suffix(".raw.png")).convert("RGBA")
-        r, g, b, a = im.split()
-        Image.merge("RGBA", (b, g, r, a)).save(fname)
-        fname.with_suffix(".raw.png").unlink()
+        # Presented twice on purpose: read-back is one buffer swap behind the
+        # draw on this GPU build, so a single frame reads back the *previous*
+        # one. Anything that wants to capture a frame has to present it twice.
+        engine_rl.save_frame(str(fname))
 
     shot(OUT / f"{args.name}-rest.png")
     saved = [OUT / f"{args.name}-rest.png"]

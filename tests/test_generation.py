@@ -1044,4 +1044,4 @@ def test_available_populates_the_registry_on_its_own() -> None:
     assert result.returncode == 0, result.stderr
     line = next(l for l in result.stdout.splitlines() if l.startswith("SCENES="))
     assert set(line.removeprefix("SCENES=").split(",")) == {"runner", "parkour",
-                                                            "tower", "spiral"}
+                                                            "spiral"}

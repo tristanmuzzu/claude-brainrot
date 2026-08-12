@@ -81,7 +81,8 @@ def main() -> None:
     ap.add_argument("--run", type=int, default=21)
     ap.add_argument("--settle", type=int, default=2400,
                     help="frames simulated before timing starts")
-    ap.add_argument("--scenes", nargs="*", default=["runner", "parkour"])
+    ap.add_argument("--scenes", nargs="*",
+                    default=["runner", "parkour", "spiral"])
     args = ap.parse_args()
 
     cfg = Config()
@@ -103,6 +104,10 @@ def main() -> None:
         spread = max(got[name]) - min(got[name])
         print(f"{name:<8} {ms:6.2f} ms/frame   (spread {spread:.2f} ms "
               f"over {args.rounds} rounds)")
+    if "runner" in med and med["runner"]:
+        for other in ("parkour", "spiral"):
+            if other in med:
+                print(f"{other} / runner = {med[other] / med['runner']:.3f}")
     if "runner" in med and "parkour" in med and med["runner"]:
         print(f"\nparkour / runner = {med['parkour'] / med['runner']:.3f}"
               "   <- the number that means something")

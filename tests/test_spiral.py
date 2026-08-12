@@ -1,17 +1,13 @@
-"""The spiral scene's invariants, stated rather than hoped for.
+"""The spiral tower: the invariants, stated so they cannot quietly lapse.
 
-Split the way the scene is: everything about the *geometry* runs against
-``scenes/spiralplan``, which imports no renderer, so those tests need no window
-and a sweep costs a second or two. Only the tests that watch a body move build
-a scene.
+``tools/spiral_probe.py`` measures this scene in numbers and is the thing to
+run after changing it. This file is the subset of those numbers that must
+never move at all, in a form that fits in the suite.
 
-The numbers here are the ones ``tools/spiral_probe.py`` prints. Where a
-threshold is not zero it is because the probe says it is not zero, and the
-comment says what the residue is.
-
-Several of these guard a specific defect that cost a session to find. Each one
-says which, because a threshold with no story behind it is the first thing
-somebody relaxes.
+The split is deliberate. A probe answers "how good is it"; a test answers "is
+it still correct". Two things can only ever be zero -- two solid things in one
+cell, and a landing off the lattice -- and a handful more have a ceiling that
+is a promise rather than a measurement.
 """
 
 from __future__ import annotations
@@ -22,359 +18,386 @@ from collections import Counter
 
 import pytest
 
+from brainrot.scenes import parkourkit as pk
 from brainrot.scenes import spiralplan as sp
-from brainrot.scenes import towerplan as tp
-
-from conftest import ensure_window
 
 
-def grow(run: int, blocks: int = 260):
-    """A course grown without a body. Returns the course and every block laid."""
-    spiral = sp.Spiral(random.Random(run * 977 + 13), 0)
-    course = sp.Course(random.Random(run * 6151 + 29), spiral)
-    laid = list(course.blocks)
+def cone(run: int = 1) -> sp.Cone:
+    return sp.Cone(random.Random(run * 977 + 13), 0)
+
+
+def grow(run: int = 1, blocks: int = 160):
+    """A course grown without a body, collecting every landing as it is laid.
+
+    Collected on the way past rather than read off the end, because the course
+    keeps nineteen at a time and anything read afterwards is a sample of the
+    last nineteen.
+    """
+    c = cone(run)
+    course = sp.Course(random.Random(run * 6151 + 29), c)
+    seen = list(course.blocks)
     for _ in range(blocks):
-        laid.append(course.spawn())
+        seen.append(course.spawn())
         if len(course.blocks) > sp.AHEAD:
             course.advance(len(course.blocks) - sp.AHEAD + sp.TRAIL)
-    return course, laid
+    return course, seen
 
 
-def solid_claims(course) -> Counter:
-    seen: Counter = Counter()
-    for cell, style in course.struct.items():
-        if style not in sp.SEE_THROUGH:
-            seen[cell] += 1
-    for blk in course.blocks:
-        for cell in tp._footprint(blk["x"], blk["y"], blk["z"], blk["form"]):
-            seen[cell] += 1
-        for d in blk["deco"]:
-            if d.get("solid"):
-                seen[(blk["x"] + round(d["dx"]), blk["y"] + round(d["dy"]),
-                      blk["z"] + round(d["dz"]))] += 1
-    return seen
+# ---------------------------------------------------------------------------
+# The cone
+# ---------------------------------------------------------------------------
+
+def test_the_trough_is_walkable_all_the_way_round() -> None:
+    """Ground under the feet, air where the body is, a ceiling within one turn.
+
+    The whole format rests on :meth:`Cone.rock` and its first draft had two
+    branches that :meth:`Cone.unwrap` made unreachable -- which produced a
+    smooth cylinder with the themes painted on as stripes and nothing to run
+    along. This is the test that would have caught it in a second.
+    """
+    bad_air = bad_ground = bad_ceiling = samples = 0
+    for run in range(4):
+        c = cone(run)
+        for i in range(120):
+            u = -4.0 + i * 0.32
+            yf = c.floor_at(u)
+            out = c.outer_at(u)
+            th = u * c.wind
+            ct, st = math.cos(th), math.sin(th)
+            # Sampled across the lane the course may actually use, not the
+            # raw band. The band's edges are ragged by construction -- the rim
+            # wobbles and the core is round -- and a cell centre rounded up
+            # against either one is the world working, not a hole in it.
+            lo = out - sp.BAND + sp.BAND_MARGIN
+            hi = out - sp.BAND_MARGIN
+            for frac in (0.2, 0.5, 0.8):
+                r = lo + (hi - lo) * frac
+                x, z = pk.iround(ct * r), pk.iround(st * r)
+                samples += 1
+                # Each cell against *its own* floor, not against the sample's.
+                # The trough is a staircase -- a block every eight of arc --
+                # so the cell just past a step has its floor one higher, and
+                # the cell at the old height is that step's riser and is
+                # rightly solid. Asking every cell about one shared floor
+                # measures the staircase and calls it a hole: 2.8% of samples,
+                # all of them the world working correctly.
+                cyf = c.floor_at(c.unwrap(x, z, yf + 1))
+                if c.rock((x, cyf, z)) or c.rock((x, cyf + 1, z)):
+                    bad_air += 1
+                if not c.rock((x, cyf - 1, z)):
+                    bad_ground += 1
+                if not any(c.rock((x, cyf + h, z)) for h in
+                           range(sp.TURN_RISE - sp.FLOOR_T, sp.TURN_RISE + 1)):
+                    bad_ceiling += 1
+    assert samples > 1000
+    assert bad_air / samples < 0.005, f"{bad_air} of {samples} not standable"
+    assert bad_ground / samples < 0.005, f"{bad_ground} of {samples} unsupported"
+    assert bad_ceiling == 0, "the trough is open to the sky somewhere"
 
 
-# -- the building -----------------------------------------------------------
+def test_the_cone_is_analytic() -> None:
+    """The same cell is the same answer every time it is asked.
 
-def test_every_dressing_material_exists():
-    """A platform's scenery is named by string, and a name the atlas has never
-    heard of is a ``KeyError`` in the middle of a frame rather than anything
-    the generator would notice. One typo (``sand`` for ``sandstone``) got as
-    far as the second seed of a smoke run."""
-    verbs = {"lamp", "post", "block", "pool", "hollow"}
-    for theme, kit in sp.DRESSING.items():
-        for what in kit:
-            if what in verbs:
+    This is what lets the building have no memory, and it is what removed the
+    entire class of bug where a wall was built through a jump that had already
+    been solved.
+    """
+    c = cone(5)
+    rng = random.Random(4)
+    cells = [(rng.randint(-40, 40), rng.randint(-30, 90), rng.randint(-40, 40))
+             for _ in range(2000)]
+    first = {cell: c.rock(cell) for cell in cells}
+    rng.shuffle(cells)
+    assert all(c.rock(cell) == first[cell] for cell in cells)
+    assert any(first.values()), "nothing at all is rock"
+    assert not all(first.values()), "everything is rock"
+
+
+def test_the_tower_flares_as_it_rises() -> None:
+    """An inverted cone, which is the reference's whole silhouette."""
+    c = cone(2)
+    assert c.rim_at(200) > c.rim_at(0) > c.rim_at(-50) > 0
+
+
+def test_the_trough_floor_is_always_a_whole_number() -> None:
+    """A helix that climbs continuously puts the walking surface three quarters
+    of the way up a cell, and every hop off it is then solved against a height
+    no block has."""
+    c = cone(3)
+    for i in range(400):
+        assert isinstance(c.floor_at(-6.0 + i * 0.1), int)
+
+
+def test_one_turn_of_the_helix_is_exactly_turn_rise() -> None:
+    c = cone(6)
+    for u in (-3.0, 0.0, 2.5, 11.0):
+        assert c.floor_at(u + 2 * math.pi) - c.floor_at(u) == sp.TURN_RISE
+
+
+def test_sections_tile_the_helix_without_gaps() -> None:
+    c = cone(7)
+    c.section_at(30.0)
+    for a, b in zip(c.sections, c.sections[1:]):
+        assert a.u1 == b.u0
+        assert b.u1 > b.u0
+
+
+def test_no_two_sections_running_are_the_same_theme() -> None:
+    c = cone(8)
+    c.section_at(40.0)
+    for a, b in zip(c.sections, c.sections[1:]):
+        assert a.theme is not b.theme
+
+
+# ---------------------------------------------------------------------------
+# Safety
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("run", [1, 2, 3])
+def test_nothing_the_course_builds_is_inside_anything_else(run: int) -> None:
+    course, seen = grow(run, 200)
+    cells: Counter = Counter()
+    for blk in seen:
+        for cell in pk.cells_of(blk):
+            cells[cell] += 1
+        for cell in blk["pedestal"]:
+            cells[cell] += 1
+    doubled = [c for c, n in cells.items() if n > 1]
+    assert not doubled, f"{len(doubled)} cells claimed twice, e.g. {doubled[:3]}"
+
+
+@pytest.mark.parametrize("run", [1, 2, 3])
+def test_every_landing_is_on_a_whole_cell(run: int) -> None:
+    _, seen = grow(run, 200)
+    for blk in seen:
+        assert all(isinstance(v, int) for v in (blk["x"], blk["y"], blk["z"]))
+
+
+def test_the_emergency_answer_is_effectively_never_reached() -> None:
+    """``stuck`` counts the one hop in the module nothing verified.
+
+    It is allowed to be non-zero -- the alternative is a generator that can
+    deadlock -- and it is not allowed to be common. The ceiling here is well
+    above what it measures, so that an ordinary bad seed does not fail the
+    suite and a regression of any size does.
+    """
+    total = laid = 0
+    for run in range(6):
+        course, seen = grow(run, 150)
+        total += course.stuck
+        laid += len(seen)
+    assert total / laid < 0.02, f"{total} unchecked placements in {laid}"
+
+
+def test_no_ladder_or_water_column_is_buried_in_the_tower() -> None:
+    for run in range(4):
+        course, _ = grow(run, 150)
+        for cell in course.softcells:
+            assert not (course.cone.rock(cell) and cell not in course.carved)
+
+
+def test_a_pedestal_always_reaches_the_ground() -> None:
+    """A landing three blocks up is the top of a three-block dune. One with
+    nothing under it is a cube floating over a field, which is the thing this
+    format exists not to be."""
+    for run in range(4):
+        # Deliberately short and *unadvanced*: ``advance`` releases a retired
+        # landing's cells, so asking a grown-and-trimmed course whether an old
+        # pedestal still stands on something asks about cells nothing owns any
+        # more. The invariant is about the moment of placement.
+        c = cone(run)
+        course = sp.Course(random.Random(run * 6151 + 29), c)
+        for _ in range(60):
+            course.spawn()
+        for blk in course.blocks:
+            if not blk["pedestal"]:
                 continue
-            assert what in tp.MATERIALS, f"{theme}: {what}"
+            lowest = min(c[1] for c in blk["pedestal"])
+            assert course.blocked((blk["x"], lowest - 1, blk["z"])) or \
+                any(course.blocked((c[0], lowest - 1, c[2]))
+                    for c in blk["pedestal"])
 
 
-def test_a_cave_has_a_way_in_and_a_way_out():
-    """Five cells wide, not one. A body is 0.6 m across and plants its feet
-    0.4 m off the middle of a block along the way it is going, so a one-cell
-    doorway refuses every diagonal entry -- and a bridge crosses the wall line
-    a metre or two to one side of the cell it is aiming at."""
-    seen = 0
-    for run in range(1, 9):
-        spiral = sp.Spiral(random.Random(run * 977 + 13), 0)
-        cells: dict = {}
-        spiral.build_to(5, lambda c, s: cells.__setitem__(c, s))
-        for pad in spiral.pads[:6]:
-            if not pad.enclosed:
-                continue
-            seen += 1
-            # Only the heights a body occupies: it stands 1.8 m tall on the
-            # floor, and a lamp in the ceiling over the doorway is a lamp over
-            # the doorway.
-            for door in (pad.enter, pad.leave):
-                for h in range(1, 4):
-                    assert (door[0], pad.y - 1 + h, door[2]) not in cells
-                    for ox, oz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                        at = (door[0] + ox, pad.y - 1 + h, door[2] + oz)
-                        assert at not in cells or \
-                            cells[at] in sp.SEE_THROUGH, at
-    assert seen, "no cave in eight runs -- the fixture stopped testing anything"
+# ---------------------------------------------------------------------------
+# The moves
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("run", [1, 2, 3, 4])
+def test_every_hop_is_one_a_body_can_make(run: int) -> None:
+    """Against ``hop_span``, which is derived from one jump impulse and one
+    horizontal speed rather than from a table anybody chose."""
+    _, seen = grow(run, 200)
+    for blk in seen:
+        move = blk["move"]
+        if move is None or move.kind != "hop" or blk["unchecked"]:
+            continue
+        rise = move.to[1] - move.frm[1]
+        lo, hi = pk.hop_span(rise)
+        d = math.dist((move.frm[0], move.frm[2]), (move.to[0], move.to[2]))
+        assert lo - 1e-6 <= d <= hi + 1e-6, \
+            f"{d:.2f} m hop rising {rise:.2f} is outside {lo:.2f}..{hi:.2f}"
 
 
-def test_the_spiral_climbs_and_comes_back_round():
-    spiral = sp.Spiral(random.Random(11), 0)
-    pads = [spiral.pad(i) for i in range(13)]
-    for a, b in zip(pads, pads[1:]):
-        assert b.y > a.y, "a platform must be higher than the one before"
-    first, again = pads[0], pads[sp.PADS_PER_TURN]
-    assert math.dist((first.cx, first.cz), (again.cx, again.cz)) < 8.0, \
-        "one revolution should come back over where it started"
-
-
-def test_a_platform_lane_never_climbs_two_at_once():
-    """A lane's own steps are three cells apart on purpose: landings are a hop
-    apart, and nothing in the game rises two blocks in one jump."""
-    for run in range(1, 7):
-        spiral = sp.Spiral(random.Random(run * 977 + 13), 0)
-        for i in range(8):
-            pad = spiral.pad(i)
-            for a, b in zip(pad.lane, pad.lane[1:]):
-                assert abs(b[1] - a[1]) <= 1
-
-
-# -- placement --------------------------------------------------------------
-
-def test_nothing_is_ever_inside_anything_else():
-    for run in range(1, 9):
-        course, _ = grow(run)
-        worst = [c for c, n in solid_claims(course).items() if n > 1]
-        assert not worst, f"run {run}: {worst[:4]}"
-
-
-def test_every_block_is_on_a_whole_cell():
-    for run in range(1, 7):
-        _, laid = grow(run)
-        for blk in laid:
-            assert all(float(blk[k]).is_integer() for k in "xyz")
-
-
-def test_the_emergency_answer_is_effectively_never_reached():
-    """The one unchecked placement. It started at 13% of nodes; the fixes are
-    recorded in ``spiralplan`` where they live. The probe reads 0.19% over
-    40 runs x 400 blocks, so half a per cent is a ceiling with room in it and
-    not a number to relax."""
-    stuck = laid = 0
-    for run in range(1, 13):
-        course, blocks = grow(run, 300)
-        stuck += course.stuck
-        laid += len(blocks)
-    assert stuck / laid < 0.005, f"{stuck} of {laid}"
-
-
-def test_every_hop_is_one_a_body_can_make():
-    """Vanilla's numbers, not a table of gaps. The exemption is the unchecked
-    answer, which is counted separately above."""
-    for run in range(1, 7):
-        _, laid = grow(run)
-        for blk in laid:
+def test_nothing_rises_two_blocks_in_one_ballistic_move() -> None:
+    """The discriminant in ``hop_span`` has no solution for it, here or in the
+    game. On a helix that is itself a staircase this is easy to violate by
+    accident: the trough steps up a block every eight of arc, so a landing one
+    above the ground reached from a landing on it asks for two."""
+    for run in range(5):
+        _, seen = grow(run, 200)
+        for blk in seen:
             move = blk["move"]
-            if move is None or blk["unchecked"] or move.kind != "hop":
+            if move is None or blk["unchecked"]:
                 continue
-            leg = move.legs[0]
-            assert tp.VY_MIN <= leg["vy0"] <= tp.VY_MAX
-            assert tp.AIR_MIN <= leg["dur"] <= tp.AIR_MAX
-            flat = math.dist((move.frm[0], move.frm[2]),
-                             (move.to[0], move.to[2]))
-            assert flat >= tp.MIN_HOP - 1e-6
+            if move.kind in sp.BALLISTIC:
+                assert move.rise() <= 1.001, f"{move.kind} rose {move.rise():.2f}"
 
 
-def test_the_band_agrees_with_the_move_it_is_planning():
-    """``_band`` converts ``hop_span`` from take-off points to cell centres,
-    and it has to account for the *direction*: the feet plant against a
-    block's face, so running into a corner they plant 1.41 times as far out as
-    running into a side. Ignoring that is worth nearly half a metre, and the
-    band for a hop that climbs a block is only a metre wide -- so the plan asks
-    for steps the physics does not have about one time in three."""
-    course, _ = grow(2, 40)
-    prev = course.blocks[-1]
-    for dx in range(-5, 6):
-        for dz in range(-5, 6):
-            if dx == dz == 0:
-                continue
-            for rise in (-1, 0, 1):
-                cell = (prev["x"] + dx, prev["y"] + rise, prev["z"] + dz)
-                lo, hi = sp._band(prev["form"], "full",
-                                  cell[1] + 1.0 - (prev["y"]
-                                                   + tp.FORMS[prev["form"]]),
-                                  dx, dz)
-                if hi < lo:
-                    continue
-                d = math.hypot(dx, dz)
-                # Exactly on an edge of the band the two agree to within
-                # floating-point noise and the answer is arbitrary; what this
-                # test is about is the half-metre the direction is worth.
-                if min(abs(d - lo), abs(d - hi)) < 0.02:
-                    continue
-                inside = lo <= d <= hi
-                frm = tp.takeoff_point(prev["x"], course.surface(prev),
-                                       prev["z"], prev["form"], (dx, dz))
-                to = tp.land_point(cell[0], cell[1] + 1.0, cell[2], "full",
-                                   (dx, dz))
-                leg = tp.arc_leg(frm, to)
-                span = math.dist((frm[0], frm[2]), (to[0], to[2]))
-                real = (span >= tp.MIN_HOP
-                        and tp.VY_MIN <= leg["vy0"] <= tp.VY_MAX
-                        and tp.AIR_MIN <= leg["dur"] <= tp.AIR_MAX
-                        and leg["dur"] >= leg["vy0"] / tp.GRAVITY)
-                assert inside == real, (dx, dz, rise, d, lo, hi)
+def test_every_move_kind_the_vocabulary_has_actually_happens() -> None:
+    """A verb nobody can reach is a verb that is not in the scene, whatever the
+    table says."""
+    kinds: Counter = Counter()
+    for run in range(14):
+        _, seen = grow(run, 200)
+        kinds.update(b["move"].kind for b in seen if b["move"])
+    for kind in ("hop", "walk", "slide", "climb", "bubble", "bounce", "web"):
+        assert kinds[kind] > 0, f"no {kind} in fourteen runs"
 
 
-def test_a_bridge_steps_across_onto_a_platform_and_never_up_into_it():
-    """A platform's ground is two cells deep, so a landing hop that still has
-    to climb crosses the lower of the two with the body's head. The bridge
-    climbs beside the platform first and then walks in. Worth 0.68% of nodes
-    against 0.25%."""
-    for run in range(1, 9):
-        _, laid = grow(run, 300)
-        for prev, blk in zip(laid, laid[1:]):
-            if blk["form"] != "floor" or prev["form"] == "floor":
-                continue
-            if blk["unchecked"] or prev["unchecked"]:
-                continue
-            assert blk["y"] <= prev["y"], (prev["y"], blk["y"])
+def test_the_course_is_mostly_but_not_only_plain_hops() -> None:
+    """The complaint this rebuild answered was "jump, jump, jump, then walk a
+    bit". Most parkour is jumping and should be; a tower with no ladders,
+    no ice and no slime in it is one move repeated."""
+    kinds: Counter = Counter()
+    for run in range(10):
+        _, seen = grow(run, 200)
+        kinds.update(b["move"].kind for b in seen if b["move"])
+    n = sum(kinds.values())
+    assert 0.80 < kinds["hop"] / n < 0.96
+    assert (n - kinds["hop"]) / n > 0.045
 
 
-def test_a_course_block_is_never_built_in_a_flight_already_solved():
-    """``pathcells`` is the corridor a solved move flies through. The ring
-    version only asks the *building* about it, because a course that keeps
-    moving forward never lays a block where it has already agreed to fly --
-    this one comes back over the same three cells every time it climbs a
-    flight of steps beside a rim. Before the check, the body was inside a
-    course block on 3.2% of frames, every one of them a block two to four
-    ahead of the one it was standing on."""
-    for run in range(1, 7):
-        course, _ = grow(run, 260)
-        live = course.blocks
-        for i, blk in enumerate(live):
-            for cell in tp._footprint(blk["x"], blk["y"], blk["z"],
-                                      blk["form"]):
-                for other in live[:max(0, i - 1)]:
-                    assert cell not in other["path"], (run, cell)
+# ---------------------------------------------------------------------------
+# The place
+# ---------------------------------------------------------------------------
 
-
-def test_a_seed_replays_exactly():
-    a, first = grow(5, 120)
-    b, again = grow(5, 120)
-    assert [(x["x"], x["y"], x["z"], x["style"], x["form"]) for x in first] == \
-           [(x["x"], x["y"], x["z"], x["style"], x["form"]) for x in again]
-    assert a.stuck == b.stuck
-
-
-def test_most_of_a_run_happens_on_the_platforms():
-    """The whole point of the format, and the thing the version this replaced
-    got wrong: a ``floor`` landing is the platform's own ground, everything
-    else is a stone the course put there. A third of the blocks and, because a
-    crossing is unhurried and a bridge is not, about half the *time* -- which
-    is what ``tools/spiral_probe.py`` measures and this cannot."""
-    ground = total = 0
-    for run in range(1, 9):
-        _, laid = grow(run, 300)
-        total += len(laid)
-        ground += sum(1 for b in laid if b["form"] == "floor")
-    assert ground / total > 0.28, ground / total
-
-
-def test_a_run_meets_several_different_places():
-    for run in range(1, 5):
-        spiral = sp.Spiral(random.Random(run * 977 + 13), 0)
-        names = {spiral.pad(i).theme.name for i in range(9)}
-        assert len(names) >= 6, names
-
-
-def test_every_bridge_style_can_actually_happen():
-    seen: Counter = Counter()
-    for run in range(1, 13):
-        _, laid = grow(run, 300)
-        seen.update(b["segment"] for b in laid)
-    for style in sp.BRIDGES:
-        assert seen[style] > 0, style
-
-
-# -- with a body ------------------------------------------------------------
-
-def build_scene(run: int):
-    from brainrot.engine import scene as scene_api
-    from brainrot.palette import generate as generate_palette
-    from brainrot.rng import Seed
-    ensure_window()
-    seed = Seed.for_run(run)
-    ctx = scene_api.SceneContext(360, 640, generate_palette(seed), seed)
-    return scene_api.build("spiral", ctx)
-
-
-@pytest.mark.parametrize("run", (1, 4))
-def test_every_orb_laid_down_is_collected(run: int):
-    scene = build_scene(run)
-    for _ in range(int(30 / (1 / 60))):
-        scene.update(1 / 60)
-    assert scene.course.orbs_missed == 0
-    assert scene.orbs > 10
-
-
-@pytest.mark.parametrize("run", (2, 6))
-def test_the_body_is_never_inside_the_building(run: int):
-    """Zero, and it stays zero. The ring version carries a residue of 0.33% of
-    frames from structure built after an arc was solved; this scene reserves
-    the flight path against its own blocks as well, and the probe reads 0 over
-    27,000 frames."""
-    scene = build_scene(run)
-    worst = 0.0
-    for _ in range(int(20 / (1 / 60))):
-        scene.update(1 / 60)
-        x, y, z = scene.pos
-        feet = tp._floor(y + 0.05)
-        blocks = scene.course.blocks
-        ends = [blocks[scene.index]]
-        if scene.phase == "move" and scene.index + 1 < len(blocks):
-            ends.append(blocks[scene.index + 1])
-        own = {c for b in ends
-               for c in tp._footprint(b["x"], b["y"], b["z"], b["form"])}
-        for cell in tp.body_cells(x, y, z):
-            if cell not in scene.course.solid or cell[1] < feet or cell in own:
-                continue
-            worst = max(worst, min(
-                0.5 + tp.BODY_HALF_W - abs(x - cell[0]),
-                0.5 + tp.BODY_HALF_W - abs(z - cell[2]),
-                min(y + tp.BODY_H, cell[1] + 1.0) - max(y, float(cell[1]))))
-    assert worst < 0.05, worst
-
-
-def test_the_body_never_stops():
-    scene = build_scene(3)
-    frozen = 0
-    prev = list(scene.pos)
-    for _ in range(int(20 / (1 / 60))):
-        scene.update(1 / 60)
-        if math.dist(prev, scene.pos) / (1 / 60) < 0.05:
-            frozen += 1
-        prev = list(scene.pos)
-    assert frozen == 0, frozen
-
-
-def test_a_run_goes_indoors_and_comes_out_again():
-    """There is no wall to be inside of, so ``roofed`` answers the question a
-    cylinder answered with a radius. Both halves matter: a scene that never
-    goes in has lost the strongest beat the format has, and one that never
-    comes out is a body stuck in a room."""
-    inside = outside = 0
-    for run in (3, 5, 7):
-        scene = build_scene(run)
-        for _ in range(int(40 / (1 / 60))):
-            scene.update(1 / 60)
-            if scene.tower.roofed(*scene.pos):
-                inside += 1
+def test_most_landings_are_built_terrain_rather_than_floating_blocks() -> None:
+    """The headline claim of the format, and the one the previous two attempts
+    both failed: you are running over a place, not over cubes in the sky."""
+    terrain = floating = 0
+    for run in range(6):
+        _, seen = grow(run, 200)
+        for blk in seen:
+            if blk["form"] == "floor" or blk["pedestal"] or blk["lift"] <= 1:
+                terrain += 1
             else:
-                outside += 1
-    assert inside > 0 and outside > inside
+                floating += 1
+    assert terrain / (terrain + floating) > 0.7
 
 
-def test_the_platform_furniture_is_actually_drawn():
-    """Crops, fences, lantern posts and chains are models rather than cells,
-    so nothing about the meshed building will notice if the wiring between the
-    plan and the renderer comes apart -- the platforms simply go back to being
-    floors, and a contact sheet is the only thing that would say so. This
-    renders a frame with the furniture and again without it and requires the
-    two to differ."""
-    from brainrot.engine import rl
+def test_a_run_meets_several_different_places() -> None:
+    for run in range(4):
+        _, seen = grow(run, 200)
+        assert len({b["theme"] for b in seen}) >= 4
 
-    ensure_window()
-    scene = build_scene(1)
-    for _ in range(int(14 / (1 / 60))):
-        scene.update(1 / 60)
-    assert scene.tower.props, "no furniture was generated at all"
-    scene.draw()
-    scene.draw()
-    with_it = rl.capture_frame()
-    keep, scene.tower.props = scene.tower.props, []
-    scene.draw()
-    scene.draw()
-    without = rl.capture_frame()
-    scene.tower.props = keep
-    assert with_it is not None and without is not None
-    assert with_it != without
+
+def test_every_feature_can_actually_happen() -> None:
+    got: Counter = Counter()
+    for run in range(24):
+        _, seen = grow(run, 200)
+        got.update(b["segment"] for b in seen)
+    missing = sorted(set(sp.FEATURES) - set(got))
+    assert not missing, f"never laid: {missing}"
+
+
+def test_every_theme_names_materials_and_props_that_exist() -> None:
+    from brainrot import assets
+    have = set(assets.available())
+    for theme in sp.THEMES:
+        for slot in (theme.ground, theme.sub, theme.rock, theme.accent,
+                     theme.glow):
+            assert slot in pk.MATERIALS, f"{theme.name}: no material {slot}"
+        if theme.liquid:
+            assert theme.liquid in pk.MATERIALS
+        for kind in theme.props:
+            assert kind in have, f"{theme.name}: no asset {kind}"
+        for feat in theme.features:
+            assert feat in sp.FEATURES, f"{theme.name}: no feature {feat}"
+
+
+def test_every_prop_a_theme_names_is_one_the_scene_loads() -> None:
+    """A theme that names a prop nobody loaded draws nothing and says nothing
+    about it."""
+    for theme in sp.THEMES:
+        for kind in theme.props:
+            assert kind in sp.PROP_KINDS
+
+
+def test_a_hanging_prop_is_hung_and_not_buried() -> None:
+    """``vinehang`` and ``dripstone`` have their origin at the *top*. Dropped
+    on a floor cell they are simply invisible."""
+    for run in range(6):
+        course, _ = grow(run, 200)
+        for (x, y, z), kind, _yaw in course.cone.props:
+            if kind not in sp.HANGING:
+                continue
+            assert course.blocked((x, y + 1, z)), \
+                f"{kind} at {(x, y, z)} hangs from nothing"
+
+
+# ---------------------------------------------------------------------------
+# Pacing
+# ---------------------------------------------------------------------------
+
+def test_the_course_climbs() -> None:
+    for run in range(4):
+        _, seen = grow(run, 200)
+        assert seen[-1]["y"] - seen[0]["y"] > 60
+
+
+def test_the_course_never_turns_back_on_itself() -> None:
+    """Progress is the unwrapped angle, and it only ever increases. A course
+    that came back would be running into the section it just left."""
+    for run in range(4):
+        course, seen = grow(run, 120)
+        us = [course.cone.unwrap(b["x"], b["z"], b["y"] + 1) for b in seen]
+        for a, b in zip(us, us[1:]):
+            assert b >= a - 0.35
+
+
+def test_the_gaps_ramp_and_then_hold() -> None:
+    """Reported on the mean, not the median: a hop length is one of a handful
+    of discrete values, so a median snaps between modes and can move the wrong
+    way between two samples that differ by a few per cent."""
+    early: list[float] = []
+    late: list[float] = []
+    for run in range(8):
+        _, seen = grow(run, 240)
+        for i, blk in enumerate(seen):
+            move = blk["move"]
+            if move is None or move.kind != "hop":
+                continue
+            d = math.dist((move.frm[0], move.frm[2]), (move.to[0], move.to[2]))
+            (early if i < 40 else late).append(d)
+    assert sum(late) / len(late) > sum(early) / len(early) + 0.1
+
+
+# ---------------------------------------------------------------------------
+# Determinism
+# ---------------------------------------------------------------------------
+
+def test_a_seed_replays_exactly() -> None:
+    def fingerprint(run: int):
+        course, seen = grow(run, 120)
+        return ([(b["x"], b["y"], b["z"], b["form"], b["style"], b["segment"])
+                 for b in seen],
+                sorted(course.struct.items())[:400],
+                list(course.cone.props)[:80])
+    for run in (1, 4):
+        assert fingerprint(run) == fingerprint(run)
+
+
+def test_two_seeds_are_different_runs() -> None:
+    _, a = grow(1, 60)
+    _, b = grow(2, 60)
+    assert [x["x"] for x in a] != [x["x"] for x in b]

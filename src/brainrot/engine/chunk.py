@@ -264,6 +264,26 @@ class ChunkedVolume:
         self.cells[cell] = si
         self._touch(key, cell)
 
+    def clear(self, cell: tuple[int, int, int]) -> None:
+        """Take one cell away again.
+
+        Needed because the spiral tower's terrain is *dug* as well as built --
+        a pond is a hole in the terrace with water in it, and a pond painted
+        on top of the floor does not read as one. Cheap: the cell list for a
+        chunk is only walked when that chunk is re-meshed, so a hole costs one
+        dirty chunk and nothing else.
+        """
+        if self.cells.pop(cell, None) is None:
+            return
+        key = self.key_of(cell)
+        owned = self._by_chunk.get(key)
+        if owned is not None:
+            try:
+                owned.remove(cell)
+            except ValueError:
+                pass
+        self._touch(key, cell)
+
     def _touch(self, key, cell) -> None:
         """Mark this chunk and any neighbour whose culling this changes."""
         self._dirty.add(key)
