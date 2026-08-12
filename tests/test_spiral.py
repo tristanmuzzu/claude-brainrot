@@ -276,10 +276,15 @@ def test_the_emergency_answer_is_effectively_never_reached() -> None:
     ground, and the nearest such ground is the terrace the body has just spent
     five landings climbing off. ``tools/spiral_probe.py`` prints the live
     figure, which is a little under 0.5%.
+
+    Twelve runs and not six. A ceiling this close to the live figure needs a
+    sample that can carry it: at six runs of a hundred and fifty the count is
+    single digits and one unlucky level moves it by half a point, so the test
+    fails on seeds that are not worse, only different.
     """
     total = laid = 0
-    for run in range(6):
-        course, seen = grow(run, 150)
+    for run in range(12):
+        course, seen = grow(run, 200)
         total += course.stuck
         laid += len(seen)
     assert total / laid < 0.01, f"{total} unchecked placements in {laid}"
@@ -459,6 +464,73 @@ def test_the_course_never_turns_back_on_itself() -> None:
         us = [course.cone.unwrap(b["x"], b["z"], b["y"] + 1) for b in seen]
         for a, b in zip(us, us[1:]):
             assert b >= a - 0.35
+
+
+def test_a_level_is_about_something() -> None:
+    """Its signature verb turns up on it more than it does anywhere else.
+
+    Weighted rather than forced, on purpose: a level that is *only* its own
+    verb is a tutorial stage. What is being asserted is that the emphasis
+    survives the shared grammar it competes with -- a jungle with the
+    occasional vine in it is not a jungle level.
+    """
+    own = other = 0
+    for run in range(8):
+        course, seen = grow(run, 240)
+        cone = course.cone
+        for blk in seen:
+            if blk["segment"] in ("ascent", "start", "stuck", "recover"):
+                continue
+            lv = cone.section_at(cone.unwrap(blk["x"], blk["z"], blk["y"] + 1))
+            if not lv.signature:
+                continue
+            if blk["segment"] == lv.signature:
+                own += 1
+            elif blk["segment"] in sp.THEMED:
+                other += 1
+    assert own > other, f"signature {own} against other themed verbs {other}"
+
+
+def test_a_hard_level_is_actually_harder_than_a_mild_one() -> None:
+    """The ramp lives in the *level*, and it has to be visible in the course.
+
+    Two things are asserted and they are different claims. That the levels
+    genuinely differ -- a run that drew the same pitch every time would pass
+    any check on the mean -- and that the difference reaches the parkour: a
+    landing on a hard level is further away than one on a mild level. Measured
+    on the mean rather than the median, for the reason
+    ``test_the_gaps_ramp_and_then_hold`` gives.
+
+    The exit climb is left out. It is nearly half of every run, its shape is
+    set by how tall the level is rather than by how hard it is, and it would
+    drown the signal it is not part of.
+    """
+    mild: list[float] = []
+    stiff: list[float] = []
+    pitches: list[float] = []
+    for run in range(12):
+        course, seen = grow(run, 240)
+        cone = course.cone
+        pitches += [s.hard for s in cone.sections if s.index >= sp.START_LEVEL]
+        for blk in seen:
+            if blk["move"] is None or blk["segment"] == "ascent":
+                continue
+            if blk["move"].kind not in ("hop", "slide"):
+                # A climb's start and end are three legs apart and most of the
+                # distance between them is vertical. It is not a gap and it
+                # does not belong in a measurement of how far the gaps are.
+                continue
+            lv = cone.section_at(cone.unwrap(blk["x"], blk["z"], blk["y"] + 1))
+            frm, to = blk["move"].frm, blk["move"].to
+            reach = math.dist((frm[0], frm[2]), (to[0], to[2]))
+            if lv.hard >= 0.9:
+                stiff.append(reach)
+            elif lv.hard < 0.6:
+                mild.append(reach)
+    assert min(pitches) < 0.55 and max(pitches) > 1.0, "levels all one pitch"
+    assert len(mild) > 100 and len(stiff) > 100
+    assert sum(stiff) / len(stiff) - sum(mild) / len(mild) > 0.12, (
+        f"mild {sum(mild)/len(mild):.2f} vs hard {sum(stiff)/len(stiff):.2f}")
 
 
 def test_a_level_is_never_left_and_then_re_entered() -> None:

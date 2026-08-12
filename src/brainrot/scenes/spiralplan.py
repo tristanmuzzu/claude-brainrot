@@ -515,10 +515,12 @@ class Section:
     floor. Those two are the whole reason the parkour is not optional.
     """
 
-    __slots__ = ("index", "theme", "u0", "u1", "y", "rise", "gap")
+    __slots__ = ("gap", "hard", "index", "rise", "signature", "theme", "u0",
+                 "u1", "y")
 
     def __init__(self, index: int, theme: Theme, u0: float, u1: float,
-                 y: int, rise: int, gap: float) -> None:
+                 y: int, rise: int, gap: float, hard: float = 1.0,
+                 signature: str = "") -> None:
         self.index = index
         self.theme = theme
         self.u0 = u0
@@ -528,6 +530,26 @@ class Section:
         self.rise = rise
         #: Radians at the far end of the level with no floor slab in them.
         self.gap = gap
+        #: How hard *this level* is, 0 to 1, and the unit the whole ramp is
+        #: expressed in.
+        #:
+        #: A single ramp over the first seventy landings makes every run the
+        #: same shape and every level after the seventieth landing the same
+        #: level. A level is the natural unit instead: it is a themed terrace
+        #: with a beginning and an end, it is six to ten seconds of strip, and
+        #: the eye reads it as one place. Drawn from a distribution that
+        #: *widens* with altitude rather than one that slides upward, so the
+        #: bottom of the tower is uniformly mild and the top is where a level
+        #: might be anything -- which is the difference between a course that
+        #: gets harder and one that gets more varied. Tower of Hell does the
+        #: same thing and for the same reason: the ramp lives in what the pool
+        #: is made of, not in a hand-placed sequence.
+        self.hard = hard
+        #: The one feature this level is *about*, weighted well above the rest
+        #: of its theme's pool. Every reference map has a verb per section and
+        #: this format's themes only half did: a jungle that occasionally has a
+        #: vine in it is not a jungle level.
+        self.signature = signature
 
     @property
     def u_edge(self) -> float:
@@ -760,9 +782,32 @@ class Cone:
         # the tower is.
         radius = max(6.0, self.rim_at(y))
         gap = self.rng.uniform(*GAP_ARC) / radius
-        self.sections.append(Section(i, self._next_theme(), u0,
+        theme = self._next_theme()
+        # How much of the range this level's difficulty may be drawn from. It
+        # is the *top* end that opens up with altitude, never the bottom: a run
+        # that simply got harder would spend its second half at one pitch, and
+        # what makes a course read as varied is that a mild level can still
+        # turn up late.
+        reach = min(1.0, max(0, i - START_LEVEL) / HARD_SPAN)
+        top = HARD_FLOOR + (HARD_TOP - HARD_FLOOR) * (0.45 + 0.55 * reach)
+        # Skewed toward the top of whatever range is open, because the draw has
+        # to keep the *average* pitch up while widening the spread: a plain
+        # uniform between a floor and a rising ceiling makes the course easier
+        # on the whole than the flat ramp it replaces, which is the opposite of
+        # what was asked for.
+        hard = HARD_FLOOR + (top - HARD_FLOOR) * self.rng.random() ** 0.38
+        # Preferring a verb that is not a jump, where the theme owns one. The
+        # course is over nine tenths plain hop and the exit climb -- half of
+        # every run -- can only ever be hops, so the one place a level can say
+        # something else is its own signature. A theme with nothing but hops to
+        # its name still gets one; it just will not change the mix.
+        own = [f for f in theme.features if f in THEMED]
+        verbs = [f for f in own if f in NON_HOP] or own
+        signature = verbs[self.rng.randrange(len(verbs))] if verbs else ""
+        self.sections.append(Section(i, theme, u0,
                                      u0 + LEVEL_ARC, y, rise,
-                                     min(gap, LEVEL_ARC * 0.45)))
+                                     min(gap, LEVEL_ARC * 0.45), hard,
+                                     signature))
 
     def theme_at(self, y: float, x: float = 0.0, z: float = 0.0) -> Theme:
         """The theme of the trough under a point. The scene asks this for the
@@ -924,6 +969,21 @@ ASCENT_ARC = 3.2
 #: body from the very first frame, and a run starting at the bottom of the
 #: tower has nothing under it to draw.
 START_LEVEL = 4
+
+#: Levels over which a level's difficulty may open out to the full range. Nine
+#: is three revolutions, which is about as far as a strip that lives for one
+#: thinking turn ever gets.
+HARD_SPAN = 9.0
+#: The mildest a level may be. Not zero: an easy level is a *breather*, not an
+#: empty terrace, and the gap tables it draws from still have to be jumped.
+HARD_FLOOR = 0.30
+#: ...and the hardest. Over one, because the pitch a level is drawn at has to
+#: keep its *average* where the flat ramp had it while spreading either side of
+#: it, and one was the flat ramp's ceiling. Everything downstream either
+#: saturates on it (a probability) or scales gently (the gap ramp).
+HARD_TOP = 1.15
+#: How far above the rest of its theme's pool a level's signature verb sits.
+SIGNATURE_WEIGHT = 2.0
 
 #: Blocks of arc of head start the exit climb is given on top of what it needs.
 #:
@@ -1148,13 +1208,19 @@ class Course:
 
     @property
     def difficulty(self) -> float:
-        """0 at the start of a run, 1 once it is up to speed.
+        """How hard the course is being *here*: 0 mild, 1 as hard as it goes.
 
-        Counted in blocks laid rather than in metres travelled, because
-        generation runs sixteen landings ahead of the body and half the tests
-        grow a course without ever moving one.
+        Two things multiplied, and they answer different questions. The first
+        is the opening ramp, counted in blocks laid rather than in metres
+        travelled, because generation runs sixteen landings ahead of the body
+        and half the tests grow a course without ever moving one. The second is
+        the **level's own** difficulty, which is what stops every level past
+        the seventieth landing being the same level: a level is a themed
+        terrace with a beginning and an end and six to ten seconds of strip,
+        and it is the unit the eye actually reads a course in.
         """
-        return min(1.0, self.laid / RAMP_BLOCKS)
+        return (min(1.0, self.laid / RAMP_BLOCKS)
+                * self.cone.section_at(self.u).hard)
 
     # -- blocks ------------------------------------------------------------
 
@@ -1442,6 +1508,43 @@ class Course:
                             got = self._attempt(prev, node, cell, strict=False)
                             if got is not None:
                                 return got
+        return self._grab_the_wall(prev, theme)
+
+    def _grab_the_wall(self, prev: dict, theme) -> dict | None:
+        """The last thing to try before the unchecked hop: climb the far wall.
+
+        What is left when everything above has failed is always the same
+        picture -- the body on the level's own ground at the chasm lip, two to
+        five blocks below the terrace on the other side, with no terrace left
+        to climb on and no jump in the physics that both crosses a hole and
+        gains that much height. Read as a place rather than as a search
+        failure, that is not a dead end at all: there is a wall three metres
+        away with four blocks of climbable rock in it.
+
+        So a ladder or a vine goes up the far side of the chasm and the body
+        crosses at the top of it. Every part of that is checked by the ordinary
+        machinery -- ``_climb_move`` still wants a free column, an anchor to
+        hang it on and a reachable grab -- and the far wall is the best anchor
+        on the tower. It is also, being a climb, the one recovery in the module
+        that makes the move mix *better* rather than more of the same.
+        """
+        u = self.u_of(prev)
+        lv = self.cone.level(self.cone.level_index(u))
+        need = self.cone.level(lv.index + 1).y - int(self.surface(prev))
+        if need < 2:
+            return None                 # a jump would have done, and did not
+        kind = "vine" if "vine" in theme.exits else "ladder"
+        style, climb = ASCENT_STYLE[kind]
+        for step in (need + 1, need, need + 2):
+            for hug in (1.6, 2.2, 1.2):
+                node = self._node(style, arc=2.4, step_y=step, kind=climb,
+                                  climb_style=ASCENT_SOFT[kind], hug=hug,
+                                  pedestal=False, spread=0, cross=True,
+                                  label="ascent", orbs=2)
+                for cell in self._targets(prev, node):
+                    got = self._attempt(prev, node, cell, strict=False)
+                    if got is not None:
+                        return got
         return None
 
     def _emergency(self, prev: dict, node: dict):
@@ -2247,6 +2350,26 @@ class Course:
                 weights[name] = base * 0.15     # never twice running
             else:
                 weights[name] = base
+        if lv.signature in weights:
+            # The verb this level is *about*. Every reference map builds a
+            # section around one and reads as a place because of it; a pool
+            # weighted only by theme gives a jungle with the occasional vine
+            # in it, which is a different thing.
+            weights[lv.signature] *= SIGNATURE_WEIGHT
+        if "flat" in weights:
+            # The easy beat, and a hard level does not get one. Chaining two or
+            # three demanding landings with no rest between them is the
+            # cheapest difficulty there is -- it costs no geometry, only the
+            # decision not to offer a breather.
+            weights["flat"] *= max(0.1, 1.0 - self.difficulty)
+        # ...and the demanding half of the shared grammar comes out on a hard
+        # level. This is where "harder" actually lives: a longer gap is bounded
+        # by one jump impulse and runs out almost at once, whereas a lid to
+        # stay under, a one-cell landing and a hole with nothing in it are
+        # different *questions* and the pool can ask them as often as it likes.
+        for name, extra in HARDER.items():
+            if name in weights:
+                weights[name] *= 1.0 + extra * self.difficulty
         name = _pick(self.rng, weights)
         self.segment = name
         self._pending = getattr(self, f"_feat_{name}")(self.rng, theme)
@@ -2959,6 +3082,28 @@ FEATURES: dict[str, float] = {
     "railrun": 2.4, "croprow": 2.4, "fencehop": 2.4, "cactusrun": 1.6,
     "treestump": 2.4,
 }
+
+#: Extra weight a feature gets at full difficulty, over its base.
+#:
+#: These are the shared grammar's demanding entries, and they are the honest
+#: answer to "make it harder": a head-hitter to stay flat under, one-cell
+#: landings, a spire, a run at a ceiling, a hole with nothing in it. Gap length
+#: is a poor difficulty dial in this motion model -- there is one jump impulse,
+#: so the whole usable range is 2.0 to 4.3 m and a course spends most of it by
+#: the second landing. What kind of question the landing asks is not bounded
+#: like that.
+HARDER: dict[str, float] = {
+    "headhitter": 1.8, "pillars": 1.3, "spire": 1.5, "voidgap": 1.1,
+    "duckrun": 1.0, "slabline": 0.8,
+}
+
+#: Features whose landings are reached by something other than a jump. Named
+#: rather than derived, because a feature's move kind is a keyword buried in
+#: its own expansion and nothing else has cause to go looking for it.
+NON_HOP = frozenset((
+    "iceline", "webwalk", "ladderrun", "vineclimb", "bubblelift",
+    "slimebounce",
+))
 
 #: Features that appear only in a theme that names them.
 THEMED = frozenset((
