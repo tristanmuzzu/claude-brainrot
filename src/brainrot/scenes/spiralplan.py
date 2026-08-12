@@ -892,6 +892,11 @@ ASCENT_SOFT = {"ladder": "ladder", "vine": "vine", "bubble": "water"}
 #: hanging over the hole.
 ASCENT_ARC = 3.0
 
+#: Which level a run opens on. Not the first: the world is drawn well below the
+#: body from the very first frame, and a run starting at the bottom of the
+#: tower has nothing under it to draw.
+START_LEVEL = 4
+
 #: Blocks of arc of head start the exit climb is given on top of what it needs.
 #:
 #: Small, because it no longer has to absorb a whole feature: ``_plan_feature``
@@ -1011,7 +1016,12 @@ class Course:
         #: course's own progress coordinate.
         self.u = 0.0
 
-        start_u = cone.sections[0].u1 + 1.2
+        # Start a fifth of the way into a level, not wherever the arithmetic
+        # lands. A run that opens near a chasm opens looking at sea and sky
+        # with a handful of blocks in it -- and the first three seconds are the
+        # ones every viewer sees, on a strip that is up for one thinking turn.
+        # A fifth in means a whole themed terrace ahead before the first climb.
+        start_u = (cone.level(START_LEVEL).u0 + LEVEL_ARC * 0.2)
         y = cone.floor_at(start_u)
         cone.built_to = y + BUILD_ABOVE
         cone.built_from = y - BUILD_BELOW
@@ -2271,9 +2281,13 @@ class Course:
         style, climb = ASCENT_STYLE[kind]
         return [
             # A block against the wall to launch from, still over solid ground.
-            self._node(lv.theme.rock, arc=2.8, lift=1, hug=1.0, spread=1),
+            self._node(lv.theme.rock, arc=2.8, lift=1, hug=2.2, spread=1),
+            # 1.6 and not 1.0. The column stands one cell back from the landing,
+            # so at 1.6 it is still against the core and finds its anchor -- and
+            # the *body*, which stands on the landing rather than on the column,
+            # is no longer close enough to the wall to fill the lens with it.
             self._node(style, arc=2.4, step_y=need + 1, kind=climb,
-                       climb_style=ASCENT_SOFT[kind], hug=1.0,
+                       climb_style=ASCENT_SOFT[kind], hug=1.6,
                        pedestal=False, spread=0, label="ascent", orbs=2),
             self._crossing(rng, lv),
         ]
