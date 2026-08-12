@@ -233,7 +233,7 @@ FLARE = 0.05
 # top of a ramp that already went all the way to the top.
 #
 # So the trough is now a stack of **levels**: a flat terrace, then a chasm with
-# no floor in it at all, then the next terrace four to seven blocks higher.
+# no floor in it at all, then the next terrace four to six blocks higher.
 # Neither half of that is walkable -- you cannot walk over a hole and you
 # cannot walk up four blocks -- so the only way out of a level is the parkour
 # out of it. ``tools/spiral_probe.py`` has a walker that tries, and reports how
@@ -250,7 +250,7 @@ LEVEL_ARC = 2 * math.pi / LEVELS_PER_TURN
 #:
 #: The floor is five because a body jumps 1.25 and steps up one block without
 #: thinking about it, so anything up to two is walkable and three is one
-#: block-place away from it. The ceiling is eight because the sum of
+#: block-place away from it. The ceiling is six because the sum of
 #: ``LEVELS_PER_TURN`` of these is the height of one turn of the trough, and
 #: what is left after the floor slab has to stay taller than a body can jump.
 LEVEL_RISE = (4, 6)
@@ -306,11 +306,11 @@ BAND = 9.5
 #: that makes the tower read as a *mass* rather than as a screw thread. Solid
 #: fraction is ``FLOOR_T`` over the height of one turn: at three in sixteen the
 #: ledges came out as thin plates with daylight between them from every angle,
-#: which is not what any reference shot looks like. At nine in sixteen-to-
-#: twenty-eight it is a third to a half solid, the soffit overhead has real
-#: depth to it, and the open gap is still seven to nineteen blocks -- as tall
-#: as the band is wide or better, so the sky and the drop are both still there
-#: on your outboard side.
+#: which is not what any reference shot looks like. At five in twelve-to-
+#: eighteen it is between a quarter and a half solid, the soffit overhead has
+#: real depth to it, and the open gap is still seven to thirteen blocks -- as
+#: tall as the band is wide or better, so the sky and the drop are both still
+#: there on your outboard side.
 #:
 #: A thick slab is not expensive: only its top cell (walked on) and its bottom
 #: cell (the soffit) are ever seen across the whole band, and :meth:`Cone._slab`
@@ -926,7 +926,9 @@ START_LEVEL = 4
 FEATURE_SLACK = 4.0
 
 #: The tallest a feature may stand above the terrace's own ground. Six, because
-#: the trough is thirteen blocks of open air and a body needs two over its
+#: the trough is seven to thirteen blocks of open air (it varies now that the
+#: level rises do -- ask :meth:`Cone.trough_height`) and a body needs two over
+#: its
 #: head -- and because a landing higher than this has the next section's floor
 #: slab for a ceiling before it has anywhere to jump to.
 LIFT_MAX = 6
@@ -1268,17 +1270,28 @@ class Course:
             # Measured, that was 68 of 71 stuck landings, every one of them the
             # crossing failing from a staircase that had not climbed.
             steps = (node["step_y"], node["step_y"] - 1)
+        # Sideways alternatives, but only for a climb. Every other node's
+        # radial offset is the *shape* the feature asked for and moving it is
+        # moving the feature; a stair step has no shape to lose and one that
+        # cannot be placed where it was aimed is the single most expensive
+        # failure in the module -- it drops the body a block short of the level
+        # it was climbing to and the crossing then has no jump that reaches.
+        sides = ((0.0, 1.6, -1.6)
+                 if node["step_y"] is not None or node["label"] == "ascent"
+                 else (0.0,))
         for step in steps:
-            for lift in node["lifts"]:
-                for arc in node["arcs"]:
-                    trial = node
-                    if (lift != node["lift"] or arc != node["arc"]
-                            or step != node["step_y"]):
-                        trial = dict(node, lift=lift, arc=arc, step_y=step)
-                    for cell in self._targets(prev, trial):
-                        got = self._place(prev, trial, cell)
-                        if got is not None:
-                            return got
+            for side in sides:
+                for lift in node["lifts"]:
+                    for arc in node["arcs"]:
+                        trial = node
+                        if (lift != node["lift"] or arc != node["arc"]
+                                or step != node["step_y"] or side):
+                            trial = dict(node, lift=lift, arc=arc, step_y=step,
+                                         radial=node["radial"] + side)
+                        for cell in self._targets(prev, trial):
+                            got = self._place(prev, trial, cell)
+                            if got is not None:
+                                return got
         # Nothing at any height. Relax the comfort rules -- never the
         # correctness ones -- before giving up on the feature entirely.
         for cell in self._targets(prev, node):
@@ -2016,7 +2029,7 @@ class Course:
                 #: An absolute rise from the landing before, used instead of a
                 #: height above the level's own floor. The climb out of a level
                 #: needs it: it crosses the boundary where that floor jumps by
-                #: four to seven blocks at once, so a height measured against
+                #: four to six blocks at once, so a height measured against
                 #: "the floor here" means two different things either side of
                 #: one hop.
                 "step_y": step_y,
@@ -2026,11 +2039,12 @@ class Course:
                 #: A distance and not a flag, because the two things that want
                 #: it want different amounts. A ladder has to *hang on
                 #: something* and out over the chasm the only thing always
-                #: there is the tower, so it goes to 1.0 -- an exit climb laid
-                #: mid-lane finds no anchor and fails, and that was 96% of
-                #: every run that got stuck. A staircase only wants to read as
-                #: ledges cut into the wall rather than as free-standing
-                #: columns, and at 1.0 it put the camera *inside* the wall.
+                #: there is the tower, so a ladder's column goes to 1.6 -- an
+                #: exit climb laid mid-lane finds no anchor and fails, and that
+                #: was 96% of every run that got stuck. A staircase only wants
+                #: to read as ledges cut into the wall rather than as
+                #: free-standing columns and sits at 2.4. Neither may go to
+                #: 1.0: that is close enough to put the *camera* in the wall.
                 "hug": hug,
                 #: Gaps placement may fall back through when the one asked for
                 #: has no legal landing. A staircase out of a chasm cannot
@@ -2316,7 +2330,7 @@ class Course:
         """The staircase out: a landing a block higher, over and over.
 
         Every level is flat and ends in a hole with nothing in it, and the next
-        level is four to seven blocks higher. A body cannot walk over a hole
+        level is four to six blocks higher. A body cannot walk over a hole
         and cannot walk up four blocks, so this is not one feature among many
         -- it is the load-bearing one, and if it fails the run is stuck against
         a wall.
@@ -2325,7 +2339,7 @@ class Course:
         one ballistic move**, so gaining seven takes seven landings whatever
         else is true. They are laid with ``step_y`` rather than a height above
         the level's floor, because that floor means one thing on the near side
-        of the boundary and something four to seven blocks different on the far
+        of the boundary and something four to six blocks different on the far
         side. And they carry no pedestal: a stack of terrain down to the ground
         would fill in the very hole that makes the climb necessary.
         """

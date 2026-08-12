@@ -20,7 +20,7 @@ had the reference wrong, and both are deleted along with `towerplan.py`,
 
 **Now verified on real Windows hardware with a GPU**, which turned up several
 things the software-rasteriser cloud sessions could not have seen — see
-"Landmines" below. 595 passed, 34 skipped, including a Win32 suite that
+"Landmines" below. 602 passed, 34 skipped, including a Win32 suite that
 exercises the real window API.
 
 The runner has a real collision model. Obstacles carry hitboxes derived from
@@ -204,100 +204,140 @@ window being dragged. Real geometry lives in `overlay/win32.py`
 (`window_rect`, `work_area`, `move_window` — `SetWindowPos`, never raylib's
 `SetWindowPosition`, which would block off-thread).
 
-## The spiral tower: one solid cone, one helical trough (rebuilt 2026-08-12)
+## The spiral tower: a cone of stacked levels (rebuilt 2026-08-12)
 
 A third scene, `spiral`, and the other Minecraft reel format -- the Parkour
 Spiral genre, where the course winds up the outside of a tower that keeps going
 out of the top of the frame.
 
-**The reference was misread twice, and that is the headline.** The owner's
-screenshot is a view of the tower's *underside*, which looks like a forest of
-grey columns. Attempt one built a cylinder with jump blocks hung round it.
-Attempt two read the columns as *stilts* and built a stack of hexagonal
-platforms standing on legs. Hielke's own Parkour Spiral 1-3 screenshots settle
-it as neither, and every one of these is now a constant:
+**The trough is not a ramp: it is a stack of levels, and that is the headline.**
+The owner looked at a render and said *without the parkour you could still just
+walk up this*. He was right, and it was geometry rather than course design: the
+trough climbed a block every eight blocks of arc -- a spiral staircase, which a
+body walks up without noticing -- so every landing was decoration on a ramp that
+already reached the top. A `Section` is now a **level**: a flat themed terrace,
+then a chasm with no floor in it at all (`GAP_ARC = (2.8, 3.9)` blocks of arc),
+then the next terrace `LEVEL_RISE = (4, 6)` blocks higher. Neither half is
+passable, so the only way out of a level is the climb out of it. **The
+acceptance test is a walker**: `spiral_probe`'s `walkability` floods the *cone
+alone* -- no course blocks, no pedestals, no dressing -- one block up and any
+survivable drop, and gets **0 m at worst, 0.0 m mean**.
 
-- The tower is **one solid mass**, an **inverted cone** -- narrow at the
-  waterline, flaring as it rises. `BASE_R = 24.0`, `FLARE = 0.05`, measured off
-  the reference as about 1.7x as wide at the crown over fourteen revolutions.
-- The "column forest" is the **skin, not the structure**: vertical one-cell
-  ribs alternating in and out for the whole height, a corduroy surface.
-  `RIBS = 56` (a rib every 1.9 cells at the base), `SKIN = 2`. `rib_out` takes
-  them from the *bearing*, not from arc length -- arc-length ribs drift up a
-  growing circumference and read as a barber's pole.
-- The parkour is a **continuous helical trough** cut round the outside. You are
-  always in a corridor: drop and sky outboard, fluted core inboard, the floor
-  slab of the turn above as a ceiling. `TURN_RISE = 22`, `FLOOR_T = 9` -- over
-  forty per cent solid, thirteen blocks of open air. At three in sixteen the
-  ledges came out as thin plates with daylight between them, which is no
-  reference shot.
-- **Several themed sections fit in one revolution**, and the seam is *hard*,
-  with no blending. `SECTION_ARC = (26.0, 38.0)`, three or four to a turn, ~6 s
-  of strip each; fifteen themes out of a shuffled bag.
-- **The parkour is built into the theme's own ground** -- the desert's dunes,
-  its pond crossed on lily pads. Floating blocks over the void are the minority
-  and are a *theme* (the wool section), not the default.
+- **One turn must be a whole number of levels** (`LEVELS_PER_TURN = 3`). The
+  ceiling over level `i` is the floor slab of level `i + LEVELS_PER_TURN`;
+  anything else has soffit and floor stepping at different bearings and sawing
+  against each other.
+- **The rises vary**, so a revolution gains 12-18 rather than a fixed 22 -- the
+  other half of the same complaint, that it climbed at the same rate forever.
+- **`unwrap` is no longer a division.** It was one while every turn rose by the
+  same fixed amount and cannot be now, so it walks the levels at a bearing (they
+  are `j`, `j+3`, `j+6`...) to the last floor at or below the height. That walk
+  is why `Course._rock` memoises.
+- **The exit climb (`ascent`) is ~44% of all landings** and is the load-bearing
+  feature: a staircase of ledges against the core, or a ladder, vine or
+  soul-sand column where the theme has one (`Theme.exits`). Stairs are weighted
+  well above the vertical climbs for a *measured* reason -- stair-only exits
+  fall through to the unchecked hop on 2.35% of landings, mixed exits on 3.05%,
+  because a ladder needs a free column, an anchor and a launch block hard
+  against the core, and any of the three can be missing.
+- **The staircase has a theme's own footing** (`Theme.step`, a
+  `(material, move)`). Being 44% of every run, one stone and one hop in all
+  fifteen places was the largest source of sameness left: the farm climbs hay,
+  the nether soul sand, the mine oak, the end purpur, and the ice level climbs
+  packed ice on *slides*, which reach further than a hop for the same rise.
+- **The crossing descends one block.** `hop_span(-1)` allows 2.35-4.98 m where a
+  flat jump reaches 4.26, so the staircase climbs one *above* the next level and
+  the last jump comes down onto it.
+- **The staircase stays on the level's own ground** (`node["confine"]`), and
+  nothing may be placed in a chasm below the far level's floor
+  (`Course._far_floor`): a body stranded low over a chasm cannot get out, the
+  climb re-plans from inside the hole, and lays its staircase through the one
+  already there.
+- **`hug` is a distance, not a flag.** An exit climb laid mid-lane finds no
+  anchor and fails, and that was 96% of every run that got stuck -- but at 1.0
+  the wall filled the lens. The column stands one cell back from the landing it
+  caps, so 1.6 still finds its anchor while the *body* stands clear (2.2 for
+  its launch block, 2.4 for a staircase). And **no slab step in the exit
+  stair**: a slab stands half a block up, so the step after asks for +1.5.
+- **Head-hitters are a checked constraint**, not a beam drawn near a jump -- the
+  lid goes into the arc's clearance test, so a landing whose jump would rise
+  through it is refused. Why it sits at three, not the genre's two: landmine
+  below.
+- **Landings are the level's own stone, marked by being *lit*** -- the candy
+  palette is gone from this scene. Owner's objection and map-making consensus
+  both: a contrasting jump block wrecks the theme and buys nothing (a cake and a
+  cobblestone have the same hitbox), so light the landing face (`LAND_LIT_FAR`).
+- **Ladders and vines are thin models on a block face**, not 0.84-wide cubes
+  (`assets/src/props_climb.py`, tileable vertically). Which face is recorded
+  when the column is placed: working it out at draw time is how you draw a cube.
+
+**The building** is one solid **inverted cone** (`BASE_R = 24.0`,
+`FLARE = 0.05`, 1.7x as wide at the crown over fourteen revolutions), and the
+"forest of columns" in the reference is its **skin** -- one-cell ribs
+alternating in and out for the whole height (`RIBS = 56`, `SKIN = 2`, taken from
+the *bearing*, since arc-length ribs drift up a growing circumference and read
+as a barber's pole). You are always in a **corridor**: drop and sky outboard,
+fluted core inboard, the slab above as a ceiling (`BAND = 9.5`, `FLOOR_T = 5`
+out of a turn of 12-18, so about a third solid and seven to thirteen blocks of
+open air), three themed sections to a revolution with *hard* seams, 6-10 s of
+strip each, fifteen themes from a shuffled bag, and the parkour **built into the
+theme's own ground** -- floating blocks over the void are a *theme* (the wool
+section), not the default. That shape was misread twice getting here; the
+history is in `docs/ARCHITECTURE.md` § "Scene formats".
 
 **Three modules, and the split is the point.** `scenes/parkourkit.py` is the
 kernel -- vanilla's motion numbers, `Move` as a list of legs, `hop_span`,
 `fit_gap`, the lattice helpers, `body_cells`, `MATERIALS` -- extracted
-**unchanged** from the deleted ring-tower plan, because that was the part which
-measured clean and the part that had nothing to do with a building whose shape
-was wrong. `scenes/spiralplan.py` is the cone, the sections, the course and 34
-features. `scenes/spiral.py` is the renderer and nothing else. Neither plan
-module imports raylib: a 24-run sweep costs seconds and no window.
+**unchanged** from the deleted ring-tower plan, being the part that measured
+clean and had nothing to do with a building whose shape was wrong.
+`scenes/spiralplan.py` is the cone, the levels, the course and 35 features
+besides the ascent; `scenes/spiral.py` is the renderer and nothing else. Neither
+plan module imports raylib: a 24-run sweep costs seconds and no window.
 
 **The building is analytic, and that deletes a class of bug.** `Cone.rock(cell)`
 answers "is this inside the tower" in closed form, no memory, same answer
-whenever asked. Nothing is generated ahead of the course and nothing can appear
-behind it. The old design streamed its building into an occupancy map as the
-course advanced -- so a wall could be built through a jump already solved -- and
-needed four reservations largely to defend against that. Three remain
-(`headroom`, `pathcells`, `softcells`) plus a fourth, `ground`, the cells
-load-bearing *under* a landing: a `floor` landing places no block, so without it
-a pond dug during dressing takes the floor out from under a committed landing.
+whenever asked, so nothing can appear behind the course. The old design streamed
+its building into an occupancy map as the course advanced -- a wall could be
+built through a jump already solved -- and needed four reservations to defend
+against that. Three remain (`headroom`, `pathcells`, `softcells`) plus `ground`,
+the cells load-bearing *under* a landing: a `floor` landing places no block, so
+without it a pond dug during dressing takes the floor out from under one.
 
 **Course first, terrain second.** The course is laid, its arc, its run and its
-head-room reserved, and only *then* is terrain painted around what is reserved.
-Terrain laid second cannot block a course. The previous attempt built the world
-first and negotiated through it, and started at **13% of nodes** falling through
-to the one unchecked emergency hop. It is **0.46%** now.
+head-room reserved, and only *then* is terrain painted around what is reserved,
+so terrain laid second cannot block a course. Building the world first and
+negotiating through it started at **13% of nodes** falling through to the one
+unchecked emergency hop; it was 0.46% before the levels, 2.98% with them, and
+**2.00%** after the two follow-ups. That is still a regression, and it is the
+top item under "Still outstanding".
 
-Three defects that cost real time here, all of the kind that recurs:
+Two defects that cost real time here, both of the kind that recurs:
 
-- **`Cone.rock` had two unreachable branches.** `unwrap` returns the turn *at or
-  below* a cell, so `y` is never below that turn's floor and the two branches
-  handling lower heights never fired. Symptom: a smooth cylinder with the themes
-  painted on as stripes and nothing to run along. Found by rendering the
-  generated world in Blender from outside -- not by reading the code.
-- **The trough floor must be quantised to whole blocks.** A helix that climbs
-  continuously puts the walking surface three quarters of the way up a cell and
-  every hop off it is solved against a height no block has. It is a *staircase*
-  -- one block every `1/RPR` radians, about eight blocks of arc -- which is what
-  a helical ramp in Minecraft actually is, so nothing is lost.
-- **Nothing rises two blocks in one ballistic move**, and on a staircase helix
-  this bites in a way a flat course never sees: a landing one block above the
-  ground, reached from one *on* the ground across a step, asks for two. Measured
-  at two thirds of the stuck cases *every* candidate had a rise of exactly +2.0.
-  The clamp is in `Course._targets` and is for `BALLISTIC` kinds only -- clamping
-  ladders and bubble columns too took climbs and lifts from 3% of moves to none.
+- **`Cone.rock` had two unreachable branches.** `unwrap` returns the level *at
+  or below* a cell, so the branches for lower heights never fired -- a smooth
+  cylinder with the themes as stripes and nothing to run along. Found by
+  rendering the world in Blender from outside, not by reading the code.
+- **Nothing rises two blocks in one ballistic move**, and a landing one block
+  above the ground reached from one *on* the ground across a step asks for two:
+  at two thirds of the stuck cases *every* candidate rose exactly +2.0. The
+  clamp is in `Course._targets`, `BALLISTIC` kinds only -- clamping ladders and
+  bubble columns too took climbs and lifts from 3% of moves to none.
 
 **The world is emitted outward from the body, not upward from the bottom.**
-`Course.build_world` takes a `y_from` and alternates out from it, because the
-chunk mesher builds in the order cells were dirtied -- so bottom-up means the
-first thing meshed is the world forty-six blocks *below* the camera, which is
-fog. Measured: 422 chunks still unmeshed after the priming pass, three and a
-half seconds of a strip that lives for one thinking turn watching its own world
-assemble around it. The prime is bounded (`PRIME_CHUNKS`) rather than exhaustive
-for the opposite reason: `_begin_scene` runs at the moment the strip becomes
-visible, so every millisecond there is a millisecond the strip is late and the
-event loop is deaf -- meshing the lot took construction from 1.1 s to 1.6 s.
-Nearest-first is what makes a bounded prime sufficient.
+`Course.build_world` alternates out from a `y_from`, because the chunk mesher
+builds in the order cells were dirtied -- bottom-up means the first thing meshed
+is the world forty-six blocks *below* the camera, which is fog: 422 chunks still
+unmeshed after priming, three and a half seconds of a strip watching its own
+world assemble. The prime is bounded (`PRIME_CHUNKS`) for the opposite reason --
+`_begin_scene` runs when the strip becomes visible, and meshing the lot took
+construction from 1.1 s to 1.6 s. Likewise a run opens on `START_LEVEL = 4`, a
+fifth of the way in: the bottom of the tower has nothing under it to draw, and a
+run opening beside a chasm opens looking at sea and sky.
 
 **Dressing needs a margin around the running line.** `pathcells` is exactly
-body-width, so a cell merely *adjacent* to a jump is free by that test -- and a
+body-width, so a cell merely *adjacent* to a jump passes that test -- and a
 block face half a metre from an eighty-degree lens is most of the frame. A fifth
-of a contact sheet came back solid green before `_dressable`'s margin existed.
+of a contact sheet was solid green before `_dressable`'s margin existed.
 
 **The camera is pure geometry, and it set a generation constant.** The body runs
 *outside* a convex core, so a camera looking along the trough looks down a
@@ -305,66 +345,61 @@ tangent -- and a tangent to a circle you are outside of never meets it. At a
 13-block band the core wall sat 50-90 degrees off the direction of travel at
 every bearing against a 52-degree horizontal field: drawn correctly on every
 frame, visible on none. The fix is not aiming at it (that means running
-sideways) but *standing nearer to it* -- `BAND = 9.5`, with `COURSE_OUT = 0.5`
-keeping the course mid-lane. The renderer additionally blends the head's bearing
-toward the trough's own tangent (`TANGENT_MIX`), because aiming only at the next
-few landings swings the view out over the rim. `spiral_probe` reports it: median **7.20 m** of
-clear lens straight ahead, and **3.03%** of frames with a surface inside 0.8 m.
-(An earlier scratch measurement said 0.79% off five runs; the probe's figure
-over six is the one to quote, and the difference is how bursty it is -- it is
-one landing approached badly, not a steady state.)
+sideways) but *standing nearer to it* -- `BAND = 9.5`, `COURSE_OUT = 0.5` --
+plus blending the head's bearing toward the trough's tangent (`TANGENT_MIX`),
+because aiming only at the next few landings swings the view out over the rim.
 
-Two more numbers: `LIFT_MAX = 6` (thirteen blocks of open air, two needed over
-the head, and a landing higher has the next turn's slab for a ceiling before it
-has anywhere to jump to), and `GAP_RAMP = 0.26`, applied centrally in `_node`
-because most features want a *fixed* shape and would otherwise sit out the ramp
--- before it, mean hop was 2.62 m at the start of a run and 2.67 m two hundred
-landings in, a flat line with noise on it.
+Two more numbers: `LIFT_MAX = 6` (seven to thirteen blocks of open air, two
+needed over the head, and a landing higher has the next turn's slab for a
+ceiling before it has anywhere to jump to), and `GAP_RAMP = 0.26`, applied
+centrally in `_node` because most features want a *fixed* shape and would sit
+out the ramp -- before it, mean hop was 2.62 m at the start of a run and 2.67 m
+two hundred landings in. The exit climb is exempt by name: stretch its arc and
+the last steps of the staircase hang over the chasm.
 
 **Platform furniture is models, not cells** (`assets/src/props_mc.py`,
-`props_flora.py`, `props_deco.py`). Crops, flowers, fences, torches, rails,
-bamboo, cacti, lily pads, mushroom caps, chorus plants and dripstone are the
-parts of Minecraft that are *not* cubes, and as cells they all come out as the
-same coloured box. Fourteen per section (`PROP_BUDGET`), one draw call each,
-distance- and direction-culled like the chunks.
+`props_flora.py`, `props_deco.py`, `props_climb.py`): crops, fences, torches,
+rails, bamboo, cacti, lily pads, mushroom caps, chorus plants, dripstone,
+ladders and vines are the parts of Minecraft that are *not* cubes, and as cells
+they all come out as the same coloured box. Fourteen per section
+(`PROP_BUDGET`), one draw call each, distance- and direction-culled.
 
-`tools/spiral_probe.py` is the acceptance test in numbers and is now
-self-contained. Current, over 24 runs x 300 landings and 6 runs x 40 s:
+`tools/spiral_probe.py` is the acceptance test in numbers and is self-contained.
+Current, over 16 runs x 240 landings, 5 runs x 35 s and 6 walk runs:
 
 | | |
 |---|---|
-| cells claimed twice (of ~90,000) | **0** |
-| landings off the lattice | **0** of 7,584 |
-| ladders/water inside rock | **0** |
-| orbs laid but not collected | **0** of 200 |
-| unchecked emergency placements | **0.46%** |
-| body inside the world | 0.22% of frames, worst 0.60 m |
-| **landings on built terrain** | **83.8%** (the terrace itself 2.2%) |
-| landings floating over the drop | 16.2% |
-| hop length min/mean/max | 2.12 / **2.89** / 5.32 m |
-| mean hop by landing index | 2.69 -> 2.83 -> 2.92 -> **2.95** (climbs, then holds) |
-| altitude gained | 1.00 / **1.09** / 1.16 m/s |
-| revolutions per minute | **2.80** |
-| moves per minute | **99** |
-| median idle between moves | **0.53 s** |
-| dead air (idle over 3 s) | **0.5%** |
-| frozen (under 0.05 m/s, 3-D) | **0.00%** |
-| move mix | hop 93%, slide 2%, climb 2%, web 1%, walk 1%, bubble 1%, bounce 1% |
-| feature mix | 36 labels, commonest `hump` at 8%; all 15 themes seen |
+| **climbable without the parkour** | **0 m at worst, 0.0 m mean** |
+| cells twice-claimed / off-lattice / soft in rock / orbs missed | **0** each |
+| unchecked emergency placements | **2.00%** (was 0.46%; see outstanding) |
+| body inside the world | 0.02% of frames, worst 0.54 m |
+| **landings on built terrain** | **92.2%** (terrace 8.2%, floating 7.8%) |
+| hop length min/mean/max | 1.48 / **2.97** / 6.32 m |
+| mean hop by landing index | 2.72 -> 2.98 -> 3.03 -> **3.03** (climbs, then holds) |
+| altitude gained | **0.76 m/s** mean |
+| revolutions per minute | **2.71** (5.8-10.2 s on one theme) |
+| moves per minute | **99.8**, median idle **0.50 s** |
+| dead air (idle over 3 s) / frozen | **0.7%** / **0.00%** |
+| clear lens ahead | median **8.00 m**; **2.16%** of frames inside 0.8 m |
+| move mix | hop 93.9%, slide 2.6%, then climb, bubble, walk |
+| feature mix | 38 kinds; all 15 themes seen |
 
-Two notes. The **body figure is not zero** -- the residue is a pedestal or a
-piece of dressing built after an arc was solved, and the probe's three
-exemptions are exactly the three the generator makes (the landing being left,
-the landing being arrived on, and a slab, whose surface is halfway up its own
-cell). And the **36 feature labels are the 34-feature vocabulary plus `start`
-and `stuck`** -- if `stuck` disappears from that list, emergency placements are
-at zero.
+Three notes. The **unchecked rate and the move mix are the only two rows the
+follow-up commits moved** (2.98 -> 2.08 -> 2.00%, and hop 95.0 -> 93.9% as the
+ice level's exit stair became slides); everything else was measured at the
+levels commit. The **body figure is not zero** -- the residue is a pedestal or
+a piece of dressing built after an arc was solved, and the probe's exemptions
+are the three the generator makes (the landing being left, the landing arrived
+on, and a slab, whose surface is halfway up its own cell). And the **38 feature
+kinds are the 35-feature vocabulary plus `ascent`, `start` and `stuck`** -- if
+`stuck` goes, emergency placements are at zero.
 
 **When it goes wrong, turn on `TRACE`.** It is a counter round `Course._attempt`
 recording *which* check refused each candidate, off by default because placement
 asks those questions a few thousand times a landing. Every reduction this format
-has had, 13% down to a fraction of one, came from reading that table, and **not
-one was found by reading the code.** Rebuild it before changing anything here.
+has had, 13% of nodes down to a few per cent, came from reading that table, and
+**not one was found by reading the code.** Rebuild it before changing anything
+here -- the 2.00% above is the next one to go after.
 
 ## Linux (added 2026-08-09, verified on the owner's Ubuntu box)
 
@@ -392,7 +427,35 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
-0. **`tools/depth_probe.py` does not know about the spiral.** It patches
+0. **The spiral's unchecked placements went 0.46% -> 2.98%** when the trough
+   became a stack of levels, and are **1.71%** after three follow-ups. That is a
+   real regression, not noise, and the reason is structural: a *mandatory* move
+   is a much harder guarantee than a free one. The old course could wander when
+   a landing would not fit; this one must leave every level, over a chasm, onto
+   ground four to six blocks up, and the exit climb is 44% of all landings.
+   `tests/test_spiral.py` holds the ceiling at 4% and its docstring says the
+   number is worse than the 0.5% this scene used to make. The failure is
+   concentrated in the ascent, and the way to work it down is the way every
+   previous reduction was found: `TRACE` plus `tools/spiral_probe.py`, reading
+   which check refused what. Both follow-ups bear that out -- standing the
+   ladder 1.6 off the core rather than 1.0 was worth 0.90 points on its own,
+   because landing further out leaves more of the band reachable from the top
+   of a climb, and it was found by *looking* at a frame. The third was giving
+   a stair step sideways alternatives as well as shorter and longer ones,
+   which is worth another 0.29: a step that cannot be placed where it was
+   aimed is the most expensive failure in the module, because it leaves the
+   body a block short of the level it was climbing to and the crossing then
+   has no jump that reaches.
+1. **The spiral's move mix is 93.9% plain hop**, which is in tension with the
+   owner's "not just jump, jump, jump" note. The cause is the same change: the
+   staircase out of every level is made of hops and is nearly half the course,
+   so the themed verbs -- climbs, bubble lifts, bounces -- are squeezed into
+   what is left. `Theme.step` is the shape of the answer and is only started:
+   giving the ice level's stair packed ice and *slides* moved the whole mix a
+   point and took the unchecked rate down with it, because a slide reaches
+   further than a hop for the same rise. Fourteen themes still climb on hops.
+   The fix is not reweighting `FEATURES`.
+2. **`tools/depth_probe.py` does not know about the spiral.** It patches
    `parkour`'s own draw methods by name. The spiral's translucent draws --
    water, cobweb, lava glow, every emissive -- do all go through
    `fx.no_depth_write` / `fx.glow_pass`, and `tests/test_rendering.py` proves
@@ -400,7 +463,7 @@ touching any of it — the reasoning is there, this is the short list:
    many pixels each individual draw in *this* scene would hide, which is what
    the probe would tell you. The tower's version of that coverage went with
    `tests/test_tower.py` and has not been replaced.
-1. **DPI**: measured 2026-08-07 on the owner's 1920x1080 at 125%. The daemon
+3. **DPI**: measured 2026-08-07 on the owner's 1920x1080 at 125%. The daemon
    *is* per-monitor DPI aware — GLFW sets that at `InitWindow` — so every
    `GetWindowRect`/`SetWindowPos`/work-area number inside it is in **physical
    pixels**, and placement is self-consistent. What is still open is that
@@ -409,7 +472,7 @@ touching any of it — the reasoning is there, this is the short list:
    against an outside probe: a plain script is DPI-*un*aware and reads the
    same window back scaled (1920 → 1536), which looks exactly like a bug and
    is not. Call `SetProcessDpiAwareness(2)` in probes.
-2. Per-frame cost at sustained top speed, vsync off, against a 16.7 ms
+4. Per-frame cost at sustained top speed, vsync off, against a 16.7 ms
    budget. `python tools/frame_cost.py` is the harness and it does the things
    that have to be right: `HeadlessWindow` + `SetTargetFPS(0)` (`DesktopWindow`
    has vsync on and reports a flat 16.6 ms that tells you nothing), and the two
@@ -553,19 +616,22 @@ long jumps you need a different motion model, not a bigger number.
   minute, and "surface pops" — a body teleported upward by a surface, which is
   what a badly built ramp looks like). `--safety-runs 60 --safety-seconds 180`
   is the full sweep the collision model is held to.
-- `python tools/spiral_probe.py --runs 24 --blocks 300 --motion-runs 6
-  --seconds 40` is the spiral scene's acceptance test in numbers, and it is
-  self-contained -- it imports nothing from another probe. Three sections:
-  **safety** (cells claimed twice, landings off the lattice, ladders and water
-  inside rock, emergency placements, and whether the body is ever inside the
-  world), **the course** (the number this format exists for -- how many
-  landings are the section's own ground or something built down to it rather
-  than a cube hung over the drop -- plus the move mix, the feature mix, the
-  themes seen, and the hop distribution and its ramp), and **the climb and
-  pacing** (metres a second gained, revolutions a minute, seconds on one theme,
-  the idle between moves, dead air, frozen frames). `--no-motion` needs no
-  window at all, because `scenes/spiralplan.py` imports no renderer -- a
-  24-run sweep is seconds.
+- `python tools/spiral_probe.py --runs 16 --blocks 240 --motion-runs 5
+  --seconds 35 --walk-runs 6` is the spiral scene's acceptance test in numbers,
+  and it is self-contained -- it imports nothing from another probe. Four
+  sections: **walkability** (the one this rebuild exists for -- a walker let
+  loose on the *cone alone*, no course blocks, no pedestals, no dressing, that
+  may step one block up and drop any survivable distance; anything but 0 m
+  means the levels are not levels), **safety** (cells claimed twice, landings
+  off the lattice, ladders and water inside rock, emergency placements, and
+  whether the body is ever inside the world), **the course** (how many landings
+  are the level's own ground or something built down to it rather than a cube
+  hung over the drop, plus the move mix, the feature mix, the themes seen, and
+  the hop distribution and its ramp), and **the climb and pacing** (metres a
+  second gained, revolutions a minute, seconds on one theme, the idle between
+  moves, dead air, frozen frames, and how much of the lens is clear ahead).
+  `--no-motion` needs no window at all, because `scenes/spiralplan.py` imports
+  no renderer -- and neither does the walk, so both are seconds.
 - `python tools/parkour_probe.py --runs 24 --motion-runs 12` is the parkour
   scene's acceptance test in numbers: interpenetration, grid alignment,
   emergency hops, the hop distribution and its ramp, and whether the body ever
@@ -729,6 +795,17 @@ long jumps you need a different motion model, not a bigger number.
   and writes no depth; islands are solid land and *must* write depth, and
   cannot reach the course anyway because everything in the world below tops out
   at least 7 m under the lowest altitude the course may use (now a test).
+- **A head-hitter sits at *three* above the take-off, not the genre's two.**
+  The `2bc` -- a lid two blocks over the floor that the head strikes, killing
+  the rise and keeping the run -- is the most-used obstacle in serious
+  Minecraft parkour, and this motion model cannot have one. A body is 1.8 m
+  tall and a jump reaches 1.25, so its head sweeps the two cells above *every*
+  take-off: a lid at two is a lid inside the player, and the arc's clearance
+  test then correctly refuses every jump under it. At three it is honest and
+  mild -- it refuses the arcs that climb hardest and passes the flat and
+  descending ones. Making it faithful means adding the game's jump-cancel
+  response to `parkourkit`, which does not exist and is a change to the
+  physics, not to `spiralplan._ceiling_cells`.
 - **A booked action can only fire on a frame boundary.** The planner solves a
   take-off window in continuous time and the loop fires it on the next frame,
   so the body always leaves the ground a little late — and near the ends of an
@@ -774,10 +851,11 @@ long jumps you need a different motion model, not a bigger number.
   seed must replay pixel-identically (tests assert this).
 - Scenes never touch windowing/hooks/config. Solvability is by construction,
   never by rejection sampling; invariants live in `tests/test_generation.py`
-  and, for the spiral, `tests/test_spiral.py` (34 of them).
+  and, for the spiral, `tests/test_spiral.py` (32 of them, including that
+  nothing can walk up the tower without touching the parkour).
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~140s). **595
+- Run `python -m pytest tests/` before committing; it is fast (~140s). **602
   passed, 34 skipped.** The Win32 suite skips off Windows and the X11 suite
   skips without a display, so a green run means less on the other platform's
   machine -- check the count.
