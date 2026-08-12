@@ -898,6 +898,18 @@ long jumps you need a different motion model, not a bigger number.
   minute, and "surface pops" — a body teleported upward by a surface, which is
   what a badly built ramp looks like). `--safety-runs 60 --safety-seconds 180`
   is the full sweep the collision model is held to.
+- `python tools/level_review.py --level N --all` is **the** per-level tool and
+  the one to reach for when a level is being designed rather than the tower.
+  Four artefacts in `shots/review/lNN_slug/`: the game camera over the level
+  and into the next (`frames.png`, the judge); a **blueprint** — elevation and
+  plan of the built world, which is the only view that shows ground running
+  unbroken past three of your jumps; the level as solid geometry rendered
+  orthographically in Blender (`--outside`); and the numbers for that level
+  alone — per-beat fidelity, move mix, no-jump walk coverage, body inside the
+  world, how much of the frame is empty sky, and how long its structure is on
+  screen. `--seam` prints what the level below hands it and what the level
+  above opens with. **One level per process**: the phase pin is a class-level
+  patch and the tool refuses a second.
 - `python tools/tower_probe.py --runs 16 --blocks 340` is the hand-built
   tower's acceptance test *for the design*: every authored jump checked against
   the physics on paper (`--design-only` needs nothing built and is instant),

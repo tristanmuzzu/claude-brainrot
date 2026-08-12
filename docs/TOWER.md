@@ -6,9 +6,25 @@ the physics, the placement checks and the renderer are the ones that were
 already there; what changes is **who decides what the parkour is, and what the
 world around it is made of**.
 
-This document is the design. `src/brainrot/scenes/handplan.py` is that design
-as data, and the level table's comments are the per-level detail — read them
-together, but read this first.
+This document is the design. `src/brainrot/scenes/levels/` is that design as
+data — **one module per level** since 2026-08-13, so that a level can be
+rewritten without touching any other; `_base.py` holds the vocabulary and
+`handlevels.py` is a re-export for anything that imported the old table.
+`handplan.py` is the machinery that places it.
+
+Two documents sit under this one and are read before it when the job is
+building a level rather than the tower:
+
+- **`docs/RULES.md`** — the constitution a single level must satisfy. The jump
+  envelope per rise, the verb table (and which verbs actually fire, which is
+  not the same thing), the ground rules that decide whether a level can be
+  walked past, structures, rhythm, and the checklist with the command that
+  prints each number.
+- **`docs/RESEARCH.md`** — what the real map and its footage do, measured;
+  `docs/reference/` is the material itself.
+
+`tools/level_review.py` is the one command that renders and measures a single
+level.
 
 ## Why the last tower failed, in frames
 
