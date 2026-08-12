@@ -428,7 +428,7 @@ touching any of it — the reasoning is there, this is the short list:
 ## Still outstanding
 
 0. **The spiral's unchecked placements went 0.46% -> 2.98%** when the trough
-   became a stack of levels, and are **1.71%** after three follow-ups. That is a
+   became a stack of levels, and are **1.68%** after four follow-ups. That is a
    real regression, not noise, and the reason is structural: a *mandatory* move
    is a much harder guarantee than a free one. The old course could wander when
    a landing would not fit; this one must leave every level, over a chasm, onto
@@ -445,7 +445,11 @@ touching any of it — the reasoning is there, this is the short list:
    which is worth another 0.29: a step that cannot be placed where it was
    aimed is the most expensive failure in the module, because it leaves the
    body a block short of the level it was climbing to and the crossing then
-   has no jump that reaches.
+   has no jump that reaches. The fourth was noticing that a climb's *shorter*
+   fallback gap can never work: both ends of a landing are set back from its
+   centre by ``EDGE``, so an arc of 2.7 is a jump of 2.0 and 0.84 of it is
+   1.6, under ``MIN_HOP`` and refused before it is solved. A climb now only
+   ever falls back longer.
 1. **The spiral's move mix is 93.9% plain hop**, which is in tension with the
    owner's "not just jump, jump, jump" note. The cause is the same change: the
    staircase out of every level is made of hops and is nearly half the course,

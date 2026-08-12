@@ -910,7 +910,7 @@ ASCENT_SOFT = {"ladder": "ladder", "vine": "vine", "bubble": "water"}
 #: four-block one. It has to be the *top* of the range the stair actually
 #: asks for, not the middle: reserving the average leaves the last step or two
 #: hanging over the hole.
-ASCENT_ARC = 3.0
+ASCENT_ARC = 3.2
 
 #: Which level a run opens on. Not the first: the world is drawn well below the
 #: body from the very first frame, and a run starting at the bottom of the
@@ -2050,7 +2050,15 @@ class Course:
                 #: has no legal landing. A staircase out of a chasm cannot
                 #: settle for a different *height* -- there is only one that
                 #: works -- so it has to be allowed a different distance.
-                "arcs": (arc, arc * 0.84, arc * 1.18),
+                #:
+                #: A climb only ever falls back *longer*. Both ends of a
+                #: landing are set back from its centre by ``EDGE``, so an arc
+                #: of 2.7 is a jump of 2.0 and the shorter fallback would be
+                #: 1.6 -- under ``MIN_HOP``, refused before it is even solved.
+                #: Offering it wastes a third of every retry on a distance that
+                #: cannot work.
+                "arcs": ((arc, arc * 1.14, arc * 1.28) if step_y is not None
+                         else (arc, arc * 0.84, arc * 1.18)),
                 "radial": radial, "kind": kind, "form": form, "deco": deco,
                 "orbs": orbs, "pedestal": pedestal,
                 "pedestal_style": pedestal_style, "climb_style": climb_style,
@@ -2363,7 +2371,14 @@ class Course:
                 (theme.step[0] if theme.step and i % 3 else
                  theme.rock if i % 3 else theme.accent),
                 kind=theme.step[1] if theme.step else "hop",
-                arc=rng.uniform(2.6, 3.0) if on_ground else 2.5,
+                # 2.9 to 3.3 and not 2.6 to 3.0. A landing's take-off and
+                # touch-down are both set back from the block's centre by
+                # ``EDGE``, so an arc of 2.6 is a *jump* of 1.92 -- under
+                # ``MIN_HOP``, refused outright, and the shorter of the two
+                # fallback arcs was shorter still. Measured, that was every
+                # remaining stuck landing: on the ground, below the level it
+                # was climbing to, with no legal hop at any offered distance.
+                arc=rng.uniform(2.7, 3.1) if on_ground else 2.7,
                 step_y=1, pedestal=on_ground, pedestal_style=theme.sub,
                 spread=0, confine=on_ground, label="ascent",
                 # Weaves, but does not change *form*: a slab step stands half
