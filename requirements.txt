@@ -7,3 +7,10 @@ pillow>=10.0
 # user32, the Linux one is ctypes on libX11/libXext plus a gnome-shell
 # extension that ships in this package -- no pywin32, no python-xlib, no
 # D-Bus binding.
+
+# Only for `tools/mapdig/` -- reading the real Parkour Spiral world save that
+# this project's tower is measured against (`docs/reference/`). Not imported
+# by the package or the tests; install them if you want to re-derive the
+# numbers in `docs/RESEARCH.md` from the map file itself.
+anvil-parser2>=0.10
+NBT>=1.5
