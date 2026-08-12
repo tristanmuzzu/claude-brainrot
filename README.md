@@ -31,7 +31,7 @@ Three scenes, chosen per run from the run's seed.
 |---|---|
 | `runner` | The classic: three locked lanes, a chase camera, subway cars with per-run liveries, hazard barriers, gantries, coin arcs, and a city canyon whose windows light up at night. An autopilot follows a corridor that is guaranteed reachable *by construction* and live-dodges oncoming trains. |
 | `parkour` | First-person infinite parkour, the way the actual background reels do it: one flawless sprint-jump per beat, high over an ocean of wooded islands, reef shallows and drifting cloud shelves. The course arrives in set-pieces — a staircase, a plank causeway, a spiral round a brick tower, a gate you run *through*, a long fall onto a lantern-lit platform — each built from one family of materials. Orbs hang on the exact arc of the jump that reaches them, so every one laid down is collected. Something is always in your hand: a block, a sword, a pickaxe, a torch. |
-| `tower` | First-person **spiral-tower parkour** -- the Parkour Spiral / Tower of Hell genre, where the course winds up the outside of a building that keeps going out of the top of the frame. Eleven themed rings in a shuffled bag (a stone keep, a mine, an overgrown ruin, the nether, an ice ring, a slime laboratory, a prismarine deep, the end, a gold summit and more), changing abruptly at the gallery between them. The building -- wall, windows, cornices, buttresses, balconies -- is meshed a chunk at a time so thousands of cells cost one draw call each, and the course goes *inside* it: every ring is a hollow room with a hole in the middle of its floor, four lantern-lit piers and a ground-level arcade of archways, entered from the gallery and left by another arch or by a ladder up to a window near the ceiling. And because a tower has nowhere to go but up and vanilla's one jump impulse reaches 1.25 blocks, it has the game's other verbs too: ladders, soul-sand bubble columns, slime bounces, ice run-ups, cobwebs and soul sand, each checked against its own physics. |
+| `spiral` | First-person **Parkour Spiral** -- the genre where the course winds up the outside of a tower that keeps going out of the top of the frame. The tower is one solid inverted cone, narrow at the waterline and flaring as it rises, its whole flank fluted with vertical ribs; the parkour is a continuous helical trough cut round the outside of it, so you are always in a corridor -- the drop and the sky on your outboard side, the fluted core on your inboard side, and the floor slab of the turn above as a ceiling. Fifteen themes come out of a shuffled bag several to a revolution (plains, farm, desert, mesa, jungle, mushroom, village, mine, deep dark, dripstone, ice, both nethers, the end, and a rainbow wool section), and the seam between two is *hard*, with no blending. The parkour is built into each theme's own ground: you run over the desert's dunes and cross its pond on lily pads, climb a mine's ladders, slide an ice run, leap a nether lava channel, ride a soul-sand bubble column. Floating blocks over the void are the minority and they are a *theme* rather than the default. The cone is meshed a chunk at a time, so thousands of cells cost one draw call each, and the sub-block furniture -- crops, fences, torches, bamboo, dripstone -- is drawn as models, because the parts of Minecraft that are not cubes come out as identical coloured boxes if you build them as cells. |
 
 Every run also generates its own palette, time of day, weather and sky — a sun
 or crescent moon with a real glow, parallax clouds, a starfield that thins
@@ -233,7 +233,7 @@ follow_focus = true      # on screen only while you are looking at Claude Code
 drag_chord = "ctrl+alt"  # hold to drag the strip; "" to disable
 
 [content]
-scenes = ["runner", "parkour", "tower"]
+scenes = ["runner", "parkour", "spiral"]
 quality = "high"
 ```
 
@@ -262,7 +262,7 @@ pip install raylib-software --force-reinstall --no-deps  # headless machines/CI
 pytest
 ```
 
-399 tests covering the show/hide state machine, the seeding guarantees, hook
+595 tests covering the show/hide state machine, the seeding guarantees, hook
 install/uninstall, the real shim end to end, a full daemon driven over UDP,
 pixel-identical determinism per seed, the real overlay window driven against a
 real X server, the compositor bridge's parsing and host resolution, and the

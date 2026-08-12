@@ -226,6 +226,35 @@ def _body_depth(scene) -> tuple[float, str]:
     return worst, what
 
 
+def _lens_clearance(scene) -> float:
+    """How far it is from the eye to the first solid thing dead ahead.
+
+    The body being outside the world is one question and the *camera* having
+    room to see is another: a block face half a metre from an eighty-degree
+    lens is most of the frame while the body it belongs to is comfortably
+    clear. Contact sheets kept turning up frames that were one flat colour and
+    nothing in the safety section could explain them.
+
+    Cast from the body rather than from ``scene.camera``, deliberately.
+    ``_aim_camera`` runs in ``draw`` and this probe only calls ``update``, so
+    the camera object is a frame stale or never set at all -- reading it gave a
+    clearance of 0.12 m on every frame of every run, which looked like a
+    catastrophe and was an artefact of the harness.
+    """
+    eye = (scene.pos[0], scene.pos[1] + pk.EYE, scene.pos[2])
+    flat = math.cos(scene.pitch)
+    fx = math.sin(scene.yaw) * flat
+    fy = -math.sin(scene.pitch)
+    fz = -math.cos(scene.yaw) * flat
+    for i in range(1, 67):
+        t = i * 0.12
+        p = (eye[0] + fx * t, eye[1] + fy * t, eye[2] + fz * t)
+        if scene.course.blocked((pk.iround(p[0]), pk.ifloor(p[1]),
+                                 pk.iround(p[2]))):
+            return t
+    return 8.0
+
+
 def motion(runs: int, seconds: float) -> dict:
     ensure_window()
     frames = int(seconds / DT)
@@ -234,6 +263,7 @@ def motion(runs: int, seconds: float) -> dict:
     revolutions: list[float] = []
     idles: list[float] = []
     moves: Counter = Counter()
+    lens: list[float] = []
     frozen = body_frames = 0
     body_worst = 0.0
     body_where = ""
@@ -262,6 +292,7 @@ def motion(runs: int, seconds: float) -> dict:
             here = math.atan2(scene.pos[2], scene.pos[0])
             turned += abs(_wrap(here - angle))
             angle = here
+            lens.append(_lens_clearance(scene))
             depth, what = _body_depth(scene)
             if depth > 0.02:
                 body_frames += 1
@@ -294,6 +325,8 @@ def motion(runs: int, seconds: float) -> dict:
         "moves": moves, "per_min": n / (runs * seconds) * 60.0,
         "dead": sum(1 for i in idles if i > 3.0) / max(1, len(idles)),
         "frozen": frozen / max(1, total_frames),
+        "lens": stats(lens),
+        "lens_tight": sum(1 for d in lens if d < 0.8) / max(1, len(lens)),
         "body_frames": body_frames, "body_worst": body_worst,
         "body_where": body_where,
         "orbs_taken": orbs_taken, "orbs_missed": orbs_missed,
@@ -388,6 +421,9 @@ def report(geo: dict, mot: dict | None) -> str:
                    f"{mix(mot['moves'], sum(mot['moves'].values()))}")
         out.append(f"  orbs taken / missed               "
                    f"{mot['orbs_taken']} / {mot['orbs_missed']}")
+        out.append(f"  lens to the nearest surface       "
+                   f"median {mot['lens']['med']:.2f} m,"
+                   f" {100 * mot['lens_tight']:.2f}% of frames under 0.8 m")
     return "\n".join(out)
 
 

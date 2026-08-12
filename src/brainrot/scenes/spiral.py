@@ -63,18 +63,6 @@ SEA_Y = -90.0
 #: crisply lit stub hanging in mid-air.
 UNDER_FOG = 2.6
 
-#: How far the look-at point is pulled back toward the tower's axis, and how
-#: much further down the camera aims than the next landing.
-#:
-#: The bias is small and both directions of error were measured. At a quarter
-#: of the way in, the camera spends a run with its nose against masonry -- the
-#: strip is portrait, so its *horizontal* field is only about fifty degrees and
-#: a wall four metres away fills all of it. At zero, the head looks straight
-#: along the helix, the wall sits at ninety degrees to that, and the building
-#: the whole format is about is off the side of the frame entirely. An eighth
-#: of the way in puts it along one edge, which is where a player hugging a wall
-#: actually sees it. The pitch bias is separate and unconditional: the drop is
-#: underneath you, and a camera levelled at the next landing never shows it.
 #: How far the look-at point is pushed *outward*, away from the tower's axis,
 #: and how much further down the camera aims than the next landing.
 #:
@@ -124,6 +112,8 @@ STRIDE_RATE = 2.9
 #: that nothing is ever wanted on the frame it is made, so the only thing these
 #: buy is that no single frame pays for a whole floor at once.
 CHUNK_BUDGET = 2
+#: Chunks meshed during scene construction. See ``_pump``.
+PRIME_CHUNKS = 190
 WRITE_BUDGET = 900
 
 
@@ -270,7 +260,8 @@ class SpiralScene(Scene):
     def _pump(self, prime: bool = False) -> None:
         """Move generated structure into the renderer, a budget at a time."""
         floor_y = int(self.pos[1]) - self.below
-        self.course.build_world(floor_y, int(self.pos[1]) + ABOVE)
+        self.course.build_world(floor_y, int(self.pos[1]) + ABOVE,
+                                int(self.pos[1]))
         writes = self.course.writes
         budget = len(writes) if prime else WRITE_BUDGET
         if writes:
@@ -287,7 +278,15 @@ class SpiralScene(Scene):
                 else:
                     self.volume.set(cell, style)
             self._written += len(take)
-        self.volume.build_pending(64 if prime else CHUNK_BUDGET)
+        # The priming pass meshes enough to fill the frame and no more.
+        #
+        # It cannot simply mesh everything: ``_begin_scene`` runs at the moment
+        # the strip becomes visible, so every millisecond here is a millisecond
+        # the strip is late and the event loop is deaf. Meshing the lot took
+        # scene construction from 1.1 s to 1.6 s. What makes a bounded prime
+        # enough is that the cone is now emitted outward from the body rather
+        # than upward from the bottom, so these are the chunks in shot.
+        self.volume.build_pending(PRIME_CHUNKS if prime else CHUNK_BUDGET)
 
     def _spawn_shelf(self, rng) -> None:
         y = self._next_shelf + rng.uniform(18, 46)

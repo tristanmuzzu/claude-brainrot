@@ -249,7 +249,6 @@ RPR = TURN_RISE / (2 * math.pi)
 #: enters the frame about nine metres ahead, which is inside the distance over
 #: which the trough's own curvature carries it away again.
 BAND = 9.5
-BAND = 9.5
 #: Cells of terrace floor slab -- which is also, seen from the trough below,
 #: the thickness of your ceiling.
 #:
@@ -866,8 +865,18 @@ class Course:
 
     # -- the world ---------------------------------------------------------
 
-    def build_world(self, y_lo: int, y_hi: int) -> None:
+    def build_world(self, y_lo: int, y_hi: int, y_from: int | None = None) -> None:
         """Hand the renderer every cone cell between two heights, once.
+
+        Emitted **outward from ``y_from``**, which is the body, rather than
+        upward from the bottom. The chunk mesher builds in the order cells were
+        dirtied, so whichever layers are emitted first are the ones meshed
+        first -- and emitting bottom-up means the first thing built is the
+        world forty-six blocks *below* the camera, which is fog. Measured: 422
+        chunks still unmeshed after the priming pass, three and a half seconds
+        of a strip that lives for one thinking turn watching its own world
+        assemble around it. Nearest-first costs nothing and puts what is in
+        shot at the front of the queue.
 
         Drawn cells only. The cone is *analytic* -- :meth:`Cone.rock` already
         answers every collision question about it without any of this existing
@@ -876,14 +885,18 @@ class Course:
         to be taken back: the body only ever climbs.
         """
         if self._drawn_hi is None:
-            self._drawn_lo = y_lo
-            self._drawn_hi = y_lo - 1
-        while self._drawn_hi < y_hi:
-            self._drawn_hi += 1
-            self.cone.emit_layer(self._drawn_hi, self._draw_only)
-        while self._drawn_lo > y_lo:
-            self._drawn_lo -= 1
-            self.cone.emit_layer(self._drawn_lo, self._draw_only)
+            start = y_lo if y_from is None else min(max(y_from, y_lo), y_hi)
+            self._drawn_lo = start
+            self._drawn_hi = start - 1
+        # Alternating out from the middle while both ends still have work, so
+        # the ceiling overhead and the terrace below arrive together.
+        while self._drawn_hi < y_hi or self._drawn_lo > y_lo:
+            if self._drawn_hi < y_hi:
+                self._drawn_hi += 1
+                self.cone.emit_layer(self._drawn_hi, self._draw_only)
+            if self._drawn_lo > y_lo:
+                self._drawn_lo -= 1
+                self.cone.emit_layer(self._drawn_lo, self._draw_only)
 
     def _draw_only(self, cell, style: str) -> None:
         """A cone cell: drawn, and deliberately not written into ``struct``.

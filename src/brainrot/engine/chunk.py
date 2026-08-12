@@ -242,7 +242,14 @@ class ChunkedVolume:
         self.cells: dict[tuple[int, int, int], int] = {}
         self._by_chunk: dict[tuple[int, int, int], list] = {}
         self._meshes: dict[tuple[int, int, int], ChunkMesh] = {}
-        self._dirty: set[tuple[int, int, int]] = set()
+        #: Chunks needing a re-mesh, **in the order they were dirtied**. A
+        #: dict and not a set, because that ordering is a promise the mesher
+        #: makes and a set cannot keep it: ``next(iter(set))`` is arbitrary,
+        #: so priming the nearest chunks first quietly meshed whichever the
+        #: hash order happened to offer. The symptom was the first frame of a
+        #: spiral run showing sea where the ground should be, with the
+        #: priming budget spent on chunks forty blocks below the camera.
+        self._dirty: dict[tuple[int, int, int], None] = {}
         self.built = 0
         self.faces = 0
 
@@ -286,15 +293,15 @@ class ChunkedVolume:
 
     def _touch(self, key, cell) -> None:
         """Mark this chunk and any neighbour whose culling this changes."""
-        self._dirty.add(key)
+        self._dirty[key] = None
         s = self.SIZE
         x, y, z = cell
         for within, (ox, oy, oz) in ((x % s, (1, 0, 0)), (y % s, (0, 1, 0)),
                                      (z % s, (0, 0, 1))):
             if within == 0:
-                self._dirty.add((key[0] - ox, key[1] - oy, key[2] - oz))
+                self._dirty[(key[0] - ox, key[1] - oy, key[2] - oz)] = None
             elif within == s - 1:
-                self._dirty.add((key[0] + ox, key[1] + oy, key[2] + oz))
+                self._dirty[(key[0] + ox, key[1] + oy, key[2] + oz)] = None
 
     # -- building ----------------------------------------------------------
 
@@ -304,17 +311,16 @@ class ChunkedVolume:
     def build_pending(self, budget: int = 1) -> int:
         """Mesh up to ``budget`` dirty chunks. Returns how many it did.
 
-        Nearest-to-nothing ordering on purpose: chunks are built in the order
-        they were dirtied, which for a course generated bottom-up is the order
-        they will be looked at. A priority queue keyed on distance to the
-        camera would be better and is not worth the machinery -- generation
-        runs far enough ahead that no chunk is ever wanted the frame it is
-        made.
+        **In the order they were dirtied**, which is why ``_dirty`` is a dict
+        rather than a set. That makes the emission order the mesh order, so a
+        generator that hands over its world nearest-first gets the chunks in
+        shot meshed first -- which is all the priority a camera-distance queue
+        would buy, without the machinery.
         """
         done = 0
         while self._dirty and done < budget:
             key = next(iter(self._dirty))
-            self._dirty.discard(key)
+            self._dirty.pop(key, None)
             self._build(key)
             done += 1
         return done
@@ -370,13 +376,13 @@ class ChunkedVolume:
         for key in [k for k in self._by_chunk if k[1] < limit]:
             for cell in self._by_chunk.pop(key):
                 self.cells.pop(cell, None)
-            self._dirty.discard(key)
+            self._dirty.pop(key, None)
             # The layer that was resting on what just went now has its
             # underside exposed. Cheap to say and wrong to leave: a tower whose
             # lowest built chunk has no floor reads as a hovering slice.
             above = (key[0], key[1] + 1, key[2])
             if above in self._by_chunk:
-                self._dirty.add(above)
+                self._dirty[above] = None
         return gone
 
     def draw(self, tint: Callable[[float, float, float], rl.RGBA],

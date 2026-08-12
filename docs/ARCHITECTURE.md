@@ -336,9 +336,10 @@ and tree trunks all cost one mesh and no new geometry.
 
 One cube per draw call is the right answer for a course of a dozen platforms
 that pop in, fade and move. It is the wrong answer for *architecture*. The
-tower scene's building — wall, floors, arches, cornices, buttresses — is
-thousands of cells, and at roughly seven microseconds of Python per
-`DrawModelEx` that is the whole frame budget spent on scenery nobody lands on.
+spiral scene's tower — a solid cone, its flank, its fluted skin, and the floor
+slab of every turn of the helix — is thousands of cells a layer, and at roughly
+seven microseconds of Python per `DrawModelEx` that is the whole frame budget
+spent on scenery nobody lands on.
 
 `engine/chunk.py` builds the static half the way the game does:
 
@@ -349,16 +350,22 @@ thousands of cells, and at roughly seven microseconds of Python per
   six.
 - **Only the faces you can see.** A face is emitted where its neighbour cell is
   empty or see-through, culled against the *whole world* rather than the chunk
-  — so seams are clean, hollowing a tower out costs nothing, and filling it in
-  costs nothing either. A solid cylinder of radius nine is 250 cells a layer
-  and about 40 faces.
+  — so seams are clean, hollowing a building out costs nothing, and filling it
+  in costs nothing either. That second half is what makes the spiral's tower a
+  *solid* mass rather than a shell: a solid disc of radius nine is 250 cells a
+  layer and about 40 faces.
 - **Drawn only if it could be on screen.** A distance cull keeps a *sphere*
   around the camera, and this project's window is a tall narrow strip with
   about fifty degrees of horizontal field -- so most of that sphere is behind
   the viewer, and every chunk of it was a draw call and a pass over its
   vertices for nothing. `draw` takes the camera's own direction and drops
   anything outside a generous cone around it: worth a third of the spiral
-  scene's frame, where a platform has the rest of the spiral behind it.
+  scene's frame, where the body in its trough has a whole tower behind it.
+- **Cells can be taken away again.** `ChunkedVolume.clear` exists because the
+  spiral's terrain is *dug* as well as built — a pond is a hole in the terrace
+  with water in it, and a blue square painted on top of the floor is not one.
+  It costs one dirty chunk: a chunk's cell list is only walked when it is
+  re-meshed anyway.
 - **Cut into cubic chunks, and that is about fog rather than culling.**
   Distance fog is a per-draw tint, so everything in one mesh recedes by the
   same amount; a whole tower in one mesh would fog its near wall and its far
@@ -507,143 +514,161 @@ the same poses the GPU does.
     early moves the take-off, so the arc is re-solved at that moment and the
     orbs on it move with it — on autopilot the two are the same numbers.
 
-- **tower** is the *other* Minecraft reel format, and a different thing rather
-  than a reskin of the first: **spiral-tower parkour**, the Parkour Spiral /
-  Tower of Hell genre, where the course winds up the outside of a building that
-  keeps going out of the top of the frame. Four things break when you try to
-  express it as a variation on flat parkour, and each of them is why
-  `scenes/towerplan.py` exists:
+- **spiral** is the *other* Minecraft reel format, and a different thing rather
+  than a reskin of the first: the **Parkour Spiral** genre, where the course
+  winds up the outside of a tower that keeps going out of the top of the frame.
 
-  - **Progress is altitude, round a fixed axis.** The course comes back over
-    itself every revolution, so an occupancy map that only grows refuses the
-    world within a couple of hundred blocks — far sooner than the flat scene's
-    does — and a generator that only asks "is the next block clear" is climbing
-    through the space it was in twenty seconds ago.
-  - **Most of what you see is not course.** It is a wall, with windows,
-    cornices, buttresses and galleries, and the course is furniture hung on it.
-    That is the meshed-chunk renderer above, and it is what makes the format
-    affordable at all.
-  - **Two blocks up is normal, and one jump impulse reaches 1.25.** A tower has
-    nowhere else to go, so it has to have the game's other verbs: a ladder at
-    2.35 m/s, a soul-sand bubble column at eleven, a slime bounce, an ice
-    run-up, a cobweb, soul sand. `Move` is therefore a **list of legs** with a
-    speed each rather than a hard-coded parabola, so a ladder, a swim, a run
-    round a curved gallery and a sprint-jump are the same kind of object to the
-    simulation, the orb solver and the probe.
-  - **Sections, not just set-pieces.** A spiral map is read as a stack of
-    themed floors with a landing between them, and the theme changes *abruptly*
-    at that landing — the one structural note every map in the reference
-    material agrees on. Eleven themes come out of a shuffled bag, twelve blocks
-    of altitude each, and a ring is about one revolution and about sixteen
-    seconds, which is the length of a thinking turn.
+  **The reference was misread twice, and that is the headline.** The owner's
+  screenshot is a view of the tower's *underside*, which looks like a forest of
+  grey columns. The first attempt built a cylinder with jump blocks hung round
+  the outside. The second read the columns as *stilts* and built a stack of
+  hexagonal platforms standing on legs. Hielke's own screenshots of Parkour
+  Spiral 1-3 say it is neither:
 
-  **And the course goes inside.** A ring is a hollow room with a hole in the
-  middle of its floor, four lit piers, and a *ground-level arcade* of six
-  archways — regular and known, because a course that has to find a randomly
-  placed door is a course that mostly does not, and the alternative is a
-  renderer that can take meshed cells away again. Four windows near the ceiling
-  are the way back out higher up. Two set-pieces use them: `hall` walks in,
-  crosses the room past the piers and leaves by another arch; `shaft` walks in
-  and spends the whole ring's height in one ladder or bubble column, coming out
-  of a window seven blocks up.
+  - The tower is **one solid mass**, and it is an **inverted cone** — narrow at
+    the waterline, flaring as it rises. Every wide shot shows it. `BASE_R` is
+    24 and `FLARE` 0.05, which is measured off the reference: about 1.7 times
+    as wide at the crown as at the waterline over roughly fourteen revolutions.
+  - The "column forest" is the **skin, not the structure**: vertical one-cell
+    ribs alternating in and out for the tower's whole height, a corduroy
+    surface. Full-resolution crops of the underside show them running unbroken
+    from the themed lip down into the sea with nothing behind them. `RIBS` is
+    56, which at the base is a rib every 1.9 cells, and `rib_out` takes them
+    from the *bearing* rather than from arc length — arc-length ribs drift up a
+    cone whose circumference is growing and read as a barber's pole.
+  - The parkour is a **continuous helical trough** cut round the outside. You
+    are always in a corridor: the drop and the sky on your outboard side, the
+    fluted core on your inboard side, and the floor slab of the turn above as a
+    ceiling. `TURN_RISE` is 22 blocks a revolution and `FLOOR_T` 9 of that is
+    slab, so the mass is over forty per cent solid and the open gap is still
+    thirteen blocks. At three in sixteen the ledges came out as thin plates
+    with daylight between them from every angle, which is not what any
+    reference shot looks like.
+  - **Several themed sections fit in one revolution**, not one — a single band
+    in the reference runs end, farm, village, plains, mesa in one arc — and the
+    seam between two is **hard**, with no blending. `SECTION_ARC` is 26 to 38
+    blocks of arc, three or four to a revolution, about six seconds of strip
+    each. Fifteen themes come out of a shuffled bag.
+  - **The parkour is built into the theme's own ground.** You run over the
+    desert's dunes and across its pond on lily pads. Floating blocks over the
+    void are the minority and they are a *theme* — the wool section — rather
+    than the default. Measured: 83.8% of landings are the section's own terrain
+    or something built down to it.
 
-  Three rules make interiors safe rather than a trap, and each answers a
-  measured failure:
+  Three modules, and the split is the interesting part:
 
-  - **They are only entered from a gallery.** That is the floor of the room
-    they open onto, and the one place in a run where an archway is at eye level
-    rather than eight blocks below it.
-  - **Indoors the course stays within one block of the floor.** An archway is
-    three cells tall from the floor up, so a body higher than that cannot step
-    out at all. Left free, the course climbed onto its own blocks near the
-    ceiling and then oscillated between two cells for three hundred and fifty
-    blocks.
-  - **A visit is bounded.** `INDOOR_MAX` blocks in, and the way out is
-    scheduled by name against every arch in the ring; past that the course will
-    take a *graze* — a hop out whose path is not checked against the building,
-    counted separately as `bailed` — rather than another twenty blocks of
-    circling a flat floor while the altitude goes nowhere.
+  - `scenes/parkourkit.py` is the **kernel**: vanilla's motion numbers,
+    `Move` (a list of legs with a speed each), `hop_span`, `fit_gap`, the
+    lattice helpers, `body_cells`, and `MATERIALS`. It knows the shape of no
+    building, and it was extracted **unchanged** from the ring-tower plan
+    module that used to live here — because it is the part of that file that
+    measured clean, and the part that had nothing to do with the building whose
+    shape turned out to be wrong.
+  - `scenes/spiralplan.py` is the cone, the sections, the course and the 34
+    features. **No raylib import**, deliberately: a 24-run geometry sweep costs
+    a few seconds and no window.
+  - `scenes/spiral.py` is the renderer, and nothing else. It meshes what the
+    plan describes, moves a body along it and points a camera; the only two
+    questions it asks about the building are "is this section lit by the sky"
+    and "which way is along the trough".
 
-  Two numbers from the reference material set the pace and neither is a taste
-  call. A helix cannot climb faster than about a block a hop, because that is
-  what the jump impulse reaches; and two published spiral maps independently
-  work out at 0.64 blocks of rise per hop, which at this radius is twelve
-  blocks a revolution. Hence `TIER_H = 12`.
+  **The building is analytic, and that deletes a whole class of bug.**
+  `Cone.rock(cell)` answers "is this cell inside the tower" in closed form, for
+  any cell, at any time, with no memory — two rules, a flare and a wobble.
+  Nothing has to be generated ahead of the course and nothing can appear behind
+  it. The previous version streamed its building into an occupancy map as the
+  course advanced, which meant a wall could be built through a jump that had
+  already been solved; four reservations existed largely to defend against
+  that. Three of them are still here (head-room, path cells, soft cells) plus a
+  fourth for terrain (`ground`, the cells load-bearing *under* a landing),
+  because terrain and course blocks are still written — but the case where the
+  *building* grows into a solved arc is gone by construction.
 
-  The climb is also *governed* rather than hoped for. `CLIMB_TARGET` says where
-  the course should be by now and `climb_pressure` reweights the set-piece
-  table — and then floors the rises themselves — when it falls behind. Measured
-  against a high-water mark instead, the course climbs until it beats its own
-  record, relaxes, spends the gain on the next descending set-piece and comes
-  back to the same mark: one run in eight gained seven centimetres a second
-  over forty-five seconds that way.
+  **The course is laid first and the terrain is painted around it afterwards**,
+  which is the opposite of the previous attempt's order and the single most
+  important thing in the file. A feature expands into nodes; each node is
+  resolved against the world one at a time and never in advance; the landing is
+  placed, its pedestal is built down to the ground under it, and the arc that
+  reaches it, the run across it and the two cells over it are all *reserved*;
+  and only then is the terrain painted, around what is reserved rather than
+  through it. Terrain laid second cannot block a course. Building the world
+  first and then negotiating a course through it started at **13% of nodes**
+  falling through to an unchecked emergency hop; it is **0.46%** now. A human
+  map-maker builds this way too.
 
-- **spiral** is the *same reel format read properly*, and it is a separate
-  scene rather than a change to `tower` because the two get a different thing
-  wrong and right. The owner's reference screenshot of a Parkour Spiral map
-  settles it: the format is not a cylinder with jump blocks hung round it, it
-  is a **stack of built places** — a farm with crops and fences, a nether cave
-  with lava and lanterns, a rainbow floor — each a slab of real world a couple
-  of dozen blocks across, standing on a forest of columns, spiralling up. The
-  parkour is two different things stitched together: *running over actual
-  ground* across a platform, and floating-block parkour out over the drop
-  *between* platforms.
+  Three more things, each of which cost real time to see:
 
-  `scenes/spiralplan.py` is the format and none of its rendering; `Course`
-  subclasses `towerplan.Course`, so the physics, the lattice, the move
-  vocabulary, the four reservations and the orb solver are inherited unchanged
-  — that half was never about the shape of the building. `scenes/spiral.py` is
-  forty lines, because `TowerScene` turned out to be a *renderer* and a
-  renderer does not care what shape a building is. It says two things a
-  renderer cannot work out: which way indoors is, and how to draw the
-  furniture that is not made of cells.
+  - **The trough floor is quantised to whole blocks.** Everything in this
+    project that reasons about standing on a block depends on a cell's `y`
+    being its floor and a surface being an integer; a helix that climbs
+    continuously puts the walking surface three quarters of the way up a cell,
+    and every hop off it is then solved against a height no block has. So the
+    trough is a **staircase** — one block every `1 / RPR` radians, about eight
+    blocks of arc — which is also what a helical ramp in Minecraft actually is,
+    so nothing is lost by it.
+  - **Nothing rises two blocks in one ballistic move**, and on a staircase
+    helix this bites in a way a flat course never sees: a landing one block
+    above the ground, reached from a landing *on* the ground across a step,
+    asks for two. Measured before the clamp in `Course._targets`, at two thirds
+    of the stuck cases *every* candidate had a rise of exactly +2.0. The clamp
+    is for the ballistic kinds only — a ladder, a bubble column and a slime
+    bounce all rise several blocks by design, and clamping those too took
+    climbs and lifts from 3% of moves to none at all.
+  - **The world is emitted outward from the body**, not upward from the bottom.
+    The chunk mesher builds in the order cells were dirtied, so bottom-up means
+    the first thing meshed is the world forty-six blocks *below* the camera,
+    which is fog: 422 chunks were still unmeshed after the priming pass, three
+    and a half seconds of a strip that lives for one thinking turn watching its
+    own world assemble around it. `Course.build_world` takes a `y_from` and
+    alternates out from it. The prime itself is bounded (`PRIME_CHUNKS`) for
+    the opposite reason — scene construction happens at the moment the strip
+    becomes visible, and meshing everything took it from 1.1 s to 1.6 s.
+  - **Dressing needs a margin around the running line.** `pathcells` is exactly
+    body-width, so a cell merely *adjacent* to a jump is free by that test —
+    and a block face half a metre from an eighty-degree lens is most of the
+    frame. Without the margin in `_dressable`, a fifth of a contact sheet came
+    back solid green, which reads as the camera being inside the world and is
+    really the camera standing beside a boulder nobody meant to put there.
 
-  Five things are worth knowing before touching it:
+  **The camera is pure geometry and it decided a generation constant.** The
+  body runs *outside* a convex core, so a camera looking along the trough is
+  looking down a tangent — and a tangent to a circle you are outside of never
+  meets it. Measured at a thirteen-block band: the core wall sat 50 to 90
+  degrees off the direction of travel at every bearing, against a horizontal
+  field of 52. The wall was drawn, correctly, on every frame and appeared on
+  none of them; every frame was ground, sky and soffit, which reads as floating
+  islands rather than as a tower. The fix is not aiming at it — aiming at it
+  means running sideways — it is **standing nearer to it**, so `BAND` is 9.5
+  and `COURSE_OUT` puts the course mid-lane within it. The renderer then blends
+  the head's bearing toward the trough's own tangent (`TANGENT_MIX`), because
+  aiming only at the next few landings swings the view out over the rim on
+  every frame where the next hop goes outboard.
 
-  - **Every node is decided from where the body actually is.** Not from where
-    an earlier plan assumed it would be. Both halves of the course — the
-    crossing and the bridge — hand back one node at a time and re-measure
-    from `blocks[-1]`, and every node carries the runners-up it would have
-    accepted so placement can take a second choice rather than an unchecked
-    one. This is the single rule the file rests on, it was learned twice, and
-    between them the two halves were 82% of every placement failure.
-  - **A plan chooses cells; `hop_span` answers in take-off points.** `_band`
-    converts between them, and it has to know the *heading*: feet plant against
-    a block's face, so running into a corner they plant 1.41 times as far out
-    as running into a side. That is nearly half a metre against a legal band
-    for a climbing hop that is only a metre wide.
-  - **When the bridge is under its platform and low, it climbs beside it.**
-    One jump reaches 1.25 blocks; a bridge that arrives underneath with three
-    still to climb finds that the direction "toward the landing" is made of
-    rounding error and lays every stone on top of the last. `_beside` circles
-    the landing instead — a ring of cells a few out from the rim, each a real
-    hop from the last and each a block higher — and the head-room already
-    reserved over each one is what forces the flight to *turn* rather than
-    bounce between two stones. It reads as a corkscrew of steps up the outside
-    of a platform, which is what a spiral map builds at exactly this moment.
-  - **It steps across onto a platform, never up into it.** A platform's ground
-    is two cells deep, so a landing hop that still has to climb crosses the
-    lower of those two with the body's head.
-  - **A platform's own climb is built parkour, not terrain.** The way out is
-    one to three blocks above the way in, and the last few landings of a
-    crossing are blocks on plinths that go through the same four checks as a
-    bridge stone. Raising the platform's *ground* under the lane instead was
-    tried first and is the more obvious idea; it puts a step at shoulder height
-    beside every landing next to it and takes unchecked placements from 0.2% to
-    5%, unfixably, because the offending geometry is the building.
+  Two smaller numbers worth knowing. `LIFT_MAX` is 6: the trough is thirteen
+  blocks of open air, a body needs two over its head, and a landing higher than
+  that has the next turn's floor slab for a ceiling before it has anywhere to
+  jump to. And `GAP_RAMP` is 0.26 — how much wider every gap gets between the
+  start of a run and full difficulty, applied centrally in `_node` rather than
+  left to each feature's own tables, because most features want a *fixed* shape
+  and would otherwise sit out the ramp entirely. Measured before it existed:
+  mean hop 2.62 m at the start of a run and 2.67 m two hundred landings in,
+  which is a flat line with noise on it, in a scene whose whole pacing story is
+  that it gets harder.
 
-  The proportions are the point and they are four numbers that move together —
-  six platforms of 23 to 29 cells on a radius of 34, climbing 3 to 6 blocks
-  plus the terrace. That is a gap of six to twelve metres: two to four stones
-  of bridge against six or seven landings of crossing, and **52% of a run's
-  time on built ground**. The first attempt (five platforms of 11 to 15 on a
-  radius of 22) spent a quarter of the run on a platform in stretches of a
-  second and a half — which is the cylinder it replaced, wearing a hat.
+  A word on the **furniture**, because it is the reason the terraces read as
+  places. Crops, flowers, fences, lantern posts, sugar cane, torches, rails,
+  end rods, chorus plants, bamboo, mushroom caps, cacti, dead bushes, pebbles,
+  hanging vines and dripstone are the parts of Minecraft that are *not* cubes —
+  two crossed quads, a post and two rails, a stalk a few pixels wide — and as
+  cells they all come out as the same coloured box. They are models
+  (`assets/src/props_mc.py`, `props_flora.py`, `props_deco.py`), fourteen of
+  them per section, one draw call each, distance- and direction-culled like the
+  chunks.
 
 ## Solvability by construction
 
-Both scenes could generate layouts that fail. Neither is allowed to, and
-neither checks afterwards — rejection sampling would stall inside a render
+Every scene could generate layouts that fail. None of them is allowed to, and
+none of them checks afterwards — rejection sampling would stall inside a render
 loop.
 
 - **runner**: the guaranteed-clear lane is written by whichever set-piece owns
@@ -700,36 +725,52 @@ loop.
   hangs is collected, which is asserted over two minutes of running and again
   over a minute of being steered by hand.
 
-- **tower**: the same discipline, and four reservations rather than one
-  occupancy map, because a tower is built *around* a course that is still being
-  laid. `solid` is the building plus the course; `softcells` holds what a
-  ladder, a bubble column or a cobweb is using, which is drawn and never solid;
-  `headroom` holds the two cells over every live landing; and `pathcells` holds
-  every cell the body will pass through on a move already solved. The last two
-  exist because checking is not the same as reserving: head-room is *checked*
-  when a block is placed, and a spiral comes back over itself, so a later block
-  — or a post driven down from a landing twenty blocks further on — lands in
-  the space an earlier one was given to stand in. Both cases were measured as
-  the body running for a second with three quarters of a metre of masonry
-  through its head, and neither is visible in any other way.
+- **spiral**: the same discipline as parkour — it inherits the arithmetic
+  wholesale from `parkourkit` — plus *reservations*, because the terrain here
+  is written **after** the course it has to leave alone. The building itself
+  needs no reservation at all: `Cone.rock` is analytic, so the cone cannot
+  grow into anything. What is reserved is everything the course has committed
+  to and nothing else can see:
 
-  A `floor` landing places no block, so on its own it reserves nothing and
-  gives the course no *ratchet*: a body on a gallery could step between two
-  cells for the rest of a run, and one seed in twenty-four did exactly that.
-  The head-room over every landing is already reserved, so a floor landing
-  simply asks about it.
+  - `headroom`, the two cells over every live landing. Checking is not the same
+    as reserving: head-room is *checked* when a block is placed, and a spiral
+    comes back over itself, so a later block — or a pedestal driven down from a
+    landing twenty blocks further on — lands in the space an earlier one was
+    given to stand in. Measured as the body running for a second with three
+    quarters of a metre of masonry through its head, which is not visible in
+    any other way.
+  - `pathcells`, every cell the body will pass through on a move already
+    solved. This is the one the flat scene does not need, because a course that
+    keeps going forward never lays a block where it has agreed to fly; a helix
+    comes back over the same cells every revolution.
+  - `softcells`, what a ladder, a bubble column or a cobweb is using — drawn,
+    never solid, and a wall built through a ladder is a ladder in a wall.
+  - `ground`, the cells load-bearing *under* a landing. Head-room covers what
+    is over one and the path covers what the body passes through; neither
+    covers the floor a `floor` landing stands on, because that landing places
+    no block of its own. Without it a pond dug during dressing takes the floor
+    out from under a landing already committed.
 
-  Placement then separates *correctness* from *comfort*. A landing must be
-  empty, have head-room, be reachable by a move the physics has, and have a
-  clear path — those never relax. That the body also fits comfortably where it
-  lands, all the way across the block, and stays clear of a gallery's overhang
-  are relaxed by the last resort, because a hop that clips the corner of a
-  buttress is better than the one answer nobody checked at all. Measured over
-  60 runs of 400 blocks: zero cells claimed twice out of a million, and one
-  emergency placement.
+  Placement then separates *correctness* from *comfort*, and the split is
+  load-bearing. A landing must be empty, have head-room, sit on something, be
+  reachable by a move the physics has, and have a clear path — those never
+  relax. That the body also fits comfortably where it lands and all the way
+  across it is **comfort**, relaxed by the last resort, because a course that
+  cannot satisfy those anywhere is better off grazing a bank than falling
+  through to the one answer nothing checked. That last answer is counted in
+  `Course.stuck`: 0.46% of landings over 24 runs of 300 blocks, against zero
+  cells claimed twice out of some 90,000 and zero landings off the lattice out
+  of 7,584.
+
+  When it does go wrong, the way to find out why is `TRACE` — a counter around
+  `Course._attempt` recording *which* check refused each candidate. It is off
+  by default because placement asks those questions a few thousand times a
+  landing. Every reduction this format has had, from 13% of nodes to a fraction
+  of one, came out of reading that table, and **not one of them was found by
+  reading the code**. Rebuild it before changing anything here.
 
 All of these are asserted directly in `tests/test_generation.py` and
-`tests/test_tower.py` across many runs, rather than being left as comments.
+`tests/test_spiral.py` across many runs, rather than being left as comments.
 
 ## Cost while idle
 
@@ -752,15 +793,15 @@ tools/                offline, never imported by the daemon
 │                     interpenetration, grid alignment, emergency hops, the
 │                     hop distribution and its difficulty ramp, and whether
 │                     the body is ever inside a solid block
-├── tower_probe.py    measures the tower: cells claimed twice, the body inside
-│                     the building, emergency placements, the move and
-│                     set-piece mix, how fast the run gains altitude, how long
-│                     a themed ring lasts, and the idle between moves
-├── spiral_probe.py   the same safety block, imported from `tower_probe` rather
-│                     than restated, plus what this format is actually about:
-│                     how much of a run is on built ground against out over
-│                     the drop, how long one platform lasts, and how many
-│                     platforms a minute go by
+├── spiral_probe.py   measures the spiral tower: cells claimed twice, landings
+│                     off the lattice, ladders buried in rock, the body inside
+│                     the world, emergency placements, the move and feature
+│                     mix, the hop distribution and its ramp, how fast the run
+│                     gains altitude, how long a themed section lasts, the idle
+│                     between moves, how much of the lens is clear ahead, and
+│                     the number the format exists for: how many landings are
+│                     the section's own ground rather than a cube hung in air.
+│                     `--no-motion` needs no window at all
 ├── depth_probe.py    what each translucent draw is hiding, by re-rendering
 │                     the frame with that one draw's depth writing off
 ├── frame_cost.py     per-frame cost of each scene, alternated in one process
@@ -778,7 +819,15 @@ assets/
     ├── train.py      cab + middle cars
     ├── track.py      tileable 3-lane track segment
     ├── city.py       three building archetypes with window zones
-    └── props.py      barrier, gantry, fence, pillar, coin
+    ├── props.py      barrier, gantry, fence, pillar, coin
+    ├── props_mc.py   the spiral's Minecraft furniture: crops, flowers, sugar
+    │                 cane, lantern posts, chains, and `mcfence` -- named that
+    │                 because `props.py` already exports the runner's trackside
+    │                 `fence`, and an asset name is a filename
+    ├── props_flora.py grass tufts, dead bushes, cacti, lily pads, hanging
+    │                 vines, bamboo, mushroom caps
+    └── props_deco.py torches, rails, end rods, chorus plants, nether fungus,
+                      pebbles, dripstone
 
 src/brainrot/
 ├── cli.py            run / demo / shoot / install / uninstall / ping / scenes
@@ -820,14 +869,14 @@ src/brainrot/
     ├── runner.py     three-lane chase-cam runner
     ├── runnerplan.py the runner's lane search and take-off planner
     ├── parkour.py    first-person infinite parkour
-    ├── spiralplan.py the spiral's platforms, columns, caves and bridges; the
-    │                 course over them subclasses `towerplan.Course`, so the
-    │                 physics and every occupancy rule are inherited unchanged
-    ├── spiral.py     the spiral scene: `TowerScene` against `spiralplan`,
-    │                 plus which way indoors is and the model furniture
-    ├── towerplan.py  the tower's architecture, course, moves and physics --
-    │                 no renderer in it, so a 60-run sweep needs no window
-    └── tower.py      first-person spiral-tower parkour
+    ├── parkourkit.py the parkour kernel: vanilla's physics, `Move` as a list
+    │                 of legs, the lattice, what a body fits in. Knows the
+    │                 shape of no building; no renderer in it either
+    ├── spiralplan.py the cone, the themed sections, the course and its 34
+    │                 features -- no renderer, so a 24-run sweep needs no
+    │                 window
+    └── spiral.py     first-person Parkour Spiral: meshing, weather, a body
+                      and a lens, and nothing that knows the building's shape
 ```
 
 ## Adding a scene
