@@ -69,12 +69,12 @@ def test_three_rises_are_the_head_room() -> None:
         assert 6 <= air <= 16, f"{lv.name} has {air} blocks of open air"
 
 
-def test_the_tower_is_twenty_four_distinct_places() -> None:
+def test_the_tower_is_thirty_three_distinct_places() -> None:
     """Distinct by *name*, and no two neighbours built from the same theme.
 
-    Fifteen themes and twenty-four levels means nine themes appear twice, and
-    the whole value of hand-building is lost if the two turn up back to back.
-    Cyclic again: level 24 is followed by level 1.
+    Twenty-three themes and thirty-three levels means several themes appear
+    twice, and the whole value of hand-building is lost if the two turn up
+    back to back. Cyclic again: level 33 is followed by level 1.
     """
     names = [lv.name for lv in hp.LEVELS]
     assert len(set(names)) == len(names), "two levels share a name"

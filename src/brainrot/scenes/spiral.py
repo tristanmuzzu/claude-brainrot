@@ -310,9 +310,22 @@ class SpiralScene(Scene):
     def _spawn_shelf(self, rng) -> None:
         y = self._next_shelf + rng.uniform(18, 46)
         self._next_shelf = y
+        # Clear of the tower. A shelf is sized 55-120 and drifts, so one
+        # spawned over the footprint slides across a terrace as a translucent
+        # sheet at ankle height -- which is what it looks like: a rendering
+        # fault, not weather. Ringing them around the building keeps the
+        # climb-past-the-cloud-layer read without ever putting one indoors.
+        keep_out = self.cone.rim_at(y) + 85.0
+        for _ in range(8):
+            x, z = rng.uniform(-260, 260), rng.uniform(-260, 260)
+            if math.hypot(x, z) > keep_out:
+                break
+        else:
+            ang = rng.uniform(0, 6.283)
+            x, z = math.cos(ang) * (keep_out + 40), math.sin(ang) * (keep_out + 40)
         self.shelves.append({
             "tex": cloud_blob(int(y) * 31 + 7, 160),
-            "x": rng.uniform(-150, 150), "z": rng.uniform(-150, 150),
+            "x": x, "z": z,
             "y": y, "s": rng.uniform(55, 120), "drift": rng.uniform(0.3, 1.1),
             "phase": rng.uniform(0, 6.283),
         })
@@ -325,13 +338,18 @@ class SpiralScene(Scene):
     def _indoor_want(self) -> float:
         """1 when the body is under a roof, 0 when it is under the sky.
 
-        There is no inside to a trough cut round the outside of a solid cone,
-        so this asks the question the format actually has: is this section one
-        the sky lights, or one lit only by its own lamps? A deep-dark or a mine
-        section is a cave with the roof taken off, and it has to *read* as one
-        or fifteen themes become fifteen shades of daylight.
+        Two answers, and the larger wins. The theme's own darkness is the old
+        one: a deep-dark or a mine section is a cave with the roof taken off,
+        and it has to *read* as one or fifteen themes become fifteen shades
+        of daylight. The new one is literal: the shells build real roofs now,
+        so ask whether there is one overhead. Sampled once a frame over the
+        body -- the analytic rock test plus the course's own solids, both
+        cheap -- and eased by the caller like every exposure change.
         """
-        return self.theme_here().dark
+        x, z = tp.iround(self.pos[0]), tp.iround(self.pos[2])
+        y = tp.ifloor(self.pos[1])
+        roofed = any(self.course.blocked((x, y + h, z)) for h in range(3, 9))
+        return max(self.theme_here().dark, 0.85 if roofed else 0.0)
 
     def _begin_ground(self) -> None:
         """Set up the run across the block just landed on.
@@ -502,6 +520,23 @@ class SpiralScene(Scene):
         aim = [sum(b["x"] * w for b, w in ahead),
                sum(self.course.surface(b) * w for b, w in ahead),
                sum(b["z"] * w for b, w in ahead)]
+        # How hard the head is locked onto the landing it is actually jumping
+        # to. A player looks down the corridor while crossing a block and
+        # snaps onto the landing as they commit; the old blend never exceeded
+        # half a weight on the next landing, so at take-off the block the body
+        # was flying at was routinely off-centre -- read from outside as the
+        # character not looking where it is jumping, which is what it was.
+        # Ramps up through the run across the block and holds through the
+        # flight; climbs and bubble rides keep the corridor view (their look
+        # is the pitch override below).
+        nxt = self.course.blocks[min(self.index + 1, last)]
+        if self.phase == "move" and self.move.kind not in ("climb", "bubble"):
+            lock = 1.0
+        elif self.phase == "ground":
+            lock = min(1.0, self.phase_t / max(1e-5, self.ground_dur)) * 0.85
+        else:
+            lock = 0.0
+        target = self.course.land_point(nxt)
         # ...and a quarter of the way back toward the axis. Looking straight
         # along a helix points the camera tangentially, which puts the tower
         # off the side of a portrait strip and fills the frame with sky: the
@@ -540,6 +575,14 @@ class SpiralScene(Scene):
         if flat_r < near:
             aim[0] *= near / max(1e-6, flat_r)
             aim[2] *= near / max(1e-6, flat_r)
+        # The lock happens *after* the tangent pull and both radial clamps:
+        # they are corridor framing, and the landing is the course itself --
+        # clamping the head off the block it is jumping to is how the old
+        # camera lost it.
+        if lock > 0.0:
+            aim[0] += (target[0] - aim[0]) * lock
+            aim[1] += (target[1] - aim[1]) * lock
+            aim[2] += (target[2] - aim[2]) * lock
 
         self._flick = max(0.0, self._flick - dt * 5.5)
         rate = min(1.0, (5.0 + 22.0 * self._flick ** 2) * dt)
@@ -768,6 +811,13 @@ class SpiralScene(Scene):
             elif form == "slab":
                 voxel.draw_box(model, blk["x"], blk["y"] + 0.25, blk["z"], tint,
                                scale, 0.5 * scale, scale)
+            elif form == "web":
+                # Crossed gauze sheets, like the soft cells: a cobweb as a
+                # full translucent cube fills the whole lens while the body
+                # wades through its middle.
+                for yaw in (45.0, -45.0):
+                    voxel.draw_box(model, blk["x"], blk["y"] + 0.5, blk["z"],
+                                   tint, 1.3 * scale, scale, 0.10, yaw=yaw)
             else:
                 voxel.draw_box(model, blk["x"], blk["y"] + h * 0.5, blk["z"],
                                tint, scale, h * scale, scale)
@@ -839,9 +889,24 @@ class SpiralScene(Scene):
             return
         with no_depth_write():
             for s in clear:
+                at = (blk["x"] + s["dx"], blk["y"] + s["dy"] + 0.5,
+                      blk["z"] + s["dz"])
+                if s["style"] == "web":
+                    # A cobweb is a crossed pair of gauze sheets, exactly as
+                    # the game draws it. As a full translucent cube -- which
+                    # is what this was -- the body wades through the *inside*
+                    # of it and the whole lens goes speckled for a second.
+                    # The yaw is salted per cell: a wade lays several webs in
+                    # a row, and identically angled sheets read as one long
+                    # curtain instead of a webbed-up gallery.
+                    salt = (at[0] * 7 + at[2] * 13) % 5 * 11.0
+                    for yaw in (45.0 + salt, -45.0 + salt):
+                        voxel.draw_box(self._model("web"), at[0], at[1],
+                                       at[2], self._fog(dist, 150),
+                                       1.15, 1.0, 0.10, yaw=yaw)
+                    continue
                 narrow = 0.66 if s["style"] == "water" else 0.94
-                voxel.draw_box(self._model(s["style"]), blk["x"] + s["dx"],
-                               blk["y"] + s["dy"] + 0.5, blk["z"] + s["dz"],
+                voxel.draw_box(self._model(s["style"]), at[0], at[1], at[2],
                                self._fog(dist, 120), narrow, 1.0, narrow)
         if clear[0]["style"] == "water":
             top = max(s["dy"] for s in clear)

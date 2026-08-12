@@ -1,103 +1,231 @@
 # The hand-built tower
 
-A designed tower of twenty-four levels, climbed in order and looping, replacing
-the procedurally chosen course in the `spiral` scene. The building, the physics,
-the placement checks, the terrain painting and the renderer are all the ones
-that were already there; what changes is **who decides what the parkour is**.
+A designed tower of thirty-three levels, climbed in order and looping,
+replacing the procedurally chosen course in the `spiral` scene. The building,
+the physics, the placement checks and the renderer are the ones that were
+already there; what changes is **who decides what the parkour is, and what the
+world around it is made of**.
 
-This document is the design. `src/brainrot/scenes/handplan.py` is that design as
-data, and the level table's comments are the per-level detail — read them
+This document is the design. `src/brainrot/scenes/handplan.py` is that design
+as data, and the level table's comments are the per-level detail — read them
 together, but read this first.
 
-## Why hand-build it at all
+## Why the last tower failed, in frames
 
-The generator works and is safe: 0.30% of landings fall through to the one
-unchecked hop, no two solids share a cell, nothing is unreachable. What it
-cannot do is be *memorable*. Its levels are drawn from one vocabulary with
-per-level weights, so a level is a different **mix** of the same thirty-five
-features rather than a different **place**, and the shape of a run is the same
-shape every time. Two numbers say it plainly: the exit climb is 47% of all
-landings and is one of four shapes, and the move mix is 94% plain hop.
+The 24-level tower of 2026-08-12 measured clean — 97% fidelity, 0.13%
+unchecked, 0 m walkable — and looked wrong, and the owner said so. A contact
+sheet of any run says why, and none of it is a number the probes watched:
 
-A designed level can commit to something. It can be four maximum-reach jumps
-onto one-cell pillars with no rest, or a room you cross entirely under a
-ceiling, or a shaft you climb rather than a terrace you run along. It can also
-be *wrong*, which is what the rest of this document is about.
+1. **The ground was a plaza.** Nearly every frame was a wide flat terrace
+   with knee-high boxes scattered on it. The body hopped between blocks it
+   could visibly have walked around: the walker probe only proves you cannot
+   climb *between* levels, and within a level the floor was right there under
+   every jump. Parkour over ground you could walk on is parkour that reads as
+   unnecessary — the owner's word, and the correct one.
+2. **Nothing was ever interior.** The reference alternates exposed cliff
+   ledge with enclosed rooms, tunnels and shafts every ten to twenty seconds.
+   The old tower was one hundred per cent open corridor: no walls, no roofs,
+   no lamps, no rhythm.
+3. **No level had a landmark.** "Village" was plaster-coloured boxes;
+   "jungle" was green ones. A place you recognise needs one thing to
+   recognise — a windmill, a temple hall, a giant tree — and no level had
+   anything larger than a pillar.
+4. **The wall and ceiling were undressed.** The core was a smooth fluted
+   cylinder and the ceiling a flat grey slab, both obviously procedural at
+   one glance.
+5. **The camera aimed at dirt.** The look-at is a blend of the next three
+   landings pulled toward the corridor tangent, so at take-off the actual
+   landing was routinely off-centre or off-frame — the owner read it as the
+   character not looking where it is jumping, which is exactly what it is.
 
-## The bargain: authored intent, mechanical placement, verified physics
+## What the reference actually does
 
-Three layers, and the split is the whole design.
+Read off Hielke's own maps at frame level (Parkour Spiral 1 walkthrough and
+speedrun, Parkour Spiral 3 walkthrough; 130-odd sampled frames, 2026-08-12):
 
-**Authored.** Every landing in every level is written down: what it is made of,
-how far along the terrace, how far in or out of the corridor, how high off the
-floor, what shape it is, whether there is a lid over the jump that reaches it,
-whether there is water underneath. Nothing is rolled.
+- **The course is a shelf, not a floor.** The walking surface is two to four
+  blocks wide, hugging a cliff face, with the drop directly outboard. Wide
+  ground exists only where a *place* needs it — a village street, a temple
+  floor — and then it is dressed as that place.
+- **In/out rhythm.** Exposed ledge, then an interior (temple hall, mine
+  gallery, treasure cave, library, barrel silo, ice tunnel), then exposed
+  again. Interiors have two-to-three-block ceilings, walls on both sides,
+  and their own light: lanterns, candles, glowstone, lava.
+- **One landmark per level.** Windmill, lighthouse, beehive frame, giant
+  tree, scaffolding crane, bell tower, wool loom, obsidian totem. It fills
+  the frame at least once and is what you remember.
+- **The cliff overhangs.** The rock face above the course leans out, ragged,
+  with vines, icicles, moss and the occasional lava or water pour falling
+  past the course. The tower reads as one huge weathered thing, not a stack
+  of clean plates.
+- **Hazards run through the floor.** Lava channels, water channels, void
+  slots — cut into the course's own ground, jumped along and across, not
+  parked beside it as decoration.
+- **Verticality is readable.** You look down and see the level you left as a
+  little diorama — the farm below the cliff you just climbed. You climb
+  hollow shafts inside the tower. You descend into pits and come back out.
+  Net motion is always up; *travel* is up and down.
+- **Difficulty is mostly modest.** The place is the star; the hard jumps are
+  punctuation. What keeps it entertaining watched rather than played is
+  exposure and variety, not gap length.
 
-**Mechanical.** The tower is round and the world is a lattice, so "3.6 blocks
-further along the corridor and 1.2 further out" is not a cell. Placement resolves
-that to whole cells the way it always has (`Course._targets` ranks the cells
-nearest the authored point; `_try_node` walks its fallbacks). This is not
-generation: the *shape* is authored and the machine only decides which cell is
-nearest to what was asked for.
+## Acceptance criteria
 
-**Verified.** Every resolved landing goes through the same `Course._attempt`
-that the generator's did: the cell must be free, have head-room, stand on
-something, be reachable by a move vanilla's numbers actually have, and have a
-clear path. An authored jump that no body can make is refused exactly as a
-generated one would be, and `tools/tower_probe.py` reports how many landings
-came out as authored, how many needed a fallback, and how many were refused
-outright. **Fidelity is the acceptance criterion for the design; safety is the
-acceptance criterion for the code.** They are different numbers and both are
-printed.
+Two kinds, and the split is the point: **frame criteria are judged by looking
+at contact sheets** — they are the reason this rebuild exists and no probe
+replaces them — and **probe criteria hold the old guarantees** while the world
+gets more complicated.
 
-The consequence worth stating: a level that measures badly is a level I
-designed badly, and the fix is to change the design, not to widen a tolerance.
+Frame criteria, over a contact sheet of any 40-second run:
+
+- F1. No frame in which flat terrace ground dominates the lower half with
+  the course as scattered knee-high blocks on it. The footing is always a
+  shelf, a structure, a pit, a channel bank or a room floor.
+- F2. The run alternates: at least a quarter of frames enclosed (walls both
+  sides, ceiling within three blocks), at least a third exposed (drop, sea
+  or the level below visible past the course), and no stretch of more than
+  ~15 s in one state.
+- F3. Every level's signature structure is on screen within its first four
+  seconds.
+- F4. In airborne frames the next landing sits in the middle third of the
+  frame at least seven times in ten.
+- F5. Any single frame shows at least three materials of distinct value in
+  the course zone; no level reads as one colour.
+- F6. Standing frames on undressed flat wall/soffit stay as rare as they are
+  now (lens metric ≤ 0.5% of frames mostly wall).
+
+Probe criteria (`tools/tower_probe.py`, `tools/spiral_probe.py --plan tower`),
+all held at or better than the 24-level tower:
+
+- P1. Designed landings placed as authored ≥ 90% overall, no level under 80%.
+- P2. Unchecked emergency placements ≤ 0.3%; cells twice-claimed 0;
+  off-lattice 0; orbs missed 0.
+- P3. Cone-alone walkability 0 m (the levels stay levels).
+- P4. Body inside the world ≤ 0.05% of frames.
+- P5. Per frame ≤ 3.5 ms in `frame_cost.py` terms (the shells and dressing
+  are not free; this is the budget they must fit in).
+- P6. Every authored jump legal on paper (`--design-only` clean).
+
+## What the engine grows to say it
+
+Six capabilities, each earned by a specific reference observation. The level
+table may only name things on this list or things that already existed.
+
+1. **Terrace profiles** (`Level.profile`). The plaza dies. A level's ground
+   is one of: `ledge` (a shelf against the core, the drop genuinely
+   outboard — the default; it swells into an *apron* at one bearing to hold
+   the landmark), `plaza` (the old full floor, reserved for levels that
+   dress it as a real place), `channel` (full floor with the theme's liquid
+   cut along the course). Profiles carve what `Cone`'s section painting
+   emits, with paint and collision deciding by the same per-cell test; the
+   walkability guarantee is unchanged because removing floor never adds a
+   walkable route. Going *down* is not a profile: the quarry descends the
+   **outside** of the tower on floating benches below the rim (signed
+   `step_y` hops), because a dug pit would need terrain carved ahead of
+   placement and the chasm guard rightly refuses landings below the far
+   floor.
+2. **Shells** (beat-level `shell=`). A stretch of course can be built
+   *inside* something: `tunnel` (tight walls, flat roof two to three over
+   the course), `hall` (tall interior, lamp niches), `cave` (rough walls,
+   uneven roof), `shaft` (a vertical tube around a climb). Painted after
+   the course is laid, through the same reservation checks as pedestals, so
+   a shell can never close over a jump's clearance. Shell interiors carry
+   their own light so the level's `dark` flag finally has somewhere to be
+   dark.
+3. **A weathered face.** The core wall grows a brow — the profile is
+   monotone in height by construction, only ever leaning further out as it
+   rises, so no cell of the cliff ever has free air above it and nothing
+   can stand on the face (the first draft used rock noise here and the
+   walkability probe caught it making one-block stairs at the level seams)
+   — plus bearing-keyed ridges, hanging teeth under the soffit's rim, and
+   dark cliff materials in place of the old light stone brick. Per-theme
+   pours (falling lava and water columns) are designed but not yet built.
+4. **Landmarks** (`Level.landmark`). Data-driven blueprint stamps painted on
+   the terrace through `_dressable`: windmill (with a bladed prop), watch
+   tower, temple front, giant tree, bell frame, crane, arch. One per level,
+   placed where the course faces it.
+5. **Authored exits.** A level may write its exit beats the way it writes
+   any beat — a staircase through a broken roof, a ladder inside a shaft
+   shell — with the generated climb kept as the fallback it already is.
+   The reliability chain (`_climb_on`, `_grab_the_wall`) is untouched.
+6. **The camera looks where it jumps.** From the moment a take-off is
+   booked until landing, the aim blends hard toward the actual landing
+   block; the corridor-tangent blend applies only while running. This is
+   F4, and it is a renderer change, not a course change.
 
 ## The tower
 
-The same shape as the generated version, because its shape was not the problem:
-a solid inverted cone flaring 0.05 per block, with a helical trough cut round it
-and one-cell ribs for a skin. It is **half as wide again** (`Cone.base_r = 36`
-against 24) and that is a design requirement rather than a preference: a level
-is a third of a revolution, its exit climb needs a fixed run-up in *blocks*, and
-what is left over is the design. At the generated radius that left about four
-authored landings a level against seven for the climb — a hand-built tower that
-was three fifths staircase, which is the thing hand-building it was meant to
-stop. A bigger circle lengthens every terrace and changes nothing else. It also
-straightens the corridor, which is why fewer frames come back looking into a
-wall. You are always in a corridor
-— drop and sky outboard, fluted core inboard, the floor slab of the level three
-above as a ceiling.
+Same building: solid inverted cone, `base_r = 36`, flare 0.05, one-cell ribs,
+three levels to a revolution. Thirty-three levels is eleven revolutions;
+at six to ten seconds a level that is four to five minutes of distinct
+content before anything repeats. A run still starts anywhere in the cycle,
+and the tower still loops by climbing — level 33's exit lands on level 1
+six blocks higher.
 
-What changes is that **the levels are no longer random**. Their themes, heights
-and chasm widths come from the table instead of from dice:
+Rises vary 3–10 and any three consecutive rises sum to 13–20 (the ceiling
+over a level is the floor slab of the level three above; the sum *is* the
+head-room). Tall rises belong to the two shaft levels and the canopy; short
+rises to thresholds and streets. Down happens inside levels — pits, drops
+through canopy, descents into cisterns — never between them, exactly as the
+reference does it.
 
-- **Twenty-four levels**, three to a revolution, so the cycle is eight
-  revolutions. At six to ten seconds a level that is a little under three
-  minutes of distinct content before anything repeats — comfortably longer than
-  the strip is ever on screen for one thinking turn.
-- **A run starts anywhere in the cycle.** The tower is fixed; the seed picks
-  which level you enter on. Two runs a minute apart show different places.
-- **It loops by climbing.** Level 24's exit lands on level 25, which is level 1
-  again, six or so blocks higher. There is no seam to hide because there is no
-  seam: the tower genuinely keeps going up, and the designed sequence is what
-  repeats. The last level is designed as a gate for that reason — it is the one
-  place the loop is legible, and making it legible is better than pretending.
+## The roster
 
-Level heights vary from 4 to 8 by design rather than 4 to 6 at random, which is
-most of what makes one level feel like a different building from the next: a
-four-block rise is a step up between two rooms and an eight-block rise is a
-shaft. The range is bounded at both ends and neither bound is taste. Below, the
-ceiling over a level is the floor slab of the level *three* above it, so three
-consecutive rises are literally the head-room and a run of short levels puts the
-soffit inside the parkour. Above, a single ladder spans nine and a half blocks,
-so a taller level cannot be left by one and falls back to a staircase that eats
-the terrace.
+Thirty-three levels. Consecutive levels differ on at least three of: band,
+enclosure, form, verb, constraint, rhythm, light. No theme twice in a row;
+interiors never twice in a row; each third of the tower gets at least three
+interiors and at least one vertical level.
+
+| # | name | theme | the idea | encl. | landmark | rise | exit |
+|---|------|-------|----------|-------|----------|------|------|
+| 1 | THE GATEHOUSE | plains | hedge-walled garden path, pond, benches; the gentle open | open | gate arch | 5 | stair |
+| 2 | WINDMILL REACH | farm | crop furrows as channels, hay ranks at full reach | open | windmill | 4 | hay stair |
+| 3 | MARKET STREET | village | a real street: facades, stalls, awning slabs, one house crossed inside | mixed | belfry facade | 6 | ladder up a gable |
+| 4 | THE TIMBERWORKS | mine | timbered gallery, rails, webs, candle light | interior | TNT crate stack | 5 | ladder in a timber cage |
+| 5 | SUNKEN TEMPLE | desert | sandstone hall, lava channel down the middle, doorway lids | interior | temple front | 6 | stair through broken roof |
+| 6 | THE BALCONIES | mesa | narrow terra ledges, big drops, bridge over a lava pour | open | terra bridge | 7 | rim stair |
+| 7 | CANOPY WALK | jungle | giant trunk, leaf decks, vine to the upper storey, drop back through | mixed | giant tree | 7 | vine wall |
+| 8 | THE CISTERN | dripstone | flooded cave, stepping stones, spikes, bubble out of the pool | interior | the well shaft | 6 | bubble in the well |
+| 9 | GLACIER SHELF | ice | open slides at reach, icicle brow, crevasse pit mid-level | open | crevasse | 4 | ice stair |
+| 10 | THE APIARY | honey | honeycomb frames, one slow honey beat, a slime bounce room | mixed | comb frame | 5 | scaffold |
+| 11 | THE CRUCIBLE | nether | dark cavern, zigzag lava channel, glowstone points | interior | lava fall | 7 | blackstone stair |
+| 12 | REEF GARDEN | coral | colour after the dark: coral fans, sea lanterns, water channel | open | brain-coral dome | 5 | prismarine stair |
+| 13 | THE SILENCE | deepdark | one-cell sculk landings over void, amethyst light | open | amethyst cluster | 6 | ladder |
+| 14 | THE BELFRY | village | vertical: beams and ledges up inside the bell tower | interior | the bell | 8 | ladder in the shaft |
+| 15 | WOOLWORKS | rainbow | the loom: wool stripe wall, checks, slime pad; short and loud | open | stripe wall | 4 | quartz stair |
+| 16 | THE VAULT | gold | treasure cave: gold, glowstone veins, a ledge over lava | interior | gold hoard | 5 | stair through the collapse |
+| 17 | THE WEIR | plains | water channel the whole way, stones barely above it, one long leap | open | the mill tower | 5 | oak ledges |
+| 18 | BLUE RUN | ice | relentless rim slides, then an ice tunnel finish | mixed | ice tunnel | 6 | ice stair |
+| 19 | THE QUARRY | desert | the undercut: down the *outside* of the tower on jutting benches, sea below, climb back over the crane | open | crane | 4 | stair |
+| 20 | ROPE BRIDGE | jungle | one-wide planks at the rim, guy posts, lantern poles | open | the bridge | 5 | vine |
+| 21 | BASALT FLUES | nether | blackstone columns under a low soffit, magma vents | interior | flue stacks | 7 | stair |
+| 22 | THE PILLARS | end | obsidian pillars over the void, purpur slabs, chorus | open | obsidian totem | 6 | bubble |
+| 23 | SPORE HOLLOW | mushroom | cave of giant mushrooms, shroomlight, mycelium | interior | great red cap | 5 | vine |
+| 24 | THE ARCHIVE | library | bookshelf halls, gallery stairs, lantern light | interior | the stair rotunda | 6 | ladder behind the shelves |
+| 25 | PUMPKIN ROWS | farm | dusk farm: glowing jack-o-lanterns, scarecrow, hay | open | scarecrow | 4 | hay stair |
+| 26 | THE GROVE | warped | teal shroomlight wood, bubble mid-level, caps above | mixed | warped giant | 6 | bubble |
+| 27 | DUST DEVILS | mesa | hoodoo spires with capstones, uneven rhythm, biggest drops | open | hoodoo forest | 7 | rim stair |
+| 28 | THE SEA GATE | prismarine | monument hall: sea-lantern light, water floor slots | interior | the gate arch | 5 | stair |
+| 29 | THE CORNICE | snow | snow ridge at the rim, icicles under it, a lit cabin crossed inside | mixed | the cabin | 5 | stair |
+| 30 | WART FIELDS | crimson | vivid nylium ledge, wart-canopy trees, lava pour behind | open | crimson giant | 6 | ladder on a trunk |
+| 31 | ECHO SHAFT | deepdark | the dark vertical: a louvred sculk well climbed from inside, amethyst light | interior | the shaft | 8 | ladder |
+| 32 | THE WHITE STAIR | quartz | pale gallery, long views, elegant; the breath before the gate | mixed | colonnade | 5 | stair |
+| 33 | THE GATE | end | the obsidian arch, one last leap, and the garden again | open | the arch | 4 | stair |
+
+Every level: 10–15 authored landings before its exit, a filler in its own
+voice, and its skin naming three to five materials with real value contrast.
+
+New themes this roster needs: honey, coral, gold, library, prismarine, snow,
+crimson, quartz — most built from materials that already exist; new
+materials are bookshelf, honeycomb, coral (three colours), shroomlight,
+crimson nylium and wart block, pumpkin, raw gold, calcite already exists.
+New props: lantern pole, windmill blades, bell, candle cluster, coral fans,
+scarecrow. All built by `assets/src/` scripts like everything else.
 
 ## What "difficult" can mean here, honestly
 
-There is one jump impulse and one horizontal speed, so the envelope is fixed
-and small, and pretending otherwise would produce jumps the checker refuses:
+Unchanged from the 24-level tower and still binding — one jump impulse, one
+speed:
 
 | | shortest | longest |
 |---|---|---|
@@ -107,150 +235,54 @@ and small, and pretending otherwise would produce jumps the checker refuses:
 | down one | 2.35 m | **4.98 m** |
 | down four | 3.98 m | **7.05 m** |
 
-Distances are stand-point to stand-point, which is about 0.7 m shorter than
-centre to centre for ordinary blocks — the feet plant back from each edge.
-
-So difficulty is not "longer". It is:
-
-1. **At the top of the envelope, repeatedly.** A 4.0 m level jump is a
-   four-block jump in the game and is the standard hard jump; a 3.0 m up-jump
-   is the three-block up-jump. A designed level can ask for those back to back,
-   which a weighted table almost never does.
-2. **Small landings.** One-cell pillars, slabs, fence posts. The body's own
-   footprint is 0.6 m against a 1 m cell, so a one-cell landing is genuinely
-   tight and reads as tight.
-3. **A lid.** A ceiling over the jump forces a flat arc and refuses the ones
-   that climb. Checked, not decorative.
-4. **No rest.** Chaining demanding landings with no easy beat between them is
-   the cheapest difficulty there is and costs no geometry.
-5. **Consequence in view.** A jump over lava, over a hole with nothing in it, or
-   out over the rim with two hundred blocks of air under it is not harder to
-   land and is much harder to *watch*, which is what this strip is for.
-
-Nine tenths of the roster leans on 1, 2 and 4 together. Where a level wants a
-verb the kernel does not have, the kernel gets it — but that is a physics
-change with its own proof, and it is listed under "Kernel work" rather than
-smuggled into a level.
-
-## Making twenty-four levels feel like twenty-four places
-
-Seven axes, and the roster is laid out so that consecutive levels differ on at
-least three:
-
-- **Band** — where in the corridor the course runs: hard against the core,
-  down the middle, or out at the rim over the drop.
-- **Altitude** — on the floor, at head height, or up near the soffit.
-- **Form** — the terrace itself, full blocks, slabs, one-cell pillars, wide
-  platforms.
-- **Verb** — hop, ice slide, cobweb wade, ladder, bubble column, slime bounce,
-  walk.
-- **Constraint** — lids, moats, void beneath, narrow corridors.
-- **Rhythm** — even, accelerating, burst-and-rest, relentless.
-- **Light** — daylit, dusk, or dark enough that the level's own lamps are all
-  you have.
-
-## The roster
-
-Levels are listed in climb order. "Rise" is how far above this level the next
-one sits; "exit" is the designed way out of it.
-
-Each level runs six to nine beats before its exit climb, and every one of them
-plays: measured over sixteen runs, no beat in the table is ever skipped and the
-median level gets through its whole script and into its filler. The scripts
-were lengthened once for exactly that reason — at three to five beats a level
-spent half its terrace repeating filler.
-
-| # | theme | name | the idea | rise | exit |
-|---|---|---|---|---|---|
-| 1 | plains | Meadow Gate | wide grass humps at full reach over a carved pond, then fence posts | 5 | oak ledges |
-| 2 | farm | The Long Furrow | hay bales in a straight rank at 4.0 m, crop rows between, a haystack to top out | 4 | hay stair |
-| 3 | village | Rooftops | plaster roofs at three heights, doorway lids, a drop onto a slab awning | 6 | ladder up a gable |
-| 4 | desert | Sunstruck | dune tops, then sandstone one-cell pillars under a beam | 5 | sandstone stair |
-| 5 | mesa | Red Spires | tall thin spires, big drops, the longest jumps in the tower | 8 | stair on the rim |
-| 6 | jungle | Canopy | logs and leaf platforms, a vine to gain the upper storey, a drop through it | 7 | vine wall |
-| 7 | mushroom | Spore Deck | wide caps with wide gaps, a slime pad in the middle | 4 | vine |
-| 8 | dripstone | The Drip | spikes down from the soffit, water below, a bubble lift out of the pool | 9 | bubble column |
-| 9 | mine | Cut and Cover | rails on the floor and a low ceiling the whole way, webs in the dark | 5 | ladder shaft |
-| 10 | deepdark | Sculk | void gaps, tiny landings, lit only by amethyst | 6 | ladder |
-| 11 | ice | Glacier Run | packed ice, the fastest level, slides at maximum reach | 5 | ice stair on slides |
-| 12 | nether | Lava Leap | lava moats and magma pillars, a soul-sand beat to break the pace | 7 | stair |
-| 13 | warped | Warped Grove | shroomlight, a bubble lift mid-level, caps and vines | 6 | bubble |
-| 14 | end | Endpillars | obsidian pillars over the void, purpur slabs, chorus | 8 | bubble |
-| 15 | rainbow | Woolwork | the candy level: pure floating blocks, slime, checks | 4 | stair |
-| 16 | plains | The Weir | a water channel crossed on stepping stones, then one long leap | 5 | oak ledges |
-| 17 | mine | The Shaft | vertical: scaffolds and ladders, barely a jump in it | 11 | ladder |
-| 18 | ice | Blue Ice | relentless: long slides, no rest, out at the rim | 6 | ice stair |
-| 19 | desert | The Quarry | a stepped pit of cut sandstone, deep drop-jumps | 4 | stair |
-| 20 | jungle | Rope Bridge | one-wide plank runs out at the rim over two hundred blocks of air | 5 | vine |
-| 21 | nether | Basalt Deltas | blackstone columns, tight lids, magma underfoot | 7 | stair |
-| 22 | deepdark | Silence | the hardest: maximum reach onto one-cell landings, in the dark | 6 | ladder |
-| 23 | village | Belfry | vertical: beams and ledges up the inside of a tower | 10 | ladder |
-| 24 | end | The Gate | an obsidian arch, one last leap, and the cycle begins again | 3 | stair |
-
-## Kernel work this design asks for
-
-Listed separately because each is a change to the physics and needs its own
-proof, not a level that happens to use it. Nothing in the roster above depends
-on any of them; they are what the roster would like *next*.
-
-- **Jump-cancel** — hitting your head zeroes the rise and keeps the run. Closed
-  form, and it makes a lid at two blocks honest instead of the three the
-  clearance test currently needs. Worth knowing before building it: a level
-  jump under a two-block lid reaches at most 1.7 m, under `MIN_HOP`, so a `2bc`
-  is a thing you sprint under rather than a gap you clear.
-- **Ice accumulation** — speed as a state that ice raises and friction decays,
-  so an ice corridor is a run-up you build. Levels 11 and 18 are designed
-  around ice reaching further than stone; with accumulation they could reach
-  further still the longer they ran.
-- **Two-leg steered jumps** — an approximation of air control, which would make
-  the neo family expressible. Levels 20 and 23 both want it.
+Difficulty is: the top of the envelope repeatedly, small landings, lids,
+no rest, and consequence in view. The roster leans on all five, but the
+lesson of the reference is that difficulty is the punctuation, not the
+sentence — the place is the sentence.
 
 ## Verifying it
 
-Two probes, two questions.
+`python tools/tower_probe.py` asks **did it come out as designed** — every
+authored jump against `hop_span` on paper first (`--design-only`, instant),
+then fidelity per level and per beat. `python tools/spiral_probe.py --plan
+tower` asks **is it safe**, with nothing special-cased. The frame criteria
+are judged from `brainrot shoot` contact sheets per level — `tools/`
+carries a per-level harness so one level can be rendered without waiting
+for the tower to reach it.
 
-`python tools/tower_probe.py` asks **did it come out as designed**, which is the
-question only a hand-built tower can fail. It checks every authored jump
-against `hop_span` *on paper* first — that costs nothing and catches the whole
-class of "I wrote a four-block up-jump" before anything is built — then reports
-fidelity per level and per beat. `--design-only` is instant.
+`tests/test_tower.py` holds the invariants: design legal on paper, rises
+sum to head-room, no theme twice in a row, every level reached, the loop
+closes, fidelity over 90%, unknown materials refused, and the scene drawn
+end to end across seeds.
 
-`python tools/spiral_probe.py --plan tower` asks **is it safe**, using exactly
-the measurements the generated tower is held to. Nothing there is special-cased
-for this one; it is the same building, the same physics and the same renderer.
+Measured on this design, 2026-08-12 (16 runs × 340 landings; 12 × 306 for
+safety; 6 × 35 s for motion; 8 walk runs):
 
-Measured, 16 runs × 340 landings and 6 runs × 40 s:
-
-| | generated | hand-built |
+| | 24-level tower | this tower |
 |---|---|---|
-| designed landings placed **as authored** | n/a | **97.1%** |
-| designed content, as a share of the course | n/a | **68%** |
-| the exit climb, as a share of the course | 47% | **33%** |
-| distinct named beats in a run | 38 kinds | **137 kinds** |
-| named places | 15 shuffled themes | **24 designed levels** |
-| mean jump / share over 4 m | 2.90 m / — | **3.12 m / 17%** |
-| unchecked emergency placements | 0.30% | **0.13%** |
-| cells claimed twice / off the lattice | 0 | **0** |
+| designed landings placed as authored | 97.1% | **98.5%** |
+| designed content / the exit climb | 68% / 33% | **67% / 33%** |
+| named places | 24 | **33** |
+| designed jump min/mean/max | — / 3.12 / — | **2.26 / 3.02 / 7.55 m** |
+| unchecked emergency placements | 0.13% | **0.19–0.22%** |
+| cells twice-claimed / off-lattice | 0 | **0** |
 | climbable without the parkour | 0 m | **0 m** |
-| frames mostly filled by a wall | 1.7% | **0.4%** |
-| seconds on one place | 7.3 s | **10.7 s** |
-| per frame | 2.34 ms | **2.80 ms** |
+| moves per minute / median idle | — | **98.6 / 0.53 s** |
+| dead air / frozen frames | — | **0.6% / 0.00%** |
+| orbs taken / missed | — | **252 / 0** |
+| per frame (vs parkour same run) | 2.80 ms (×1.39) | **3.41 ms (×1.30)** |
+| frames mostly filled by a wall | 0.4% | **2.8%** |
 
-Two of those deserve a note. **Fidelity is not 100% and should not be**: the
-tower is round and the world is whole cells, so some authored point always
-falls between two of them and placement takes the nearer. What the number
-guards against is *sag* — a design change that quietly stops arriving. And the
-**exit climb is still a third of the course**, which is the largest remaining
-gap between this and a real map; the levels own which of the four shapes they
-use and what the treads are made of, but not the shape itself. Measured: giving
-four more levels a ladder exit buys 0.2 points of non-hop share for 0.13 points
-of unchecked placement, so the fix is structural, not a reweighting.
-
-`tests/test_tower.py` holds the invariants that must never lapse: the design is
-legal on paper, three consecutive rises are the head-room, no two neighbouring
-levels share a theme, every level is reached, the tower loops, fidelity stays
-over 90%, and — the one that would have caught the only bug hand-authoring
-actually produced — the scene is *drawn* all the way through several levels,
-because a level naming a material the renderer has no recipe for is a
-`KeyError` a hundred and forty frames into a run and no geometry check can see
-it.
+Two of those need the honest note. The 7.55 m maximum jump is the quarry's
+undercut drops — the longest jumps the motion model can express, finally
+somewhere a viewer can see why. And **the wall-filled frame rate went up**,
+which is partly the price of having interiors at all (a tunnel *is* walls
+near the lens) and partly a real residue: it clusters in one- to two-second
+stretches at corridor bends where the cliff swings across the aim, exactly
+the shape the last such residue had. The method that closed that one —
+bucket `_lens_jammed` frames by segment — is the way into this one, and it
+is the top outstanding item, with per-theme pours, the windmill's blades
+(and a bell, coral fans, a scarecrow) as the assets the roster still wants,
+and authored `exit_beats` written for no level yet — the mechanism exists
+and is tested, so the remaining third of the course that is machinery can
+now be replaced one level at a time.

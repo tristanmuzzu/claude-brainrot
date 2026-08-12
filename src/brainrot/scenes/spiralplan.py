@@ -176,9 +176,23 @@ MATERIALS.update({
     "wool_blue": ((60, 96, 190), "wool", 0.02),
     "wool_purple": ((136, 62, 178), "wool", 0.02),
     "wool_pink": ((228, 132, 176), "wool", 0.02),
-    # -- the neutral mass everything else is set against
-    "conestone": ((156, 156, 161), "stonebrick", 0.02),
-    "conerib": ((138, 138, 144), "stonebrick", 0.02),
+    # -- the designed tower's own places
+    "bookshelf": ((146, 108, 62), "bricks", 0.04),
+    "honeycomb": ((222, 156, 40), "bricks", 0.03),
+    "rawgold": ((216, 176, 72), "cobble", 0.03),
+    "coral_red": ((202, 62, 72), "speck", 0.04),
+    "coral_pink": ((230, 122, 152), "speck", 0.04),
+    "coral_blue": ((72, 112, 204), "speck", 0.04),
+    "wartblock": ((146, 24, 30), "leaves", 0.04),
+    "pumpkin": ((218, 126, 34), "grain", 0.03),
+    "diorite": ((216, 212, 208), "speck", 0.02),
+    # -- the neutral mass everything else is set against. A *cliff*, not
+    # masonry: the reference's core face is dark weathered rock with the
+    # course's own colours set against it, and the light stone brick this
+    # used to be filled half of every frame with something that read as a
+    # castle wall from a different game.
+    "conestone": ((88, 84, 82), "cobble", 0.03),
+    "conerib": ((74, 71, 69), "cobble", 0.03),
     # The soffit is its own material and its base is deliberately far brighter
     # than the stone beside it. Vanilla shades a downward face to 0.50 and this
     # project keeps that constant honestly, so a mid-grey ceiling measured
@@ -187,7 +201,7 @@ MATERIALS.update({
     # an overhang; this renderer has no such thing, so the compensation goes
     # into the material. The soffit is the single largest surface in the format
     # and it has to read as stone.
-    "conesoffit": ((228, 229, 235), "stonebrick", 0.02),
+    "conesoffit": ((206, 202, 194), "cobble", 0.03),
 })
 
 #: Props whose origin is at the *top* of the model, so they hang from the cell
@@ -492,6 +506,57 @@ THEMES = (
            "voidgap": 1.6},
           (240, 220, 250), 0.0, WOOLS,
           exits=("stair",)),
+    # -- places the designed tower asked for. In the generated rotation they
+    # are simply eight more themes in the bag; in the hand-built tower each
+    # is the base skin of one or two named levels.
+    Theme("honey", "hay", "honeycomb", "honeycomb", "honey", None,
+          "shroomlight", ("mcfence", "grasstuft", "flower"),
+          {"slimebounce": 2.8, "haystack": 2.0, "headhitter": 1.8},
+          (232, 196, 128),
+          exits=("stair", "ladder"),
+          step=("honeycomb", "hop")),
+    Theme("coral", "sand", "coral_pink", "coral_red", "coral_blue", "water",
+          "sealantern", ("flower", "pebbles", "grasstuft"),
+          {"pond": 2.6, "channel": 2.2, "pillars": 1.8, "spire": 1.6},
+          (140, 208, 216),
+          exits=("stair",),
+          step=("coral_red", "hop")),
+    Theme("gold", "tuff", "deepslate", "rawgold", "gold", "lava",
+          "glowstone", ("pebbles", "torch", "chain"),
+          {"headhitter": 2.2, "lavaleap": 2.0, "corner": 1.8},
+          (150, 118, 62), 0.72,
+          exits=("stair", "ladder"),
+          step=("rawgold", "hop")),
+    Theme("library", "spruce", "oak", "bookshelf", "oak", None, "lantern",
+          ("torch", "lanternpost"),
+          {"doorway": 2.6, "slabline": 2.2, "corner": 1.8, "headhitter": 1.6},
+          (172, 148, 112), 0.58,
+          exits=("ladder", "stair"),
+          step=("oak", "hop")),
+    Theme("prismarine", "prismarine", "darkprismarine", "prismarine",
+          "sealantern", "water", "sealantern", ("pebbles",),
+          {"pond": 2.4, "channel": 2.2, "doorway": 2.0, "slabline": 1.6},
+          (86, 148, 158), 0.5,
+          exits=("stair", "bubble"),
+          step=("darkprismarine", "hop")),
+    Theme("snow", "snow", "packedice", "frost", "spruce", None, "lantern",
+          ("pebbles", "mcfence", "lanternpost"),
+          {"iceline": 2.4, "slabline": 2.0, "hump": 1.8, "voidgap": 1.6},
+          (222, 230, 242),
+          exits=("stair",),
+          step=("frost", "hop")),
+    Theme("crimson", "crimsonnylium", "netherrack", "crimson", "wartblock",
+          "lava", "shroomlight", ("netherfungus", "vinehang"),
+          {"capstep": 2.4, "lavaleap": 2.0, "vineclimb": 2.0, "spire": 1.6},
+          (150, 58, 56), 0.55,
+          exits=("ladder", "vine", "stair"),
+          step=("crimson", "hop")),
+    Theme("quartz", "quartz", "diorite", "quartz", "gold", None, "lantern",
+          ("lanternpost", "pebbles"),
+          {"slabline": 2.4, "corner": 2.0, "pillars": 1.8, "doorway": 1.6},
+          (228, 232, 244),
+          exits=("stair",),
+          step=("diorite", "hop")),
 )
 THEME_BY_NAME = {t.name: t for t in THEMES}
 #: ``ladder`` and ``vine`` are here rather than in a theme's prop list because
@@ -499,6 +564,155 @@ THEME_BY_NAME = {t.name: t for t in THEMES}
 PROP_KINDS = tuple(sorted({k for t in THEMES for k in t.props}
                           | {"lilypad", "ladder", "vine"}))
 MATERIALS.setdefault("mycelium", ((150, 132, 146), "dirt", 0.04))
+
+
+def _lm_box(cells, t0, t1, y0, y1, r0, r1, style) -> None:
+    for dt in range(t0, t1 + 1):
+        for dy in range(y0, y1 + 1):
+            for dr in range(r0, r1 + 1):
+                cells.append((dt, dy, dr, style))
+
+
+def _lm_windmill(rng, theme):
+    cells: list = []
+    _lm_box(cells, -1, 1, 0, 2, -1, 1, "plaster")
+    _lm_box(cells, 0, 1, 3, 5, 0, 1, "plaster")
+    _lm_box(cells, -1, 2, 6, 6, -1, 2, "roof")
+    cells.append((0, 1, -2, theme.glow))
+    return cells
+
+
+def _lm_watchtower(rng, theme):
+    cells: list = []
+    _lm_box(cells, 0, 1, 0, 4, 0, 1, theme.rock)
+    _lm_box(cells, -1, 2, 5, 5, -1, 2, theme.accent)
+    for dt, dr in ((-1, -1), (2, -1), (-1, 2), (2, 2)):
+        cells.append((dt, 6, dr, theme.rock))
+    cells.append((0, 6, 0, theme.glow))
+    return cells
+
+
+def _lm_tree(rng, theme):
+    cells: list = []
+    trunk = "junglelog" if theme.name in ("jungle", "CANOPY WALK") else "log"
+    leaf = "jungleleaf" if trunk == "junglelog" else "leaves"
+    _lm_box(cells, 0, 0, 0, 4, 0, 0, trunk)
+    _lm_box(cells, -1, 1, 4, 5, -1, 1, leaf)
+    cells.append((0, 6, 0, leaf))
+    return cells
+
+
+def _lm_bell(rng, theme):
+    cells: list = []
+    _lm_box(cells, -1, -1, 0, 3, 0, 0, theme.rock)
+    _lm_box(cells, 1, 1, 0, 3, 0, 0, theme.rock)
+    _lm_box(cells, -1, 1, 4, 4, 0, 0, "oak")
+    cells.append((0, 3, 0, "gold"))
+    return cells
+
+
+def _lm_crane(rng, theme):
+    cells: list = []
+    _lm_box(cells, 0, 0, 0, 5, 0, 0, "spruce")
+    _lm_box(cells, 0, 3, 5, 5, 0, 0, "spruce")
+    cells.append((3, 4, 0, "spruce"))
+    return cells
+
+
+def _lm_totem(rng, theme):
+    cells: list = []
+    _lm_box(cells, 0, 0, 0, 4, 0, 0, "obsidian")
+    _lm_box(cells, 0, 0, 2, 4, 1, 1, "obsidian")
+    cells.append((0, 3, 0, theme.glow))
+    return cells
+
+
+def _lm_comb(rng, theme):
+    cells: list = []
+    _lm_box(cells, -1, 2, 0, 3, 1, 1, "honeycomb")
+    cells.append((0, 1, 1, theme.glow))
+    cells.append((1, 2, 1, "honey"))
+    return cells
+
+
+def _lm_greatcap(rng, theme):
+    cells: list = []
+    _lm_box(cells, 0, 0, 0, 2, 0, 0, "mushroomstem")
+    _lm_box(cells, -2, 2, 3, 3, -2, 2, "mushroomred")
+    _lm_box(cells, -1, 1, 4, 4, -1, 1, "mushroomred")
+    return cells
+
+
+def _lm_hoard(rng, theme):
+    cells: list = []
+    _lm_box(cells, 0, 1, 0, 0, 0, 1, "rawgold")
+    cells.append((0, 1, 0, "gold"))
+    cells.append((1, 1, 1, "rawgold"))
+    cells.append((2, 0, 0, "gold"))
+    return cells
+
+
+def _lm_stripes(rng, theme):
+    cells: list = []
+    for i, dt in enumerate(range(-2, 4)):
+        _lm_box(cells, dt, dt, 0, 3, 1, 1, WOOLS[i % len(WOOLS)])
+    return cells
+
+
+def _lm_cabin(rng, theme):
+    cells: list = []
+    _lm_box(cells, -1, 1, 0, 1, -1, 1, "spruce")
+    _lm_box(cells, -1, 1, 2, 2, -1, 1, "roof")
+    cells.append((0, 0, -2, theme.glow))
+    return cells
+
+
+def _lm_hoodoo(rng, theme):
+    cells: list = []
+    h1, h2 = rng.randint(3, 4), rng.randint(5, 6)
+    _lm_box(cells, 0, 0, 0, h1, 0, 0, "terra_red")
+    cells.append((0, h1 + 1, 0, "terra_white"))
+    _lm_box(cells, 2, 2, 0, h2, 1, 1, "terra_orange")
+    cells.append((2, h2 + 1, 1, "terra_white"))
+    return cells
+
+
+def _lm_arch(rng, theme):
+    cells: list = []
+    _lm_box(cells, -2, -2, 0, 3, 0, 0, theme.rock)
+    _lm_box(cells, 2, 2, 0, 3, 0, 0, theme.rock)
+    _lm_box(cells, -2, 2, 4, 4, 0, 0, theme.accent)
+    return cells
+
+
+def _lm_cluster(rng, theme):
+    cells: list = []
+    _lm_box(cells, 0, 0, 0, 1, 0, 0, "amethyst")
+    cells.append((1, 0, 0, "amethyst"))
+    cells.append((0, 2, 0, "amethyst"))
+    cells.append((-1, 0, 1, "amethyst"))
+    return cells
+
+
+#: The signature structure a level is recognised by, by name. Built in the
+#: trough's own frame and painted by :meth:`Course._landmark` -- off the
+#: course, on real ground, or not at all.
+LANDMARKS = {
+    "windmill": _lm_windmill,
+    "watchtower": _lm_watchtower,
+    "tree": _lm_tree,
+    "bell": _lm_bell,
+    "crane": _lm_crane,
+    "totem": _lm_totem,
+    "comb": _lm_comb,
+    "greatcap": _lm_greatcap,
+    "hoard": _lm_hoard,
+    "stripes": _lm_stripes,
+    "cabin": _lm_cabin,
+    "hoodoo": _lm_hoodoo,
+    "arch": _lm_arch,
+    "cluster": _lm_cluster,
+}
 
 
 class Section:
@@ -515,12 +729,13 @@ class Section:
     floor. Those two are the whole reason the parkour is not optional.
     """
 
-    __slots__ = ("gap", "hard", "index", "rise", "signature", "theme", "u0",
-                 "u1", "y")
+    __slots__ = ("gap", "hard", "index", "landmark", "profile", "rise",
+                 "shelf", "signature", "theme", "u0", "u1", "y")
 
     def __init__(self, index: int, theme: Theme, u0: float, u1: float,
                  y: int, rise: int, gap: float, hard: float = 1.0,
-                 signature: str = "") -> None:
+                 signature: str = "", profile: str = "plaza",
+                 shelf: float = 4.0, landmark: str = "") -> None:
         self.index = index
         self.theme = theme
         self.u0 = u0
@@ -550,6 +765,19 @@ class Section:
         #: this format's themes only half did: a jungle that occasionally has a
         #: vine in it is not a jungle level.
         self.signature = signature
+        #: What the terrace's *ground* is. ``plaza`` is the full band, and is
+        #: what every generated level is; ``ledge`` keeps ground only for
+        #: ``shelf`` cells out from the core, with the drop genuinely outboard
+        #: -- the reference's course is a shelf on a cliff, not a floor with
+        #: toys on it, and this is that shape; ``channel`` is the full band
+        #: with the theme's liquid cut along the middle of it. The hand-built
+        #: levels choose; dice never do.
+        self.profile = profile
+        self.shelf = shelf
+        #: The one structure this level is recognised by, or "". A place you
+        #: remember needs one thing to remember it by, and no amount of good
+        #: parkour is that thing. Painted during dressing, off the course.
+        self.landmark = landmark
 
     @property
     def u_edge(self) -> float:
@@ -700,6 +928,99 @@ class Cone:
         """The trough's inner edge: the foot of the flank above."""
         return self.outer_at(u) - BAND
 
+    def floor_range(self, u: float, apron: bool = True) -> tuple[float, float]:
+        """The radial extent of the ground at this bearing.
+
+        The full band for a ``plaza`` level -- every generated level, and the
+        designed streets and halls that dress a wide floor as a place. A
+        ``ledge`` level keeps only a shelf against the core, wobbled a little
+        so the edge reads as broken ground rather than a sawn plank, and
+        everything outboard of it is the drop. The shelf never narrows under
+        three cells: the exit stair hugs the core at 2.4 and has to have
+        ground under its piers.
+        """
+        out = self.outer_at(u)
+        lv = self.level(self.level_index(u))
+        if lv.profile == "ledge":
+            w = max(3.0, lv.shelf + 0.9 * math.sin(u * 1.7 + self._w2)
+                    + 0.4 * math.sin(u * 4.3 + self._w3))
+            # The apron: one stretch of every ledge swells out to hold the
+            # level's landmark. A shelf four cells wide has no room for a
+            # windmill beside the course, and a constant-width ribbon reads
+            # as machined anyway. Closed form off the level's own index, so
+            # collision, mesh and the landmark painter all agree on where.
+            if apron:
+                # ``apron=False`` is the course's view: the pull toward the
+                # shelf edge must not follow the bulge, or the course parks
+                # itself exactly where the landmark was meant to stand.
+                au = self.apron_u(lv)
+                d = abs(u - au) * max(6.0, self.rim_at(lv.y))
+                if d < 5.0:
+                    w += 4.5 * (1.0 - d / 5.0)
+            return out - BAND, out - BAND + w
+        return out - BAND, out
+
+    def apron_u(self, lv: Section) -> float:
+        """Where this level's ledge swells, in unwrapped angle."""
+        f = 0.3 + 0.4 * ((math.sin(lv.index * 12.9898) * 43758.5453) % 1.0)
+        return lv.u0 + (lv.u1 - lv.u0) * f
+
+    def on_floor(self, u: float, r: float) -> bool:
+        """Is this radius over ground, at a bearing that has any?"""
+        r0, r1 = self.floor_range(u)
+        return r <= r1 + 1e-9
+
+    def channel_range(self, u: float) -> tuple[float, float] | None:
+        """The radial extent of the liquid cut along a ``channel`` level, or
+        ``None``. Two cells wide, mid-band, wandering just enough that the
+        stepping stones across it are never twice the same jump."""
+        lv = self.level(self.level_index(u))
+        if lv.profile != "channel":
+            return None
+        out = self.outer_at(u)
+        mid = out - BAND + 3.6 + 1.1 * math.sin(u * 1.3 + self._w1)
+        return mid, mid + 2.2
+
+    def core_r(self, u: float, y: int) -> float:
+        """The core wall's radius at a height -- the cliff at your back.
+
+        Not a cylinder any more. Two or three cells under the soffit the wall
+        leans *out* over the course -- the reference's cliff overhangs and the
+        smooth flute was the single most procedural-looking thing left -- and
+        above head height it carries a knuckle of roughness. Both are closed
+        forms keyed on the bearing and the height, so collision and mesh can
+        never disagree; and the roughness starts three cells off the floor so
+        the walker can never use it as a stair (one knob at +3 with nothing at
+        +1 is unreachable, and the walkability probe holds that at zero).
+        """
+        lv = self.level(self.level_index(u))
+        inner = self.outer_at(u) - BAND
+        if not self.has_floor(u + 2 * math.pi):
+            # No ceiling overhead means a bulge would have open air above its
+            # top cell -- a standable shelf on the cliff face, which is
+            # exactly the thing the walkability probe exists to refuse.
+            return inner
+        soffit = self.level(lv.index + LEVELS_PER_TURN).y - FLOOR_T
+        h = y - lv.y
+        span = max(1.0, soffit - lv.y - 2.0)
+        # Monotone in height, by construction and not by tuning: the wall
+        # only ever leans *further out* as it rises, so no cell of the face
+        # ever has free air above it and nothing can stand on the cliff. The
+        # first walkability regression this project had came from a knuckle
+        # of rock noise here whose bumps made one-block stairs at the level
+        # seams; a profile that cannot un-lean cannot make a stair.
+        t = min(1.0, max(0.0, (h - 2.0) / span)) ** 1.3
+        ridge = (0.3 + 0.7 * (0.5 + 0.5 * math.sin(u * 2.1 + self._w3))
+                 + 0.5 * (0.5 + 0.5 * math.sin(u * 7.7 + self._w1)))
+        return inner + ridge * t
+
+    def tooth(self, u: float) -> bool:
+        """Does the ceiling slab hang a tooth at this bearing? The soffit's
+        underside is dead flat otherwise, and a flat plate overhead is the
+        other half of what read as procedural."""
+        return (math.sin(u * 6.3 + self._w2)
+                + 0.6 * math.sin(u * 15.7 + self._w1)) > 1.05
+
     def rib_out(self, x: float, z: float) -> float:
         """How far the flute stands proud at this bearing. Either 0 or 1.
 
@@ -748,8 +1069,20 @@ class Cone:
             up = u + 2 * math.pi
             if not self.has_floor(up):
                 return False
-            return r <= self.outer_at(up)
-        return r <= self.outer_at(u) - BAND     # the core, behind your back
+            if r > self.floor_range(up)[1]:
+                return False            # outboard of a ledge level's shelf
+            ch = self.channel_range(up)
+            if ch and ch[0] <= r <= ch[1] and y >= above.y - 2:
+                return False            # the cut the channel's liquid sits in
+            return True
+        if y == above.y - FLOOR_T - 1 and self.tooth(u):
+            # A tooth hanging off the soffit, out near the slab's edge.
+            up = u + 2 * math.pi
+            if self.has_floor(up):
+                r1f = self.floor_range(up)[1]
+                if r1f - 1.6 <= r <= r1f:
+                    return True
+        return r <= self.core_r(u, y)           # the core, behind your back
 
     def surface_y(self, x: float, z: float, y_hint: float) -> int:
         """The ``y`` a body standing at this bearing has its feet at."""
@@ -853,12 +1186,19 @@ class Cone:
             h = y - lv.y
             inner = self.outer_at(u) - BAND
             # The core, at every height: the wall at the back of the trough,
-            # fluted. Its lowest two cells carry the theme's own subsoil, so
-            # the wall reads as a cut bank through the level rather than as
-            # bare masonry meeting grass.
-            self._ring(ct, st, inner - SKIN, inner, y,
+            # fluted, browed and knuckled -- ``core_r`` is the collision
+            # radius, so the mesh follows it and the two cannot disagree.
+            # Its lowest two cells carry the theme's own subsoil, so the wall
+            # reads as a cut bank through the level rather than as bare
+            # masonry meeting grass.
+            self._ring(ct, st, inner - SKIN, self.core_r(u, y), y,
                        lv.theme.sub if 0 <= h < 2 else "conerib",
                        seen, place, rib=True)
+            if y == above.y - FLOOR_T - 1 and self.tooth(u) \
+                    and self.has_floor(u + 2 * math.pi):
+                r1f = self.floor_range(u + 2 * math.pi)[1]
+                self._ring(ct, st, r1f - 1.6, r1f, y, "conesoffit",
+                           seen, place)
             if y >= above.y - FLOOR_T and self.has_floor(u + 2 * math.pi):
                 self._slab(ct, st, u + 2 * math.pi, y, above.y - 1 - y,
                            seen, place)
@@ -876,21 +1216,42 @@ class Cone:
         than a stack of plates, for the price of two.
         """
         theme = self.section_at(up).theme
-        out = self.outer_at(up)
+        out = self.floor_range(up)[1]
         if depth == 0:
-            style, r0 = theme.ground, out - BAND - SKIN
+            style, r0 = theme.ground, self.outer_at(up) - BAND - SKIN
         elif depth == 1:
             # The cut face under the ground: a slice through the place, which
             # is what stops the rim reading as a painted line.
-            style, r0 = theme.sub, out - BAND - SKIN
+            style, r0 = theme.sub, self.outer_at(up) - BAND - SKIN
         elif depth == FLOOR_T - 1:
-            style, r0 = "conesoffit", out - BAND - SKIN
+            style, r0 = "conesoffit", self.outer_at(up) - BAND - SKIN
         else:
             style, r0 = "conestone", out - 2.0
+        ch = self.channel_range(up) if depth <= 1 else None
+        lv = self.level(self.level_index(up))
+        if ch or lv.profile == "ledge":
+            # A cut profile must be painted with exactly the test collision
+            # uses -- paint deciding by the float radius of the march while
+            # ``rock`` decides by the cell's own is how a course grows
+            # invisible walls and fall-through ledges. Same cell, same answer.
+            liquid = theme.liquid or "water"
+            edge = out
+
+            def styler(cell):
+                r = math.hypot(cell[0], cell[2])
+                if r > edge + 1e-9:
+                    return None
+                if ch and ch[0] <= r <= ch[1]:
+                    return liquid if depth == 1 else None
+                return style
+            self._ring(ct, st, r0, out + 0.6, y, style, seen, place,
+                       styler=styler)
+            return
         self._ring(ct, st, r0, out, y, style, seen, place)
 
     def _ring(self, ct: float, st: float, r0: float, r1: float, y: int,
-              style: str, seen: set, place, rib: bool = False) -> None:
+              style: str, seen: set, place, rib: bool = False,
+              styler=None) -> None:
         if rib:
             r1 += self.rib_out(ct, st)
         r0 = max(0.0, r0)
@@ -899,12 +1260,16 @@ class Cone:
             cell = (iround(ct * r), y, iround(st * r))
             if cell not in seen:
                 seen.add(cell)
-                place(cell, style)
+                got = styler(cell) if styler else style
+                if got:
+                    place(cell, got)
             r += 0.5
         cell = (iround(ct * r1), y, iround(st * r1))
         if cell not in seen:
             seen.add(cell)
-            place(cell, style)
+            got = styler(cell) if styler else style
+            if got:
+                place(cell, got)
 
 
 # ---------------------------------------------------------------------------
@@ -1132,7 +1497,7 @@ class Course:
         y = cone.floor_at(start_u)
         cone.built_to = y + BUILD_ABOVE
         cone.built_from = y - BUILD_BELOW
-        r = (cone.outer_at(start_u) + cone.outer_at(start_u) - BAND) / 2
+        r = sum(cone.floor_range(start_u)) / 2
         th = start_u * cone.wind
         first = self._block(iround(math.cos(th) * r), y - 1,
                             iround(math.sin(th) * r),
@@ -1648,7 +2013,17 @@ class Course:
         if hug:
             radius = lo
         else:
-            radius += (lo + (hi - lo) * COURSE_OUT - radius) * COURSE_PULL
+            # Mid-band on a plaza; the *outer edge* of the shelf on a ledge.
+            # Two reasons and they compound: the course near the rim stands
+            # against sky and drop, which is the exposure this profile
+            # exists for -- and the camera rides the course, so a course
+            # against the core is a lens full of cliff.
+            r0f, r1f = self.cone.floor_range(u, apron=False)
+            if r1f < hi:
+                want = max(lo + 0.3, r1f - 1.4)
+            else:
+                want = lo + (hi - lo) * COURSE_OUT
+            radius += (want - radius) * COURSE_PULL
             radius = min(max(radius, lo), hi)
         th = u * self.cone.wind
         ix, iz = math.cos(th) * radius, math.sin(th) * radius
@@ -1676,6 +2051,10 @@ class Course:
                     # work out over the chasm, and finding that out one full
                     # attempt at a time was two thirds of every rejection in
                     # the module.
+                    continue
+                if wants_ground and not self.cone.on_floor(cu, r):
+                    # The radial version of the same rule: on a ledge level
+                    # everything outboard of the shelf is the drop.
                     continue
                 ground = self.cone.floor_at(cu)
                 if node["step_y"] is not None:
@@ -2135,6 +2514,8 @@ class Course:
         self.ground.update(got["footing"])
         if node["moat"]:
             self._moat(blk, theme, node)
+        if node["shell"]:
+            self._shell(prev, blk, theme, node["shell"])
         if got["form"] != "floor":
             for cell in footprint(cx, cy, cz, got["form"]):
                 self.struct.setdefault(cell, node["style"])
@@ -2234,6 +2615,7 @@ class Course:
               spread: int = 2, moat: bool = False, step_y: int | None = None,
               hug: float = 0.0, confine: bool = False, ceiling: int = 0,
               cross: bool = False, ramp: bool = True,
+              shell: str | None = None,
               label: str | None = None) -> dict:
         """One entry in a feature's expansion.
 
@@ -2314,6 +2696,12 @@ class Course:
                 #: reference's signature overworld beat and it cannot be a
                 #: decoration -- the water has to be *under* the jump.
                 "moat": moat,
+                #: Build an interior around the move onto this landing:
+                #: ``tunnel``, ``hall``, ``cave`` or ``shaft``. Painted at
+                #: commit, cell by cell through :meth:`write`, whose refusal
+                #: of reserved cells is what cuts the doorways -- the shell
+                #: cannot close over a path the course has claimed.
+                "shell": shell,
                 #: Keep this landing over ground that exists. See ``_targets``.
                 "confine": confine,
                 #: This landing must be on the **far side of the chasm**, and
@@ -2451,6 +2839,75 @@ class Course:
 
     # -- painting the place ------------------------------------------------
 
+    def _landmark(self, section: Section) -> None:
+        """Paint the level's signature structure, if it names one.
+
+        Placed on the level's own ground, off the course (every cell goes
+        through :meth:`_dressable` with a margin, and every base cell must
+        have support), and tried at a handful of bearings before giving up --
+        a landmark half-built where the course happened to be is worse than
+        none. Structures are authored in the trough's own frame: ``dt`` along
+        the corridor, ``dy`` up, ``dr`` outward toward the rim.
+        """
+        name = section.landmark
+        build = LANDMARKS.get(name)
+        if not build:
+            return
+        rng = self.rng
+        cone = self.cone
+        cells = build(rng, section.theme)
+        for attempt in range(8):
+            # The apron first: on a ledge level it is the one place with room.
+            if attempt < 3 and section.profile == "ledge":
+                u = cone.apron_u(section) + rng.uniform(-0.4, 0.4) \
+                    / max(6.0, cone.rim_at(section.y))
+            else:
+                f = 0.2 + 0.6 * rng.random()
+                u = section.u0 + (section.u1 - section.u0) * f
+            if not cone.has_floor(u):
+                continue
+            r0f, r1f = cone.floor_range(u)
+            r = min(r0f + 1.8, r1f - 2.2)
+            if section.profile == "ledge":
+                r = max(r0f + 1.2, r1f - 3.0)
+            th = u * cone.wind
+            ct, st = math.cos(th), math.sin(th)
+            tx, tz = -st * cone.wind, ct * cone.wind
+            top = cone.trough_height(u) - 1
+            y = cone.floor_at(u)
+            placed = []
+            ok = True
+            for dt, dy, dr, style in cells:
+                if dy > top:
+                    continue            # truncated against the soffit
+                x = iround(ct * r + tx * dt + ct * dr)
+                z = iround(st * r + tz * dt + st * dr)
+                cell = (x, y + dy, z)
+                if not self._dressable(cell, margin=1):
+                    # An accent reaching toward the course -- a doorway lamp,
+                    # a cap's rim -- is dropped alone; a structural cell
+                    # failing moves the whole structure. One lantern must not
+                    # cost a windmill its terrace.
+                    if dy > 0:
+                        continue
+                    ok = False
+                    break
+                if dy == 0 and not self.blocked((x, y - 1, z)):
+                    ok = False          # a base cell over the drop
+                    break
+                placed.append((cell, style))
+            if not ok:
+                continue
+            seen: set[tuple[int, int, int]] = set()
+            for cell, style in placed:
+                if cell in seen:
+                    continue
+                seen.add(cell)
+                self.write(cell, style)
+                if style == section.theme.glow:
+                    cone.lamps.append(cell)
+            return
+
     def _paint_behind(self) -> None:
         """Dress every section the *generator* has finished crossing.
 
@@ -2473,6 +2930,7 @@ class Course:
         span = section.u1 - section.u0
         if span <= 0:
             return
+        self._landmark(section)
         steps = max(6, int(span * cone.outer_at(section.u0) * 1.6))
         pool_at = rng.uniform(0.2, 0.8) if theme.liquid else -1.0
         # Per *block of terrace*, not per section. A section is a third of a
@@ -2489,8 +2947,12 @@ class Course:
             out = cone.outer_at(u)
             th = u * cone.wind
             ct, st = math.cos(th), math.sin(th)
+            r0f, r1f = cone.floor_range(u)
             for _ in range(4):
-                r = out - BAND * rng.uniform(0.12, 0.92)
+                # Dressing goes where the ground is. On a ledge level the
+                # band's outer half is the drop, and a prop over the drop is
+                # a prop floating in the sky.
+                r = r1f - (r1f - r0f) * rng.uniform(0.12, 0.92)
                 x, z = iround(ct * r), iround(st * r)
                 cell = (x, yf, z)
                 if not self._dressable(cell):
@@ -2500,11 +2962,17 @@ class Course:
                     self._pool(theme, x, yf, z)
                     break
                 if theme.dark > 0.35 and rng.random() < 0.10:
-                    # A dark section has to light itself, and a lamp on the
-                    # floor of a trough thirteen blocks deep is the only thing
-                    # that reaches the walls.
-                    self.write((x, yf, z), theme.glow)
-                    cone.lamps.append((x, yf, z))
+                    # A dark section has to light itself. At the *wall*, not
+                    # mid-shelf: the renderer hangs a near-four-metre glow on
+                    # every lamp cell, and one sitting beside the running
+                    # line is a bloom filling the lens from a metre away.
+                    wx = iround(ct * (r0f + 1.2))
+                    wz = iround(st * (r0f + 1.2))
+                    lamp = (wx, yf, wz)
+                    if self._dressable(lamp) and self.blocked(
+                            (wx, yf - 1, wz)):
+                        self.write(lamp, theme.glow)
+                        cone.lamps.append(lamp)
                     break
                 if budget > 0 and theme.props and rng.random() < 0.5:
                     budget -= 1
@@ -2591,6 +3059,112 @@ class Course:
                     continue
                 self.carve(cell)
                 self.write(cell, liquid)
+
+    def _shell(self, prev: dict, blk: dict, theme: Theme, kind: str) -> None:
+        """Build an interior around the move just committed.
+
+        The reference alternates exposed ledge with enclosed rooms every ten
+        or twenty seconds, and the old tower had no interior anywhere -- this
+        is that other half. Everything goes through :meth:`write`, which
+        refuses reserved cells, so the course's own paths punch the doorways
+        and nothing here can wall off a jump. Walls only stand where the
+        terrain gives them a footing; a column with nothing under it is
+        skipped, which is what ends a shell naturally at the chasm.
+
+        ``tunnel`` is tight and flat-roofed, ``hall`` is tall with lamp
+        niches, ``cave`` closes down and opens up as it goes, ``shaft`` is a
+        tube around a climb.
+        """
+        if kind == "shaft":
+            self._shell_shaft(blk, theme)
+            return
+        off, roof_h = {"tunnel": (2, 4), "hall": (3, 6), "cave": (2, 4)}[kind]
+        x0, y0, z0 = self.takeoff_point(prev)
+        x1, y1, z1 = self.land_point(blk)
+        dx, dz = x1 - x0, z1 - z0
+        d = math.hypot(dx, dz)
+        if d < 0.5:
+            return
+        dx, dz = dx / d, dz / d
+        px, pz = -dz, dx
+        wall = theme.rock
+        roof = theme.sub
+        steps = max(2, int(d / 0.7))
+        for i in range(steps + 1):
+            f = i / steps
+            x, z = x0 + (x1 - x0) * f, z0 + (z1 - z0) * f
+            by = ifloor(min(y0, y1) + (max(y0, y1) - min(y0, y1)) * f + 0.01)
+            h_roof = roof_h
+            w_off = off
+            if kind == "cave":
+                # The roof falls and rises and the walls breathe. One closed
+                # form keyed on world position, so the two sides agree.
+                h_roof = roof_h + iround(1.2 * math.sin(x * 0.9 + z * 1.3))
+                w_off = off + (1 if math.sin(x * 1.7 - z * 0.8) > 0.55 else 0)
+            for side in (-1, 1):
+                wx = iround(x + px * side * w_off)
+                wz = iround(z + pz * side * w_off)
+                if not self.blocked((wx, by - 1, wz)):
+                    continue        # nothing to stand a wall on
+                for h in range(h_roof):
+                    cell = (wx, by + h, wz)
+                    # A lamp *in* the wall, sparingly. The renderer hangs a
+                    # near-four-metre glow billboard on every lamp cell, so a
+                    # lamp at the course's own floor line is a bloom filling
+                    # the lens from a metre away -- wall height keeps it out
+                    # of the frame's centre, and one every seven steps keeps
+                    # an interior lit without turning it into a lightbox.
+                    if h == 2 and i % 7 == 3 and side == 1:
+                        self.write(cell, theme.glow)
+                        self.cone.lamps.append(cell)
+                        continue
+                    self.write(cell, wall)
+            for lat in range(-w_off, w_off + 1):
+                rx = iround(x + px * lat)
+                rz = iround(z + pz * lat)
+                self.write((rx, by + h_roof, rz), roof)
+
+    def _shell_shaft(self, blk: dict, theme: Theme) -> None:
+        """A tube of the theme's rock around a climb: the belfry, the mine
+        shaft, the echo well. The approach and exit paths are reserved cells,
+        so the tube gets its doorway for free."""
+        soft = blk.get("soft") or ()
+        if not soft:
+            return
+        ys = [blk["y"] + s["dy"] for s in soft]
+        lx = blk["x"] + soft[0]["dx"]
+        lz = blk["z"] + soft[0]["dz"]
+        # The tube stops a course below the top of the climb. The landing
+        # *after* the climb does not exist yet when this paints, so a tube
+        # sealed to the top has no reserved path to refuse against and walls
+        # off the exit -- placement then negotiates around its own shell,
+        # and the stuck rate doubles. Open at the top, the ride is still
+        # enclosed for its whole length and the dismount has sky.
+        lo, hi = min(ys), max(ys) - 1
+        # Which way is *out*: the ride faces the tube for three seconds, and
+        # a sealed tube is three seconds of bare wall. Louvre slits on the
+        # outboard side -- every other course, like a belfry -- put slivers
+        # of sky in the climb without opening a way in.
+        r = math.hypot(lx, lz)
+        ox_out = 1 if lx > 0 else -1
+        oz_out = 1 if lz > 0 else -1
+        out_axis = 0 if abs(lx) >= abs(lz) else 1
+        for ox in (-2, -1, 0, 1, 2):
+            for oz in (-2, -1, 0, 1, 2):
+                ring = max(abs(ox), abs(oz))
+                if ring != 2:
+                    continue
+                outward = (ox == 2 * ox_out if out_axis == 0
+                           else oz == 2 * oz_out)
+                for y in range(lo, hi + 1):
+                    if outward and y % 2 == (lo % 2) and lo + 1 < y < hi:
+                        continue        # the louvre slit
+                    self.write((lx + ox, y, lz + oz), theme.rock)
+        # Two lamps up the inside of the tube, so the ride is lit.
+        for f in (0.33, 0.75):
+            cell = (lx + 1, lo + int((hi - lo) * f), lz + 1)
+            self.write(cell, theme.glow)
+            self.cone.lamps.append(cell)
 
     def _feat_ascent(self, rng, lv, need: int) -> list[dict]:
         """Dispatch: every level's exit, in whichever way this one climbs."""

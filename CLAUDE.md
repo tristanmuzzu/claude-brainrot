@@ -14,7 +14,7 @@ match the real reel formats, animation overhaul (rig with knees/elbows,
 world-axis pose system, ballistic parkour hops with ground beats) — and a
 **third scene, `spiral`**, which is the other Minecraft reel format, Parkour
 Spiral — and, since 2026-08-12, a **fourth, `tower`**, which is that scene's
-renderer against a *hand-built* course of twenty-four designed levels. `tower`
+renderer against a *hand-built* course of thirty-three designed levels. `tower`
 is what the default rotation plays. Both have their own sections below. (The
 old ring tower and platform-stack spiral were earlier, deleted attempts at the
 same format with the reference wrong; nothing of them survives, and the current
@@ -495,102 +495,79 @@ answers, and bucketing it by how much terrace was left and how far below the
 next level the body was -- two lines of context that turned one undifferentiated
 pile into four separate bugs.
 
-## The hand-built tower: `tower` (added 2026-08-12)
+## The hand-built tower: `tower` (rebuilt 2026-08-12, second pass)
 
-**The scene the rotation plays.** Same building, same physics, same renderer,
-same placement checks as `spiral` — and the course is *written down* instead of
-chosen. `docs/TOWER.md` is the design; `scenes/handplan.py` is that design as
-data. Read the doc before touching a level.
+**The scene the rotation plays**, rebuilt the same day it was first built,
+because the owner looked at the 24-level version and said what the probes
+could not: the parkour read as unnecessary (blocks on a walkable plaza),
+nothing was ever interior, no level had a landmark, and the camera did not
+look where it jumped. All four were true. The rebuild started from frame-level
+research of the real maps -- Parkour Spiral 1 and 3 walkthroughs plus the
+speedrun, 130-odd frames sampled and read -- and `docs/TOWER.md` is now the
+design doc that carries what the reference actually does, the acceptance
+criteria (frame criteria F1-F6 judged from contact sheets, probe criteria
+P1-P6), the 33-level roster, and the measured table. Read it before touching
+any of this.
 
-Why: the generator is safe and is not memorable. Its levels are a different
-*mix* of one thirty-five-entry vocabulary rather than different *places*, so
-every run has the same shape. Two numbers said it — the exit climb was 47% of
-all landings and one of four shapes, and the move mix was 94% plain hop.
+The design as data moved to **`scenes/handlevels.py`** (33 levels, ~345
+authored landings); `handplan.py` is the machinery that reads it. What the
+engine grew, each verified by render + probe the day it was written:
 
-**`SpiralScene.plan` was already a class attribute**, and that is the whole
-mechanism: `TowerScene` is `class TowerScene(SpiralScene): plan = handplan`.
-`handplan.Cone` overrides one method (`_extend_section`, reading the level table
-instead of rolling) and `handplan.Course` overrides three (`_choose_feature`,
-`_feat_ascent`, `_level_budget`). Nothing else is forked. To make that possible
-`spiralplan._plan_feature` was split into `_level_budget` / `_choose_feature` /
-`_truncate`, and `Cone.base_r`, `Cone.flare` and `Course.ahead` became class
-attributes.
+- **Terrace profiles**: `ledge` (default -- shelf against the core, drop
+  outboard, apron swell for the landmark), `plaza`, `channel`. Paint and
+  collision decide by the same per-cell test, or the course grows invisible
+  walls.
+- **Shells**: `shell=tunnel|hall|cave|shaft` on any beat builds an interior
+  around the move at commit, through `write()`, whose refusal of reserved
+  cells cuts the doorways for free. The shaft tube stops a course below the
+  climb's top -- sealed to the top it walls off an exit that has no reserved
+  path yet, and the stuck rate doubles (measured 0.41% -> 0.22%).
+- **A weathered face**: `Cone.core_r` -- monotone-in-height overhang, so no
+  cell of the cliff ever has air above it and nothing can stand on the face.
+  The first draft used rock noise and the walkability probe caught it making
+  one-block stairs at the level seams. Plus soffit teeth, dark cliff
+  materials, and cloud shelves that keep out of the tower's radius (one
+  drifting through a terrace reads as a rendering fault).
+- **Landmarks**: 14 cell blueprints (windmill, watchtower, tree, bell, crane,
+  totem, comb, great cap, hoard, wool stripes, cabin, hoodoo, arch, amethyst
+  cluster) painted during dressing on real ground; accent cells may be
+  dropped alone, base cells move the whole structure.
+- **The camera locks onto the landing** through take-off and flight
+  (`_look`'s `lock` ramp); the corridor-tangent blend only steers early in a
+  run. This was the owner's "not looking where it jumps", and it was real.
+- **The quarry descends the outside of the tower** -- signed `step_y` hops
+  onto floating benches below the rim, the longest jumps in the tower
+  (7.55 m max) with the sea under them. A dug pit is not expressible:
+  terrain would have to be carved ahead of placement, and the chasm guard
+  rightly refuses landings below the far floor.
+- **Webs draw as crossed gauze sheets** (salted yaw per cell), never cubes:
+  the body wades *through* a web, and a translucent cube from inside is a
+  whole lens of speckle. Same fix in `_draw_course` for web-form landings
+  and the soft-cell path.
+- Eight new themes (honey, coral, gold, library, prismarine, snow, crimson,
+  quartz) and nine materials; `Level.exit_beats` lets a level author its way
+  out with the generated climb as fallback (mechanism live and tested, no
+  level uses it yet).
 
-**Authored intent, mechanical placement, verified physics.** Every landing is
-written down. The lattice is resolved by `_targets` as it always was — the
-*shape* is authored and the machine only picks the nearest cell. `_attempt` is
-untouched, so an authored jump no body can make is refused exactly as a
-generated one would be. **Fidelity is the acceptance criterion for the design;
-safety is the acceptance criterion for the code**, they are different numbers,
-and both are printed.
+Measured (full table in `docs/TOWER.md`): design 100% legal on paper,
+**98.5% placed as authored** (worst level 88%), unchecked **0.19-0.22%**,
+twice-claimed 0, walkability 0 m, 622 tests + 34 skips green, **3.41 ms** a
+frame against parkour's 2.63 in the same process (ratio 1.30, better than
+the 24-level tower's 1.39). The one number that got worse: **frames mostly
+filled by a wall, 0.4% -> 2.8%** -- partly the price of interiors existing,
+partly a residue that clusters in one-to-two-second stretches at corridor
+bends; the segment-bucketing method that closed the last camera residue is
+the way into this one.
 
-`tools/tower_probe.py` asks the question only a hand-built tower can fail: did
-it come out as designed. It checks every authored jump against `hop_span` **on
-paper** before building anything (`--design-only` is instant), then reports
-fidelity per level and per beat. It found **nineteen real errors** on the first
-pass, and the most valuable thing about it is what it found *second*: the
-mistakes hand-authoring makes are not the ones you look for.
-
-- Half of them were **at a beat boundary**, not inside a beat. Beats play in
-  order and the jump from the last landing of one to the first of the next is a
-  jump like any other.
-- The largest single class was **the filler loop seam**. A level's filler
-  repeats when the terrace outlasts the script, and `filler` defaults to the
-  last two beats — which for a level that *ends* on a five-block fall is
-  exactly the wrong choice. Eight of the twenty-four needed their own.
-- The checker was itself wrong twice before it was right: it read `lift` off a
-  climb node (climbs use `step_y`, measured from the landing before, so every
-  jump after a climb was checked against the wrong height), and it used a flat
-  0.68 m edge inset when `wide` is 1.05 at each end — a five-block gap between
-  two mushroom caps is a three-block jump, and reading it as five condemns a
-  good design.
-
-Four things the design needed that are not the design:
-
-- **The tower is half as wide again** (`Cone.base_r = 36`). A level is a third
-  of a revolution, its exit climb needs a fixed run-up in *blocks*, and what is
-  left is the design; at the generated radius that was four authored landings a
-  level against seven for the climb. A bigger circle lengthens every terrace and
-  changes nothing else — and straightens the corridor, which the camera likes.
-- **The exit reserve knows which of the four shapes the level uses.** A ladder
-  costs three landings whatever the height; reserving seven for one threw away
-  sixteen blocks of a forty-block terrace.
-- **Generation runs twenty-six landings ahead, not sixteen** (`Course.ahead`).
-  A section is dressed when the *generator* leaves it, and with longer terraces
-  the body was standing in an undressed section a third of the time.
-- **A mid-level climb gets a launch block hard against the core**, the way the
-  exit climb always has. Without it the ladder has nothing to hang on and is
-  refused every single time — two beats measured 0% fidelity and the fix took
-  them to 60-67%.
-
-Measured, 16 runs x 340 landings and 6 runs x 40 s, against the generated tower
-on the same probes:
-
-| | generated | hand-built |
-|---|---|---|
-| designed landings placed **as authored** | n/a | **97.1%** |
-| designed content / the exit climb | n/a / 47% | **68% / 33%** |
-| distinct named beats in a run | 38 | **137** |
-| named places | 15 shuffled themes | **24 designed levels** |
-| mean jump / share over 4 m | 2.90 m / — | **3.12 m / 17%** |
-| unchecked emergency placements | 0.30% | **0.13%** |
-| cells twice-claimed / off-lattice | 0 | **0** |
-| climbable without the parkour | 0 m | **0 m** |
-| frames mostly filled by a wall | 1.7% | **0.4%** |
-| seconds on one place | 7.3 s | **10.7 s** |
-| per frame | 2.34 ms | **2.80 ms** |
-
-Fidelity is not 100% and should not be: the tower is round and the world is
-whole cells, so some authored point always falls between two of them. What the
-number guards is *sag*.
-
-**The one bug hand-authoring produced that no geometry check could see** was a
-level naming a material the renderer has no recipe for (`candy0`, which this
-scene deliberately does not define). Growing the course was fine; the run died
-with a `KeyError` a hundred and forty frames in, the first time that block came
-into view. Two guards now: the design checker refuses an unknown material
-outright, and `tests/test_tower.py` builds, updates and **draws** the scene
-every forty-five frames for nine hundred, across two seeds.
+Two hard-won harness facts. `tools/level_shot.py --level N --sheet` renders
+one level without waiting for the tower to reach it -- and it must patch
+`sp.Cone.__init__` (the base class), never `hp.Cone.__init__`, because
+handplan's own `__init__` draws the phase from the rng before delegating,
+and skipping that draw silently renders a *different world* from the one a
+normal run of the same seed builds. And the fidelity probe's per-beat table
+is the design feedback loop: every table row under 98% traced to a real
+authoring mistake, and half of them were at beat boundaries -- including the
+one class nobody looks for, the filler loop's last-landing-to-first seam.
 
 ## Linux (added 2026-08-09, verified on the owner's Ubuntu box)
 
@@ -618,24 +595,24 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
-0. **The exit climb is still a third of the hand-built tower.** The levels own
-   *which* of the four shapes they leave by, and that is worth a lot -- 98
-   distinct beats against 38 -- but not the shape itself, so a third of every
-   run is machinery rather than design. The way in is to let a level author its
-   exit the way it authors a beat, with the generated climb kept as the
-   fallback it already is; the reliability guarantee lives in `_climb_on` and
-   `_grab_the_wall`, not in `_ascent_stair`, so an authored exit that fails is
-   already caught.
-1. **A wall fills the lens on 0.7% of frames** in `tower` and 1.7% in
-   `spiral`, down from 1.6% and 2.3%. What closed most of it was measuring
-   *which segment the body was in* when it happened: 10% of exit-climb frames
-   and **0% of every designed beat**. So it was never a camera constant that
-   was wrong everywhere -- it was one arrangement the aim had no answer for,
-   the course hugging the core for the whole climb, and the fix is an inner
-   clamp on the aim point (`AIM_INSET`) matching the outer one that had always
-   been there. The residue is the same shape and the same method will find it:
-   `scratchpad`-style harness that walks a run, calls `spiral_probe._lens_jammed`
-   every few frames and buckets by `blk["segment"]`.
+0. **The exit climb is still a third of the hand-built tower**, and the way
+   in now exists: `Level.exit_beats` is live and tested (an authored exit
+   that fails falls to the generated climb, whose reliability chain --
+   `_climb_on`, `_grab_the_wall` -- is untouched), but no level writes one
+   yet. Replacing the machinery third with design is now a per-level
+   authoring job in `handlevels.py`, not an engine change.
+1. **A wall fills the lens on 2.8% of frames in the rebuilt tower** -- up
+   from 0.4%, and partly on purpose: interiors exist now, and a tunnel *is*
+   walls near the lens. The real residue clusters in one- to two-second
+   stretches at corridor bends where the cliff swings across the aim
+   (watched on a dusk run, seed 9, THE BALCONIES). Same shape as the last
+   camera residue, same method to find it: walk a run, call
+   `spiral_probe._lens_jammed` every few frames, bucket by `blk["segment"]`
+   -- and now also by whether a shell encloses the body, because enclosed
+   wall-frames are the level working as designed and open ones are not.
+1b. **The roster still wants assets**: per-theme pours (falling lava/water
+   columns past the course), the windmill's blades, a bell, coral fans, a
+   scarecrow -- all `assets/src/` work, none load-bearing.
 2. **The spiral's move mix is 94% plain hop.** The exit climb is 47% of all
    landings and can only ever be hops, so this is bounded by what the *kernel*
    can express, not by the feature table -- reweighting `FEATURES` was tried
