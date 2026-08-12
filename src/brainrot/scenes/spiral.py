@@ -31,6 +31,7 @@ from ..engine.hud import chip, text
 from ..engine.scene import Scene, SceneContext, register
 from ..engine.sky import SkyDome
 from ..engine.textures import cloud_blob
+from . import handplan as hp
 from . import parkourkit as tp
 from . import spiralplan as sp
 
@@ -163,7 +164,8 @@ class SpiralScene(Scene):
         # Sub-block furniture. A terrace reads as a *place* because of the
         # parts of Minecraft that are not cubes -- grass, crops, fences, vines,
         # rails -- and as cells those all come out as the same coloured box.
-        self.props = {name: assets.load(name) for name in sp.PROP_KINDS}
+        self.props = {name: assets.load(name)
+                      for name in self.plan.PROP_KINDS}
         for model in self.props.values():
             model.recolor({
                 "leaf": rl.mix_rgb(pal.accent, (110, 160, 60), 0.55),
@@ -247,7 +249,7 @@ class SpiralScene(Scene):
     def _style_of(self, blk: dict) -> str:
         """What a block is made of. A ``floor`` landing has no material of its
         own -- it is standing on the building -- so it borrows the ring's."""
-        return blk["style"] or sp.THEME_BY_NAME[blk["theme"]].sub
+        return blk["style"] or self.plan.THEME_BY_NAME[blk["theme"]].sub
 
     # -- world streaming ---------------------------------------------------
 
@@ -386,7 +388,7 @@ class SpiralScene(Scene):
         # of what is behind it -- cells and chunks both. An occupancy map that
         # only grew would refuse the whole tower within a couple of hundred
         # blocks, and this course comes back over itself every revolution.
-        while len(self.course.blocks) - self.index < sp.AHEAD:
+        while len(self.course.blocks) - self.index < self.plan.AHEAD:
             self.course.spawn()["born"] = self.elapsed
         dropped = self.course.advance(self.index)
         if dropped:
@@ -758,7 +760,8 @@ class SpiralScene(Scene):
                 fade = 1.0 - dist / LAND_LIT_FAR
                 self._glows.append((
                     blk["x"], blk["y"] + h + 0.05, blk["z"], 1.15,
-                    rl.mix_rgb(self._colour(sp.THEME_BY_NAME[blk["theme"]].glow),
+                    rl.mix_rgb(self._colour(
+                        self.plan.THEME_BY_NAME[blk["theme"]].glow),
                                (255, 250, 235), 0.45),
                     int(52 * fade * alpha / 255)))
             self._draw_furniture(blk, dist, alpha)
@@ -1018,6 +1021,20 @@ def _recipes(pal, run: int) -> dict[str, dict]:
     # is in stops the place being a place. Landings here are the level's own
     # stone, and what marks them is the light on their top face.
     return out
+
+
+@register("tower")
+class TowerScene(SpiralScene):
+    """The hand-built tower: this renderer against a designed course.
+
+    Not a scene so much as a second *plan*. Everything visible here -- the
+    meshing, the body, the camera, the weather, the head-up display -- is
+    :class:`SpiralScene`'s, and the only difference is which module decides
+    what the parkour is. See :mod:`brainrot.scenes.handplan` and
+    ``docs/TOWER.md``.
+    """
+
+    plan = hp
 
 
 def _choose_kit(rng) -> dict:

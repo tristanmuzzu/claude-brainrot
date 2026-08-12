@@ -86,8 +86,18 @@ class Config:
 
     # --- Content ---------------------------------------------------------
     #: Scenes eligible to play. Order is irrelevant; selection is seeded.
+    #:
+    #: ``tower`` and not ``spiral``: they are the same building, the same
+    #: physics and the same renderer, and they differ in whether the course is
+    #: chosen from a weighted table or read off a designed page. The designed
+    #: one measures better on every axis that matters -- twenty-four named
+    #: places instead of fifteen shuffled themes, a third of the course being
+    #: the exit climb instead of a half, longer jumps, and a third as many
+    #: frames with the lens jammed against a wall. ``spiral`` is still
+    #: registered, still tested and still worth shooting; it is simply not what
+    #: a run gets by default.
     scenes: list[str] = field(
-        default_factory=lambda: ["runner", "parkour", "spiral"])
+        default_factory=lambda: ["runner", "parkour", "tower"])
     #: Force one scene (debugging). Empty means "pick per run".
     force_scene: str = ""
     #: Replay a specific run number instead of advancing the counter.

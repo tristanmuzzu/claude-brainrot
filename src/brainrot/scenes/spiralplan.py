@@ -571,6 +571,14 @@ class Cone:
     hundred thousand cells nobody looks at.
     """
 
+    #: How wide the tower is at its base and how fast it flares, as class
+    #: attributes rather than module constants so that a *differently sized*
+    #: tower is a subclass rather than a fork. The hand-built tower is wider,
+    #: because a terrace has to be long enough to hold a designed level and the
+    #: only thing that lengthens one is a bigger circle.
+    base_r = BASE_R
+    flare = FLARE
+
     def __init__(self, rng, base_y: int = 0) -> None:
         self.rng = rng
         self.base = base_y
@@ -670,7 +678,7 @@ class Cone:
 
     def rim_at(self, y: float) -> float:
         """The cone's outer radius at a height. The flare, and nothing else."""
-        return BASE_R + FLARE * (y - self.base)
+        return self.base_r + self.flare * (y - self.base)
 
     def wobble(self, u: float) -> float:
         """How far the rim strays from the perfect circle at ``u``.
@@ -726,7 +734,7 @@ class Cone:
         r = math.hypot(x, z)
         # Cheap rejection first: nothing this far out is ever rock, and this is
         # the hottest predicate in the module by a distance.
-        if r > BASE_R + FLARE * (y - self.base) + 6.0:
+        if r > self.base_r + self.flare * (y - self.base) + 6.0:
             return False
         u = self.unwrap(x, z, y)
         i = self.level_index(u)
@@ -1234,7 +1242,7 @@ class Course:
                 "yaw": math.atan2(step[0], -step[1]), "laid": self.laid,
                 "lift": lift, "born": -1e9,
                 "deco": [], "soft": [], "orbs": [], "move": None,
-                "path": (), "unchecked": False, "impact": 0.0,
+                "path": (), "unchecked": False, "impact": 0.0, "exact": False,
                 "pedestal": (), "footing": (), "ceiling": ()}
 
     def surface(self, blk: dict) -> float:
@@ -1375,12 +1383,21 @@ class Course:
                         for cell in self._targets(prev, trial):
                             got = self._place(prev, trial, cell)
                             if got is not None:
+                                # Whether the landing came out *as asked for*
+                                # or on one of the fallbacks. Nothing in the
+                                # generator reads it; it is the acceptance
+                                # criterion for a hand-built level, where a
+                                # fallback means the design did not survive
+                                # contact with the lattice and the fix belongs
+                                # in the design. See ``tools/tower_probe.py``.
+                                got["exact"] = trial is node
                                 return got
         # Nothing at any height. Relax the comfort rules -- never the
         # correctness ones -- before giving up on the feature entirely.
         for cell in self._targets(prev, node):
             got = self._place(prev, node, cell, strict=False)
             if got is not None:
+                got["exact"] = False
                 return got
         return None
 
@@ -2091,6 +2108,7 @@ class Course:
         blk["pedestal"] = got["pedestal"]
         blk["footing"] = got["footing"]
         blk["ceiling"] = got["ceiling"]
+        blk["exact"] = got.get("exact", False)
         for cell in got["ceiling"]:
             self.write(cell, node["pedestal_style"] or theme.rock)
         for cell in got["pedestal"]:
@@ -2206,7 +2224,8 @@ class Course:
               pedestal_style: str | None = None, climb_style: str = "ladder",
               spread: int = 2, moat: bool = False, step_y: int | None = None,
               hug: float = 0.0, confine: bool = False, ceiling: int = 0,
-              cross: bool = False, label: str | None = None) -> dict:
+              cross: bool = False, ramp: bool = True,
+              label: str | None = None) -> dict:
         """One entry in a feature's expansion.
 
         ``lift`` is the height of the landing's walking surface above the
@@ -2221,8 +2240,14 @@ class Course:
         zero, because a stair whose steps are sometimes two blocks apart is not
         a staircase.
         """
-        if label != "ascent":
-            # Not the exit climb. Its shape is set by how tall the level is,
+        if label != "ascent" and ramp:
+            # Not the exit climb, and not a distance somebody chose on purpose.
+            # A hand-built level's gaps are the design: stretching them by a
+            # quarter turns a jump written as "the standard four-block jump"
+            # into one no body can make, and the checker then refuses the
+            # landing the level was about.
+            #
+            # Its shape is set by how tall the level is,
             # and the trigger reserves room for exactly that many landings at
             # exactly this spacing -- so ramping it stretches the staircase
             # past the run-up it was promised and the last steps end up out
@@ -2317,10 +2342,29 @@ class Course:
         return table[self.rng.randrange(len(table))]
 
     def _plan_feature(self) -> None:
+        """Decide the next stretch of course, or start the climb out.
+
+        Split into three so that a *hand-built* tower can be the same class
+        with one method replaced. The budget and the climb trigger are true of
+        any course on this building; only :meth:`_choose_feature` knows that
+        this one picks its content from a weighted table rather than reading it
+        off a page. See :mod:`brainrot.scenes.handplan`.
+        """
+        lv, need, want, radius = self._level_budget()
         # The climb out of a level takes priority over everything, and it has
         # to be started early enough that the last landing clears the chasm.
         # Nothing else in the vocabulary can cross a hole with no floor in it
         # and a four-to-seven block wall on the far side.
+        if (lv.u_edge - self.u) * radius <= want:
+            self.segment = "ascent"
+            self._pending = self._feat_ascent(self.rng, lv, need)
+            return
+        self._pending = self._choose_feature(lv)
+        self._truncate(lv, radius, want)
+
+    def _level_budget(self):
+        """This level, how much of it is left to climb, and what the climb
+        wants: ``(level, need, want, radius)``."""
         cone = self.cone
         lv = cone.level(cone.level_index(self.u))
         need = cone.level(lv.index + 1).y - int(self.surface(self.blocks[-1]))
@@ -2334,10 +2378,10 @@ class Course:
         # far more often than the sequences they were cut from.
         want = ((max(1, need) + 1) * ASCENT_ARC + gap_blocks + 1.4
                 + FEATURE_SLACK)
-        if (lv.u_edge - self.u) * radius <= want:
-            self.segment = "ascent"
-            self._pending = self._feat_ascent(self.rng, lv, need)
-            return
+        return lv, need, want, radius
+
+    def _choose_feature(self, lv) -> list[dict]:
+        """One feature from the theme's pool, expanded into nodes."""
         section = lv
         theme = section.theme
         weights = {}
@@ -2372,25 +2416,29 @@ class Course:
                 weights[name] *= 1.0 + extra * self.difficulty
         name = _pick(self.rng, weights)
         self.segment = name
-        self._pending = getattr(self, f"_feat_{name}")(self.rng, theme)
-        # ...and never let it run into the run-up the exit climb needs.
-        #
-        # Features are chosen and expanded *whole*, so the one picked while
-        # there is still room can carry the frontier past the chasm edge on its
-        # own -- and the climb then starts three or four blocks out over the
-        # void, where a stack of terrain cannot stand and nothing can be
-        # placed. Measured, that single case was every stuck run in the module.
-        # Reserving a wider margin instead would work and would cost the levels
-        # a third of their length; truncating costs nothing.
+        return getattr(self, f"_feat_{name}")(self.rng, theme)
+
+    def _truncate(self, lv, radius: float, want: float) -> None:
+        """Never let a feature run into the run-up the exit climb needs.
+
+        Features are chosen and expanded *whole*, so the one picked while there
+        is still room can carry the frontier past the chasm edge on its own --
+        and the climb then starts three or four blocks out over the void, where
+        a stack of terrain cannot stand and nothing can be placed. Measured,
+        that single case was every stuck run in the module. Reserving a wider
+        margin instead would work and would cost the levels a third of their
+        length; truncating costs nothing.
+        """
         budget = (lv.u_edge - self.u) * radius - want
-        if budget > 0:
-            keep, spent = [], 0.0
-            for node in self._pending:
-                if keep and spent + node["arc"] > budget:
-                    break
-                keep.append(node)
-                spent += node["arc"]
-            self._pending = keep
+        if budget <= 0:
+            return
+        keep, spent = [], 0.0
+        for node in self._pending:
+            if keep and spent + node["arc"] > budget:
+                break
+            keep.append(node)
+            spent += node["arc"]
+        self._pending = keep
 
     # -- painting the place ------------------------------------------------
 
@@ -2418,7 +2466,13 @@ class Course:
             return
         steps = max(6, int(span * cone.outer_at(section.u0) * 1.6))
         pool_at = rng.uniform(0.2, 0.8) if theme.liquid else -1.0
-        budget = PROP_BUDGET
+        # Per *block of terrace*, not per section. A section is a third of a
+        # revolution and a revolution is as long as the tower is wide, so a
+        # fixed count per section is a density that halves when somebody
+        # builds a bigger tower -- which is exactly what the hand-built one
+        # did, and the terraces came back looking swept.
+        budget = max(6, int(span * cone.outer_at(section.u0)
+                             * PROP_DENSITY))
         for i in range(steps):
             f = i / steps
             u = section.u0 + span * f
@@ -3060,6 +3114,9 @@ TRACE = False
 #: draw call against a whole terrace that costs a handful, so this is set by
 #: the frame budget rather than by how much room there is.
 PROP_BUDGET = 14
+#: ...expressed as a rate, which is what the dressing pass actually uses.
+#: Set so that the generated tower's count is unchanged.
+PROP_DENSITY = PROP_BUDGET / (LEVEL_ARC * BASE_R)
 
 # The shared grammar is deliberately worth *less* than a theme's own verbs.
 # Measured at the first weights that worked at all, the move mix came out 96.6%

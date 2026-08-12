@@ -57,6 +57,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from brainrot.scenes import parkourkit as pk
 from brainrot.scenes import spiralplan as sp
 
+#: Which plan module and which scene are being measured. Rebound by ``--plan``,
+#: because the hand-built tower in :mod:`brainrot.scenes.handplan` is the same
+#: building, the same physics and the same renderer with its course written down
+#: instead of chosen -- so every safety and pacing number here means exactly the
+#: same thing for it, and holding it to the standards the generated tower
+#: reached is the point. ``tools/tower_probe.py`` asks the other question, which
+#: is whether it came out as designed.
+SCENE = "spiral"
+
 DT = 1.0 / 60.0
 W, H = 360, 640
 _window = None
@@ -85,7 +94,7 @@ def build_scene(run: int):
     from brainrot.rng import Seed
     seed = Seed.for_run(run)
     ctx = scene_api.SceneContext(W, H, generate_palette(seed), seed)
-    return scene_api.build("spiral", ctx)
+    return scene_api.build(SCENE, ctx)
 
 
 def grow(run: int, blocks: int, seen: list | None = None) -> sp.Course:
@@ -501,7 +510,14 @@ def main() -> None:
     ap.add_argument("--no-motion", action="store_true")
     ap.add_argument("--walk-runs", type=int, default=6)
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--plan", choices=("spiral", "tower"), default="spiral",
+                    help="which tower to measure: the generated one or the "
+                         "hand-built one in scenes/handplan.py")
     args = ap.parse_args()
+    if args.plan == "tower":
+        global sp, SCENE
+        from brainrot.scenes import handplan as sp   # noqa: F811
+        SCENE = "tower"
 
     geo = geometry(args.runs, args.blocks)
     walk = walkability(args.walk_runs)
