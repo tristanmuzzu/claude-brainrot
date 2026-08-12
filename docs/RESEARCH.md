@@ -208,9 +208,153 @@ Every level in this tower is a monotonic climb.
 
 ---
 
-## 8. What the frames say
+## 8. What the frames say — and first, whose frames they are
 
-<!-- filled from the footage pass -->
+**Two of the three reference videos are not Parkour Spiral.** `ps1_shaders` and
+`ps3_shaders` are the same map, **Parkour Volcano** — both open on the same
+garden and the same painted "Parkour Volcano" title board. Only the speedrun is
+a different map. Same author, same cone-spiral genre, so the design
+observations transfer, but **`docs/TOWER.md` § "What the reference actually
+does" is sourced from Volcano and says Parkour Spiral**, and that is the
+provenance of everything in it.
+
+This also explains the two places where §§1–7 above and this section disagree:
+**§§1–7 are the Parkour Spiral world save, this section is Parkour Volcano
+footage.** They are different maps and the differences are real, not error.
+Where they conflict, the save is authoritative for Spiral and a block census
+beats frame-reading. Full report: `docs/reference/FRAME_FINDINGS.md`.
+
+| | Spiral (save) | Volcano (footage) |
+|---|---|---|
+| fully enclosed | 6.1% of the way, runs of 2 m | 20.8% of seconds, 17 runs ≥ 3 s, mean 5.6 s |
+| slime | 189 cells, 46 pads, **26 / 43 levels** | **none seen in ~2,900 s** |
+| level length | — | **10–15 s**, mean 12 |
+
+A 2×2 pad is easy to miss at three-second sampling, so the slime rows are
+consistent with each other; the enclosure rows are a genuine difference between
+two maps.
+
+### The frame is a slot, and the overhang makes it one
+
+Measured over 325 frames of Volcano at 1 s:
+
+| | |
+|---|---|
+| the top fifth of the screen, share of its pixels that are dark rock | **63%** on average |
+| frames whose top fifth is more than half dark rock | **73%** |
+| seconds with more than 10% open sky or sea | 66.6% |
+| seconds with more than 20% | 53.1% |
+| seconds showing **no sky at all** | 20.8% |
+| luminance standard deviation across the frame | mean **65.8** |
+
+**The overhang deletes every wrong answer above you.** You are in a slot: the
+roof is the underside of the level above, the floor is the lightest thing in
+the lower half, the cliff is the darkest thing in the upper, and the only
+bright exit is forward. Sky is present in two thirds of seconds — but as a
+band, not as the subject.
+
+### How a level opens
+
+- **An emissive block flush in the floor, on a rise, on screen 2.3 s before you
+  reach it.** One block, level with the ground, emitting light — it reads at
+  distance and at speed and never looks like scenery.
+- **The material changes completely at that block**, in one or two frames.
+  Nine seams in 120 s, every one abrupt. No two adjacent levels share a
+  dominant hue.
+- **The exit is not signposted.** The corridor narrows to a tongue that ends in
+  air, or to a lit doorway. The design tells you where a level *starts* and
+  lets the geometry tell you where it ends.
+
+### How you are told where to go — four devices, all cheap
+
+1. **The route is paved.** A stripe of a different floor material down the
+   middle of every terrace wide enough to be ambiguous: a dirt path across
+   grass, gravel through a garden, a red carpet runner down a stone hall.
+2. **Every lamp is at the far end.** Lanterns hang at a corridor's exit, not
+   spread through it; a lamp post stands at the tip of a promontory where the
+   course turns. **There is no ambient decorative lighting anywhere — every
+   light in these frames is doing a job.**
+3. **A landmark stands where the course turns**, on the last block of the
+   ledge, not in the middle of the terrace.
+4. **Silhouettes against sky are legible; anything against the cliff is not.**
+
+### Why you cannot walk it — width and hazard, not gaps
+
+The reference does **not** break a continuous ledge with chasms.
+
+1. The walking surface is **2–4 blocks wide with the drop directly outboard**,
+   so there is nothing to walk around.
+2. **Where the ground is wide, its whole width is hazard.** A lava lake
+   spanning the terrace with one lit block in it; a room whose entire floor is
+   lava, crossed on a staircase of oak stairs; a stretch where the floor is the
+   *sea* and the landings are lily pads. The landings are isolated single
+   blocks with two or three blocks of hazard between them — not a five-block
+   chasm.
+3. Interiors are corridors of two to three blocks, where bypass is not a
+   question.
+
+And the nuance that matters: **the rule is "no level walkable end to end", not
+"no metre walkable".** At its widest the ground stops being a course and
+becomes a *place* — a village terrace with fences and a trough, a garden — and
+the map lets you walk that for a few seconds, because the level's entrance and
+exit are still separated by a real break somewhere else.
+
+### Structures
+
+Six read closely. Two habits worth copying:
+
+- **A structure is either a corridor you are inside or a silhouette you run at
+  the foot of.** Nothing in the footage is a solid mass parked beside the
+  course.
+- **The big interiors are always the level's height gain.** A lava hall
+  climbing on oak stairs, a six-second ladder shaft, a cantilevered white
+  structure whose steps *are* the landings. The structure and the climb are one
+  decision.
+
+### The obstacle vocabulary, seen
+
+Staples: plain gaps level or ±1; **stairs and slabs as the walking surface —
+the commonest non-cube form by a wide margin**; fences as edging and scenery
+(never unambiguously a landing); hazard floors of lava then water; doorways and
+lintels you run under.
+
+Once or twice a level: one-block landings in a hazard field; **ladders**, both
+as short wall climbs and as a whole level's climb; ice as one level's terrain.
+
+**The negative result, and it is load-bearing for this project.** Across ~2,900
+seconds: **no slime, no honey, no soul sand, no magma bounce, no bubble column,
+and no cobweb used as a movement surface.** The only physics-altering block
+present is ice, as one level's ground. An engine that can express those and
+uses almost none of them is **matching** the reference, not falling short. The
+one special block to lean on is the **ladder**.
+
+### Pacing
+
+A level is **10–15 s**, mean 12 over ten consecutive sections. Read end to end
+at 4 fps, one level ran 16.3 s: 2.5 s of approach and arrival, ~11 s of the
+level's own terrain, 2–3 s of descent into the next interior. **The hardest
+moment sat at about 60% of the way through**, not at the end.
+
+Altitude changes the backdrop: below halfway the drop reads as sea and beach,
+above it as a flat white cloud deck. That one change makes the top of the map
+feel higher with no geometry change at all.
+
+### The move vocabulary, named correctly
+
+From a bounded check of community sources: **2bc and head-hitter are the same
+move** — a jump under a ceiling low enough to strike your head, cutting the
+rise. A **neo** is jumping off a block's edge and landing back against the face
+of the pillar you left; a **neup** targets one block higher. A **ladder jump**
+uses height gained off a ladder to clear a gap. **Momentum/FMM** is sprinting
+in mid-air out of a confined space to widen a one-tick window. Notation: `3b
++1` is a three-block jump one block up.
+
+**Where the sources and the frames disagree, the frames win, and they do.** The
+community lists are written for *technical* parkour servers — neos, momentum,
+one-tick windows. There is no frame in 2,900 s where the player does anything
+needing a named technique. **This genre is adventure parkour, not technical
+parkour**, and the vocabulary that matters for building it is architectural:
+corridor, shaft, hazard floor, ledge, threshold.
 
 ---
 
@@ -223,5 +367,10 @@ Every level in this tower is a monotonic climb.
 | one big landmark per level | **median biggest mass 12 cells** | keep ours, but the floor does the work and small furniture is everywhere |
 | the course should wander radially | **4.4 m within a level** | wandering is a feature for one or two levels, not a default |
 | levels climb | **36/43 descend, 22 dip below their start** | a level goes down as well as up, by falling |
-| exotic physics blocks are the variety | **cobweb 0, honey 2, scaffolding 3** | lava and water are the mechanic; slime is one pad |
+| exotic physics blocks are the variety | **cobweb 0, honey 2, scaffolding 3**, and none seen in 2,900 s of footage | lava and water are the mechanic; slime is one pad; the special block to lean on is the **ladder** |
 | difficulty is the top of the envelope | **modal jump 3.0 m, 4.7 jumps a level** | write 3.0–3.5 m and save the envelope's top for a showpiece |
+| the frames are Parkour Spiral | **two of the three videos are Parkour Volcano** | relabel the provenance; the save is the authority for Spiral |
+| unwalkability comes from breaking the floor | **width plus hazard**; where it widens, the whole width is lava or water with one block in it | breaks are one tool, not the tool |
+| nothing says where a level begins | **an emissive block flush in the floor, on a rise, 2.3 s early, and the palette changes completely at it** | levels need a threshold |
+| the route is obvious | **it is painted** — a stripe of another floor material down the middle of any wide ground | free legibility we have never used |
+| light is decoration | **every lamp is at the far end of a room; there is no ambient decorative lighting anywhere** | light is a wayfinding device |
