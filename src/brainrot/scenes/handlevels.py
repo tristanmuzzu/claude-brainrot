@@ -143,6 +143,13 @@ LEVELS: tuple[Level, ...] = (
     ], filler=[
         ("rank", [n("hay", arc=4.4, lift=1, spread=0, orbs=1),
                   n("hay", arc=4.4, lift=1, spread=0)]),
+    ], exit_beats=[
+        n("hay", arc=2.9, step_y=1, hug=2.4, spread=0, confine=True),
+        n("hay", arc=3.0, step_y=1, hug=2.4, spread=0, radial=0.9, orbs=1),
+        n("oak", arc=2.9, step_y=1, form="fence", hug=2.4, spread=0,
+          pedestal=False),
+        n("hay", arc=3.0, step_y=1, hug=2.4, spread=0, radial=-0.9, orbs=1),
+        n("hay", arc=2.9, step_y=1, hug=2.6, spread=0),
     ]),
 
     # ---- 3 ---------------------------------------------------------------
@@ -229,6 +236,17 @@ LEVELS: tuple[Level, ...] = (
         ("court", [n("ground", arc=4.8, lift=0, form="floor", orbs=1)]),
         ("altar", [n("chiselled", arc=3.4, lift=1, spread=0),
                    n("chiselled", arc=3.3, lift=2, spread=0, orbs=1)]),
+    ], exit_beats=[
+        n("chiselled", arc=2.9, step_y=1, hug=2.4, spread=0, confine=True,
+          deco="lamp"),
+        n("chiselled", arc=3.0, step_y=1, hug=2.4, spread=0, radial=0.9),
+        n("chiselled", arc=2.9, step_y=1, hug=2.4, spread=0, radial=-0.9,
+          orbs=1),
+        n("chiselled", arc=3.0, step_y=1, hug=2.4, spread=0, radial=0.9),
+        n("chiselled", arc=2.9, step_y=1, hug=2.4, spread=0, radial=-0.9,
+          orbs=1),
+        n("chiselled", arc=3.0, step_y=1, hug=2.4, spread=0, deco="lamp"),
+        n("chiselled", arc=2.9, step_y=1, hug=2.6, spread=0),
     ]),
 
     # ---- 6 ---------------------------------------------------------------
@@ -283,6 +301,11 @@ LEVELS: tuple[Level, ...] = (
     ], filler=[
         ("understory", [n("rock", arc=4.2, lift=2, spread=1, orbs=1),
                         n("accent", arc=3.4, lift=2, spread=1)]),
+    ], exit_beats=[
+        n("rock", arc=2.8, lift=1, hug=2.2, spread=1),
+        n("junglelog", arc=2.4, step_y=7, kind="climb", climb_style="vine",
+          hug=2.0, pedestal=False, spread=0, orbs=2),
+        n("accent", arc=3.0, step_y=1, hug=2.8, spread=0),
     ]),
 
     # ---- 8 ---------------------------------------------------------------
@@ -307,6 +330,11 @@ LEVELS: tuple[Level, ...] = (
                      orbs=1)]),
         ("basin", [n("accent", arc=4.6, lift=1, spread=0, moat=True,
                      orbs=1)]),
+    ], exit_beats=[
+        n("rock", arc=2.8, lift=1, hug=2.2, spread=1),
+        n("prismarine", arc=2.4, step_y=7, kind="bubble",
+          climb_style="water", hug=2.0, pedestal=False, spread=0, orbs=2),
+        n("accent", arc=3.0, step_y=1, hug=2.8, spread=0),
     ]),
 
     # ---- 9 ---------------------------------------------------------------
@@ -331,6 +359,17 @@ LEVELS: tuple[Level, ...] = (
         ("serac", [n("rock", arc=3.4, lift=2, spread=0),
                    n("rock", arc=4.8, lift=2, kind="slide", form="ice",
                      spread=0, orbs=1)]),
+    ], exit_beats=[
+        n("packedice", arc=4.0, step_y=1, kind="slide", form="ice",
+          hug=2.6, spread=0, confine=True),
+        n("packedice", arc=4.0, step_y=1, kind="slide", form="ice",
+          hug=2.6, spread=0, radial=0.9, orbs=1),
+        n("packedice", arc=4.0, step_y=1, kind="slide", form="ice",
+          hug=2.6, spread=0, radial=-0.9),
+        n("packedice", arc=4.0, step_y=1, kind="slide", form="ice",
+          hug=2.6, spread=0, orbs=1),
+        n("packedice", arc=4.0, step_y=1, kind="slide", form="ice",
+          hug=2.8, spread=0),
     ]),
 
     # ---- 10 --------------------------------------------------------------
@@ -584,6 +623,15 @@ LEVELS: tuple[Level, ...] = (
     ], filler=[
         ("blocks", [n("rock", arc=3.4, lift=1, spread=1, orbs=1),
                     n("accent", arc=4.4, lift=1, spread=1)]),
+    ], exit_beats=[
+        n("rock", arc=2.9, step_y=1, hug=2.4, spread=0, confine=True),
+        n("accent", arc=3.0, step_y=1, hug=2.4, spread=0, radial=0.9,
+          orbs=1),
+        n("oak", arc=2.9, step_y=1, form="fence", hug=2.4, spread=0,
+          pedestal=False),
+        n("rock", arc=3.0, step_y=1, hug=2.4, spread=0, radial=-0.9,
+          orbs=1),
+        n("rock", arc=2.9, step_y=1, hug=2.6, spread=0),
     ]),
 
     # ---- 20 --------------------------------------------------------------
@@ -644,6 +692,14 @@ LEVELS: tuple[Level, ...] = (
         ("vents", [n("accent", arc=3.4, lift=3, spread=0, moat=True),
                    n("accent", arc=3.3, lift=3, spread=0, moat=True,
                      orbs=1)]),
+    ], exit_beats=[
+        n("rock", arc=2.9, step_y=1, hug=2.4, spread=0, confine=True),
+        n("rock", arc=3.0, step_y=1, hug=2.4, spread=0, radial=0.9),
+        n("rock", arc=2.9, step_y=1, hug=2.4, spread=0, radial=-0.9,
+          orbs=1),
+        n("rock", arc=3.0, step_y=1, hug=2.4, spread=1),
+        n("oak", arc=2.4, step_y=4, kind="climb", climb_style="ladder",
+          hug=2.0, pedestal=False, spread=0, orbs=2),
     ]),
 
     # ---- 22 --------------------------------------------------------------
@@ -725,6 +781,13 @@ LEVELS: tuple[Level, ...] = (
         ("hearth", [n("ground", arc=4.6, lift=0, form="floor", orbs=1)]),
         ("lectern", [n("rock", arc=3.4, lift=1, spread=0),
                      n("rock", arc=3.3, lift=2, spread=0, orbs=1)]),
+    ], exit_beats=[
+        n("rock", arc=2.9, step_y=1, hug=2.4, spread=0, confine=True),
+        n("rock", arc=3.0, step_y=1, hug=2.4, spread=0, radial=0.9,
+          orbs=1),
+        n("rock", arc=2.9, step_y=1, hug=2.4, spread=1, radial=-0.9),
+        n("oak", arc=2.4, step_y=4, kind="climb", climb_style="ladder",
+          hug=2.0, pedestal=False, spread=0, orbs=2),
     ]),
 
     # ---- 25 --------------------------------------------------------------
@@ -732,7 +795,7 @@ LEVELS: tuple[Level, ...] = (
     # scarecrow's cousin standing guard as a lantern post, and the farm
     # read the second time round with the lights on.
     Level("PUMPKIN ROWS", "farm", rise=4, gap=2.8, exit="stair",
-          band=10.5, landmark="cabin", glow="glowstone", step=("pumpkin", "hop"),
+          band=10.5, landmark="scarecrow", glow="glowstone", step=("pumpkin", "hop"),
           beats=[
         ("rows", [n("pumpkin", arc=3.6, lift=1, spread=0, orbs=1),
                   n("pumpkin", arc=3.5, lift=1, spread=0),
@@ -918,6 +981,15 @@ LEVELS: tuple[Level, ...] = (
         ("terrace", [n("ground", arc=4.8, lift=0, form="floor", orbs=1)]),
         ("plinths", [n("rock", arc=3.4, lift=1, spread=0),
                      n("sub", arc=3.5, lift=2, spread=0, orbs=1)]),
+    ], exit_beats=[
+        n("quartz", arc=2.9, step_y=1, hug=2.4, spread=0, confine=True,
+          deco="lamp"),
+        n("diorite", arc=3.0, step_y=1, hug=2.4, spread=0, radial=0.9),
+        n("quartz", arc=2.9, step_y=1, hug=2.4, spread=0, radial=-0.9,
+          orbs=1),
+        n("diorite", arc=3.0, step_y=1, hug=2.4, spread=0, radial=0.9),
+        n("quartz", arc=2.9, step_y=1, hug=2.4, spread=0, deco="lamp"),
+        n("quartz", arc=3.0, step_y=1, hug=2.6, spread=0, orbs=1),
     ]),
 
     # ---- 33 --------------------------------------------------------------
@@ -940,5 +1012,12 @@ LEVELS: tuple[Level, ...] = (
     ], filler=[
         ("court", [n("rock", arc=3.6, lift=1, spread=1, orbs=1),
                    n("accent", arc=4.4, lift=1, spread=1)]),
+    ], exit_beats=[
+        n("rock", arc=2.9, step_y=1, hug=2.4, spread=0, confine=True),
+        n("accent", arc=3.0, step_y=1, hug=2.4, spread=0, radial=0.9,
+          orbs=1),
+        n("rock", arc=2.9, step_y=1, hug=2.4, spread=0, radial=-0.9),
+        n("rock", arc=3.0, step_y=1, hug=2.4, spread=0, orbs=1),
+        n("rock", arc=2.9, step_y=1, hug=2.6, spread=0),
     ]),
 )

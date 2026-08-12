@@ -206,7 +206,7 @@ MATERIALS.update({
 
 #: Props whose origin is at the *top* of the model, so they hang from the cell
 #: they are given rather than stand on it. Getting this wrong buries them.
-HANGING = frozenset(("vinehang", "dripstone", "chain"))
+HANGING = frozenset(("vinehang", "dripstone", "chain", "bell"))
 
 #: Every furniture model the scene has to load. Derived from the themes rather
 #: than typed out again, because a theme that names a prop nobody loaded draws
@@ -520,7 +520,7 @@ THEMES = (
           exits=("stair", "ladder"),
           step=("honeycomb", "hop")),
     Theme("coral", "sand", "coral_pink", "coral_red", "coral_blue", "water",
-          "sealantern", ("flower", "pebbles", "grasstuft"),
+          "sealantern", ("coralfan", "flower", "pebbles", "grasstuft"),
           {"pond": 2.6, "channel": 2.2, "pillars": 1.8, "spire": 1.6},
           (140, 208, 216),
           exits=("stair",),
@@ -566,7 +566,8 @@ THEME_BY_NAME = {t.name: t for t in THEMES}
 #: ``ladder`` and ``vine`` are here rather than in a theme's prop list because
 #: they belong to a *move*, not to a place: any level may be left by climbing.
 PROP_KINDS = tuple(sorted({k for t in THEMES for k in t.props}
-                          | {"lilypad", "ladder", "vine"}))
+                          | {"lilypad", "ladder", "vine", "millblades",
+                             "bell", "scarecrow", "coralfan"}))
 MATERIALS.setdefault("mycelium", ((150, 132, 146), "dirt", 0.04))
 
 
@@ -583,7 +584,7 @@ def _lm_windmill(rng, theme):
     _lm_box(cells, 0, 1, 3, 5, 0, 1, "plaster")
     _lm_box(cells, -1, 2, 6, 6, -1, 2, "roof")
     cells.append((0, 1, -2, theme.glow))
-    return cells
+    return cells, ((0, 5, -1, "millblades"),)
 
 
 def _lm_watchtower(rng, theme):
@@ -611,8 +612,7 @@ def _lm_bell(rng, theme):
     _lm_box(cells, -1, -1, 0, 3, 0, 0, theme.rock)
     _lm_box(cells, 1, 1, 0, 3, 0, 0, theme.rock)
     _lm_box(cells, -1, 1, 4, 4, 0, 0, "oak")
-    cells.append((0, 3, 0, "gold"))
-    return cells
+    return cells, ((0, 3, 0, "bell"),)
 
 
 def _lm_crane(rng, theme):
@@ -698,10 +698,18 @@ def _lm_cluster(rng, theme):
     return cells
 
 
+def _lm_scarecrow(rng, theme):
+    cells: list = [(0, 0, 0, "coarse")]
+    return cells, ((0, 1, 0, "scarecrow"),)
+
+
 #: The signature structure a level is recognised by, by name. Built in the
 #: trough's own frame and painted by :meth:`Course._landmark` -- off the
-#: course, on real ground, or not at all.
+#: course, on real ground, or not at all. A builder returns cells, or
+#: ``(cells, props)`` when the structure carries a model -- sails, a bell,
+#: a scarecrow -- that whole cells cannot say.
 LANDMARKS = {
+    "scarecrow": _lm_scarecrow,
     "windmill": _lm_windmill,
     "watchtower": _lm_watchtower,
     "tree": _lm_tree,
@@ -2960,10 +2968,17 @@ class Course:
             return
         rng = self.rng
         cone = self.cone
-        cells = build(rng, section.theme)
-        for attempt in range(8):
+        built = build(rng, section.theme)
+        # A builder returns cells, or (cells, props) when the structure
+        # carries a model that whole cells cannot say.
+        if isinstance(built, tuple) and len(built) == 2 \
+                and isinstance(built[0], list):
+            cells, props = built
+        else:
+            cells, props = built, ()
+        for attempt in range(14):
             # The apron first: on a ledge level it is the one place with room.
-            if attempt < 3 and section.profile == "ledge":
+            if attempt < 5 and section.profile == "ledge":
                 u = cone.apron_u(section) + rng.uniform(-0.4, 0.4) \
                     / max(6.0, cone.rim_at(section.y))
             else:
@@ -2982,6 +2997,7 @@ class Course:
             y = cone.floor_at(u)
             placed = []
             ok = True
+            skipped = 0
             for dt, dy, dr, style in cells:
                 if dy > top:
                     continue            # truncated against the soffit
@@ -2990,10 +3006,16 @@ class Course:
                 cell = (x, y + dy, z)
                 if not self._dressable(cell, margin=1):
                     # An accent reaching toward the course -- a doorway lamp,
-                    # a cap's rim -- is dropped alone; a structural cell
-                    # failing moves the whole structure. One lantern must not
-                    # cost a windmill its terrace.
+                    # a cap's rim -- may be dropped alone; a structural cell
+                    # failing moves the whole structure. *Bounded*: skipping
+                    # freely hollowed a whole windmill out cell by cell and
+                    # left its sails floating over a sugarcane, which is why
+                    # more than a quarter gone means try elsewhere.
                     if dy > 0:
+                        skipped += 1
+                        if skipped > max(2, len(cells) // 4):
+                            ok = False
+                            break
                         continue
                     ok = False
                     break
@@ -3011,6 +3033,56 @@ class Course:
                 self.write(cell, style)
                 if style == section.theme.glow:
                     cone.lamps.append(cell)
+            for dt, dy, dr, kind in props:
+                px = iround(ct * r + tx * dt + ct * dr)
+                pz = iround(st * r + tz * dt + st * dr)
+                # Facing the corridor: the model's front looks outward from
+                # the wall, which is where the course and the camera are.
+                yaw = math.atan2(-ct, st)
+                cone.props.append(((px, y + dy, pz), kind, yaw))
+            return
+
+    def _pour(self, section: Section) -> None:
+        """A column of the theme's liquid falling down the core face.
+
+        The reference's cliff constantly has water and lava pouring past the
+        course, and it is most of why that wall reads as a living thing
+        rather than masonry. One pour per level at most, on the levels that
+        own a liquid; hard against the wall so it falls *behind* the course,
+        with a dug pool at its foot. Liquid cells are see-through, so they
+        never join the occupancy map and the walker never stands on one.
+        """
+        theme = section.theme
+        if not theme.liquid:
+            return
+        rng = self.rng
+        if rng.random() > 0.65:
+            return
+        cone = self.cone
+        for _ in range(4):
+            f = 0.2 + 0.6 * rng.random()
+            u = section.u0 + (section.u1 - section.u0) * f
+            if not cone.has_floor(u):
+                continue
+            if abs(u - cone.apron_u(section)) \
+                    * max(6.0, cone.rim_at(section.y)) < 4.0:
+                continue
+            th = u * cone.wind
+            ct, st = math.cos(th), math.sin(th)
+            top = section.y + cone.trough_height(u) - 1
+            r = cone.core_r(u, section.y + 2) + 0.7
+            x, z = iround(ct * r), iround(st * r)
+            cell = (x, section.y, z)
+            if not self._dressable(cell, margin=1) \
+                    or not self.blocked((x, section.y - 1, z)):
+                continue
+            for y in range(section.y, top + 1):
+                if self.blocked((x, y, z)):
+                    break
+                self.write((x, y, z), theme.liquid)
+            self._pool(theme, x, section.y, z)
+            if theme.liquid == "lava":
+                self.cone.lamps.append((x, section.y + 2, z))
             return
 
     def _paint_behind(self) -> None:
@@ -3036,6 +3108,7 @@ class Course:
         if span <= 0:
             return
         self._landmark(section)
+        self._pour(section)
         steps = max(6, int(span * cone.outer_at(section.u0) * 1.6))
         pool_at = rng.uniform(0.2, 0.8) if theme.liquid else -1.0
         # Per *block of terrace*, not per section. A section is a third of a
