@@ -23,7 +23,7 @@ resurrections.)
 
 **Now verified on real Windows hardware with a GPU**, which turned up several
 things the software-rasteriser cloud sessions could not have seen — see
-"Landmines" below. 621 passed, 34 skipped, including a Win32 suite that
+"Landmines" below. 628 passed, 34 skipped, including a Win32 suite that
 exercises the real window API.
 
 The runner has a real collision model. Obstacles carry hitboxes derived from
@@ -530,8 +530,10 @@ engine grew, each verified by render + probe the day it was written:
   drifting through a terrace reads as a rendering fault).
 - **Landmarks**: 14 cell blueprints (windmill, watchtower, tree, bell, crane,
   totem, comb, great cap, hoard, wool stripes, cabin, hoodoo, arch, amethyst
-  cluster) painted during dressing on real ground; accent cells may be
-  dropped alone, base cells move the whole structure.
+  cluster) **reserved** the moment a section enters the horizon -- laid out
+  at the apron from a per-level stream, held against placement, arcs,
+  shells, pours and dressing, and merely redeemed at paint time. Accent
+  cells may be dropped alone, base cells move the whole structure.
 - **The camera locks onto the landing** through take-off and flight
   (`_look`'s `lock` ramp); the corridor-tangent blend only steers early in a
   run. This was the owner's "not looking where it jumps", and it was real.
@@ -549,15 +551,97 @@ engine grew, each verified by render + probe the day it was written:
   out with the generated climb as fallback (mechanism live and tested, no
   level uses it yet).
 
+Two features are **machinery inserted between script beats**, both tied to a
+world feature, both leaving the cursor untouched, and the pattern is the same
+one twice (`handplan.MACHINERY` names them, and they are kept out of the
+fidelity numbers because they are aimed rather than authored):
+
+- **Locks** (2026-08-12). Every level's first floor break is 5.5-6.7 wide --
+  unjumpable -- and `Course._lock_nodes` crosses it: approach at height, an
+  island floated over the hole, a landing on the far ground. Measured with
+  `tools/bypass_probe.py`, which walks the *built world* rather than the cone
+  alone: **47% of a level covered without a jump, 0 of 42 levels walkable end
+  to end**, against the real map's exactly-comparable 46% and 0 of 43.
+- **Gated landmarks** (2026-08-12, this pass). Twelve of the fourteen
+  structures have a bigger variant carrying a held-open passage
+  (`spiralplan.GATED`), and `Course._landmark_nodes` steers the course
+  through it. See below.
+
 Measured (full table in `docs/TOWER.md`): design 100% legal on paper,
-**98.5% placed as authored** (worst level 88%), unchecked **0.19-0.22%**,
-twice-claimed 0, walkability 0 m, 622 tests + 34 skips green, **3.41 ms** a
-frame against parkour's 2.63 in the same process (ratio 1.30, better than
-the 24-level tower's 1.39). The one number that got worse: **frames mostly
-filled by a wall, 0.4% -> 2.8%** -- partly the price of interiors existing,
-partly a residue that clusters in one-to-two-second stretches at corridor
-bends; the segment-bucketing method that closed the last camera residue is
-the way into this one.
+**93.5% placed as authored** over the design alone, unchecked **0.31%**,
+twice-claimed 0, walkability 0 m, body inside the world 0.00%, 628 tests +
+34 skips green, **frames mostly filled by a wall 1.8%** (down from 2.8%).
+The one criterion missed is the frame budget: **3.74 ms** against parkour's
+2.44 in the same process (ratio 1.53, against 1.30 with the gates switched
+off in the same process), where the criteria ask for 3.5. The gated
+structures are three to four times the cells of the ones they replace, and
+the cheap way back is fewer cells per blueprint -- hollow interiors, ring
+eaves -- rather than fewer gates.
+
+## The course runs *through* the landmarks (2026-08-12)
+
+The owner watched five minutes of live strip and remembered **one**
+structure, against a 97% placement rate. `tools/landmark_probe.py` is the
+number that says why -- a real run, frame by frame, through the real camera
+-- and it agreed with him: only **18%** of the levels that stood a landmark
+up ever held it at 25 degrees, unoccluded and in frame, for a second and a
+half, and **none** ever reached 40. Placement rate was never the question,
+and this is the standing lesson: *a metric that measures the thing you can
+build rather than the thing the viewer sees will read green forever.*
+
+So twelve of the fourteen blueprints have a bigger **gated** variant
+(`spiralplan.GATED`) carrying a passage that is held open from the moment
+the level enters the horizon, and `handplan.Course._landmark_nodes` steers
+the course through it exactly as `_lock_nodes` steers it across a break.
+Same worlds, gates off vs on: **20% -> 52%** of levels at 25 degrees, **0%
+-> 29%** at 40, **1.00 -> 2.75** structures a minute, for +0.05 points of
+unchecked placement and one point of fidelity.
+
+What had to be true, and none of it was guessable:
+
+- **A doorway is walked through, not jumped through.** One jump impulse
+  always rises 1.25 m, so the head sweeps three cells above the take-off:
+  an arc under a lintel low enough to read as a doorway is refused, every
+  time. Interiors are `walk` gates (three cells of clearance, crossed at a
+  run); arches, bell frames, canopies and the hole in the loom wall are
+  `hop` gates, five cells high.
+- **A passage is three cells wide or it is a graze.** A body is 0.6 m across
+  and straddles the next cell whenever it is not dead centre, and on a
+  circle the diagonal step is the normal case.
+- **The landings are cells, computed with the structure and stored.** The
+  same arithmetic re-run later against a bearing that has moved on misses
+  its own doorway by the cell it drifted.
+- **But the crossing's real work is handing the passage over, not aiming
+  it.** Six runs: 41 crossings offered, **18 landed inside the structure, 4
+  of them on the exact stored cell**. The leg onto the first stored cell is
+  an ordinary jump from wherever the approach finished and is refused about
+  half the time; what works every time is that the offer takes the doorway
+  out of the hold while the frontier is beside it, leaving it the only
+  clear ground on the lane. **Retrying a refused offer makes it worse** --
+  `_last_resort`'s recovery hop is three to five blocks in whatever
+  direction will take one, so the second attempt aims behind itself
+  (measured: retirements 18 -> 65, unchecked 0.34% -> 0.60%).
+- **Two inserted features cannot share ground.** The lock lays seventeen
+  blocks in one decision and was walking the frontier straight past
+  doorways. Breaks on a gate-capable level are now kept nine blocks clear
+  *and on the far side of the apron*, the lock defers to a nearer doorway,
+  and script beats are clipped short of one. This is the owner's rule --
+  when they collide, move the lock -- and `floor_breaks` is where a lock
+  moves.
+- **A gate the course never reaches must come down.** Holding the big
+  structures without crossing them measured **1.96%** unchecked against
+  0.30%; crossing them, 0.77%; retiring the missed ones and standing the
+  small landmark ahead of the body instead, **0.31%**. A gate is a good
+  trade only while the crossing is still to come.
+- **Do not gate only the wide levels.** Refusing narrow ones (band under
+  8.5, shelf under four) measured *worse on both counts* -- 0.56% against
+  0.47%, and two fewer structures seen -- because the fallback there is a
+  hold on the apron with the course squeezing past. The one exception is
+  `cluster`, whose two levels are the deep-dark pair, and it is out.
+- **Fidelity is counted over the design alone now** (`handplan.MACHINERY`).
+  The climb, the recoveries, the lock and the crossing are aimed at world
+  features, not written down landing by landing; with them inside the
+  numerator the same runs read 88% and nothing was wrong.
 
 Two hard-won harness facts. `tools/level_shot.py --level N --sheet` renders
 one level without waiting for the tower to reach it -- and it must patch
@@ -601,15 +685,31 @@ touching any of it — the reasoning is there, this is the short list:
    `_climb_on`, `_grab_the_wall` -- is untouched), but no level writes one
    yet. Replacing the machinery third with design is now a per-level
    authoring job in `handlevels.py`, not an engine change.
-1. **A wall fills the lens on 2.8% of frames in the rebuilt tower** -- up
-   from 0.4%, and partly on purpose: interiors exist now, and a tunnel *is*
-   walls near the lens. The real residue clusters in one- to two-second
-   stretches at corridor bends where the cliff swings across the aim
-   (watched on a dusk run, seed 9, THE BALCONIES). Same shape as the last
-   camera residue, same method to find it: walk a run, call
-   `spiral_probe._lens_jammed` every few frames, bucket by `blk["segment"]`
-   -- and now also by whether a shell encloses the body, because enclosed
-   wall-frames are the level working as designed and open ones are not.
+0b. **Half the gate-capable levels still do not get entered.** Over 12 runs:
+   141 levels wanted a gate, 104 got the reservation (the rest lost the
+   anchor to rock, to the drop, or to having no legal crossing), the offer
+   was made on 94 and 10 were retired -- and about half of the offers put a
+   landing in the passage. The single biggest lever left is the leg **onto
+   the first stored cell**: it is an ordinary jump from wherever the approach
+   hops finished, and `no move: hop` is the whole of its rejection table. The
+   fix is to stop leaving that distance to chance -- store the approach
+   landings too, laid out along the lane at reserve time -- and *not* to
+   retry, which was measured and is worse.
+0c. **The gated structures cost 0.74 ms a frame** (3.00 -> 3.74 in one
+   process, ratio to parkour 1.30 -> 1.53), which is over the 3.5 ms the
+   tower's own criteria ask for. They are three to four times the cells of
+   the blueprints they replace and much of that is solid fill nobody sees:
+   hollow interiors and ring eaves are the cheap way back, not fewer gates.
+1. **A wall fills the lens on 1.8% of frames in the rebuilt tower** -- down
+   from 2.8% when the gates landed (a doorway frames sky), still up from
+   0.4% before interiors existed, and partly on purpose: a tunnel *is* walls
+   near the lens. The real residue clusters in one- to two-second stretches
+   at corridor bends where the cliff swings across the aim (watched on a
+   dusk run, seed 9, THE BALCONIES). Same shape as the last camera residue,
+   same method to find it: walk a run, call `spiral_probe._lens_jammed`
+   every few frames, bucket by `blk["segment"]` -- and now also by whether a
+   shell or a gate encloses the body, because enclosed wall-frames are the
+   level working as designed and open ones are not.
 1b. **The roster still wants assets**: per-theme pours (falling lava/water
    columns past the course), the windmill's blades, a bell, coral fans, a
    scarecrow -- all `assets/src/` work, none load-bearing.
@@ -823,6 +923,21 @@ long jumps you need a different motion model, not a bigger number.
   moves, dead air, frozen frames, and how much of the lens is clear ahead).
   `--no-motion` needs no window at all, because `scenes/spiralplan.py` imports
   no renderer -- and neither does the walk, so both are seconds.
+- `python tools/landmark_probe.py --runs 6 --seconds 40` asks whether a
+  level's signature structure is ever *seen*: a real run, frame by frame,
+  through the real camera, counting a structure when it holds 10/25/40
+  degrees, unoccluded and in frame, for a second and a half. Placement rate
+  was the number that stood in for this and it was wrong -- 97% placed, 18%
+  ever framed. Currently **55% of levels at 25 degrees, 30% at 40, 2.75 a
+  minute**.
+- `python tools/bypass_probe.py --runs 6 --blocks 240` walks the **built
+  world** -- cone, course, pedestals, terrain, shells, landmarks -- one cell
+  at a time, up one, down any drop, never jumping, and reports how much of a
+  level it covers. This is the walkability criterion for the hand-built
+  tower; `spiral_probe`'s cone-alone walker answers a different question and
+  reads as if levels were much harder to walk than they are. Currently **47%
+  mean, 0 of 42 levels walkable end to end**, against the real map's 46% and
+  0 of 43.
 - `python tools/parkour_probe.py --runs 24 --motion-runs 12` is the parkour
   scene's acceptance test in numbers: interpenetration, grid alignment,
   emergency hops, the hop distribution and its ramp, and whether the body ever
@@ -1046,7 +1161,7 @@ long jumps you need a different motion model, not a bigger number.
   nothing can walk up the tower without touching the parkour).
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~150s). **621
+- Run `python -m pytest tests/` before committing; it is fast (~150s). **628
   passed, 34 skipped.** The Win32 suite skips off Windows and the X11 suite
   skips without a display, so a green run means less on the other platform's
   machine -- check the count.

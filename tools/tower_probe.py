@@ -191,6 +191,7 @@ def main() -> int:
         return 1 if bad else 0
 
     exact = fallback = stuck = 0
+    machinery = machined = 0
     by_level: dict[str, Counter] = defaultdict(Counter)
     beats: Counter = Counter()
     by_beat: dict[str, list] = defaultdict(lambda: [0, 0])
@@ -213,6 +214,15 @@ def main() -> int:
             if blk["segment"] == "stuck":
                 stuck += 1
                 by_level[name]["stuck"] += 1
+                continue
+            if blk["segment"] in hp.MACHINERY:
+                # The lock across the level's break and the crossing through
+                # its landmark are aimed at world features, not written down
+                # landing by landing. Counting them as design answers a
+                # different question from the one this section asks.
+                machinery += 1
+                machined += bool(blk["exact"])
+                by_level[name]["machinery"] += 1
                 continue
             beats[blk["segment"]] += 1
             key = f"{name}/{blk['segment']}"
@@ -238,6 +248,8 @@ def main() -> int:
           f"({100 * exact / max(1, designed):.1f}%)")
     print(f"  ...placed on a fallback         {fallback} "
           f"({100 * fallback / max(1, designed):.1f}%)")
+    print(f"  machinery (lock, crossing)      {machinery} "
+          f"({100 * machined / max(1, machinery):.0f}% aimed as planned)")
     print(f"  the exit climb                  {ascent} "
           f"({100 * ascent / max(1, laid):.0f}% of the course)")
     if reach:

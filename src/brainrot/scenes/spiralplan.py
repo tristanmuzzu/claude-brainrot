@@ -708,6 +708,10 @@ def _lm_scarecrow(rng, theme):
 #: course, on real ground, or not at all. A builder returns cells, or
 #: ``(cells, props)`` when the structure carries a model -- sails, a bell,
 #: a scarecrow -- that whole cells cannot say.
+#:
+#: These are the **fallbacks** now. A landmark is tried first as one of the
+#: bigger gated structures below, which the course runs *through*; these
+#: smaller ones are what stands on a level whose apron could not hold a gate.
 LANDMARKS = {
     "scarecrow": _lm_scarecrow,
     "windmill": _lm_windmill,
@@ -725,6 +729,196 @@ LANDMARKS = {
     "arch": _lm_arch,
     "cluster": _lm_cluster,
 }
+
+
+# ---------------------------------------------------------------------------
+# Gated landmarks: the ones the course goes through
+# ---------------------------------------------------------------------------
+#
+# A structure standing beside the course is scenery, and scenery is what the
+# owner reported not seeing: five minutes of strip, ninety-seven per cent of
+# landmarks placed, one structure remembered. Measured with
+# ``tools/landmark_probe.py``, only 18% of landmarked levels ever held their
+# structure at 25 degrees for a second and a half, and *none* ever reached 40.
+# A thing you run through cannot be missed, which is also how the reference
+# does it -- its checkpoint legs go through temple halls, barrel silos and
+# libraries rather than past them.
+#
+# So each of these is (a) a bigger blocky structure than the fallback above and
+# (b) a **gate**: a box of cells through it, three or five high, that is held
+# open from the moment the level enters the horizon and that the course is
+# steered through by :meth:`handplan.Course._landmark_nodes`. The two kinds:
+#
+# ``walk`` -- an interior, three cells of clearance. A body walks through a
+# doorway; it cannot *jump* through one, because one jump impulse always rises
+# 1.25 m and the head then sweeps three cells above the take-off, so a lintel
+# low enough to read as a doorway is a lintel the arc is refused under.
+#
+# ``hop`` -- an opening five cells high: an arch, a bell frame, a hole punched
+# in a loom wall, a canopy overhead. The course jumps through those.
+#
+# The void is written down rather than modelled: every blueprint cell inside it
+# is dropped, so a builder may describe a solid mass and the doorway is cut
+# from it consistently in one place.
+
+
+def _lm_g_windmill(rng, theme):
+    cells: list = []
+    _lm_box(cells, -2, 2, 0, 3, -2, 2, "plaster")       # the mill house
+    _lm_box(cells, -3, 3, 4, 4, -3, 3, "roof")          # the eaves
+    _lm_box(cells, -1, 1, 5, 6, -1, 1, "plaster")       # the shaft
+    _lm_box(cells, -2, 2, 7, 7, -2, 2, "roof")          # the cap
+    cells.append((0, 3, -2, theme.glow))
+    return cells, ((0, 6, -2, "millblades"),)
+
+
+def _lm_g_watchtower(rng, theme):
+    cells: list = []
+    _lm_box(cells, -2, 2, 0, 3, -2, 2, theme.rock)      # the gatehouse
+    _lm_box(cells, -1, 1, 4, 6, -1, 1, theme.rock)      # the tower
+    for dt, dr in ((-2, -2), (2, -2), (-2, 2), (2, 2)):
+        cells.append((dt, 4, dr, theme.accent))         # corner merlons
+    _lm_box(cells, -1, 1, 7, 7, -1, 1, theme.accent)
+    cells.append((0, 6, -1, theme.glow))
+    return cells
+
+
+def _lm_g_cabin(rng, theme):
+    cells: list = []
+    _lm_box(cells, -2, 2, 0, 2, -2, 2, "spruce")
+    _lm_box(cells, -3, 3, 3, 3, -3, 3, "roof")
+    _lm_box(cells, 1, 1, 4, 5, 1, 1, theme.rock)        # the chimney
+    cells.append((0, 1, -2, theme.glow))
+    cells.append((0, 1, 2, theme.glow))
+    return cells
+
+
+def _lm_g_arch(rng, theme):
+    cells: list = []
+    for dr in (-2, 2):
+        _lm_box(cells, -1, 1, 0, 4, dr, dr, theme.rock)
+    _lm_box(cells, -1, 1, 5, 6, -2, 2, theme.accent)
+    cells.append((0, 4, -2, theme.glow))
+    cells.append((0, 4, 2, theme.glow))
+    return cells
+
+
+def _lm_g_totem(rng, theme):
+    cells: list = []
+    for dr in (-2, 2):
+        _lm_box(cells, -1, 1, 0, 5, dr, dr, "obsidian")
+    _lm_box(cells, -1, 1, 6, 6, -2, 2, "obsidian")
+    cells.append((0, 5, -2, theme.glow))
+    cells.append((0, 5, 2, theme.glow))
+    return cells
+
+
+def _lm_g_bell(rng, theme):
+    cells: list = []
+    for dr in (-2, 2):
+        _lm_box(cells, -1, 1, 0, 5, dr, dr, theme.rock)
+    _lm_box(cells, -1, 0, 6, 6, -2, 2, "oak")           # the headstock beam
+    return cells, ((0, 5, 0, "bell"),)
+
+
+def _lm_g_hoodoo(rng, theme):
+    cells: list = []
+    h1, h2 = rng.randint(5, 6), rng.randint(6, 7)
+    _lm_box(cells, -1, 0, 0, h1, -2, -2, "terra_red")
+    _lm_box(cells, -1, 0, h1 + 1, h1 + 1, -2, -2, "terra_white")
+    _lm_box(cells, 0, 1, 0, h2, 2, 3, "terra_orange")
+    _lm_box(cells, 0, 1, h2 + 1, h2 + 1, 2, 3, "terra_white")
+    return cells
+
+
+def _lm_g_crane(rng, theme):
+    cells: list = []
+    _lm_box(cells, -1, 0, 0, 6, 2, 3, "spruce")         # the mast
+    _lm_box(cells, -1, 0, 6, 6, -2, 1, "spruce")        # the jib over the run
+    cells.append((-1, 5, -2, "spruce"))                 # the hook
+    cells.append((0, 3, 2, theme.glow))
+    return cells
+
+
+def _lm_g_tree(rng, theme):
+    trunk = "junglelog" if theme.name in ("jungle", "CANOPY WALK") else "log"
+    leaf = "jungleleaf" if trunk == "junglelog" else "leaves"
+    cells: list = []
+    _lm_box(cells, -1, 0, 0, 5, 2, 3, trunk)            # the trunk, off the run
+    _lm_box(cells, -2, 2, 5, 6, -2, 3, leaf)            # the canopy over it
+    _lm_box(cells, -3, 3, 6, 6, -1, 2, leaf)
+    return cells
+
+
+def _lm_g_greatcap(rng, theme):
+    cells: list = []
+    _lm_box(cells, -1, 0, 0, 4, 2, 3, "mushroomstem")
+    _lm_box(cells, -2, 2, 5, 5, -2, 3, "mushroomred")
+    _lm_box(cells, -3, 3, 6, 6, -1, 2, "mushroomred")
+    return cells
+
+
+def _lm_g_stripes(rng, theme):
+    """The loom wall, with the course's hole punched through it."""
+    cells: list = []
+    for i, dr in enumerate(range(-2, 3)):
+        _lm_box(cells, -1, 0, 0, 5, dr, dr, WOOLS[i % len(WOOLS)])
+    return cells
+
+
+def _lm_g_comb(rng, theme):
+    cells: list = []
+    for dr in range(-2, 3):
+        _lm_box(cells, -1, 0, 0, 5, dr, dr, "honeycomb")
+    cells.append((-1, 2, -2, theme.glow))
+    cells.append((-1, 2, 2, "honey"))
+    cells.append((0, 5, 0, "honey"))
+    return cells
+
+
+def _lm_g_hoard(rng, theme):
+    """The treasure gate: raw gold piled either side of the way through."""
+    cells: list = []
+    for dr in (-2, 2):
+        _lm_box(cells, -1, 1, 0, 3, dr, dr, "rawgold")
+        cells.append((0, 4, dr, "gold"))
+    _lm_box(cells, -1, 1, 5, 5, -2, 2, "gold")
+    cells.append((1, 0, -2, "gold"))
+    cells.append((-1, 0, 2, "gold"))
+    return cells
+
+
+#: name -> (builder, void, kind). ``void`` is ``(dt0, dt1, dr0, dr1, dy1)``:
+#: the cells kept open through the structure, three or more wide radially
+#: because a body is 0.6 m across and straddles the cell next door whenever it
+#: is not dead centre -- a one-cell doorway is refused by the body-fit check on
+#: every diagonal step, and the diagonal is the normal case on a circle.
+GATED = {
+    "windmill": (_lm_g_windmill, (-2, 2, -1, 1, 2), "walk"),
+    "watchtower": (_lm_g_watchtower, (-2, 2, -1, 1, 2), "walk"),
+    "cabin": (_lm_g_cabin, (-2, 2, -1, 1, 2), "walk"),
+    "arch": (_lm_g_arch, (-1, 1, -1, 1, 4), "hop"),
+    "totem": (_lm_g_totem, (-1, 1, -1, 1, 4), "hop"),
+    "bell": (_lm_g_bell, (-1, 1, -1, 1, 4), "hop"),
+    "hoodoo": (_lm_g_hoodoo, (-1, 1, -1, 1, 4), "hop"),
+    "crane": (_lm_g_crane, (-1, 1, -1, 1, 4), "hop"),
+    "tree": (_lm_g_tree, (-2, 2, -1, 1, 4), "hop"),
+    "greatcap": (_lm_g_greatcap, (-2, 2, -1, 1, 4), "hop"),
+    "stripes": (_lm_g_stripes, (-1, 0, -1, 1, 4), "hop"),
+    "comb": (_lm_g_comb, (-1, 0, -1, 1, 4), "hop"),
+    "hoard": (_lm_g_hoard, (-1, 1, -1, 1, 4), "hop"),
+}
+#: ``cluster`` is deliberately not in here. Its two levels are the deep-dark
+#: pair -- one-cell sculk landings over void on a three-and-a-half-cell shelf,
+#: and a vertical shaft climbed from inside -- and a five-cell gate across
+#: either of them measured 0.47% unchecked against 0.34% on its own, for two
+#: structures. The amethyst geode stays the small landmark beside the course.
+
+#: Where the crossing's landings sit along the gate's own axis, by kind. A
+#: walk leg reaches 2.4 m edge to edge and a hop 4.26, and both ends of a
+#: landing are set back by ``EDGE``, so three cells is a comfortable walk and
+#: four a comfortable jump.
+GATE_NODES = {"walk": (-3, 0, 3), "hop": (-4, 0, 4)}
 
 
 class Section:
@@ -867,6 +1061,11 @@ class Cone:
         #: apron and is never framed may as well not exist -- the owner
         #: watched five minutes of strip and saw one.
         self.marks: dict[int, tuple[float, float, float]] = {}
+        #: Section index -> the cells that structure is made of. The centroid
+        #: above says where to look; this says how *big* the thing is and
+        #: which cells are its own, which is what a visibility metric needs
+        #: to ask whether it filled any of the frame (``tools/landmark_probe``).
+        self.mark_cells: dict[int, tuple] = {}
         self._extend_section()
 
     # -- the helix ---------------------------------------------------------
@@ -970,6 +1169,15 @@ class Cone:
         radius = max(6.0, self.rim_at(lv.y))
         span = lv.u1 - lv.u0
         au = self.apron_u(lv)
+        # A level whose landmark is one the course runs *through* keeps its
+        # breaks on the far side of the apron, and further off it. Two
+        # inserted features cannot share a stretch of ground: the lock lays an
+        # approach, an island and a landing -- seventeen blocks decided at
+        # once -- and laid across a doorway it walks the frontier straight
+        # past it. The owner's rule when they collide is to move the lock, and
+        # this is where a lock moves.
+        gated = lv.landmark in GATED
+        keep = 9.0 if gated else 5.5
         out = []
         for k in range(n):
             h = (math.sin((lv.index * 7 + k * 3 + 1) * 12.9898)
@@ -988,16 +1196,18 @@ class Cone:
                 h2 = (math.sin((lv.index * 11 + 5) * 12.9898)
                       * 43758.5453) % 1.0
                 f = 0.18 + 0.45 * h2
-                for shift in (0.0, 0.16, -0.16, 0.3):
+                for shift in (0.0, 0.16, 0.3, -0.16, 0.42):
                     fc = min(0.62, max(0.16, f + shift))
                     c = lv.u0 + span * fc
-                    if abs(c - au) * radius >= 5.5:
+                    off = (c - au) * radius
+                    if off >= keep if gated else abs(off) >= keep:
                         break
                 w = (5.5 + 1.2 * ((h * 7.13) % 1.0)) / radius
                 out.append((c - w / 2, c + w / 2))
                 continue
             c = lv.u0 + span * f
-            if abs(c - au) * radius < 5.5:
+            off = (c - au) * radius
+            if (off < keep) if gated else (abs(off) < keep):
                 continue                # never under the landmark's apron
             w = (2.2 + 1.0 * ((h * 7.13) % 1.0)) / radius
             out.append((c - w / 2, c + w / 2))
@@ -1582,6 +1792,14 @@ class Course:
         #: and beg for leftovers, and placed only half the time. The union of
         #: held cells is what placement, shells, pours and dressing respect.
         self.landmark_hold: dict[int, tuple] = {}
+        #: Section index -> ``(landing cells, passage cells, gate kind)`` for a
+        #: landmark the course is meant to go *through*. Laid out with the
+        #: structure, in the structure's own frame, and read much later by
+        #: :meth:`handplan.Course._landmark_nodes` when the frontier reaches
+        #: that bearing. Stored rather than recomputed on purpose: the same
+        #: arithmetic run twice against a bearing that has moved on is how a
+        #: crossing misses its own doorway by a cell.
+        self.landmark_cross: dict[int, tuple] = {}
         self._hold_cells: set[tuple[int, int, int]] = set()
         #: Sections whose reservation was already attempted -- retrying a
         #: failed one every spawn is a builder call and a few hundred rock
@@ -2148,6 +2366,15 @@ class Course:
         """
         pu = self.u_of(prev)
         prev_surface = self.surface(prev)
+        if node["at"] is not None:
+            # A landing laid out with a structure, in the structure's frame.
+            # Nothing to rank and nothing to fall back to: either the cell is
+            # legal, which ``_attempt`` still decides in full, or the crossing
+            # is abandoned and the course carries on without it.
+            cell = node["at"]
+            if self._u_at(pu, cell[0], cell[2]) <= pu + 1e-6:
+                return []
+            return [tuple(cell)]
         form = node["form"]
         #: The level a crossing has to have left behind. Resolved here rather
         #: than carried on the node, because a crossing is re-aimed from
@@ -2791,7 +3018,7 @@ class Course:
               spread: int = 2, moat: bool = False, step_y: int | None = None,
               hug: float = 0.0, confine: bool = False, ceiling: int = 0,
               cross: bool = False, ramp: bool = True,
-              shell: str | None = None,
+              shell: str | None = None, at=None,
               label: str | None = None) -> dict:
         """One entry in a feature's expansion.
 
@@ -2830,6 +3057,15 @@ class Course:
                     lifts.append(cand)
         if step_y is not None:
             lifts = [lift]
+        arcs = ((arc, arc * 1.14, arc * 1.28) if step_y is not None
+                else (arc, arc * 0.84, arc * 1.18))
+        if at is not None:
+            # The cell is the instruction. Heights and distances are what
+            # placement searches when a node says *roughly where*, and this
+            # kind of node says exactly where -- a doorway is one cell wide,
+            # and a fallback lands beside it, in the wall.
+            lifts = [lift]
+            arcs = (arc,)
         return {"style": style, "arc": arc, "lift": lift, "lifts": lifts,
                 #: An absolute rise from the landing before, used instead of a
                 #: height above the level's own floor. The climb out of a level
@@ -2862,8 +3098,11 @@ class Course:
                 #: 1.6 -- under ``MIN_HOP``, refused before it is even solved.
                 #: Offering it wastes a third of every retry on a distance that
                 #: cannot work.
-                "arcs": ((arc, arc * 1.14, arc * 1.28) if step_y is not None
-                         else (arc, arc * 0.84, arc * 1.18)),
+                "arcs": arcs,
+                #: A cell this landing must be *exactly*, or nothing. Used by
+                #: the crossing through a gated landmark, whose landings were
+                #: laid out with the structure and are one cell wide.
+                "at": at,
                 "radial": radial, "kind": kind, "form": form, "deco": deco,
                 "orbs": orbs, "pedestal": pedestal,
                 "pedestal_style": pedestal_style, "climb_style": climb_style,
@@ -3005,6 +3244,13 @@ class Course:
         budget = (lv.u_edge - self.u) * radius - want
         if budget <= 0:
             return
+        if self._pending and self._pending[0].get("label") == "landmark":
+            # A crossing through a structure is not a stretch of course that
+            # can be shortened: half of one leaves the body standing inside a
+            # building with the way out cut off. It is ten blocks long and it
+            # lives in the first half of the level by construction, so it
+            # cannot reach the exit climb's reserve anyway.
+            return
         keep, spent = [], 0.0
         for node in self._pending:
             if keep and spent + node["arc"] > budget:
@@ -3035,13 +3281,6 @@ class Course:
         if not build:
             return
         cone = self.cone
-        rng = random.Random(section.index * 977 + cone.wind * 31)
-        built = build(rng, section.theme)
-        if isinstance(built, tuple) and len(built) == 2 \
-                and isinstance(built[0], list):
-            cells, props = built
-        else:
-            cells, props = built, ()
         radius_here = max(6.0, cone.rim_at(section.y))
         # Never past 0.55 of the arc: the exit staircase owns the wall lane
         # from about two thirds in, and a hold there bars the one climb a
@@ -3049,13 +3288,88 @@ class Course:
         # cost this reservation ever had.
         span = section.u1 - section.u0
         cap = section.u0 + span * 0.55
-        for du in (0.0, -1.5, 1.5, -3.0, -4.5):
-            u = min(cone.apron_u(section) + du / radius_here, cap)
-            if self._try_reserve_at(section, u, cells, props):
-                return
+        # A gated structure is only worth building where the course is still
+        # *running*: past the exit climb's trigger the frontier is a staircase
+        # against the wall and it will never reach the doorway, which leaves a
+        # wall to be retired. A flat clamp does not express that -- pulling the
+        # anchor in to 0.42 of the arc measured worse (0.60% unchecked against
+        # 0.54%), because the apron's bulge is what the structure stands on and
+        # clamping the bearing walks it off the peak. The honest bound is the
+        # climb's own trigger, which is arithmetic this level already knows.
+        gate_cap = min(cap, self._gate_reach(section))
+        # The gated structure first and the small one only if it will not
+        # stand: a landmark the course runs through is the whole point, and a
+        # landmark beside the course is what the level falls back to.
+        gated = GATED.get(section.landmark)
+        plans = []
+        # Note for anyone tempted: refusing to gate the *narrow* levels -- band
+        # under 8.5, or a shelf under four cells -- measures worse on both
+        # counts (0.56% unchecked against 0.47%, and two fewer structures
+        # seen). A gate on a tight level is a designed way through it; the
+        # small landmark it falls back to is a hold on the apron with the
+        # course squeezing past, and that is what actually costs placements.
+        if gated and gate_cap > section.u0 + span * 0.12:
+            plans.append((gated[0], (gated[1], gated[2])))
+        plans.append((build, None))
+        for maker, gate in plans:
+            # A fresh stream per variant, seeded the same way: the builders
+            # that roll anything (the hoodoo's two heights) must give the same
+            # answer here as they would anywhere else, and painting redeems
+            # this plan rather than building it again.
+            rng = random.Random(section.index * 977 + cone.wind * 31)
+            built = maker(rng, section.theme)
+            if isinstance(built, tuple) and len(built) == 2 \
+                    and isinstance(built[0], list):
+                cells, props = built
+            else:
+                cells, props = built, ()
+            top = cap if gate is None else gate_cap
+            for du in (0.0, -1.5, 1.5, -3.0, -4.5):
+                u = min(cone.apron_u(section) + du / radius_here, top)
+                if self._try_reserve_at(section, u, cells, props, gate):
+                    return
+
+    def _gate_reach(self, section: Section) -> float:
+        """The last bearing on a level the course is still running along.
+
+        The climb out starts when what is left of the level is only as much as
+        the climb needs, and on a tall level with a wide chasm that is nearly
+        half of it. A doorway past that point is never reached: the frontier is
+        a staircase hugging the wall by then, and what the crossing leaves
+        behind is a structure standing across the running lane with nothing to
+        run through it. Measured as eighteen retirements in eight runs before
+        this bound existed.
+
+        Deliberately the *stair* estimate, which is the largest of the four
+        exits: erring early costs a little apron bulge, erring late costs the
+        whole structure.
+        """
+        cone = self.cone
+        radius = max(6.0, cone.rim_at(section.y))
+        need = cone.level(section.index + 1).y - section.y
+        want = ((max(1, need) + 1) * ASCENT_ARC + section.gap * radius + 1.4
+                + FEATURE_SLACK)
+        # ...plus the structure's own length and one landing to leave it by.
+        return section.u_edge - (want + 9.0) / radius
+
+    def lane_radius(self, u: float) -> float:
+        """The radius the course itself would run at, at this bearing.
+
+        The same arithmetic :meth:`_targets` does when a node asks for no
+        particular lane, factored out because a *gated* landmark has to be
+        built around that line rather than beside it: the doorway is only a
+        doorway if it is where the running is.
+        """
+        lo, hi = self.band(u)
+        r0n, r1n = self.cone.floor_range(u, apron=False)
+        if r1n < hi:
+            want = max(lo + 0.3, r1n - 1.4)
+        else:
+            want = lo + (hi - lo) * COURSE_OUT
+        return min(max(want, lo), hi)
 
     def _try_reserve_at(self, section: Section, u: float, cells,
-                        props) -> bool:
+                        props, gate=None) -> bool:
         cone = self.cone
         if not cone.has_floor(u):
             return False
@@ -3063,6 +3377,8 @@ class Course:
         base_r = min(r0f + 1.8, r1f - 2.2)
         if section.profile == "ledge":
             base_r = max(r0f + 1.2, r1f - 2.4)
+        if gate is not None:
+            base_r = self.lane_radius(u)
         th = u * cone.wind
         ct, st = math.cos(th), math.sin(th)
         tx, tz = -st * cone.wind, ct * cone.wind
@@ -3074,24 +3390,53 @@ class Course:
         # recovery chain against a wall that is not even built yet. The
         # landmark lives on the apron's bulge, outboard of the lane; inboard
         # pulls are for plazas only.
-        pulls = (0.0,) if section.profile == "ledge" else (0.0, 1.0, 2.0)
+        if gate is not None:
+            # A gate is anchored on the running lane and then allowed to slide
+            # a cell either way across it: measured, half the anchors that
+            # failed did so with one outboard cell of the structure hanging
+            # over the rim, and the shelf is a cell wider one step in.
+            pulls = (0.0, 1.0, -1.0, 2.0)
+        elif section.profile == "ledge":
+            pulls = (0.0,)
+        else:
+            pulls = (0.0, 1.0, 2.0)
         for pull in pulls:
             r = base_r - pull
+
+            def at(dt: int, dy: int, dr: int, r=r):
+                return (iround(ct * r + tx * dt + ct * dr), y + dy,
+                        iround(st * r + tz * dt + st * dr))
+
+            void: set = set()
+            if gate is not None:
+                (dt0, dt1, dr0, dr1, dy1), kind = gate
+                void = {at(dt, dy, dr)
+                        for dt in range(dt0, dt1 + 1)
+                        for dy in range(0, dy1 + 1)
+                        for dr in range(dr0, dr1 + 1)}
+                # The doorway has to be air a body can stand in *before* the
+                # structure is promised, and it has to be air nothing else has
+                # already claimed -- a gate whose passage is full is a wall.
+                if not self.free(void) or self.reserved(void) \
+                        or any(c in self.pathcells or c in self.headroom
+                               for c in void):
+                    continue
             placed = []
             ok = True
             for dt, dy, dr, style in cells:
                 if dy > top:
                     continue
-                x = iround(ct * r + tx * dt + ct * dr)
-                z = iround(st * r + tz * dt + st * dr)
-                cell = (x, y + dy, z)
+                cell = at(dt, dy, dr)
+                x, z = cell[0], cell[2]
+                if cell in void:
+                    continue            # this cell is the way through
                 if cone.rock(cell):
                     ok = False
                     break
                 if dy == 0 and not cone.rock((x, y - 1, z)):
                     ok = False
                     break
-                if section.profile == "ledge" and dy <= 2:
+                if gate is None and section.profile == "ledge" and dy <= 2:
                     # On a shelf a few cells wide, a structure crossing the
                     # course's own lane is a wall across the level: the
                     # course grinds its recovery chain against the hold and
@@ -3117,11 +3462,71 @@ class Course:
             # it doubled the stuck rate on landmarked levels, and a course
             # that runs right past a windmill's wall is exactly what the
             # real map's streets do anyway.
+            cross = None
+            if gate is not None:
+                cross = self._gate_crossing(at, y, gate[1])
+                if cross is None:
+                    continue            # a gate with no way in is a wall
             held = {c for c, _ in placed}
+            if cross is not None:
+                # The passage is held too, and held *against everyone*: it is
+                # the one part of a landmark that has to stay empty, and the
+                # course only gets it when the crossing is emitted.
+                held |= void
+                self.landmark_cross[section.index] = (cross, tuple(void),
+                                                      gate[1])
             self.landmark_hold[section.index] = (placed, prop_at)
             self._hold_cells |= held
             return True
         return False
+
+    def _gate_crossing(self, at, y: int, kind: str):
+        """The landings that take the course through a gate, or ``None``.
+
+        Three of them: one on the ground short of the structure, one inside
+        it, one out the far side. They are cells rather than distances --
+        computed here, where the structure's own frame is, and stored -- for
+        the reason the reservation exists at all: a crossing recomputed later
+        from a bearing is a crossing that misses its own doorway by the cell
+        the arithmetic drifted by.
+
+        The middle landing may not move; the two outside it may step inboard
+        looking for ground, because a ledge's apron falls away within three or
+        four cells of its peak and the shelf is what is left.
+        """
+        cone = self.cone
+        out = []
+        dts = GATE_NODES[kind]
+        for i, dt in enumerate(dts):
+            edge = i in (0, len(dts) - 1)
+            cell = None
+            for dr in ((0, -1, -2) if edge else (0,)):
+                c = at(dt, 0, dr)
+                if cone.rock(c) or not self.free((c,)) or self.reserved((c,)):
+                    continue
+                if not cone.rock((c[0], c[1] - 1, c[2])):
+                    continue            # nothing under it to stand a block on
+                # The body's own two cells, and for a hop the two the head
+                # sweeps through on the way: a landing under a lintel it
+                # cannot get to is not a landing.
+                high = 3 if kind == "walk" else 5
+                if any(cone.rock((c[0], c[1] + h, c[2]))
+                       for h in range(1, high)):
+                    continue
+                cell = c
+                break
+            if cell is None:
+                return None
+            out.append(cell)
+        # Every leg has to be a move the body actually has. A walk reaches
+        # 2.4 m edge to edge and a hop 4.26, and a landing's own edges take
+        # 0.68 of that; a hop also has a floor, ``MIN_HOP``.
+        lo, hi = (1.4, 3.05) if kind == "walk" else (2.7, 4.9)
+        for a, b in zip(out, out[1:]):
+            d = math.dist((a[0], a[2]), (b[0], b[2]))
+            if not lo <= d <= hi:
+                return None
+        return tuple(out)
 
     def _landmark(self, section: Section) -> None:
         """Paint the level's signature structure: redeem the reservation.
@@ -3135,6 +3540,13 @@ class Course:
             return
         placed, prop_at = plan
         self._hold_cells -= {c for c, _ in placed}
+        # A passage the course never used stays open -- ``write`` refuses a
+        # held cell, so the doorway is still a doorway -- but it stops being
+        # held, because the hold is a promise to the *course* and the course
+        # has gone by.
+        cross = self.landmark_cross.get(section.index)
+        if cross is not None:
+            self._hold_cells -= set(cross[1])
         seen: set[tuple[int, int, int]] = set()
         for cell, style in placed:
             if cell in seen:
@@ -3152,6 +3564,7 @@ class Course:
             self.cone.marks[section.index] = (
                 sum(xs) / len(xs), sum(ys) / len(ys) + 1.0,
                 sum(zs) / len(zs))
+            self.cone.mark_cells[section.index] = tuple(seen)
 
     def _pour(self, section: Section) -> None:
         """A column of the theme's liquid falling down the core face.

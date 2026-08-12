@@ -158,8 +158,7 @@ def test_the_design_survives_being_built() -> None:
     for run in range(4):
         _, _, seen = grow(run, 220)
         for blk in seen:
-            if blk["move"] is None or blk["segment"] in ("ascent", "start",
-                                                         "stuck", "recover"):
+            if blk["move"] is None or blk["segment"] in hp.MACHINERY:
                 continue
             total += 1
             exact += bool(blk["exact"])
@@ -195,6 +194,65 @@ def test_the_emergency_answer_is_effectively_never_reached() -> None:
         total += course.stuck
         laid += len(seen)
     assert total / laid < 0.01, f"{total} unchecked placements in {laid}"
+
+
+def test_a_gated_landmark_is_a_structure_with_a_way_through_it() -> None:
+    """Every gated blueprint is still a structure once its doorway is cut.
+
+    The void is written down apart from the builder, so the one way to get
+    this wrong is to punch a passage through a structure that was never wide
+    enough to have one -- which is how the old windmill would have come out:
+    a floating roof over nothing, the exact bug the whole-or-nothing rule
+    exists to stop.
+    """
+    for name, (build, void, kind) in sp.GATED.items():
+        dt0, dt1, dr0, dr1, dy1 = void
+        assert dr1 - dr0 >= 2, f"{name}: a passage under three cells wide"
+        assert dy1 >= (2 if kind == "walk" else 4), f"{name}: too low a lid"
+        cells = build(random.Random(1), sp.THEME_BY_NAME["plains"])
+        if isinstance(cells, tuple):
+            cells = cells[0]
+        cut = {(dt, dy, dr) for dt in range(dt0, dt1 + 1)
+               for dy in range(dy1 + 1) for dr in range(dr0, dr1 + 1)}
+        left = [c for c in cells if (c[0], c[1], c[2]) not in cut]
+        assert len(left) > len(cells) * 0.45, f"{name}: mostly doorway"
+        # ...and something the body passes between or under: a jamb either
+        # side, or a canopy over the top. Both read as going *through* it;
+        # the tree and the great cap are the ones with only one jamb.
+        jambs = sum(any(c[2] == side and c[1] <= dy1 for c in left)
+                    for side in (dr0 - 1, dr1 + 1))
+        over = any(c[1] > dy1 and dr0 <= c[2] <= dr1 for c in left)
+        assert jambs == 2 or (jambs and over), \
+            f"{name}: the passage has neither two jambs nor a lid"
+
+
+def test_the_course_goes_through_the_landmarks_it_gates() -> None:
+    """The crossings happen, and they happen *inside* the structure.
+
+    Placement rate was the number that stood in for this and it was wrong:
+    97% of landmarks were built and the owner saw one in five minutes. What
+    has to be true is that the landings labelled ``landmark`` are the cells
+    the gate reserved -- not near them, them -- because a crossing that
+    misses its own doorway by a cell is a course running past a wall.
+    """
+    offered = entered = landings = 0
+    for run in range(6):
+        _, course, seen = grow(run, 220)
+        offered += len(course._crossed) - len(course._retired)
+        entered += len(course._gate_hit)
+        landings += sum(1 for blk in seen if blk["segment"] == "landmark")
+        assert not any(blk["segment"] == "landmark" and blk["unchecked"]
+                       for blk in seen), "a crossing fell through to the " \
+                                         "unchecked answer"
+    assert offered >= 12, f"only {offered} crossings offered in six runs"
+    assert landings > 40
+    # ``entered`` is a landing *in the passage*, by any route: about half the
+    # offers manage it, and only a quarter of those land on the exact stored
+    # cell -- the leg onto it is an ordinary jump from wherever the approach
+    # finished, and it is refused often (CLAUDE.md, "Still outstanding").
+    # What must not sag is the share that gets inside at all, because a
+    # crossing that never lands is a structure nobody sees.
+    assert entered >= offered * 0.25, f"{entered} of {offered} gates entered"
 
 
 def test_the_tower_draws_all_the_way_through_several_levels() -> None:

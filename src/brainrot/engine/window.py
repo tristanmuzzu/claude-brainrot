@@ -750,7 +750,17 @@ class HeadlessWindow(_BaseWindow):
     second headless consumer (tests, an in-process daemon) resizes the
     existing window rather than fighting over it -- and destroy() is a no-op:
     the process exit reclaims an offscreen framebuffer just fine.
+
+    **It is born hidden and never taken.** "Headless" here means *this code*
+    wants no window; it does not mean the machine has no display, and on a
+    desktop with a GPU build raylib happily opens a real one -- so every probe
+    sweep and every ``shoot`` used to put a window in front of whatever the
+    owner was doing (his instruction, 2026-08-12: headless or behind, never
+    the top window). ``FLAG_WINDOW_UNFOCUSED`` is not enough on its own,
+    because it stops the window taking focus and not the window *appearing*.
     """
+
+    creation_flags = rl.FLAG_WINDOW_HIDDEN | rl.FLAG_WINDOW_UNFOCUSED
 
     def create(self, cfg: Config) -> None:
         os.environ["BRAINROT_HEADLESS"] = "1"

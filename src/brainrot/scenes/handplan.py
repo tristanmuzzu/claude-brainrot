@@ -24,6 +24,7 @@ rather than in a tolerance.
 from __future__ import annotations
 
 import math
+import random
 
 from . import spiralplan as sp
 from .handlevels import LEVELS, ROLES, Level, n  # noqa: F401
@@ -43,6 +44,16 @@ from .spiralplan import (  # noqa: F401  -- the renderer reads these off the pla
 #: was standing in an undressed section a third of the time and the terraces
 #: came back swept. Read by the renderer off the plan module.
 AHEAD = 26
+
+#: Segments that are *machinery*, not design: the climb out of a level, the
+#: recoveries, the lock across the level's wide break, and the crossing through
+#: a gated landmark. They are inserted between script beats and aimed at world
+#: features, so a fidelity number that counts them is answering a different
+#: question from "did the design survive being built" -- the lock alone took
+#: that number from 97% to 91.5% when it landed, and it was never a fallen-back
+#: authored landing. Read by ``tools/tower_probe.py`` and ``tests/test_tower``.
+MACHINERY = frozenset({"ascent", "start", "stuck", "recover", "lock",
+                       "landmark"})
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +172,15 @@ class Course(sp.Course):
         self._cursor: dict[int, int] = {}
         #: Break lips whose lock crossing was already laid.
         self._locked: set[float] = set()
+        #: Levels whose landmark crossing was already offered.
+        self._crossed: set[int] = set()
+        #: ...and those whose gate the frontier got past before it could be
+        #: offered, so the structure came down. Counted apart because the two
+        #: are opposite outcomes and one number cannot say which happened.
+        self._retired: set[int] = set()
+        #: Levels where at least one of the crossing's own landings is built:
+        #: the structure has been entered, so it stays whatever happens next.
+        self._gate_hit: set[int] = set()
         #: Beats asked for, and beats that came out with every landing placed
         #: as authored. The fidelity numbers; see ``tools/tower_probe.py``.
         self.authored = 0
@@ -194,9 +214,17 @@ class Course(sp.Course):
         return lv, need, want, radius
 
     def _choose_feature(self, lv) -> list[dict]:
-        lock = self._lock_nodes(lv)
+        # Two machinery-inserted features and one script, in the order the
+        # ground puts them in. A lock is never *clipped* -- half a lock is an
+        # approach to a hole with no island in it -- so a lock beyond the
+        # doorway simply waits, and the crossing goes first.
+        gate = self._gate_dist(lv)
+        lock = self._lock_nodes(lv, limit=gate)
         if lock:
             return lock
+        cross = self._landmark_nodes(lv)
+        if cross:
+            return cross
         design = self.cone.design(lv.index)
         cursor = self._cursor.get(lv.index, 0)
         self._cursor[lv.index] = cursor + 1
@@ -210,10 +238,219 @@ class Course(sp.Course):
             fill = design.filler
             name, specs = fill[(cursor - len(design.beats)) % len(fill)]
         self.segment = name
-        self.authored += len(specs)
-        return [self._node(**_resolve(spec, lv.theme)) for spec in specs]
+        out = self._clip_to_landmark(
+            lv, [self._node(**_resolve(spec, lv.theme)) for spec in specs])
+        # Counted after the clip, not before: a beat cut short of a gate was
+        # never asked for, and charging the design for a landing the machinery
+        # withdrew is how a fidelity number stops meaning anything.
+        self.authored += len(out)
+        return out
 
-    def _lock_nodes(self, lv) -> list[dict] | None:
+    def _landmark_nodes(self, lv) -> list[dict] | None:
+        """Run the course *through* the level's landmark.
+
+        A structure beside the course is scenery, and the owner's report was
+        that he watched five minutes of strip and saw one -- against a 97%
+        placement rate. Measured with ``tools/landmark_probe.py``, only 18% of
+        landmarked levels ever held their structure at 25 degrees for a second
+        and a half, and none ever reached 40: they were placed, and they were
+        never framed.
+
+        So the big structures carry a passage (``spiralplan.GATED``), laid out
+        and held open with the structure itself, and this is the machinery that
+        aims the course at it: ordinary approach hops to cover the ground, then
+        the three stored landings -- short of the doorway, inside it, out the
+        far side. Exactly the shape of :meth:`_lock_nodes`, for the same
+        reason: a world feature the course has to answer, inserted between
+        script beats, cursor untouched.
+
+        A walk gate is an interior three cells high and is crossed at a run,
+        because one jump impulse always rises 1.25 m and the head then sweeps
+        three cells above the take-off -- a lintel low enough to read as a
+        doorway is a lintel every arc under it is refused by. A hop gate is
+        five high, and those are jumped through.
+        """
+        dist = self._gate_dist(lv)
+        if dist is None or dist > 18.0:
+            # Wide, because the *other* inserted feature -- the lock across the
+            # level's wide break -- lays five landings and eighteen blocks in
+            # one go, and a doorway the frontier is already past is a wall.
+            return None
+        cells, void, kind = self.landmark_cross[lv.index]
+        ahead = self._gate_ahead(lv)
+        # Offered once. Retrying the ones whose first leg is refused sounds
+        # free and measures badly: a refused leg ends in ``_last_resort``,
+        # whose recovery hop is three to five blocks in whatever direction
+        # will take one, so by the second attempt the doorway is behind the
+        # body. Measured, offering up to three times took retirements from 18
+        # in twelve runs to 65 and unchecked placements from 0.34% to 0.60%.
+        self._crossed.add(lv.index)
+        # The passage was held against the whole world including us. Handing
+        # it over is what makes the crossing placeable -- ``_path_clear``
+        # treats a held cell as solid, so an arc through a held doorway is
+        # refused exactly as an arc through a wall is.
+        self._hold_cells -= set(void)
+        theme = lv.theme
+        out: list[dict] = []
+        run = max(0.0, dist - 3.4)
+        if run > 1.2:
+            legs = max(1, int(math.ceil(run / 4.0)))
+            for _ in range(legs):
+                out.append(self._node(theme.rock, arc=run / legs, lift=1,
+                                      spread=1, ramp=False, label="landmark"))
+        prev = None
+        inside = set(void)
+        for cell in ahead:
+            arc = 3.4 if prev is None else math.dist(
+                (prev[0], prev[2]), (cell[0], cell[2]))
+            out.append(self._node(
+                theme.accent if cell in inside else theme.rock, arc=arc,
+                lift=1,
+                # A landing *inside* a walk gate is arrived at at a run: the
+                # arc of a jump would take the head through the lintel. Every
+                # other leg -- including the way in, which comes off ordinary
+                # course laid where the helix put it -- is a jump.
+                kind="walk" if (kind == "walk" and cell in inside) else "hop",
+                spread=0, ramp=False, at=cell, label="landmark"))
+            prev = cell
+        self.segment = "landmark"
+        return out
+
+    def _gate_ahead(self, lv) -> list:
+        """The stored landings the frontier has not gone past yet.
+
+        A crossing is offered again if its first leg was refused, and by then
+        the body may be standing between two of its landings -- so what is
+        emitted is what is left, not what was planned.
+        """
+        plan = self.landmark_cross.get(lv.index)
+        if plan is None:
+            return []
+        radius = max(6.0, self.cone.rim_at(lv.y))
+        return [c for c in plan[0]
+                if (self._u_at(self.u, c[0], c[2]) - self.u) * radius > 0.5]
+
+    def spawn(self) -> dict:
+        self._retire_gates()
+        blk = super().spawn()
+        if blk["segment"] == "landmark":
+            # A crossing counts as *made* when the body is through the
+            # doorway, not when the crossing was offered. The leg onto the
+            # first stored cell is an ordinary jump from wherever the approach
+            # happened to land, and it is refused often enough to matter --
+            # measured, ten of twenty-three offered crossings never reached
+            # their structure. Marking on the offer threw those away; this
+            # lets the next feature pick up the landings that are left, from a
+            # few blocks closer, which is what the approach legs are for.
+            idx = self.cone.level_index(self.u_of(blk))
+            plan = self.landmark_cross.get(idx)
+            cell = (blk["x"], blk["y"], blk["z"])
+            # *In the passage*, which is not the same as *on a stored cell*
+            # and is the thing that matters. Measured over six runs: forty-one
+            # crossings offered, eighteen put a landing inside the structure,
+            # and only four of those were the exact stored landing. The
+            # crossing's real work turns out to be handing the doorway over at
+            # the right moment -- the approach hops then find it themselves,
+            # because it is the only clear ground on the lane.
+            if plan is not None and (cell in plan[1] or cell in plan[0]):
+                self._gate_hit.add(idx)
+        return blk
+
+    def _retire_gates(self) -> None:
+        """Give up on a gate the course has already run past, and take it down.
+
+        A gated landmark is a structure standing across the running lane with
+        one held passage through it. That is a good trade while the crossing is
+        still to come and a bad one the moment it is not: what is left is a
+        wall, and the level's remaining beats grind their whole recovery chain
+        against it. Measured, holding the big structures without ever crossing
+        them costs 1.96% unchecked against 0.30%; crossing them costs 0.77%,
+        and retiring the ones that got away is the rest of the way back.
+        """
+        here = self.cone.section_at(self.u).index
+        for idx in (here - 1, here):
+            plan = self.landmark_cross.get(idx)
+            if plan is None or idx in self._crossed:
+                continue
+            lv = self.cone.level(idx)
+            if self._gate_ahead(lv):
+                continue            # there is still a way through to take
+            self._crossed.add(idx)
+            if idx in self._gate_hit:
+                # The body went through it. Taking down a building the course
+                # has already run into is the one thing worse than leaving a
+                # wall standing.
+                continue
+            self._retired.add(idx)
+            self.landmark_cross.pop(idx, None)
+            held = self.landmark_hold.pop(idx, None)
+            self._hold_cells -= set(plan[1])
+            if held is not None:
+                self._hold_cells -= {c for c, _ in held[0]}
+            self._replace_landmark(lv)
+
+    def _replace_landmark(self, lv) -> None:
+        """Stand the *small* landmark ahead of the body instead.
+
+        A retired gate leaves the level with nothing to be recognised by,
+        which is the complaint this whole pass exists to answer. The fallback
+        blueprint is a third the size and stands beside the course rather than
+        across it, so it can go anywhere there is still terrace: a few bearings
+        ahead of the frontier, ending before the exit climb's ground.
+        """
+        build = sp.LANDMARKS.get(lv.landmark)
+        if not build:
+            return
+        cone = self.cone
+        radius = max(6.0, cone.rim_at(lv.y))
+        rng = random.Random(lv.index * 977 + cone.wind * 31)
+        built = build(rng, lv.theme)
+        if isinstance(built, tuple) and len(built) == 2 \
+                and isinstance(built[0], list):
+            cells, props = built
+        else:
+            cells, props = built, ()
+        top = min(lv.u0 + (lv.u1 - lv.u0) * 0.55, self._gate_reach(lv))
+        for ahead in (6.0, 9.0, 13.0, 17.0):
+            u = self.u + ahead / radius
+            if u > top:
+                return
+            if self._try_reserve_at(lv, u, cells, props):
+                return
+
+    def _gate_dist(self, lv) -> float | None:
+        """How far ahead the next landing of this level's crossing is, or
+        ``None`` if there is no crossing left to make on it."""
+        if lv.index in self._crossed:
+            return None
+        ahead = self._gate_ahead(lv)
+        if not ahead:
+            return None
+        radius = max(6.0, self.cone.rim_at(lv.y))
+        return (self._u_at(self.u, ahead[0][0], ahead[0][2]) - self.u) * radius
+
+    def _clip_to_landmark(self, lv, nodes: list[dict]) -> list[dict]:
+        """Stop a script beat short of a crossing it would run past.
+
+        A feature is chosen as a whole and a crossing is offered between
+        features, so a long beat laid just before a gate walks the frontier
+        past its own doorway -- and a doorway behind you is a wall.
+        """
+        dist = self._gate_dist(lv)
+        if dist is None:
+            return nodes
+        room = dist - 3.0
+        if room <= 0.0:
+            return nodes
+        keep, spent = [], 0.0
+        for node in nodes:
+            if keep and spent + node["arc"] > room:
+                break
+            keep.append(node)
+            spent += node["arc"]
+        return keep
+
+    def _lock_nodes(self, lv, limit: float | None = None) -> list[dict] | None:
         """Cross the level's wide break: the one stretch no walker can.
 
         Every level's first floor break is cut too wide for any flat jump,
@@ -232,6 +469,12 @@ class Course(sp.Course):
                 continue
             dist = (b0 - self.u) * radius
             if not 0.5 < dist < 11.0:
+                continue
+            if limit is not None and dist + width + 3.0 >= limit:
+                # The level's doorway comes first. Left un-marked on purpose:
+                # the break is offered again once the course is through the
+                # structure, and a level that loses its lock is a level a
+                # walker gets down end to end.
                 continue
             self._locked.add(b0)
             theme = lv.theme
