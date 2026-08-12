@@ -350,6 +350,7 @@ class Theme:
         "candy",
         "dark",
         "exits",
+        "step",
         "features",
         "glow",
         "ground",
@@ -366,7 +367,8 @@ class Theme:
                  props: tuple[str, ...], features: dict[str, float],
                  sky: tuple[int, int, int], dark: float = 0.0,
                  candy: tuple[str, ...] = (),
-                 exits: tuple[str, ...] = ("stair",)) -> None:
+                 exits: tuple[str, ...] = ("stair",),
+                 step: tuple[str, str] | None = None) -> None:
         self.name = name
         #: The top cell of the terrace floor: what you are standing on.
         self.ground = ground
@@ -390,6 +392,12 @@ class Theme:
         #: How a body may get out of this level. Every theme can be left by a
         #: staircase; a place with something better to climb says so.
         self.exits = exits
+        #: ``(material, move)`` for the treads of this level's exit staircase,
+        #: where the place has something to say about them. The climb is over
+        #: forty per cent of every run, so a staircase that is the same stone
+        #: and the same hop in all fifteen places is the single largest source
+        #: of sameness in the format.
+        self.step = step
 
 
 THEMES = (
@@ -403,43 +411,51 @@ THEMES = (
           ("crop", "mcfence", "sugarcane", "grasstuft"),
           {"haystack": 3.0, "channel": 2.4, "fencehop": 2.2, "croprow": 2.0},
           (176, 202, 226),
-          exits=("stair", "ladder")),
+          exits=("stair", "ladder"),
+          step=("hay", "hop")),
     Theme("desert", "sand", "sandstone", "sandstone", "terracotta", "water",
           "lantern", ("deadbush", "cactus", "mcfence"),
           {"dune": 3.0, "pond": 2.0, "cactusrun": 2.4, "headhitter": 1.6},
           (240, 216, 168),
-          exits=("stair",)),
+          exits=("stair",),
+          step=("sandstone", "hop")),
     Theme("mesa", "redsand", "terra_orange", "terra_red", "terra_white", None,
           "lantern", ("deadbush", "pebbles"),
           {"spire": 3.0, "dune": 1.8, "slabline": 1.8, "corner": 1.6},
           (232, 168, 112),
-          exits=("stair", "ladder")),
+          exits=("stair", "ladder"),
+          step=("terra_white", "hop")),
     Theme("jungle", "moss", "podzol", "junglelog", "jungleleaf", "water",
           "lantern", ("bamboo", "grasstuft", "vinehang", "flower"),
           {"vineclimb": 3.2, "canopy": 2.4, "logstep": 2.0, "pond": 1.4},
           (128, 190, 132),
-          exits=("vine", "stair")),
+          exits=("vine", "stair"),
+          step=("junglelog", "hop")),
     Theme("mushroom", "mycelium", "dirt", "mushroomstem", "mushroomred", None,
           "shroomlight", ("mushroomcap", "grasstuft", "flower"),
           {"capstep": 3.4, "slimebounce": 2.0, "slabline": 1.6,
            "vineclimb": 1.4},
           (196, 176, 208),
-          exits=("vine", "stair")),
+          exits=("vine", "stair"),
+          step=("mushroomstem", "hop")),
     Theme("village", "gravel", "coarse", "plaster", "brick", "water", "torch",
           ("mcfence", "lanternpost", "grasstuft", "torch"),
           {"rooftop": 3.2, "doorway": 2.4, "fencehop": 1.8, "corner": 1.8},
           (188, 196, 208),
-          exits=("ladder", "stair")),
+          exits=("ladder", "stair"),
+          step=("plaster", "hop")),
     Theme("mine", "gravel", "deepslate", "deepslate", "goldore", None, "torch",
           ("rail", "torch", "pebbles"),
           {"railrun": 3.0, "ladderrun": 2.6, "webwalk": 2.2, "headhitter": 2.0},
           (86, 84, 96), 0.74,
-          exits=("ladder", "stair")),
+          exits=("ladder", "stair"),
+          step=("oak", "hop")),
     Theme("deepdark", "sculk", "deepslate", "deepslate", "sculkvein", None,
           "amethyst", ("pebbles", "torch"),
           {"voidgap": 2.6, "slabline": 2.0, "corner": 2.0, "webwalk": 1.6},
           (34, 44, 56), 0.86,
-          exits=("ladder", "stair")),
+          exits=("ladder", "stair"),
+          step=("deepslate", "hop")),
     Theme("dripstone", "dripstone", "tuff", "dripstone", "calcite", "water",
           "lantern", ("dripstone", "pebbles", "chain"),
           {"spire": 2.6, "pond": 1.8, "headhitter": 2.2, "bubblelift": 2.0},
@@ -449,23 +465,27 @@ THEMES = (
           "lantern", ("pebbles",),
           {"iceline": 3.4, "slabline": 1.8, "voidgap": 1.8, "hump": 1.4},
           (206, 226, 248),
-          exits=("stair",)),
+          exits=("stair",),
+          step=("packedice", "slide")),
     Theme("nether", "netherrack", "netherbrick", "netherbrick", "magma",
           "lava", "magma", ("netherfungus", "deadbush"),
           {"lavaleap": 3.2, "soulwalk": 2.4, "headhitter": 2.0, "spire": 1.6},
           (176, 66, 48), 0.6,
-          exits=("stair", "ladder")),
+          exits=("stair", "ladder"),
+          step=("soulsand", "hop")),
     Theme("warped", "warpednylium", "warped", "warped", "shroomlight", "lava",
           "shroomlight", ("netherfungus", "grasstuft"),
           {"capstep": 2.4, "lavaleap": 2.0, "vineclimb": 2.0, "soulwalk": 1.8,
            "bubblelift": 1.6},
           (36, 128, 130), 0.5,
-          exits=("vine", "bubble", "stair")),
+          exits=("vine", "bubble", "stair"),
+          step=("warped", "hop")),
     Theme("end", "endstone", "endstone", "purpur", "obsidian", None, "lantern",
           ("chorus", "endrod"),
           {"endpillar": 3.2, "voidgap": 2.6, "rodline": 2.4, "corner": 1.8},
           (46, 38, 66), 0.62,
-          exits=("bubble", "stair")),
+          exits=("bubble", "stair"),
+          step=("purpur", "hop")),
     Theme("rainbow", "wool_cyan", "quartz", "quartz", "wool_pink", None,
           "glowstone", (),
           {"woolcheck": 4.0, "slimebounce": 2.6, "slabline": 2.0,
@@ -2326,7 +2346,9 @@ class Course:
                 # step. A straight column of identical hops is the single
                 # most monotonous thing a generator can produce, and this is
                 # forty per cent of every run.
-                theme.rock if i % 3 else theme.accent,
+                (theme.step[0] if theme.step and i % 3 else
+                 theme.rock if i % 3 else theme.accent),
+                kind=theme.step[1] if theme.step else "hop",
                 arc=rng.uniform(2.6, 3.0) if on_ground else 2.5,
                 step_y=1, pedestal=on_ground, pedestal_style=theme.sub,
                 spread=0, confine=on_ground, label="ascent",
