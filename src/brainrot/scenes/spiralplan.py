@@ -218,19 +218,69 @@ WOOLS = ("wool_red", "wool_orange", "wool_yellow", "wool_lime",
 BASE_R = 24.0
 FLARE = 0.05
 
-#: Altitude gained in one revolution.
+# ---------------------------------------------------------------------------
+# Levels
+# ---------------------------------------------------------------------------
+#
+# The trough is not a ramp. This is the second-biggest correction this format
+# has had and it came from the owner looking at a render of the finished tower
+# and saying: without the parkour you could still just walk up this.
+#
+# He was right, and it was a property of the geometry rather than of the
+# course. The trough used to climb one block every eight of arc -- a spiral
+# staircase, and a one-block step is something a body walks up without
+# jumping. Every landing the generator laid was therefore optional scenery on
+# top of a ramp that already went all the way to the top.
+#
+# So the trough is now a stack of **levels**: a flat terrace, then a chasm with
+# no floor in it at all, then the next terrace four to seven blocks higher.
+# Neither half of that is walkable -- you cannot walk over a hole and you
+# cannot walk up four blocks -- so the only way out of a level is the parkour
+# out of it. ``tools/spiral_probe.py`` has a walker that tries, and reports how
+# far it gets.
+
+#: Levels in one revolution. An integer, and that matters: the ceiling over
+#: level ``i`` is the floor slab of level ``i + LEVELS_PER_TURN``, and if that
+#: were not a whole number of levels the two would step at different bearings
+#: and the soffit would saw up and down against the floor under it.
+LEVELS_PER_TURN = 3
+LEVEL_ARC = 2 * math.pi / LEVELS_PER_TURN
+
+#: How much higher each level is than the one before.
 #:
-#: This is the pacing decision, and it is set by the strip rather than by the
-#: reference: at ``BASE_R`` the trough is a hundred and seven blocks round, a
-#: body makes four to five metres a second of *arc* progress once hops and
-#: radial wandering are paid for, so a revolution is twenty-two to twenty-six
-#: seconds. Eighteen blocks over that is a shade under 0.8 m/s of climb, which
-#: is what the previous two versions of this scene were held to and what makes
-#: the drop below visibly deepen inside one thinking turn.
-TURN_RISE = 22
-#: Rise per radian. The helix's handedness is applied to the *bearing* rather
-#: than to this, so that ``floor_at`` stays monotonic in ``u`` either way.
-RPR = TURN_RISE / (2 * math.pi)
+#: The floor is five because a body jumps 1.25 and steps up one block without
+#: thinking about it, so anything up to two is walkable and three is one
+#: block-place away from it. The ceiling is eight because the sum of
+#: ``LEVELS_PER_TURN`` of these is the height of one turn of the trough, and
+#: what is left after the floor slab has to stay taller than a body can jump.
+LEVEL_RISE = (4, 6)
+#: ...which makes one revolution 16 to 28 blocks rather than a fixed 22. That
+#: variation is deliberate and is the other half of the same complaint: a tower
+#: that gains exactly the same height every revolution reads as a machine part.
+TURN_MIN = LEVEL_RISE[0] * LEVELS_PER_TURN
+TURN_MAX = LEVEL_RISE[1] * LEVELS_PER_TURN
+
+#: Blocks of arc at the end of every level with **no floor at all** -- not a
+#: thin bridge, not a step down, nothing.
+#:
+#: Sized to be exactly the genre's signature jump, against this project's own
+#: numbers rather than against a guess. The crossing descends one block, and
+#: ``hop_span(-1)`` allows 2.35 to 4.98 m stand-point to stand-point; the arc
+#: asked for is the chasm plus 1.4, and the edge offsets take about 0.74 back.
+#: At a 4.4-block chasm that lands on 5.1 m and the jump is refused outright --
+#: so the widest chasms were the ones nothing could cross.
+#:
+#: And only a *climb* makes it crossable at all: the level beyond is four to six
+#: blocks up, and you cannot jump a chasm and gain four blocks in the same move.
+#: So the chasm is crossable and the boundary as a whole is not.
+#:
+#: It was ten blocks in the first draft and that was wrong in an instructive
+#: way. A staircase gaining seven blocks needs twenty of arc; past the chasm
+#: the next level's floor slab is six cells of solid rock; so the stair ran
+#: straight into it and every candidate for the last four steps was inside the
+#: tower. The climb belongs on the ground you are standing on, and the chasm is
+#: the jump at the top of it.
+GAP_ARC = (2.8, 3.9)
 
 #: How deep the walkable trough is, radially.
 #:
@@ -252,19 +302,20 @@ BAND = 9.5
 #: Cells of terrace floor slab -- which is also, seen from the trough below,
 #: the thickness of your ceiling.
 #:
-#: This number and ``TURN_RISE`` are one decision and it is the decision that
-#: makes the tower read as a *mass* rather than as a screw thread. Solid
-#: fraction is ``FLOOR_T / TURN_RISE``: at three in sixteen the ledges came out
-#: as thin plates with daylight between them from every angle, which is not
-#: what any reference shot looks like. At nine in twenty-two it is over forty
-#: per cent solid, the soffit overhead has real depth to it, and the open gap
-#: is still thirteen blocks -- taller than the band is wide, so the sky and the
-#: drop are both still there on your outboard side.
+#: This number and the level rises are one decision, and it is the decision
+#: that makes the tower read as a *mass* rather than as a screw thread. Solid
+#: fraction is ``FLOOR_T`` over the height of one turn: at three in sixteen the
+#: ledges came out as thin plates with daylight between them from every angle,
+#: which is not what any reference shot looks like. At nine in sixteen-to-
+#: twenty-eight it is a third to a half solid, the soffit overhead has real
+#: depth to it, and the open gap is still seven to nineteen blocks -- as tall
+#: as the band is wide or better, so the sky and the drop are both still there
+#: on your outboard side.
 #:
 #: A thick slab is not expensive: only its top cell (walked on) and its bottom
 #: cell (the soffit) are ever seen across the whole band, and :meth:`Cone._slab`
 #: emits the rest of it as a rim only.
-FLOOR_T = 9
+FLOOR_T = 5
 #: How many cells deep the flank and the core are actually built. The inside
 #: of a solid cone is never seen; :meth:`Cone.rock` still says it is rock.
 SKIN = 2
@@ -276,13 +327,12 @@ RIB_D = 1
 
 #: How far below the body the world is drawn.
 BUILD_BELOW = 46
-#: ...and how far above. One trough's ceiling is ``TURN_RISE`` up, and you must
-#: be able to see the one above that or the tower stops at the top of the frame.
+#: ...and how far above. One trough's ceiling is up to ``TURN_MAX`` up, and you
+#: must be able to see the one above that or the tower stops at the top of the
+#: frame.
 BUILD_ABOVE = 40
 
-#: Arc length of one themed section, in blocks. Three to four to a revolution,
-#: which is the reference's density and about six seconds of strip each.
-SECTION_ARC = (26.0, 38.0)
+
 
 
 class Theme:
@@ -299,6 +349,7 @@ class Theme:
         "accent",
         "candy",
         "dark",
+        "exits",
         "features",
         "glow",
         "ground",
@@ -314,7 +365,8 @@ class Theme:
                  accent: str, liquid: str | None, glow: str,
                  props: tuple[str, ...], features: dict[str, float],
                  sky: tuple[int, int, int], dark: float = 0.0,
-                 candy: tuple[str, ...] = ()) -> None:
+                 candy: tuple[str, ...] = (),
+                 exits: tuple[str, ...] = ("stair",)) -> None:
         self.name = name
         #: The top cell of the terrace floor: what you are standing on.
         self.ground = ground
@@ -335,6 +387,9 @@ class Theme:
         self.dark = dark
         #: Materials this theme's *floating* jump blocks use, where it has any.
         self.candy = candy or (accent, rock)
+        #: How a body may get out of this level. Every theme can be left by a
+        #: staircase; a place with something better to climb says so.
+        self.exits = exits
 
 
 THEMES = (
@@ -342,88 +397,122 @@ THEMES = (
           ("grasstuft", "flower", "mcfence", "sugarcane"),
           {"pond": 2.4, "fencehop": 2.0, "treestump": 1.8,
            "slimebounce": 1.6},
-          (150, 200, 240)),
+          (150, 200, 240),
+          exits=("stair", "ladder")),
     Theme("farm", "farmland", "dirt", "hay", "oak", "water", "lantern",
           ("crop", "mcfence", "sugarcane", "grasstuft"),
           {"haystack": 3.0, "channel": 2.4, "fencehop": 2.2, "croprow": 2.0},
-          (176, 202, 226)),
+          (176, 202, 226),
+          exits=("stair", "ladder")),
     Theme("desert", "sand", "sandstone", "sandstone", "terracotta", "water",
           "lantern", ("deadbush", "cactus", "mcfence"),
           {"dune": 3.0, "pond": 2.0, "cactusrun": 2.4, "headhitter": 1.6},
-          (240, 216, 168)),
+          (240, 216, 168),
+          exits=("stair",)),
     Theme("mesa", "redsand", "terra_orange", "terra_red", "terra_white", None,
           "lantern", ("deadbush", "pebbles"),
           {"spire": 3.0, "dune": 1.8, "slabline": 1.8, "corner": 1.6},
-          (232, 168, 112)),
+          (232, 168, 112),
+          exits=("stair", "ladder")),
     Theme("jungle", "moss", "podzol", "junglelog", "jungleleaf", "water",
           "lantern", ("bamboo", "grasstuft", "vinehang", "flower"),
           {"vineclimb": 3.2, "canopy": 2.4, "logstep": 2.0, "pond": 1.4},
-          (128, 190, 132)),
+          (128, 190, 132),
+          exits=("vine", "stair")),
     Theme("mushroom", "mycelium", "dirt", "mushroomstem", "mushroomred", None,
           "shroomlight", ("mushroomcap", "grasstuft", "flower"),
           {"capstep": 3.4, "slimebounce": 2.0, "slabline": 1.6,
            "vineclimb": 1.4},
-          (196, 176, 208)),
+          (196, 176, 208),
+          exits=("vine", "stair")),
     Theme("village", "gravel", "coarse", "plaster", "brick", "water", "torch",
           ("mcfence", "lanternpost", "grasstuft", "torch"),
           {"rooftop": 3.2, "doorway": 2.4, "fencehop": 1.8, "corner": 1.8},
-          (188, 196, 208)),
+          (188, 196, 208),
+          exits=("ladder", "stair")),
     Theme("mine", "gravel", "deepslate", "deepslate", "goldore", None, "torch",
           ("rail", "torch", "pebbles"),
           {"railrun": 3.0, "ladderrun": 2.6, "webwalk": 2.2, "headhitter": 2.0},
-          (86, 84, 96), 0.74),
+          (86, 84, 96), 0.74,
+          exits=("ladder", "stair")),
     Theme("deepdark", "sculk", "deepslate", "deepslate", "sculkvein", None,
           "amethyst", ("pebbles", "torch"),
           {"voidgap": 2.6, "slabline": 2.0, "corner": 2.0, "webwalk": 1.6},
-          (34, 44, 56), 0.86),
+          (34, 44, 56), 0.86,
+          exits=("ladder", "stair")),
     Theme("dripstone", "dripstone", "tuff", "dripstone", "calcite", "water",
           "lantern", ("dripstone", "pebbles", "chain"),
           {"spire": 2.6, "pond": 1.8, "headhitter": 2.2, "bubblelift": 2.0},
-          (108, 100, 96), 0.55),
+          (108, 100, 96), 0.55,
+          exits=("bubble", "stair")),
     Theme("ice", "snow", "packedice", "packedice", "blueice", "water",
           "lantern", ("pebbles",),
           {"iceline": 3.4, "slabline": 1.8, "voidgap": 1.8, "hump": 1.4},
-          (206, 226, 248)),
+          (206, 226, 248),
+          exits=("stair",)),
     Theme("nether", "netherrack", "netherbrick", "netherbrick", "magma",
           "lava", "magma", ("netherfungus", "deadbush"),
           {"lavaleap": 3.2, "soulwalk": 2.4, "headhitter": 2.0, "spire": 1.6},
-          (176, 66, 48), 0.6),
+          (176, 66, 48), 0.6,
+          exits=("stair", "ladder")),
     Theme("warped", "warpednylium", "warped", "warped", "shroomlight", "lava",
           "shroomlight", ("netherfungus", "grasstuft"),
           {"capstep": 2.4, "lavaleap": 2.0, "vineclimb": 2.0, "soulwalk": 1.8,
            "bubblelift": 1.6},
-          (36, 128, 130), 0.5),
+          (36, 128, 130), 0.5,
+          exits=("vine", "bubble", "stair")),
     Theme("end", "endstone", "endstone", "purpur", "obsidian", None, "lantern",
           ("chorus", "endrod"),
           {"endpillar": 3.2, "voidgap": 2.6, "rodline": 2.4, "corner": 1.8},
-          (46, 38, 66), 0.62),
+          (46, 38, 66), 0.62,
+          exits=("bubble", "stair")),
     Theme("rainbow", "wool_cyan", "quartz", "quartz", "wool_pink", None,
           "glowstone", (),
           {"woolcheck": 4.0, "slimebounce": 2.6, "slabline": 2.0,
            "voidgap": 1.6},
-          (240, 220, 250), 0.0, WOOLS),
+          (240, 220, 250), 0.0, WOOLS,
+          exits=("stair",)),
 )
 THEME_BY_NAME = {t.name: t for t in THEMES}
-PROP_KINDS = tuple(sorted({k for t in THEMES for k in t.props} | {"lilypad"}))
+#: ``ladder`` and ``vine`` are here rather than in a theme's prop list because
+#: they belong to a *move*, not to a place: any level may be left by climbing.
+PROP_KINDS = tuple(sorted({k for t in THEMES for k in t.props}
+                          | {"lilypad", "ladder", "vine"}))
 MATERIALS.setdefault("mycelium", ((150, 132, 146), "dirt", 0.04))
 
 
 class Section:
-    """One themed arc of the trough.
+    """One **level**: a flat themed terrace, and the chasm at the end of it.
 
-    ``u0``/``u1`` are *unwrapped* angles: they keep increasing for the whole
-    run, so a section is a half-open interval on a line rather than an arc that
-    has to be compared modulo anything. Everything about the helix is easier in
-    that coordinate and this is why it exists.
+    ``u0``/``u1`` are *unwrapped* angles -- they keep increasing for the whole
+    run, so a level is a half-open interval on a line rather than an arc that
+    has to be compared modulo anything. Every level is exactly ``LEVEL_ARC``
+    wide, which is what makes "the level one turn above this one" the plain
+    index arithmetic ``index + LEVELS_PER_TURN``.
+
+    ``y`` is flat across the whole level. ``rise`` is how much higher it is
+    than the level before it, and ``gap`` is how much of its far end has no
+    floor. Those two are the whole reason the parkour is not optional.
     """
 
-    __slots__ = ("index", "theme", "u0", "u1")
+    __slots__ = ("index", "theme", "u0", "u1", "y", "rise", "gap")
 
-    def __init__(self, index: int, theme: Theme, u0: float, u1: float) -> None:
+    def __init__(self, index: int, theme: Theme, u0: float, u1: float,
+                 y: int, rise: int, gap: float) -> None:
         self.index = index
         self.theme = theme
         self.u0 = u0
         self.u1 = u1
+        #: The height a body's feet stand at, anywhere on this level.
+        self.y = y
+        self.rise = rise
+        #: Radians at the far end of the level with no floor slab in them.
+        self.gap = gap
+
+    @property
+    def u_edge(self) -> float:
+        """Where the ground stops and the chasm begins."""
+        return self.u1 - self.gap
 
 
 class Cone:
@@ -470,37 +559,72 @@ class Cone:
 
     # -- the helix ---------------------------------------------------------
 
+    def level_index(self, u: float) -> int:
+        """Which level covers this unwrapped angle. Every level is the same
+        angular width, which is what keeps this arithmetic rather than a
+        search."""
+        return max(0, ifloor((u - self._u_lo) / LEVEL_ARC))
+
+    def level(self, index: int) -> Section:
+        """The level at ``index``, generated on demand."""
+        while len(self.sections) <= index:
+            self._extend_section()
+        return self.sections[index]
+
     def unwrap(self, x: float, z: float, y: float) -> float:
-        """The unwrapped angle of the terrace at or below ``y`` under ``(x, z)``.
+        """The unwrapped angle of the level at or below ``y`` under ``(x, z)``.
 
         This is the one piece of arithmetic the whole shape rests on. A bearing
         on its own is ambiguous -- the trough passes over every bearing once a
         revolution -- so it is resolved against a height, by asking which turn
-        of the helix is the last one at or below it.
+        is the last one at or below it.
 
-        Resolved against the *quantised* floor (:meth:`floor_at`) and not
-        against the continuous one, so that the answer agrees with the shape
-        exactly rather than to within a rounding. Because one turn is a whole
-        number of blocks, ``floor_at(u + 2*pi*k)`` is ``floor_at(u) + k *
-        TURN_RISE`` on the nose, and the division below is therefore exact.
+        The levels at one bearing are ``j``, ``j + LEVELS_PER_TURN``,
+        ``j + 2 * LEVELS_PER_TURN`` and so on, and their floors strictly
+        increase, so the answer is the last of those whose floor is at or below
+        ``y``. It used to be a division, back when every turn rose by the same
+        fixed amount; it cannot be one now that they do not, and this walk is
+        why :attr:`Course._rock` memoises.
         """
         theta = math.atan2(z, x) * self.wind
-        y0 = ifloor(self.base + theta * RPR)
-        return theta + 2 * math.pi * ifloor((y - y0) / TURN_RISE)
+        j = self.level_index(theta)
+        n = LEVELS_PER_TURN
+        # Start from where a constant-rate tower would have put it, then walk.
+        # The estimate is never more than a turn or two out, because the rises
+        # only vary between four and seven.
+        k = max(0, ifloor((y - self.base) / TURN_MAX))
+        i = j + k * n
+        while self.level(i + n).y <= y:
+            i += n
+        while i >= n and self.level(i).y > y:
+            i -= n
+        return theta + 2 * math.pi * ((i - j) // n)
 
     def floor_at(self, u: float) -> int:
         """The ``y`` a body's feet stand at, at unwrapped angle ``u``.
 
-        **Quantised, and it has to be.** Everything in this project that
-        reasons about standing on a block depends on a cell's ``y`` being its
-        floor and a surface being an integer; a helix that climbs continuously
-        puts the walking surface three quarters of the way up a cell, and every
-        hop off it is then solved against a height no block has. So the trough
-        is a *staircase* -- one block every ``1 / RPR`` radians, which at the
-        base is a step every six blocks of arc. That is also what a helical
-        ramp in Minecraft actually is, so nothing is lost by it.
+        Flat across a whole level, and a whole number. Both matter. Everything
+        in this project that reasons about standing on a block depends on a
+        surface being an integer; and a floor that is *flat* rather than
+        stepping is what makes the boundary between two levels a wall you have
+        to climb rather than a stair you walk up without noticing.
         """
-        return ifloor(self.base + u * RPR)
+        return self.level(self.level_index(u)).y
+
+    def trough_height(self, u: float) -> int:
+        """How much open air there is over this level, floor to soffit.
+
+        Varies from turn to turn now that the rises do -- which is exactly the
+        point -- so anything that wants to hang something from the ceiling, or
+        to know how tall a feature may stand, has to ask rather than assume.
+        """
+        i = self.level_index(u)
+        return (self.level(i + LEVELS_PER_TURN).y - self.level(i).y) - FLOOR_T
+
+    def has_floor(self, u: float) -> bool:
+        """Is there any ground at this bearing, or is this the chasm?"""
+        lv = self.level(self.level_index(u))
+        return u < lv.u_edge
 
     def rim_at(self, y: float) -> float:
         """The cone's outer radius at a height. The flare, and nothing else."""
@@ -543,14 +667,18 @@ class Cone:
         of the same cell whenever it is asked.
 
         There are exactly two rules, and it is worth saying why there are not
-        more. :meth:`unwrap` answers with the turn of the helix *at or below*
-        the cell, so ``y`` is never less than that turn's floor -- a first
-        draft of this method had three branches and the two that dealt with
-        heights below the floor were unreachable, which produced a smooth
-        cylinder with the themes painted on it as stripes and nothing to run
-        along at all. Every height belongs to some turn's trough, and within
-        one trough a cell is either the core behind you or the floor slab of
-        the turn above, which is your ceiling.
+        more. :meth:`unwrap` answers with the turn *at or below* the cell, so
+        ``y`` is never less than that turn's floor -- a first draft of this
+        method had three branches and the two that dealt with heights below the
+        floor were unreachable, which produced a smooth cylinder with the themes
+        painted on it as stripes and nothing to run along at all. Every height
+        belongs to some level's trough, and within one trough a cell is either
+        the core behind you or the floor slab of the level a turn above, which
+        is your ceiling.
+
+        The third thing it has to know is where the floor **is not**. Every
+        level ends in a chasm with nothing in it, and that hole is what makes
+        the parkour load-bearing rather than decorative.
         """
         x, y, z = cell
         r = math.hypot(x, z)
@@ -559,12 +687,18 @@ class Cone:
         if r > BASE_R + FLARE * (y - self.base) + 6.0:
             return False
         u = self.unwrap(x, z, y)
-        if y - self.floor_at(u) >= TURN_RISE - FLOOR_T:
-            # The floor slab of the turn above: the full width of the band,
-            # cantilevered off the core with nothing under it. That overhang is
-            # the reference's stepped underside and the trough's ceiling at the
-            # same time.
-            return r <= self.outer_at(u + 2 * math.pi)
+        i = self.level_index(u)
+        above = self.level(i + LEVELS_PER_TURN)
+        if y >= above.y - FLOOR_T:
+            # The floor slab of the level one turn above: the full width of the
+            # band, cantilevered off the core with nothing under it. That
+            # overhang is the reference's stepped underside and the trough's
+            # ceiling at the same time -- and it is also the *ground* of that
+            # level, so its chasm is a hole in both at once.
+            up = u + 2 * math.pi
+            if not self.has_floor(up):
+                return False
+            return r <= self.outer_at(up)
         return r <= self.outer_at(u) - BAND     # the core, behind your back
 
     def surface_y(self, x: float, z: float, y_hint: float) -> int:
@@ -583,34 +717,32 @@ class Cone:
         return self._bag.pop(0)
 
     def section_at(self, u: float) -> Section:
-        """The section covering unwrapped angle ``u``, generated on demand.
+        """The level covering unwrapped angle ``u``, generated on demand.
 
-        Sections begin a revolution and a half *below* where a run starts, so
+        Levels begin a revolution and a half *below* where a run starts, so
         that the world drawn under the body's feet on the first frame is
-        already themed. Asking for one below that is a bug rather than a case
-        to paper over: the first version quietly manufactured one-radian
-        sections going backwards, and the whole bottom of the tower came out
-        as ten copies of the same theme.
+        already themed and already has floors in it.
         """
-        while self.sections[-1].u1 <= u:
-            self._extend_section()
-        if u < self.sections[0].u0:
-            return self.sections[0]
-        lo, hi = 0, len(self.sections) - 1
-        while lo < hi:
-            mid = (lo + hi + 1) // 2
-            if self.sections[mid].u0 <= u:
-                lo = mid
-            else:
-                hi = mid - 1
-        return self.sections[lo]
+        return self.level(self.level_index(u))
 
     def _extend_section(self) -> None:
-        u0 = self.sections[-1].u1 if self.sections else self._u_lo
-        radius = self.rim_at(self.floor_at(u0))
-        arc = self.rng.uniform(*SECTION_ARC)
-        self.sections.append(Section(len(self.sections), self._next_theme(),
-                                     u0, u0 + arc / max(6.0, radius)))
+        i = len(self.sections)
+        u0 = self._u_lo + i * LEVEL_ARC
+        if i == 0:
+            y, rise = self.base, 0
+        else:
+            prev = self.sections[-1]
+            rise = self.rng.randint(*LEVEL_RISE)
+            y = prev.y + rise
+        # The chasm is measured in blocks of arc and converted here, because a
+        # fixed *angle* would be six blocks wide at the bottom of the tower and
+        # ten at the top -- and how far a body can jump does not care how wide
+        # the tower is.
+        radius = max(6.0, self.rim_at(y))
+        gap = self.rng.uniform(*GAP_ARC) / radius
+        self.sections.append(Section(i, self._next_theme(), u0,
+                                     u0 + LEVEL_ARC, y, rise,
+                                     min(gap, LEVEL_ARC * 0.45)))
 
     def theme_at(self, y: float, x: float = 0.0, z: float = 0.0) -> Theme:
         """The theme of the trough under a point. The scene asks this for the
@@ -643,17 +775,19 @@ class Cone:
             theta = (i / steps) * 2 * math.pi - math.pi
             ct, st = math.cos(theta), math.sin(theta)
             u = self.unwrap(ct, st, y)
-            h = y - self.floor_at(u)
+            lv = self.level(self.level_index(u))
+            above = self.level(lv.index + LEVELS_PER_TURN)
+            h = y - lv.y
             inner = self.outer_at(u) - BAND
             # The core, at every height: the wall at the back of the trough,
             # fluted. Its lowest two cells carry the theme's own subsoil, so
-            # the wall reads as a cut bank through the section rather than as
+            # the wall reads as a cut bank through the level rather than as
             # bare masonry meeting grass.
-            here = self.section_at(u).theme
             self._ring(ct, st, inner - SKIN, inner, y,
-                       here.sub if h < 2 else "conerib", seen, place, rib=True)
-            if h >= TURN_RISE - FLOOR_T:
-                self._slab(ct, st, u + 2 * math.pi, y, TURN_RISE - 1 - h,
+                       lv.theme.sub if 0 <= h < 2 else "conerib",
+                       seen, place, rib=True)
+            if y >= above.y - FLOOR_T and self.has_floor(u + 2 * math.pi):
+                self._slab(ct, st, u + 2 * math.pi, y, above.y - 1 - y,
                            seen, place)
 
     def _slab(self, ct: float, st: float, up: float, y: int, depth: int,
@@ -733,6 +867,38 @@ BAND_MARGIN = 2.0
 COURSE_OUT = 0.5
 #: How hard. Gentle -- this competes with every feature's own radial intent.
 COURSE_PULL = 0.34
+
+#: How a level may be left, and how likely each is where a theme allows it.
+#:
+#: The staircase is weighted well above the vertical climbs, and not for looks.
+#: Measured over ten runs: stair-only exits fall through to the unchecked hop on
+#: 2.35% of landings, mixed exits on 3.05% -- a ladder needs a free column, an
+#: anchor and a launch block hard against the core, and any of the three can be
+#: missing. They are worth having as the thing a mine or a jungle does instead;
+#: they are not worth being the default.
+ASCENTS = {"stair": 2.4, "ladder": 1.0, "vine": 1.0, "bubble": 0.8}
+#: The material the climb is hung on, and the move that rides it.
+ASCENT_STYLE = {"ladder": ("oak", "climb"), "vine": ("junglelog", "climb"),
+                "bubble": ("prismarine", "bubble")}
+#: ...and what is drawn in the column itself.
+ASCENT_SOFT = {"ladder": "ladder", "vine": "vine", "bubble": "water"}
+
+#: Blocks of arc allowed for each landing of a level's exit climb.
+#:
+#: The trigger multiplies this by how many landings the climb needs and then
+#: adds the chasm, so a six-block rise starts its staircase further back than a
+#: four-block one. It has to be the *top* of the range the stair actually
+#: asks for, not the middle: reserving the average leaves the last step or two
+#: hanging over the hole.
+ASCENT_ARC = 3.0
+
+#: Blocks of arc of head start the exit climb is given on top of what it needs.
+#:
+#: Small, because it no longer has to absorb a whole feature: ``_plan_feature``
+#: truncates whatever it picks to the room actually left. It was nine while it
+#: did, and the exit climb was then reserving over half of every level -- so a
+#: run was mostly climbing out of places rather than being in them.
+FEATURE_SLACK = 4.0
 
 #: The tallest a feature may stand above the terrace's own ground. Six, because
 #: the trough is thirteen blocks of open air and a body needs two over its
@@ -930,10 +1096,15 @@ class Course:
         soft = self.softcells
         return any(c in soft for c in cells)
 
-    def band(self, u: float) -> tuple[float, float]:
-        """The radial range a landing may stand in at this bearing."""
+    def band(self, u: float, hug: bool = False) -> tuple[float, float]:
+        """The radial range a landing may stand in at this bearing.
+
+        ``hug`` lets a landing sit one cell off the core instead of the usual
+        margin, which is what a ladder or a vine needs: the thing it hangs on
+        is the tower.
+        """
         out = self.cone.outer_at(u)
-        return out - BAND + BAND_MARGIN, out - BAND_MARGIN
+        return out - BAND + (hug or BAND_MARGIN), out - BAND_MARGIN
 
     @property
     def difficulty(self) -> float:
@@ -958,7 +1129,7 @@ class Course:
                 "lift": lift, "born": -1e9,
                 "deco": [], "soft": [], "orbs": [], "move": None,
                 "path": (), "unchecked": False, "impact": 0.0,
-                "pedestal": (), "footing": ()}
+                "pedestal": (), "footing": (), "ceiling": ()}
 
     def surface(self, blk: dict) -> float:
         return blk["y"] + FORMS[blk["form"]]
@@ -984,6 +1155,21 @@ class Course:
         """Refuse a candidate, and say why if anyone is listening."""
         if TRACE:
             self.rejects[why] = self.rejects.get(why, 0) + 1
+
+    def _far_floor(self, u: float) -> int:
+        """The floor of the level on the far side of the chasm at ``u``.
+
+        Nothing may be placed in a chasm below this, and that one rule is what
+        makes being stranded impossible rather than merely unlikely. A landing
+        low in the hole is a landing nothing can leave: the far wall is four to
+        six blocks up and a body cannot jump a chasm and climb it in the same
+        move, so the exit climb re-plans from inside the hole and lays its
+        staircase through the one already there. Every unchecked landing this
+        format had traced back to that, and negotiating it away one case at a
+        time never got below two per cent.
+        """
+        i = self.cone.level_index(u)
+        return self.cone.level(i + 1).y
 
     def _u_at(self, u_ref: float, x: float, z: float) -> float:
         """The unwrapped angle of a point, resolved against one already known.
@@ -1011,7 +1197,20 @@ class Course:
         prev = self.blocks[-1]
         node = self._pending.pop(0)
         self.laid += 1
-        got = self._try_node(prev, node) or self._last_resort(prev)
+        got = self._try_node(prev, node)
+        if got is None and node.get("label") == "ascent":
+            # The exit climb is the one feature a run cannot do without, so a
+            # failure here is answered by trying the other way out rather than
+            # by giving up on leaving the level.
+            cone = self.cone
+            lv = cone.level(cone.level_index(self.u_of(prev)))
+            need = cone.level(lv.index + 1).y - int(self.surface(prev))
+            self._pending = self._ascent_stair(self.rng, lv, need)
+            if self._pending:
+                node = self._pending.pop(0)
+                got = self._try_node(prev, node)
+        if got is None:
+            got = self._last_resort(prev)
         if got is None:
             self.stuck += 1
             got = self._emergency(prev, node)
@@ -1029,12 +1228,27 @@ class Course:
         wobbled in, a pedestal that met the section below -- and a plan that
         offers exactly one answer turns each of those into a failure.
         """
-        for lift in node["lifts"]:
-            trial = node if lift == node["lift"] else dict(node, lift=lift)
-            for cell in self._targets(prev, trial):
-                got = self._place(prev, trial, cell)
-                if got is not None:
-                    return got
+        steps = (node["step_y"],)
+        if node["step_y"] is not None and node["step_y"] > 1:
+            # A step may be shortened, never cancelled. Allowing zero looks
+            # like generosity and is the opposite: the stair spends its arc,
+            # arrives at the chasm no higher than it started, and the jump
+            # across -- which is the last node of the feature and the only one
+            # that matters -- is then asked to reach a level five blocks up.
+            # Measured, that was 68 of 71 stuck landings, every one of them the
+            # crossing failing from a staircase that had not climbed.
+            steps = (node["step_y"], node["step_y"] - 1)
+        for step in steps:
+            for lift in node["lifts"]:
+                for arc in node["arcs"]:
+                    trial = node
+                    if (lift != node["lift"] or arc != node["arc"]
+                            or step != node["step_y"]):
+                        trial = dict(node, lift=lift, arc=arc, step_y=step)
+                    for cell in self._targets(prev, trial):
+                        got = self._place(prev, trial, cell)
+                        if got is not None:
+                            return got
         # Nothing at any height. Relax the comfort rules -- never the
         # correctness ones -- before giving up on the feature entirely.
         for cell in self._targets(prev, node):
@@ -1067,6 +1281,34 @@ class Course:
                         got = self._attempt(prev, node, cell, strict=False)
                         if got is not None:
                             return got
+        # Still nothing, which over a chasm is the normal case: everything
+        # above wanted ground under it. Two answers, in this order, and the
+        # order is the whole point.
+        #
+        # First, the far side. A recovery that hangs another block in the hole
+        # leaves the body lower and further out than it started, the exit climb
+        # re-triggers from inside the chasm, and its staircase is laid through
+        # the one laid a moment ago -- measured, that cascade was most of the
+        # unchecked placements in the module, and it began every time with a
+        # *downward* recovery.
+        lv = self.cone.level(self.cone.level_index(self.u_of(prev)))
+        nxt = self.cone.level(lv.index + 1)
+        for arc in (3.0, 4.0, 5.0, 2.4):
+            node = self._node(nxt.theme.ground, arc=arc, lift=0, form="floor",
+                              label="recover")
+            for cell in self._targets(prev, node):
+                got = self._attempt(prev, node, cell, strict=False)
+                if got is not None:
+                    return got
+        # ...and only then a block in the air, and only ever *upward*.
+        for step in (1, 0):
+            for arc in (2.7, 3.1, 2.4, 3.5):
+                node = self._node(theme.rock, arc=arc, step_y=step,
+                                  pedestal=False, spread=0, label="recover")
+                for cell in self._targets(prev, node):
+                    got = self._attempt(prev, node, cell, strict=False)
+                    if got is not None:
+                        return got
         return None
 
     def _emergency(self, prev: dict, node: dict):
@@ -1077,10 +1319,21 @@ class Course:
         and the probe holds it near zero.
         """
         pu = self.u_of(prev)
-        u = pu + 3.5 / max(6.0, self.radius_of(prev))
+        cone = self.cone
+        lv = cone.level(cone.level_index(pu))
+        if not cone.has_floor(pu):
+            # Stranded out over a chasm. Aim for the far side rather than for
+            # another three and a half blocks of nothing: a body left in the
+            # hole re-triggers the exit climb from inside it, and the climb
+            # then lays its staircase through the one it laid a moment ago.
+            # Measured, that cascade was every stuck landing in the module --
+            # the first failure cost one, and the loop cost the other nine.
+            u = lv.u1 + 2.0 / max(6.0, cone.rim_at(lv.y))
+        else:
+            u = pu + 3.5 / max(6.0, self.radius_of(prev))
         lo, hi = self.band(u)
         r = min(max(self.radius_of(prev), lo), hi)
-        th = u * self.cone.wind
+        th = u * cone.wind
         cx, cz = iround(math.cos(th) * r), iround(math.sin(th) * r)
         cy = self.floor_at_cell(u, cx, cz)
         # A tuple is truthy whether or not it is (0, 0), so this cannot be
@@ -1096,7 +1349,7 @@ class Course:
         to = land_point(cx, cy + 1.0, cz, "full", step)
         return {"cell": (cx, cy, cz), "step": step, "form": "full",
                 "move": Move("hop", [arc_leg(frm, to)]), "soft": (),
-                "pedestal": (), "footing": ()}
+                "pedestal": (), "footing": (), "ceiling": ()}
 
     def _targets(self, prev: dict, node: dict):
         """Candidate landing cells, nearest first to where the helix wants one.
@@ -1110,11 +1363,27 @@ class Course:
         pu = self.u_of(prev)
         prev_surface = self.surface(prev)
         form = node["form"]
+        wants_ground = form == "floor" or (node["pedestal"]
+                                           and node["step_y"] is None)
+        # A staircase that *started* on solid ground is kept on it: it is the
+        # thing that climbs, and the crossing is the thing that leaves. Allowed
+        # out over the chasm it arrives at the far wall too low to cross, the
+        # climb re-plans from inside the hole, and its new staircase is laid
+        # through the old one. But a staircase that starts out over the chasm
+        # already -- because something before it went wrong -- has nothing to
+        # stand on and must be allowed to hang in the air, or it cannot begin
+        # at all and every attempt to recover fails the same way.
+        if node["confine"]:
+            wants_ground = True
         radius = self.radius_of(prev) + node["radial"]
         u = pu + node["arc"] / max(6.0, radius)
-        lo, hi = self.band(u)
-        radius += (lo + (hi - lo) * COURSE_OUT - radius) * COURSE_PULL
-        radius = min(max(radius, lo), hi)
+        hug = node["hug"]
+        lo, hi = self.band(u, hug)
+        if hug:
+            radius = lo
+        else:
+            radius += (lo + (hi - lo) * COURSE_OUT - radius) * COURSE_PULL
+            radius = min(max(radius, lo), hi)
         th = u * self.cone.wind
         ix, iz = math.cos(th) * radius, math.sin(th) * radius
         bx, bz = iround(ix), iround(iz)
@@ -1128,11 +1397,30 @@ class Course:
                 cu = self._u_at(u, x, z)
                 if cu <= pu + 1e-6:
                     continue            # never backwards along the trough
-                clo, chi = self.band(cu)
+                clo, chi = self.band(cu, hug)
                 r = math.hypot(x, z)
                 if not (clo - 1.0 <= r <= chi + 1.0):
                     continue
+                over_chasm = not self.cone.has_floor(cu)
+                if wants_ground and over_chasm:
+                    # A landing that needs something under it -- a pedestal
+                    # down to the terrace, or the terrace itself -- can never
+                    # work out over the chasm, and finding that out one full
+                    # attempt at a time was two thirds of every rejection in
+                    # the module.
+                    continue
                 ground = self.cone.floor_at(cu)
+                if node["step_y"] is not None:
+                    # An absolute step. Deliberately *not* checked against the
+                    # floor here: a stair climbing out of a chasm is below the
+                    # next level's floor for its whole length, which is the
+                    # entire point of it. Whether the cell is inside rock is a
+                    # question ``_attempt`` already asks properly.
+                    y = prev["y"] + node["step_y"]
+                    if over_chasm and y + FORMS[form] < self._far_floor(cu):
+                        continue
+                    scored.append((math.hypot(x - ix, z - iz), x, y, z))
+                    continue
                 y = ground + node["lift"] - 1
                 if form != "floor" and node["kind"] in BALLISTIC:
                     # **Nothing rises two blocks**, here or in the game -- the
@@ -1226,17 +1514,20 @@ class Course:
         if built is None:
             return self._no("no move: " + node["kind"])
         move, soft = built
+        lid = self._ceiling_cells(prev, node, move)
+        if lid is None:
+            return self._no("head-hitter will not fit")
         exempt = standing_cells(prev) | standing_cells(
             {"x": cx, "y": cy, "z": cz, "form": form})
         exempt |= set(soft)
         if not self._path_clear(
                 move, exempt,
                 footprint(prev["x"], prev["y"], prev["z"], prev["form"]),
-                pedestal):
+                tuple(pedestal) + lid):
             return self._no("path blocked")
         return {"cell": (cx, cy, cz), "step": step, "form": form,
                 "move": move, "soft": soft, "pedestal": pedestal,
-                "footing": footing}
+                "footing": footing, "ceiling": lid}
 
     def _pedestal(self, node: dict, cx: int, cy: int, cz: int, form: str):
         """The stack of terrain under a landing, down to the trough's ground.
@@ -1258,7 +1549,7 @@ class Course:
         #: pedestal still reaches something.
         feet = []
         for x, _y, z in footprint(cx, cy, cz, form) or ((cx, cy, cz),):
-            for y in range(cy - 1, cy - 1 - LIFT_MAX - 2, -1):
+            for y in range(cy - 1, cy - 1 - LEVEL_RISE[1] - 3, -1):
                 c = (x, y, z)
                 if self.blocked(c):
                     feet.append(c)
@@ -1274,6 +1565,50 @@ class Course:
             else:
                 return None             # never found ground: it is a stilt
         return tuple(out), tuple(feet)
+
+    def _ceiling_cells(self, prev: dict, node: dict, move: Move):
+        """The head-hitter over this jump, or ``()`` if it has none.
+
+        **Three above the take-off, not two, and that is a compromise worth
+        stating plainly.** The genre's head-hitter is a ``2bc``: a ceiling two
+        blocks over the floor, which the player's head strikes, cancelling
+        vertical momentum and conserving horizontal. It is the most-used
+        obstacle in serious Minecraft parkour precisely because it makes a gap
+        harder without making it longer.
+
+        This motion model cannot have one. A body is 1.8 m tall and a jump
+        reaches 1.25, so the head sweeps the cells one and two above the
+        take-off on *every* hop -- a lid at two is a lid inside the player, and
+        the clearance test rightly refuses every jump under it. A faithful
+        version needs the game's jump-cancel response in
+        :mod:`brainrot.scenes.parkourkit`: hitting the lid zeroes the rise and
+        keeps the run. That is a real change to the physics and it is not this
+        one.
+
+        At three it is honest and mild: it refuses the arcs that climb hardest
+        and passes the flat and descending ones, and it reads as a beam you go
+        under. ``None`` means it cannot be built at all.
+        """
+        n = node["ceiling"]
+        if not n:
+            return ()
+        top = ifloor(self.surface(prev)) + 3
+        pts = move.points(ARC_SAMPLES)
+        if max(p[1] for p in pts) > top - 0.05:
+            return None                 # the jump cannot get under it
+        mid = len(pts) // 2
+        span = range(-(n // 2), n - n // 2)
+        out = []
+        for k in span:
+            i = min(max(mid + k * 2, 1), len(pts) - 2)
+            cell = (iround(pts[i][0]), top, iround(pts[i][2]))
+            if cell in out:
+                continue
+            if self.blocked(cell) or cell in self.pathcells \
+                    or cell in self.softcells or cell in self.headroom:
+                return None
+            out.append(cell)
+        return tuple(out)
 
     def _body_fits(self, at, own) -> bool:
         """Can a body stand at ``at`` without being inside anything?"""
@@ -1372,7 +1707,7 @@ class Course:
             if not self.free(webs) or self.reserved(webs):
                 return None
             return Move("web", [line_leg(frm, to, WEB_SPEED)]), tuple(
-                (c, "web") for c in webs)
+                (c, "web", None) for c in webs)
         if kind == "walk":
             dist = math.dist((frm[0], frm[2]), (to[0], to[2]))
             if dist > 2.4 or abs(to[1] - frm[1]) > 0.55:
@@ -1406,11 +1741,14 @@ class Course:
         # A ladder has to hang on something: the stack under the landing is the
         # usual answer, and the core wall behind will do just as well.
         pedset = set(pedestal)
-        anchored = any(self.blocked((lx + ax, y, lz + az))
-                       or (lx + ax, y, lz + az) in pedset
-                       for ax, az in ((1, 0), (-1, 0), (0, 1), (0, -1))
-                       for y in (column[len(column) // 2][1], column[-1][1]))
-        if not anchored:
+        face = None
+        for ax, az in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            if any(self.blocked((lx + ax, y, lz + az))
+                   or (lx + ax, y, lz + az) in pedset
+                   for y in (column[len(column) // 2][1], column[-1][1])):
+                face = (ax, az)
+                break
+        if face is None:
             return None
         grab = (lx, foot, lz)
         reach = math.dist((frm[0], frm[2]), (grab[0], grab[2]))
@@ -1423,14 +1761,18 @@ class Course:
         if not (VY_MIN <= legs[0]["vy0"] <= VY_MAX):
             return None
         style = "water" if node["kind"] == "bubble" else node["climb_style"]
-        soft = tuple((c, style) for c in column)
+        # Which side the wall is on, kept from here rather than worked out
+        # again at draw time. A ladder is a plate on a *face*; without knowing
+        # which face, the only honest thing to draw is a cube, which is what
+        # this scene used to do and what it was rightly pulled up on.
+        soft = tuple((c, style, face) for c in column)
         if node["kind"] == "bubble":
             # Soul sand under the column is what makes it push upward. One
             # invisible cell at the bottom of a shaft, skipped rather than
             # forced when the floor is already something else.
             base = (lx, ifloor(foot) - 1, lz)
             if not self.blocked(base):
-                soft += ((base, "soulsand"),)
+                soft += ((base, "soulsand", None),)
         return Move(node["kind"], legs), soft
 
     # -- committing --------------------------------------------------------
@@ -1488,10 +1830,13 @@ class Course:
         last = got["move"].legs[-1]
         blk["impact"] = (abs(last["vy0"] - GRAVITY * last["dur"])
                          if last["kind"] == "arc" else 0.0)
-        for cell, style in got["soft"]:
-            self._place_soft(blk, cell, style)
+        for cell, style, face in got["soft"]:
+            self._place_soft(blk, cell, style, face)
         blk["pedestal"] = got["pedestal"]
         blk["footing"] = got["footing"]
+        blk["ceiling"] = got["ceiling"]
+        for cell in got["ceiling"]:
+            self.write(cell, node["pedestal_style"] or theme.rock)
         for cell in got["pedestal"]:
             self.write(cell, node["pedestal_style"] or node["style"])
         self.blocks.append(blk)
@@ -1516,13 +1861,14 @@ class Course:
             self._hang_orbs(prev, blk, node["orbs"])
         return blk
 
-    def _place_soft(self, blk: dict, cell, style: str) -> None:
+    def _place_soft(self, blk: dict, cell, style: str, face=None) -> None:
         """Ladders, vines, water and webs: drawn, never solid, owned by the
         landing they belong to, and gone when it falls off the back."""
         self.softcells.add(cell)
         self.solid.discard(cell)
         blk["soft"].append({"dx": cell[0] - blk["x"], "dy": cell[1] - blk["y"],
-                            "dz": cell[2] - blk["z"], "style": style})
+                            "dz": cell[2] - blk["z"], "style": style,
+                            "face": face})
 
     def _decorate(self, blk: dict, node: dict, theme: Theme,
                   move: Move) -> None:
@@ -1573,7 +1919,8 @@ class Course:
             self.orbs_missed += sum(1 for o in blk["orbs"] if not o["taken"])
             for cell in cells_of(blk):
                 self.solid.discard(cell)
-            for cell in blk["pedestal"] + blk.get("footing", ()):
+            for cell in (blk["pedestal"] + blk.get("footing", ())
+                         + blk.get("ceiling", ())):
                 self.solid.discard(cell)
                 self.ground.discard(cell)
             for x, y, z in footprint(blk["x"], blk["y"], blk["z"],
@@ -1601,7 +1948,8 @@ class Course:
               radial: float = 0.0, kind: str = "hop", form: str = "full",
               deco: str | None = None, orbs: int = 0, pedestal: bool = True,
               pedestal_style: str | None = None, climb_style: str = "ladder",
-              spread: int = 2, moat: bool = False,
+              spread: int = 2, moat: bool = False, step_y: int | None = None,
+              hug: float = 0.0, confine: bool = False, ceiling: int = 0,
               label: str | None = None) -> dict:
         """One entry in a feature's expansion.
 
@@ -1617,7 +1965,13 @@ class Course:
         zero, because a stair whose steps are sometimes two blocks apart is not
         a staircase.
         """
-        arc *= 1.0 + GAP_RAMP * self.difficulty
+        if label != "ascent":
+            # Not the exit climb. Its shape is set by how tall the level is,
+            # and the trigger reserves room for exactly that many landings at
+            # exactly this spacing -- so ramping it stretches the staircase
+            # past the run-up it was promised and the last steps end up out
+            # over the chasm, where a stack of terrain cannot stand.
+            arc *= 1.0 + GAP_RAMP * self.difficulty
         top = 0 if form == "floor" else LIFT_MAX
         low = 0 if form == "floor" else 1
         lift = min(max(lift, low), top)
@@ -1626,7 +1980,33 @@ class Course:
             for cand in (lift - d, lift + d):
                 if low <= cand <= top:
                     lifts.append(cand)
+        if step_y is not None:
+            lifts = [lift]
         return {"style": style, "arc": arc, "lift": lift, "lifts": lifts,
+                #: An absolute rise from the landing before, used instead of a
+                #: height above the level's own floor. The climb out of a level
+                #: needs it: it crosses the boundary where that floor jumps by
+                #: four to seven blocks at once, so a height measured against
+                #: "the floor here" means two different things either side of
+                #: one hop.
+                "step_y": step_y,
+                #: How close to the core to lay this landing, in blocks, or 0
+                #: for the usual mid-band pull.
+                #:
+                #: A distance and not a flag, because the two things that want
+                #: it want different amounts. A ladder has to *hang on
+                #: something* and out over the chasm the only thing always
+                #: there is the tower, so it goes to 1.0 -- an exit climb laid
+                #: mid-lane finds no anchor and fails, and that was 96% of
+                #: every run that got stuck. A staircase only wants to read as
+                #: ledges cut into the wall rather than as free-standing
+                #: columns, and at 1.0 it put the camera *inside* the wall.
+                "hug": hug,
+                #: Gaps placement may fall back through when the one asked for
+                #: has no legal landing. A staircase out of a chasm cannot
+                #: settle for a different *height* -- there is only one that
+                #: works -- so it has to be allowed a different distance.
+                "arcs": (arc, arc * 0.84, arc * 1.18),
                 "radial": radial, "kind": kind, "form": form, "deco": deco,
                 "orbs": orbs, "pedestal": pedestal,
                 "pedestal_style": pedestal_style, "climb_style": climb_style,
@@ -1634,7 +2014,16 @@ class Course:
                 #: theme's liquid. A pond you cross on stepping stones is the
                 #: reference's signature overworld beat and it cannot be a
                 #: decoration -- the water has to be *under* the jump.
-                "moat": moat, "label": label}
+                "moat": moat,
+                #: Keep this landing over ground that exists. See ``_targets``.
+                "confine": confine,
+                #: Blocks of solid ceiling to hang over the *middle* of the jump
+                #: that reaches this landing, at two above the take-off. A real
+                #: head-hitter, checked rather than drawn: the arc has to pass
+                #: under it or the landing is refused. The genre's most-used
+                #: obstacle, and the reason is that it costs no exotic block and
+                #: makes an ordinary gap into a jump you have to keep flat.
+                "ceiling": ceiling, "label": label}
 
     def _gap(self, easy, hard) -> float:
         """A feature's gap, ramped between two of its own tables.
@@ -1649,7 +2038,28 @@ class Course:
         return table[self.rng.randrange(len(table))]
 
     def _plan_feature(self) -> None:
-        section = self.cone.section_at(self.u)
+        # The climb out of a level takes priority over everything, and it has
+        # to be started early enough that the last landing clears the chasm.
+        # Nothing else in the vocabulary can cross a hole with no floor in it
+        # and a four-to-seven block wall on the far side.
+        cone = self.cone
+        lv = cone.level(cone.level_index(self.u))
+        need = cone.level(lv.index + 1).y - int(self.surface(self.blocks[-1]))
+        radius = max(6.0, cone.rim_at(lv.y))
+        gap_blocks = lv.gap * radius
+        # One landing of slack. Widening this is the obvious answer to a climb
+        # that arrives short and it is the wrong one -- measured, three landings
+        # of slack took the unchecked rate from 2.5% to 4.5%, because the
+        # reserve is taken out of the level and ``_plan_feature`` then truncates
+        # every ordinary feature down to a single node, and single nodes fail
+        # far more often than the sequences they were cut from.
+        want = ((max(1, need) + 1) * ASCENT_ARC + gap_blocks + 1.4
+                + FEATURE_SLACK)
+        if (lv.u_edge - self.u) * radius <= want:
+            self.segment = "ascent"
+            self._pending = self._feat_ascent(self.rng, lv, need)
+            return
+        section = lv
         theme = section.theme
         weights = {}
         for name, base in FEATURES.items():
@@ -1664,6 +2074,24 @@ class Course:
         name = _pick(self.rng, weights)
         self.segment = name
         self._pending = getattr(self, f"_feat_{name}")(self.rng, theme)
+        # ...and never let it run into the run-up the exit climb needs.
+        #
+        # Features are chosen and expanded *whole*, so the one picked while
+        # there is still room can carry the frontier past the chasm edge on its
+        # own -- and the climb then starts three or four blocks out over the
+        # void, where a stack of terrain cannot stand and nothing can be
+        # placed. Measured, that single case was every stuck run in the module.
+        # Reserving a wider margin instead would work and would cost the levels
+        # a third of their length; truncating costs nothing.
+        budget = (lv.u_edge - self.u) * radius - want
+        if budget > 0:
+            keep, spent = [], 0.0
+            for node in self._pending:
+                if keep and spent + node["arc"] > budget:
+                    break
+                keep.append(node)
+                spent += node["arc"]
+            self._pending = keep
 
     # -- painting the place ------------------------------------------------
 
@@ -1725,7 +2153,7 @@ class Course:
                         # ceiling and not on the floor. Dropped on the floor it
                         # is simply buried, which is the sort of thing that
                         # costs an hour to notice from a contact sheet.
-                        at = (x, yf + TURN_RISE - FLOOR_T, z)
+                        at = (x, yf + cone.trough_height(u) - 1, z)
                         if self.blocked(at) or not self.blocked(
                                 (x, at[1] + 1, z)):
                             break
@@ -1802,6 +2230,108 @@ class Course:
                 self.carve(cell)
                 self.write(cell, liquid)
 
+    def _feat_ascent(self, rng, lv, need: int) -> list[dict]:
+        """Dispatch: every level's exit, in whichever way this one climbs."""
+        theme = lv.theme
+        kind = _pick(rng, {k: w for k, w in ASCENTS.items()
+                           if k in theme.exits}) if theme.exits else "stair"
+        if kind != "stair" and need >= 3:
+            built = self._ascent_climb(rng, lv, need, kind)
+            if built:
+                return built
+        return self._ascent_stair(rng, lv, need)
+
+    def _crossing(self, rng, lv) -> dict:
+        """The jump over the chasm onto the next level. The hero jump of the
+        format, and the reason everything before it was necessary."""
+        nxt = self.cone.level(lv.index + 1)
+        gap = lv.gap * max(6.0, self.cone.rim_at(lv.y))
+        # It *descends* one block, and that is what makes the widest chasm
+        # crossable at all. A flat sprint jump reaches 4.26 m stand-point to
+        # stand-point in this project's numbers; dropping a block buys about a
+        # metre more, because falling takes longer and the body does not slow
+        # down while it does. So the staircase climbs one higher than the level
+        # it is heading for and the last jump comes down onto it -- which also
+        # means you can see where you are going, from above, before you commit.
+        return self._node(nxt.theme.ground, arc=gap + 1.4, lift=0,
+                          form="floor", orbs=3, label="ascent")
+
+    def _ascent_climb(self, rng, lv, need: int, kind: str) -> list[dict]:
+        """Out of the level in one vertical move: a ladder, a vine, a water
+        column.
+
+        Short in *arc*, which is the whole reason it exists beside the
+        staircase. A staircase gaining seven blocks one at a time eats twenty
+        blocks of a level that is only fifty long, and measured with nothing
+        but staircases the exit climb was 57% of the entire course -- so a run
+        was mostly hopping up cubes over a hole and barely saw the places it
+        was climbing past.
+        """
+        nxt = self.cone.level(lv.index + 1)
+        style, climb = ASCENT_STYLE[kind]
+        return [
+            # A block against the wall to launch from, still over solid ground.
+            self._node(lv.theme.rock, arc=2.8, lift=1, hug=1.0, spread=1),
+            self._node(style, arc=2.4, step_y=need + 1, kind=climb,
+                       climb_style=ASCENT_SOFT[kind], hug=1.0,
+                       pedestal=False, spread=0, label="ascent", orbs=2),
+            self._crossing(rng, lv),
+        ]
+
+    def _ascent_stair(self, rng, lv, need: int) -> list[dict]:
+        """The staircase out: a landing a block higher, over and over.
+
+        Every level is flat and ends in a hole with nothing in it, and the next
+        level is four to seven blocks higher. A body cannot walk over a hole
+        and cannot walk up four blocks, so this is not one feature among many
+        -- it is the load-bearing one, and if it fails the run is stuck against
+        a wall.
+
+        It is a staircase because it has to be: **nothing rises two blocks in
+        one ballistic move**, so gaining seven takes seven landings whatever
+        else is true. They are laid with ``step_y`` rather than a height above
+        the level's floor, because that floor means one thing on the near side
+        of the boundary and something four to seven blocks different on the far
+        side. And they carry no pedestal: a stack of terrain down to the ground
+        would fill in the very hole that makes the climb necessary.
+        """
+        theme = lv.theme
+        out = []
+        # A stair standing on the level's own ground is built terrain; one that
+        # has already been carried out over the chasm can only be hung in the
+        # air. Both happen, so ask rather than assume.
+        on_ground = self.cone.has_floor(self.u_of(self.blocks[-1]))
+        steps = max(0, min(need + 1, LEVEL_RISE[1] + 2))
+        for i in range(steps):
+            # Standing on the level's own ground, so these carry a stack down
+            # to it and read as built terrain -- a flight of piers against the
+            # wall -- rather than as cubes hung in the air. Each is one block
+            # higher and three along, which is a jump and not a step.
+            out.append(self._node(
+                # Weaving in and out as it climbs, and the odd half-height
+                # step. A straight column of identical hops is the single
+                # most monotonous thing a generator can produce, and this is
+                # forty per cent of every run.
+                theme.rock if i % 3 else theme.accent,
+                arc=rng.uniform(2.6, 3.0) if on_ground else 2.5,
+                step_y=1, pedestal=on_ground, pedestal_style=theme.sub,
+                spread=0, confine=on_ground, label="ascent",
+                # Weaves, but does not change *form*: a slab step stands half
+                # a block up, so the step after it is asked for one and a half
+                # and there is no such jump. The climb's arithmetic is exactly
+                # one block a landing and nothing in it may be half of one.
+                radial=(0.9 if i % 2 else -0.9) * rng.uniform(0.4, 1.0),
+                # Against the core. A staircase built out in the middle of the
+                # band is a forest of free-standing columns with a cube on top
+                # of each -- which is the floating-block look this format is
+                # trying not to have, rebuilt at forty per cent of the course.
+                # Hard against the wall the same blocks read as ledges cut into
+                # the tower, which is what a real map does with them.
+                hug=2.4 if i else 0.0,
+                orbs=1 if i % 2 == 0 else 0))
+        out.append(self._crossing(rng, lv))
+        return out
+
     # -- the shared grammar ------------------------------------------------
 
     def _feat_hump(self, rng, theme) -> list[dict]:
@@ -1851,13 +2381,36 @@ class Course:
                 for _ in range(rng.randint(2, 3))]
 
     def _feat_headhitter(self, rng, theme) -> list[dict]:
-        """A beam over the arc, so the jump has to stay flat. The beam's height
-        is taken from the arc it spans rather than from a number -- see
-        :meth:`_decorate`, where getting that wrong put a lintel exactly where
-        the head would be."""
+        """A ceiling two blocks over the take-off, so the jump has to stay flat.
+
+        The genre calls this a ``2bc`` and it is the most-used obstacle in
+        serious Minecraft parkour, for a reason worth restating: it makes a gap
+        harder *without making it longer*. Difficulty in this format used to
+        come only from distance, which is the one axis that runs out -- nothing
+        reaches five blocks flat, ever.
+
+        It is a checked constraint and not a decoration. The lid goes into the
+        arc's own clearance test, so a landing whose jump would rise through it
+        is refused rather than drawn with a beam through the player's head.
+        """
+        wide = 1 + int(self.difficulty * 2)
         return [self._node(theme.rock, arc=3.2, lift=rng.randint(1, 2),
-                           deco="lintel", spread=1),
+                           ceiling=rng.randint(1, max(1, wide)), spread=1,
+                           orbs=1),
                 self._node(theme.rock, arc=3.4, lift=rng.randint(1, 3))]
+
+    def _feat_duckrun(self, rng, theme) -> list[dict]:
+        """Two or three head-hitters back to back, with no recovery between.
+
+        Removing the recovery time between jumps is one of the four ways the
+        reference material says hard parkour is actually made -- the others
+        being a constrained run-up, a ceiling, and an obstacle in the flight
+        path. This is two of them at once, and it costs no new block.
+        """
+        return [self._node(theme.rock, arc=rng.uniform(3.0, 3.4),
+                           lift=rng.randint(1, 2), ceiling=1, spread=1,
+                           radial=rng.uniform(-1.4, 1.4), orbs=1)
+                for _ in range(rng.randint(2, 3))]
 
     def _feat_voidgap(self, rng, theme) -> list[dict]:
         """One long jump out over the drop, bought with a drop of its own.
@@ -2200,8 +2753,8 @@ PROP_BUDGET = 14
 FEATURES: dict[str, float] = {
     # -- the shared grammar, available everywhere
     "hump": 1.9, "stairs": 1.0, "corner": 1.2, "slabline": 0.8,
-    "headhitter": 0.7, "voidgap": 0.9, "pillars": 0.9, "spire": 0.7,
-    "flat": 0.5,
+    "headhitter": 1.1, "voidgap": 0.9, "pillars": 0.9, "spire": 0.7,
+    "flat": 0.5, "duckrun": 0.9,
     # -- verbs a place owns
     "pond": 2.4, "channel": 2.4, "lavaleap": 2.4, "iceline": 1.6,
     "soulwalk": 2.4, "webwalk": 2.4, "ladderrun": 2.4, "vineclimb": 1.6,

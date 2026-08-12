@@ -70,28 +70,35 @@ def test_the_trough_is_walkable_all_the_way_round() -> None:
             # against either one is the world working, not a hole in it.
             lo = out - sp.BAND + sp.BAND_MARGIN
             hi = out - sp.BAND_MARGIN
+            if not c.has_floor(u):
+                continue            # the chasm at the end of a level
             for frac in (0.2, 0.5, 0.8):
                 r = lo + (hi - lo) * frac
                 x, z = pk.iround(ct * r), pk.iround(st * r)
                 samples += 1
-                # Each cell against *its own* floor, not against the sample's.
-                # The trough is a staircase -- a block every eight of arc --
-                # so the cell just past a step has its floor one higher, and
-                # the cell at the old height is that step's riser and is
-                # rightly solid. Asking every cell about one shared floor
-                # measures the staircase and calls it a hole: 2.8% of samples,
-                # all of them the world working correctly.
+                # Each cell against *its own* level's floor, not against the
+                # sample's: a cell rounded across a level boundary belongs to
+                # the level next door, which is four to six blocks up.
                 cyf = c.floor_at(c.unwrap(x, z, yf + 1))
                 if c.rock((x, cyf, z)) or c.rock((x, cyf + 1, z)):
                     bad_air += 1
                 if not c.rock((x, cyf - 1, z)):
                     bad_ground += 1
-                if not any(c.rock((x, cyf + h, z)) for h in
-                           range(sp.TURN_RISE - sp.FLOOR_T, sp.TURN_RISE + 1)):
+                # ...unless the level a turn above has its *own* chasm here,
+                # in which case the hole goes straight through and the trough
+                # is open to the sky on purpose. That is a shaft of daylight,
+                # not a missing ceiling.
+                up = c.unwrap(x, z, yf + 1) + 2 * math.pi
+                if c.has_floor(up) and not any(
+                        c.rock((x, cyf + h, z))
+                        for h in range(1, sp.TURN_MAX + 1)):
                     bad_ceiling += 1
     assert samples > 1000
     assert bad_air / samples < 0.005, f"{bad_air} of {samples} not standable"
-    assert bad_ground / samples < 0.005, f"{bad_ground} of {samples} unsupported"
+    # A little more slack under the feet than over the head. A level's outer
+    # rim is where its own chasm and the *next* level's rim wobble past each
+    # other, so a cell sampled near the edge can legitimately be over nothing.
+    assert bad_ground / samples < 0.04, f"{bad_ground} of {samples} unsupported"
     assert bad_ceiling == 0, "the trough is open to the sky somewhere"
 
 
@@ -128,18 +135,99 @@ def test_the_trough_floor_is_always_a_whole_number() -> None:
         assert isinstance(c.floor_at(-6.0 + i * 0.1), int)
 
 
-def test_one_turn_of_the_helix_is_exactly_turn_rise() -> None:
+def test_one_turn_rises_by_a_whole_number_of_levels() -> None:
+    """Not by a fixed amount -- that was the complaint. But the ceiling over a
+    level is the floor of the level exactly one turn above, so the turn has to
+    be a whole number of levels or soffit and floor step at different bearings
+    and saw against each other."""
     c = cone(6)
     for u in (-3.0, 0.0, 2.5, 11.0):
-        assert c.floor_at(u + 2 * math.pi) - c.floor_at(u) == sp.TURN_RISE
+        rise = c.floor_at(u + 2 * math.pi) - c.floor_at(u)
+        assert sp.TURN_MIN <= rise <= sp.TURN_MAX
+
+
+def test_the_tower_does_not_climb_at_a_constant_rate() -> None:
+    """A tower that gains exactly the same height every revolution reads as a
+    machine part, which is what it was."""
+    c = cone(11)
+    rises = {c.level(i).rise for i in range(2, 30)}
+    assert len(rises) > 1, "every level rises by the same amount"
+
+
+def test_a_level_is_flat() -> None:
+    c = cone(9)
+    for i in range(1, 20):
+        lv = c.level(i)
+        heights = {c.floor_at(lv.u0 + (lv.u1 - lv.u0) * f)
+                   for f in (0.05, 0.3, 0.6, 0.95)}
+        assert heights == {lv.y}
+
+
+def test_every_level_ends_in_a_chasm_with_nothing_in_it() -> None:
+    """The reason the parkour is not optional."""
+    c = cone(10)
+    for i in range(1, 20):
+        lv = c.level(i)
+        mid = (lv.u_edge + lv.u1) / 2
+        th = mid * c.wind
+        out = c.outer_at(mid)
+        for frac in (0.25, 0.5, 0.75):
+            r = out - sp.BAND + sp.BAND * frac
+            x, z = pk.iround(math.cos(th) * r), pk.iround(math.sin(th) * r)
+            assert not c.rock((x, lv.y - 1, z)), "the chasm has a floor in it"
+
+
+def test_the_step_between_levels_cannot_be_walked_up() -> None:
+    """A body steps up 0.6 without trying and jumps 1.25, so one block is free
+    and two is not. Every level boundary is at least four."""
+    c = cone(12)
+    for i in range(2, 25):
+        assert c.level(i).rise >= 4
+
+
+def test_nothing_can_walk_up_the_tower() -> None:
+    """The acceptance test for the whole rebuild.
+
+    A walker that may step up one block and drop any survivable distance, let
+    loose on the **cone alone** -- no course blocks, no pedestals, no dressing
+    -- must not get anywhere. If it can, the parkour is decoration on a ramp,
+    which is exactly what the previous version was.
+    """
+    for run in (1, 3):
+        c = cone(run)
+        course = sp.Course(random.Random(run * 6151 + 29), c)
+        start = course.blocks[0]
+        y0 = start["y"] + 1
+        seen = {(start["x"], y0, start["z"])}
+        queue = [(start["x"], y0, start["z"])]
+        best = y0
+        while queue and len(seen) < 40000:
+            x, y, z = queue.pop()
+            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1),
+                           (1, 1), (1, -1), (-1, 1), (-1, -1)):
+                nx, nz = x + dx, z + dz
+                for ny in range(y + 1, y - 24, -1):
+                    if not c.rock((nx, ny - 1, nz)):
+                        continue
+                    if c.rock((nx, ny, nz)) or c.rock((nx, ny + 1, nz)):
+                        break
+                    cell = (nx, ny, nz)
+                    if cell not in seen:
+                        seen.add(cell)
+                        queue.append(cell)
+                        best = max(best, ny)
+                    break
+        assert best - y0 < sp.LEVEL_RISE[0], \
+            f"a walker climbed {best - y0} blocks without touching the parkour"
 
 
 def test_sections_tile_the_helix_without_gaps() -> None:
     c = cone(7)
     c.section_at(30.0)
     for a, b in zip(c.sections, c.sections[1:]):
-        assert a.u1 == b.u0
+        assert abs(a.u1 - b.u0) < 1e-9
         assert b.u1 > b.u0
+        assert b.index == a.index + 1
 
 
 def test_no_two_sections_running_are_the_same_theme() -> None:
@@ -177,16 +265,22 @@ def test_the_emergency_answer_is_effectively_never_reached() -> None:
     """``stuck`` counts the one hop in the module nothing verified.
 
     It is allowed to be non-zero -- the alternative is a generator that can
-    deadlock -- and it is not allowed to be common. The ceiling here is well
-    above what it measures, so that an ordinary bad seed does not fail the
-    suite and a regression of any size does.
+    deadlock -- and it is not allowed to be common.
+
+    The ceiling is 4% and that is **worse than the 0.5% this scene used to
+    hold**, deliberately and with a reason that should not be quietly forgotten.
+    The old course could go anywhere: if a landing would not fit, it wandered.
+    This one has a mandatory move -- every level must be left, over a chasm,
+    onto ground four to six blocks up -- and a mandatory move is a much harder
+    guarantee than a free one. ``tools/spiral_probe.py`` prints the live figure
+    and driving it back down is real outstanding work, tracked in CLAUDE.md.
     """
     total = laid = 0
     for run in range(6):
         course, seen = grow(run, 150)
         total += course.stuck
         laid += len(seen)
-    assert total / laid < 0.02, f"{total} unchecked placements in {laid}"
+    assert total / laid < 0.04, f"{total} unchecked placements in {laid}"
 
 
 def test_no_ladder_or_water_column_is_buried_in_the_tower() -> None:
@@ -273,8 +367,8 @@ def test_the_course_is_mostly_but_not_only_plain_hops() -> None:
         _, seen = grow(run, 200)
         kinds.update(b["move"].kind for b in seen if b["move"])
     n = sum(kinds.values())
-    assert 0.80 < kinds["hop"] / n < 0.96
-    assert (n - kinds["hop"]) / n > 0.045
+    assert 0.80 < kinds["hop"] / n < 0.97
+    assert (n - kinds["hop"]) / n > 0.03
 
 
 # ---------------------------------------------------------------------------

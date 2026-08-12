@@ -193,6 +193,66 @@ def stats(v: list[float]) -> dict:
             "p95": s[int(len(s) * 0.95)]}
 
 
+#: How far a body steps up without doing anything about it. Minecraft's step
+#: height is 0.6 and its jump reaches 1.25, so one block is free and two is
+#: not -- which is the whole basis of the question below.
+WALK_STEP = 1
+
+
+def walkability(runs: int, reach: int = 60000) -> dict:
+    """Can you get up the tower **without touching the parkour**?
+
+    This is the acceptance test for the complaint that started the rebuild:
+    *without the parkour you could still just walk up this*. It was true. The
+    trough used to climb a block every eight of arc, which is a spiral
+    staircase, and a body walks up one-block steps without noticing -- so every
+    landing the generator laid was decoration on a ramp that already reached the
+    top.
+
+    So: flood-fill the **cone alone**. No course blocks, no pedestals, no
+    dressing -- if it was placed, it is parkour and it does not count. From the
+    start, take any horizontal step onto ground at most one block higher, and
+    any drop. Report the highest the walker gets.
+
+    A number near zero means the levels are doing their job: a flat terrace
+    ending in a hole, with the next one four to six blocks up, is not something
+    you can walk out of.
+    """
+    gains = []
+    stuck_at = Counter()
+    for run in range(1, runs + 1):
+        cone = sp.Cone(random.Random(run * 977 + 13), 0)
+        course = sp.Course(random.Random(run * 6151 + 29), cone)
+        start = course.blocks[0]
+        y0 = start["y"] + 1
+        seen = {(start["x"], y0, start["z"])}
+        queue = [(start["x"], y0, start["z"])]
+        best = y0
+        while queue and len(seen) < reach:
+            x, y, z = queue.pop()
+            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1),
+                           (1, 1), (1, -1), (-1, 1), (-1, -1)):
+                nx, nz = x + dx, z + dz
+                # Where the ground is at that column, searched from a step up
+                # to a drop a body survives.
+                for ny in range(y + WALK_STEP, y - 24, -1):
+                    if not cone.rock((nx, ny - 1, nz)):
+                        continue
+                    if cone.rock((nx, ny, nz)) or cone.rock((nx, ny + 1, nz)):
+                        break
+                    cell = (nx, ny, nz)
+                    if cell not in seen:
+                        seen.add(cell)
+                        queue.append(cell)
+                        if ny > best:
+                            best = ny
+                    break
+        gains.append(best - y0)
+        stuck_at[best - y0] += 1
+    return {"runs": runs, "gain": stats([float(g) for g in gains]),
+            "worst": max(gains), "spread": sorted(stuck_at.items())}
+
+
 def _body_depth(scene) -> tuple[float, str]:
     """How deep the body is inside anything solid, and what.
 
@@ -351,7 +411,7 @@ def mix(c: Counter, total: int, top: int = 12) -> str:
                      for k, v in c.most_common(top))
 
 
-def report(geo: dict, mot: dict | None) -> str:
+def report(geo: dict, mot: dict | None, walk: dict | None = None) -> str:
     out = [f"SAFETY   ({geo['runs']} runs x {geo['blocks'] // geo['runs']}"
            f" landings)"]
     out.append(f"  cells claimed twice               {geo['clashes']}"
@@ -374,6 +434,11 @@ def report(geo: dict, mot: dict | None) -> str:
                    f" worst {mot['body_worst']:.2f} m"
                    f"{' in ' + mot['body_where'] if mot['body_where'] else ''})")
 
+    if walk:
+        out.append(f"  climbable without the parkour       "
+                   f"{walk['gain']['max']:.0f} m at worst,"
+                   f" {walk['gain']['mean']:.1f} m mean"
+                   f"  ({walk['runs']} runs)")
     n = geo["ground"] + geo["built"] + geo["floating"]
     out.append("")
     out.append("THE COURSE")
@@ -434,15 +499,18 @@ def main() -> None:
     ap.add_argument("--motion-runs", type=int, default=8)
     ap.add_argument("--seconds", type=float, default=45.0)
     ap.add_argument("--no-motion", action="store_true")
+    ap.add_argument("--walk-runs", type=int, default=6)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
     geo = geometry(args.runs, args.blocks)
+    walk = walkability(args.walk_runs)
     mot = None if args.no_motion else motion(args.motion_runs, args.seconds)
     if args.json:
-        print(json.dumps({"geometry": geo, "motion": mot}, default=str))
+        print(json.dumps({"geometry": geo, "motion": mot, "walk": walk},
+                         default=str))
     else:
-        print(report(geo, mot))
+        print(report(geo, mot, walk))
 
 
 if __name__ == "__main__":

@@ -44,6 +44,10 @@ FOV = 82.0
 PROP_FAR = 30.0
 PROP_AHEAD = -0.2
 
+#: How far a landing is still lit. Past this it is a few pixels in the haze and
+#: the glow is a draw call for nothing.
+LAND_LIT_FAR = 26.0
+
 #: Distance at which the course has faded fully into the haze.
 FOG_FAR = 110.0
 #: How far below the body the tower is still drawn. Beyond this it is a smudge
@@ -739,6 +743,24 @@ class SpiralScene(Scene):
             if style in _GLOWING:
                 self._glows.append((blk["x"], blk["y"] + h + 0.1, blk["z"],
                                     1.5, self._colour(style), 90))
+            elif dist < LAND_LIT_FAR:
+                # A soft light on the face you land on.
+                #
+                # This is how the route is made readable, and it is deliberately
+                # not done with colour. Every landing here is made of the
+                # level's own material -- the map-making consensus is that
+                # contrasting jump blocks wreck the theme and buy nothing,
+                # because a cake and a cobblestone have the same hitbox -- so
+                # what marks a landing is that it is *lit*, which is the fix
+                # real mappers converged on. Small radius, low alpha: enough to
+                # pick the next block out of a wall at a glance, not enough to
+                # read as a lamp.
+                fade = 1.0 - dist / LAND_LIT_FAR
+                self._glows.append((
+                    blk["x"], blk["y"] + h + 0.05, blk["z"], 1.15,
+                    rl.mix_rgb(self._colour(sp.THEME_BY_NAME[blk["theme"]].glow),
+                               (255, 250, 235), 0.45),
+                    int(52 * fade * alpha / 255)))
             self._draw_furniture(blk, dist, alpha)
 
     def _draw_furniture(self, blk: dict, dist: float, alpha: int) -> None:
@@ -767,8 +789,19 @@ class SpiralScene(Scene):
         opaque = [s for s in blk["soft"] if s["style"] not in _TRANSLUCENT]
         clear = [s for s in blk["soft"] if s["style"] in _TRANSLUCENT]
         for s in opaque:
-            voxel.draw_box(self._model(s["style"]), blk["x"] + s["dx"],
-                           blk["y"] + s["dy"] + 0.5, blk["z"] + s["dz"],
+            at = (blk["x"] + s["dx"], blk["y"] + s["dy"], blk["z"] + s["dz"])
+            model = self.props.get(s["style"])
+            if model is not None and s.get("face"):
+                # A ladder is a thin lattice on the face of a block and a vine
+                # is a thin sheet on one. Drawn as a 0.84-wide cube -- which is
+                # what this was -- they read as a solid pillar of wood, which
+                # is not a thing the game has.
+                ax, az = s["face"]
+                rl.DrawModelEx(model.model, at, (0, 1, 0),
+                               math.degrees(math.atan2(-ax, az)),
+                               (1.0, 1.0, 1.0), self._fog(dist, alpha))
+                continue
+            voxel.draw_box(self._model(s["style"]), at[0], at[1] + 0.5, at[2],
                            self._fog(dist, alpha), 0.84, 1.0, 0.84)
         if not clear:
             return
@@ -967,10 +1000,7 @@ def _recipes(pal, run: int) -> dict[str, dict]:
 
     The building's materials keep recognisable colours -- netherrack is red
     wherever the run's palette went -- and are only dimmed toward the run's
-    ambient, so a night tower is lit like a night tower. The three *candy*
-    colours come from the palette, because the jump blocks are the one thing
-    that has to differ run to run and the one thing the eye needs to pick out
-    of a wall at a glance.
+    ambient, so a night tower is lit like a night tower.
     """
     # Floored well above zero. A night run scales every material toward its
     # ambient, and the darkest ones -- blackstone, obsidian, deepslate -- came
@@ -981,10 +1011,12 @@ def _recipes(pal, run: int) -> dict[str, dict]:
     for i, (name, (base, pattern, noise)) in enumerate(tp.MATERIALS.items()):
         out[name] = dict(base=rl.scale_rgb(base, lit), noise=noise,
                          seed=run * 17 + i, pattern=pattern)
-    for j, name in enumerate(tp.CANDY):
-        out[name] = dict(base=pal.blocks[j % len(pal.blocks)], noise=0.03,
-                         seed=run * 17 + 90 + j,
-                         pattern=("wool", "concrete", "wool")[j % 3])
+    # No candy colours. Every other scene in this project gives its jump
+    # blocks three bright per-run colours so the eye can find them; this one
+    # deliberately does not, because the owner's complaint and the map-making
+    # consensus agree -- a landing that is a different colour from the place it
+    # is in stops the place being a place. Landings here are the level's own
+    # stone, and what marks them is the light on their top face.
     return out
 
 
