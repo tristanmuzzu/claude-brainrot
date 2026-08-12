@@ -32,10 +32,14 @@ and all of them still true of the current roster:
 
 1. *You can just run past half the obstacles.* Sixteen of the first twenty
    levels are 100% plain hop over ground that is continuous underneath.
-2. *It's the same jump every time.* Measured: the tower is 94% plain hop
-   against a kernel that expresses seven verbs.
-3. *It doesn't read as a place.* Levels average two dozen designed landings
-   and one structure that is on screen, at readable size, essentially never.
+2. *It's the same jump every time.* Measured: the tower is 94% plain hop, and
+   what non-hop share exists is almost entirely the exit staircase. Note the
+   research qualifies this one — the reference is hop-heavy too, and its
+   variety is architectural rather than a vocabulary of special blocks (§2).
+3. *It doesn't read as a place.* Levels name two or three materials against
+   the reference's fourteen, half of every frame is empty sky where the
+   reference's is overhanging rock, and no level in the first twenty holds its
+   own structure at readable size for more than 0.8 s.
 
 ---
 
@@ -108,10 +112,12 @@ It names level, beat and node index.
 
 ## 2. The verbs — and the six the tower has never used
 
-`kind=` on a node. **The tower is 94% `hop` and this is the single biggest
-thing to change.** Every verb below was placement-tested in an authored level
-this session; the recipes are what actually fired, not what the source
-suggests should.
+`kind=` on a node. The tower is 94% `hop` and six of the seven verbs have never
+appeared in any level, so each was **placement-tested in an authored level**
+before being written down here; the recipes are what actually fired, not what
+the source suggests should. Read the box after the table before deciding how
+much of your effort this deserves — the answer turned out to be "less than the
+floor".
 
 | verb | what it is | speed | verified recipe |
 |---|---|---|---|
@@ -170,21 +176,41 @@ And on the reference's own solved routes, **slime bounces are 16.4% of all
 jumps** — because a real level only has **4.7 jumps in forty metres**. One pad,
 used once, is a sixth of the level's parkour.
 
+And the footage says it harder still. Across **~2,900 seconds** of reference
+video read frame by frame: **no slime, no honey, no soul sand, no magma bounce,
+no bubble column, and no cobweb waded through.** The only physics-altering
+block on screen anywhere is **ice, as one level's ground**.
+
+> **So the honest conclusion, which is not the one this document started with:
+> a tower that is mostly plain hops is *matching* the reference, not falling
+> short of it.** The reference's variety is architectural — rooms, shafts,
+> hazard floors, ladders, stairs, ledges — not a vocabulary of special blocks.
+> The verbs below are seasoning. **If you have a choice between spending an
+> hour on a bounce pad and an hour on the level's floor palette, spend it on
+> the floor.**
+
 **Design rules — the verb quota, grounded in that:**
 
-- **≤ 80% plain hop**, and at least **two** non-hop verbs firing. (Not the 70%
-  a first draft of this document asked for: the reference's variety comes from
-  terrain, hazard and falling far more than from move types, and a rule that
-  forces gadgets produces a level made of gadgets.)
-- **One slime bounce pad**, roughly 2×2, in most levels. It is the reference's
-  own ration and it is the only way this engine gains two blocks.
+- **≤ 85% plain hop**, and **at least one non-hop verb firing in the level's
+  own body** — not merely in its exit staircase, which is where the tower's
+  entire current non-hop share lives.
+- **The ladder is the one special block the reference leans on hard**, and it
+  carries a whole level: a six-second climb up a dark shaft with a lit doorway
+  at the top, and no staircase alternative. `kind="climb"` inside a
+  `shell="shaft"` is that, and it is worth more than any other verb here.
+- **One slime bounce pad**, roughly 2×2, where it fits. The Spiral save has one
+  per level in 26 of 43; it is invisible in the footage because a 2×2 pad is
+  easy to miss. It is also the only way this engine gains two blocks.
 - **Liquid on or beside the walking line in at least one beat** — `moat=True`,
   `profile="channel"`, a lava or water cut through the level's own ground.
   This is the single most-used mechanic in the reference and this tower barely
   has it.
+- **Stairs and slabs are the commonest non-cube form in the reference by a wide
+  margin**, and `form="slab"` is barely used here. A half-height landing is
+  cheap, reads as deliberate architecture, and buys reach (§1).
 - **Ice is a speciality, not a staple.** Three levels of forty-three. If your
   level is the ice level, lean on it hard; otherwise leave it alone.
-- **Cobweb and honey: don't.** Cobweb appears nowhere in the real map and honey
+- **Cobweb and honey: don't.** Cobweb appears nowhere in either map and honey
   has no physics here at all.
 
 ---
@@ -199,6 +225,25 @@ decoration and reads as decoration however good the jumps are.
 no-jump walker, and must never be walkable end to end.** The real map measures
 46% mean and 0 of 43 legs passable. Printed by `level_review --report` under
 `CAN IT BE WALKED`, and tower-wide by `tools/bypass_probe.py`.
+
+**But the reference does not achieve that by breaking a continuous ledge**, and
+this is the part worth getting right. Read frame by frame, it does two things:
+
+1. **The walking surface is two to four blocks wide with the drop directly
+   outboard**, so there is nothing to walk *around*. This is most of the work.
+2. **Where the ground is wide, its whole width is hazard.** A lava lake
+   spanning the terrace with one lit block standing in it; a room whose entire
+   floor is lava, crossed on a run of oak stairs; a stretch where the floor is
+   the *sea* and the landings are lily pads. The landings are isolated single
+   blocks with two or three blocks of hazard between them — **not a five-block
+   chasm**.
+
+And the nuance: **the rule is "no level walkable end to end", not "no metre
+walkable".** At its widest the reference's ground stops being a course and
+becomes a *place* — a village terrace with fences and a trough — and it lets
+you walk that for a few seconds, because the level's entrance and exit are
+still separated by a real break somewhere else. A level that is unwalkable
+every single metre is as wrong as one you can stroll.
 
 The levers, in the order they are worth reaching for:
 
@@ -339,13 +384,27 @@ in this tower and the difference is not the parkour, it is **what is in the top
 half of the frame**.
 
 In the real map, nearly every frame is built the same way: the **overhanging
-rock brow fills the top third**, ragged and dark; the **level's own coloured
-ground fills the bottom third** — grass, terracotta, gold, cherry pink, nether
-red; and the sky is a bright *slot* between the two. In this tower, the top of
-the frame is sky in almost every frame of almost every level, the bottom is
-grey cone stone, and the level's colour is two isolated cubes floating in it.
-Measured: **43–77% of the view is empty sky, sea or drop**, and half the levels
-are unidentifiable from a still.
+rock brow fills the top of the frame**, ragged and dark; the **level's own
+coloured ground fills the bottom** — grass, terracotta, gold, cherry pink,
+nether red; and the sky is a bright *slot* between the two. Measured over 325
+reference frames:
+
+| | |
+|---|---|
+| the top fifth of the screen, share of its pixels that are dark rock | **63%** |
+| frames whose top fifth is more than half dark rock | **73%** |
+| seconds showing no sky at all | 20.8% |
+| luminance standard deviation across the frame | mean **65.8** — these frames are not flat |
+
+In this tower the top of the frame is sky in almost every frame of almost every
+level, the bottom is grey cone stone, and the level's colour is two isolated
+cubes floating in it. Measured: **43–77% of the view is empty sky, sea or
+drop**, and half the levels are unidentifiable from a still.
+
+**The overhang is what deletes every wrong answer above you.** You are in a
+slot; the roof is the underside of the level above; the floor is the lightest
+thing in the lower half and the cliff the darkest in the upper; and the only
+bright exit is forward.
 
 Three things follow, and they are the level designer's, not the renderer's:
 
@@ -378,8 +437,42 @@ Three things follow, and they are the level designer's, not the renderer's:
   `style` per node rather than naming the same role every time, and let the
   props and the `deco` carry more kinds on top. **Identity comes from the
   floor**, not from the one big structure — see §4.
+### Route legibility — four devices, all cheap, none of them used here
+
+Read off the footage. There is no HUD and you never hesitate.
+
+1. **The route is painted.** A stripe of a different floor material down the
+   middle of every terrace wide enough to be ambiguous — a dirt path across
+   grass, gravel through a garden, a carpet runner down a hall. Where the
+   ground could be read two ways, it is coloured.
+2. **Every lamp is at the far end.** Lanterns hang at a corridor's *exit*, not
+   spread through it. A lamp post stands at the tip of the promontory where the
+   course turns. **There is no ambient decorative lighting anywhere in the
+   reference — every light in those frames is doing a job.** Put nothing
+   decorative in the middle distance.
+3. **The landmark stands where the ledge ends**, not in the middle of the
+   terrace. It is the turn signal.
+4. **Silhouettes against sky are legible; anything against the cliff is not.**
+   If you want something seen, put sky behind it.
+
+### A level has a threshold
+
+The reference signposts where a level *begins* and lets geometry say where it
+ends: **an emissive block set flush in the floor, on a rise, on screen 2.3
+seconds before it is reached — and the palette changes completely at that
+block**, in one or two frames, with no blend. Nine seams in two minutes, every
+one abrupt, and no two adjacent levels sharing a dominant hue.
+
+**Design rule.** Your level's first beat is a threshold: a light, a material
+change, and something to aim at. Its `skin` must not share a dominant colour
+with the level before it — check `--seam`.
+
 - **Light is a level's own.** Interiors carry their own lamps; the `glow` role
   and `deco="lamp"` are what make a dark level legible rather than black.
+- **Fine dressing is for the still, not for the strip.** Flowers, grass tufts,
+  ore speckle and moss are in almost every reference frame and contribute
+  essentially nothing at glance distance. Value contrast, emissives,
+  silhouettes and the route stripe are what read at speed.
 
 ---
 
@@ -393,12 +486,20 @@ is there.
 
 A level that works has:
 
-1. **an opening** that says where you are — the structure in frame, the
-   material change, the threshold;
+1. **an opening** that says where you are — the threshold light, the complete
+   material change, the structure in frame;
 2. **an escalation** — the beats get harder, not louder;
-3. **one showpiece** — the jump or the room you would remember. Difficulty is
-   the punctuation, not the sentence;
-4. **an exit that is visible before it is reached.**
+3. **one showpiece**, and the reference puts it at about **60% of the way
+   through the level**, not at the end. Difficulty is the punctuation, not the
+   sentence;
+4. **an exit that geometry announces** — the ledge narrowing to a tongue that
+   ends in air, or a lit doorway. The reference does not signpost exits the way
+   it signposts entrances.
+
+The reference's levels run **10–15 seconds** (mean 12); ours are 6–10. That is
+a deliberate difference — this is an overlay strip, not a map you sit down to
+play — but it means your level has *less* room than the reference's to say what
+it is, so the threshold and the palette have to do more work, not less.
 
 **Frozen for this pass:** a level's `name`, `theme` and `rise`. `rise` is
 cyclic — any three consecutive rises *are* the head-room over the lowest of
@@ -428,8 +529,10 @@ A level is done when **all** of these hold:
 | every authored jump legal on paper | `--design-only` clean |
 | designed landings placed as authored | ≥ 90%, and no beat under 98% with ≥ 6 samples |
 | unchecked emergency placements | 0 |
-| plain hop | ≤ 80% of moves, ≥ 2 non-hop verbs firing |
-| a slime bounce pad, and liquid on the line | one of each |
+| plain hop | ≤ 85% of moves, ≥ 1 non-hop verb firing **in the level's own body** |
+| liquid on or beside the walking line | at least one beat |
+| a threshold: light + complete material change at the first beat | yes |
+| the route painted wherever the ground is wide | yes |
 | the level descends somewhere | not a monotonic climb |
 | distinct materials named | ≥ 6 across roles, nodes and props |
 | covered by a no-jump walker | ≤ 55% mean, never end to end |
