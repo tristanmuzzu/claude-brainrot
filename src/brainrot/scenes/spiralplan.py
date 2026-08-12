@@ -1268,6 +1268,8 @@ class Course:
         wobbled in, a pedestal that met the section below -- and a plan that
         offers exactly one answer turns each of those into a failure.
         """
+        if node["cross"]:
+            node = self._aim_crossing(prev, node)
         steps = (node["step_y"],)
         if node["step_y"] is not None and node["step_y"] > 1:
             # A step may be shortened, never cancelled. Allowing zero looks
@@ -1294,8 +1296,16 @@ class Course:
                         trial = node
                         if (lift != node["lift"] or arc != node["arc"]
                                 or step != node["step_y"] or side):
-                            trial = dict(node, lift=lift, arc=arc, step_y=step,
-                                         radial=node["radial"] + side)
+                            trial = dict(node, lift=lift, arc=arc, step_y=step)
+                            if node["hug"]:
+                                # A hugging node's radius is pinned to the band
+                                # and its ``radial`` is never read, so nudging
+                                # that would be nudging nothing. Move the lane
+                                # instead, and keep it inside the margins.
+                                trial["hug"] = min(max(node["hug"] + side, 2.0),
+                                                   BAND - BAND_MARGIN)
+                            else:
+                                trial["radial"] = node["radial"] + side
                         for cell in self._targets(prev, trial):
                             got = self._place(prev, trial, cell)
                             if got is not None:
@@ -1307,6 +1317,27 @@ class Course:
             if got is not None:
                 return got
         return None
+
+    def _aim_crossing(self, prev: dict, node: dict) -> dict:
+        """Re-measure the jump over the chasm from where the climb *got to*.
+
+        A crossing planned at the foot of a staircase is aimed from there, and
+        by the time it is asked for the body is five landings and a dozen
+        blocks of arc further on. So the arc is worked out here, against the
+        far lip, and the fallbacks are added rather than scaled: what varies is
+        how far onto the far terrace it lands, not how wide the hole is.
+
+        When the body is still well short of the lip this asks for a jump no
+        physics has, the crossing is refused, and the climb lays another step
+        and asks again -- which is the right answer, and much better than the
+        one it used to give.
+        """
+        u = self.u_of(prev)
+        lv = self.cone.level(self.cone.level_index(u))
+        reach = max(0.0, (lv.u1 - u) * max(6.0, self.radius_of(prev)))
+        arc = reach + 1.2
+        return dict(node, arc=arc,
+                    arcs=(arc, arc + 0.9, arc + 1.9, max(2.4, arc - 0.7)))
 
     def _place(self, prev: dict, node: dict, cell, strict: bool = True):
         return self._attempt(prev, node, cell, strict=strict)
@@ -1321,6 +1352,10 @@ class Course:
         """
         self._pending = []
         theme = self.cone.section_at(self.u).theme
+        if self.segment == "ascent":
+            got = self._climb_on(prev, theme)
+            if got is not None:
+                return got
         for arc in (3, 4, 2, 5, 6):
             for lift in (1, 0, 2, 3, 4):
                 for radial in (0.0, 2.0, -2.0, 4.0, -4.0):
@@ -1360,6 +1395,53 @@ class Course:
                     got = self._attempt(prev, node, cell, strict=False)
                     if got is not None:
                         return got
+        return None
+
+    def _climb_on(self, prev: dict, theme) -> dict | None:
+        """Recovery for a failed exit climb that does not throw the climb away.
+
+        The ordinary recovery is a hop at a height measured from the *level's
+        own floor*, and during an ascent that is a descent: the body is already
+        three or four blocks up its own staircase, so ``lift=1`` puts it back
+        on the terrace having spent the arc it needed in order to climb. The
+        next step then fails for the same reason from a worse place, and the
+        run arrives at the chasm lip having gained nothing -- at which point
+        there is no jump in the physics that reaches the far level and the only
+        answer left is the unchecked one. Measured, that cascade was two thirds
+        of every emergency placement in the module, and every one of them began
+        with a *flat* recovery from a climb.
+
+        So the recovery for a climb is another climb. It keeps the height it
+        has or gains one, and it is allowed to go sideways across the corridor
+        rather than along it -- which is the one direction a staircase that has
+        run out of terrace still has, and the reason the arcs here run down to
+        under a metre.
+
+        It climbs only while there is climbing left to do. A staircase that has
+        already reached the height of the level it is leaving for still has to
+        walk to the lip before the crossing is a jump anything can make, and a
+        recovery that gains a block every time it fills a stride runs the body
+        up into the slab overhead -- at which point every cell round it is
+        solid and the only answer left is the unchecked one.
+        """
+        u = self.u_of(prev)
+        lv = self.cone.level(self.cone.level_index(u))
+        need = self.cone.level(lv.index + 1).y - int(self.surface(prev))
+        on_ground = self.cone.has_floor(u)
+        for step in ((1, 0) if need > 0 else (0, 1)):
+            for radial in (0.0, 2.6, -2.6, 4.2, -4.2):
+                for arc in (2.8, 3.2, 2.4, 3.8, 1.6, 0.8):
+                    for hug in (2.4, 0.0):
+                        node = self._node(theme.rock, arc=arc, step_y=step,
+                                          radial=radial, hug=hug,
+                                          pedestal=on_ground,
+                                          pedestal_style=theme.sub,
+                                          spread=0, confine=on_ground,
+                                          label="ascent")
+                        for cell in self._targets(prev, node):
+                            got = self._attempt(prev, node, cell, strict=False)
+                            if got is not None:
+                                return got
         return None
 
     def _emergency(self, prev: dict, node: dict):
@@ -1414,6 +1496,10 @@ class Course:
         pu = self.u_of(prev)
         prev_surface = self.surface(prev)
         form = node["form"]
+        #: The level a crossing has to have left behind. Resolved here rather
+        #: than carried on the node, because a crossing is re-aimed from
+        #: wherever the climb actually got to and that may be a level on.
+        beyond = self.cone.level_index(pu) if node["cross"] else None
         wants_ground = form == "floor" or (node["pedestal"]
                                            and node["step_y"] is None)
         # A staircase that *started* on solid ground is kept on it: it is the
@@ -1448,6 +1534,8 @@ class Course:
                 cu = self._u_at(u, x, z)
                 if cu <= pu + 1e-6:
                     continue            # never backwards along the trough
+                if beyond is not None and self.cone.level_index(cu) <= beyond:
+                    continue            # a crossing that does not cross
                 clo, chi = self.band(cu, hug)
                 r = math.hypot(x, z)
                 if not (clo - 1.0 <= r <= chi + 1.0):
@@ -1467,7 +1555,21 @@ class Course:
                     # next level's floor for its whole length, which is the
                     # entire point of it. Whether the cell is inside rock is a
                     # question ``_attempt`` already asks properly.
-                    y = prev["y"] + node["step_y"]
+                    #
+                    # Measured between *walking surfaces* and not between block
+                    # floors, and the difference is a whole class of failure. A
+                    # slab's surface is halfway up its own cell, so a stair
+                    # starting from one -- which happens whenever an ordinary
+                    # feature left the body on a slab and the exit climb is
+                    # what comes next -- asked ``prev["y"] + 1`` for a full
+                    # block and got a rise of *one and a half*, which no hop in
+                    # this motion model has. Every candidate then failed for
+                    # the same reason at every distance. Flooring rather than
+                    # rounding is what makes the half-block case legal: it
+                    # asks for +0.5, which is a jump a body has, and the step
+                    # after is back on whole numbers.
+                    y = ifloor(prev_surface + node["step_y"]
+                               - FORMS[form] + 1e-6)
                     if over_chasm and y + FORMS[form] < self._far_floor(cu):
                         continue
                     scored.append((math.hypot(x - ix, z - iz), x, y, z))
@@ -2001,7 +2103,7 @@ class Course:
               pedestal_style: str | None = None, climb_style: str = "ladder",
               spread: int = 2, moat: bool = False, step_y: int | None = None,
               hug: float = 0.0, confine: bool = False, ceiling: int = 0,
-              label: str | None = None) -> dict:
+              cross: bool = False, label: str | None = None) -> dict:
         """One entry in a feature's expansion.
 
         ``lift`` is the height of the landing's walking surface above the
@@ -2077,6 +2179,20 @@ class Course:
                 "moat": moat,
                 #: Keep this landing over ground that exists. See ``_targets``.
                 "confine": confine,
+                #: This landing must be on the **far side of the chasm**, and
+                #: nothing else will do.
+                #:
+                #: Without it the jump out of a level was simply a landing on
+                #: the trough's own ground at whatever bearing the arc reached
+                #: -- and the nearest such ground is the terrace the body is
+                #: standing on. Measured, that is what it took: a staircase
+                #: climbed its five blocks, the crossing landed back on the
+                #: floor it had just climbed off, and the whole climb was spent
+                #: again from a worse place with less terrace left. It was the
+                #: single largest source of unchecked placements in the module
+                #: and it never once looked like a bug in the crossing, because
+                #: the crossing always *succeeded*.
+                "cross": cross,
                 #: Blocks of solid ceiling to hang over the *middle* of the jump
                 #: that reaches this landing, at two above the take-off. A real
                 #: head-hitter, checked rather than drawn: the arc has to pass
@@ -2314,7 +2430,7 @@ class Course:
         # it is heading for and the last jump comes down onto it -- which also
         # means you can see where you are going, from above, before you commit.
         return self._node(nxt.theme.ground, arc=gap + 1.4, lift=0,
-                          form="floor", orbs=3, label="ascent")
+                          form="floor", orbs=3, cross=True, label="ascent")
 
     def _ascent_climb(self, rng, lv, need: int, kind: str) -> list[dict]:
         """Out of the level in one vertical move: a ladder, a vine, a water
@@ -2379,6 +2495,12 @@ class Course:
                 (theme.step[0] if theme.step and i % 3 else
                  theme.rock if i % 3 else theme.accent),
                 kind=theme.step[1] if theme.step else "hop",
+                # Barely any arc at all, because the *lane change* is what
+                # carries the jump: a step travels a little over three blocks
+                # across the corridor and about one along it, which comes to a
+                # hop of two and a half -- comfortably inside the 2.0 to 3.1 a
+                # one-block rise allows -- while costing the terrace a third of
+                # what a stair walking along the trough costs it.
                 # 2.9 to 3.3 and not 2.6 to 3.0. A landing's take-off and
                 # touch-down are both set back from the block's centre by
                 # ``EDGE``, so an arc of 2.6 is a *jump* of 1.92 -- under

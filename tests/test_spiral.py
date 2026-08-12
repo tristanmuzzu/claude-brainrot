@@ -267,20 +267,22 @@ def test_the_emergency_answer_is_effectively_never_reached() -> None:
     It is allowed to be non-zero -- the alternative is a generator that can
     deadlock -- and it is not allowed to be common.
 
-    The ceiling is 4% and that is **worse than the 0.5% this scene used to
-    hold**, deliberately and with a reason that should not be quietly forgotten.
-    The old course could go anywhere: if a landing would not fit, it wandered.
-    This one has a mandatory move -- every level must be left, over a chasm,
-    onto ground four to six blocks up -- and a mandatory move is a much harder
-    guarantee than a free one. ``tools/spiral_probe.py`` prints the live figure
-    and driving it back down is real outstanding work, tracked in CLAUDE.md.
+    The ceiling is 1%, and it took getting there twice. When the trough became
+    a stack of levels this stood at 4% and the docstring said so, because a
+    *mandatory* move -- every level must be left, over a chasm, onto ground
+    four to six blocks up -- is a much harder guarantee than a free one. What
+    finally paid was not a better search but noticing that the crossing was
+    never required to actually **cross**: it was a landing on the trough's own
+    ground, and the nearest such ground is the terrace the body has just spent
+    five landings climbing off. ``tools/spiral_probe.py`` prints the live
+    figure, which is a little under 0.5%.
     """
     total = laid = 0
     for run in range(6):
         course, seen = grow(run, 150)
         total += course.stuck
         laid += len(seen)
-    assert total / laid < 0.04, f"{total} unchecked placements in {laid}"
+    assert total / laid < 0.01, f"{total} unchecked placements in {laid}"
 
 
 def test_no_ladder_or_water_column_is_buried_in_the_tower() -> None:
@@ -457,6 +459,26 @@ def test_the_course_never_turns_back_on_itself() -> None:
         us = [course.cone.unwrap(b["x"], b["z"], b["y"] + 1) for b in seen]
         for a, b in zip(us, us[1:]):
             assert b >= a - 0.35
+
+
+def test_a_level_is_never_left_and_then_re_entered() -> None:
+    """The exit climb crosses the chasm, and crossing it is not optional.
+
+    Stated on the *level index* rather than on height, because that is the
+    thing that used to go backwards without ever failing a check. The jump out
+    of a level was a landing on the trough's own ground at whatever bearing the
+    arc reached, and the nearest such ground is the terrace the body has just
+    climbed off -- so a staircase would gain its five blocks, come down on the
+    floor it started from, and spend the rest of the level climbing out of it
+    again with less room each time. Nothing in the module noticed, because the
+    crossing always succeeded.
+    """
+    for run in range(6):
+        course, seen = grow(run, 200)
+        levels = [course.cone.level_index(
+            course.cone.unwrap(b["x"], b["z"], b["y"] + 1)) for b in seen]
+        for a, b in zip(levels, levels[1:]):
+            assert b >= a, f"run {run} fell back from level {a} to {b}"
 
 
 def test_the_gaps_ramp_and_then_hold() -> None:
