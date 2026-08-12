@@ -2373,6 +2373,20 @@ class Course:
                 if i <= early and cell in leaving:
                     continue
                 return False
+            # The cell test cannot see the core's *fractional* face: the
+            # browed wall leans by tenths of a block, so a cell whose centre
+            # rounds outside it can still hold a body shoulder that is
+            # inside. Continuous check against the face alone -- the one
+            # solid in the format that is not on the lattice. Waist height
+            # is enough: the face only ever leans outward going up, so a
+            # clear waist means a clear knee.
+            r = math.hypot(x, z) - 0.30
+            if r < self.cone.rim_at(y) - BAND + 3.0:
+                # Near the wall (cheap flare arithmetic; no unwrap): now the
+                # real question, with the real face.
+                u = self.cone.unwrap(x, z, y + 0.9)
+                if r < self.cone.core_r(u, ifloor(y + 0.9)) - 1e-6:
+                    return False
         return True
 
     # -- the move vocabulary -----------------------------------------------
