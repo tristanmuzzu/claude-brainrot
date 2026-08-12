@@ -818,6 +818,19 @@ class SpiralScene(Scene):
                 for yaw in (45.0, -45.0):
                     voxel.draw_box(model, blk["x"], blk["y"] + 0.5, blk["z"],
                                    tint, 1.3 * scale, scale, 0.10, yaw=yaw)
+            elif form == "fence":
+                # A post with a cap: the real map's signature obstacle, a
+                # landing you cannot jump onto from the ground beside it.
+                voxel.draw_box(model, blk["x"], blk["y"] + 0.7, blk["z"],
+                               tint, 0.24 * scale, 1.4 * scale, 0.24 * scale)
+                voxel.draw_box(model, blk["x"], blk["y"] + 1.44, blk["z"],
+                               tint, 0.4 * scale, 0.12, 0.4 * scale)
+            elif form == "wall":
+                voxel.draw_box(model, blk["x"], blk["y"] + 0.75, blk["z"],
+                               tint, 0.55 * scale, 1.5 * scale, 0.55 * scale)
+            elif form == "trapdoor":
+                voxel.draw_box(model, blk["x"], blk["y"] + 0.1, blk["z"],
+                               tint, scale, 0.19, scale)
             else:
                 voxel.draw_box(model, blk["x"], blk["y"] + h * 0.5, blk["z"],
                                tint, scale, h * scale, scale)

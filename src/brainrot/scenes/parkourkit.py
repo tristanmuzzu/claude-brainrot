@@ -110,8 +110,15 @@ CHEST = 0.90
 #: on architecture that is already there. It is how the course gets onto the
 #: tower's own galleries, and without it a checkpoint would have to build a
 #: platform on top of the balcony it is meant to be arriving on.
+#: ``fence`` and ``wall`` stand **one and a half** high, which is the real
+#: map's signature obstacle: a body cannot jump onto one from the ground
+#: beside it (the rise is past the 1.25 a jump has), so it must be arrived
+#: at from height -- the checker enforces that for free, exactly as it
+#: refuses any other impossible rise. ``trapdoor`` is a plate lying almost
+#: flat on its cell.
 FORMS = {"full": 1.0, "slab": 0.5, "wide": 1.0, "stair": 1.0, "ice": 1.0,
-         "slime": 1.0, "web": 1.0, "floor": 1.0}
+         "slime": 1.0, "web": 1.0, "floor": 1.0,
+         "fence": 1.5, "wall": 1.5, "trapdoor": 0.2}
 #: form -> how far from a block's centre the feet plant, along the direction of
 #: travel. You land on the near edge and leave from the far one, which is what
 #: a run-up is and why the gap a body clears is wider than the gap between two
@@ -124,7 +131,10 @@ FORMS = {"full": 1.0, "slab": 0.5, "wide": 1.0, "stair": 1.0, "ice": 1.0,
 #: shoulder inside whatever the platform is bolted to, and it was the deepest
 #: single class of contact the probe found.
 EDGE = {"full": 0.34, "slab": 0.34, "stair": 0.34, "ice": 0.34,
-        "slime": 0.34, "web": 0.34, "wide": 1.05, "floor": 0.40}
+        "slime": 0.34, "web": 0.34, "wide": 1.05, "floor": 0.40,
+        # A fence post's top is a sliver: the feet plant dead centre, and a
+        # wall's cap is barely wider. The trapdoor is a full plate.
+        "fence": 0.05, "wall": 0.08, "trapdoor": 0.34}
 #: Half-footprint of a form, in cells.
 SPREAD = {"wide": 1}
 #: Forms a move may launch from with more than the jump impulse.
