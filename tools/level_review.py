@@ -249,6 +249,7 @@ def motion(index: int, seed: int, seconds: float) -> dict:
     scene = spp.build_scene(seed)
     here = scene.tier
     frames = inside = jam = held = 0
+    empty = 0.0
     worst, what = 0.0, ""
     run = 0.0
     for _ in range(int(seconds / spp.DT)):
@@ -261,6 +262,11 @@ def motion(index: int, seed: int, seconds: float) -> dict:
             inside += 1
             if depth > worst:
                 worst, what = depth, mat
+        rays = spp._lens_rays(scene)
+        # A ray that reaches the probe's 8 m horizon hit nothing: sky, sea, or
+        # the drop. The roster sheet's complaint, counted -- every level is a
+        # cliff on one side and two thirds empty frame everywhere else.
+        empty += sum(1 for d in rays if d >= 7.99) / len(rays)
         jam += spp._lens_jammed(scene)
         big, _ = landmark_probe.look(scene, here, 25.0)
         if big:
@@ -269,7 +275,8 @@ def motion(index: int, seed: int, seconds: float) -> dict:
         else:
             run = 0.0
     return {"frames": frames, "seconds": frames * spp.DT, "inside": inside,
-            "worst": worst, "what": what, "jam": jam, "landmark_hold": held}
+            "worst": worst, "what": what, "jam": jam, "landmark_hold": held,
+            "empty": empty / max(1, frames)}
 
 
 def report(index: int, runs: int, blocks: int, seed: int,
@@ -330,6 +337,9 @@ def report(index: int, runs: int, blocks: int, seed: int,
                 + (f" in {m['what']}" if m["what"] else ""),
                 f"  lens jammed by a wall   {m['jam']} of {m['frames']} frames"
                 f" ({100 * m['jam'] / max(1, m['frames']):.1f}%)",
+                f"  frame empty (sky, sea, the drop)  "
+                f"{100 * m['empty']:.0f}% of the view on average"
+                "   (the rule is under 55%)",
                 f"  structure held at 25 degrees for "
                 f"{m['landmark_hold']:.1f} s   (the rule is 1.5 s)"]
     return "\n".join(out) + "\n"
