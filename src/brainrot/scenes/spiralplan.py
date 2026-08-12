@@ -1010,8 +1010,13 @@ class Cone:
         # of rock noise here whose bumps made one-block stairs at the level
         # seams; a profile that cannot un-lean cannot make a stair.
         t = min(1.0, max(0.0, (h - 2.0) / span)) ** 1.3
-        ridge = (0.3 + 0.7 * (0.5 + 0.5 * math.sin(u * 2.1 + self._w3))
-                 + 0.5 * (0.5 + 0.5 * math.sin(u * 7.7 + self._w1)))
+        # Capped at just over one block. At 1.5 the lean reached far enough
+        # that a body riding a ladder at the wall grazed the face with its
+        # shoulders near the top of the climb -- measured at 0.14% of frames,
+        # every one of them on an ascent, and from inside the lens it reads
+        # as phasing through the tower.
+        ridge = (0.25 + 0.5 * (0.5 + 0.5 * math.sin(u * 2.1 + self._w3))
+                 + 0.35 * (0.5 + 0.5 * math.sin(u * 7.7 + self._w1)))
         return inner + ridge * t
 
     def tooth(self, u: float) -> bool:
@@ -3212,8 +3217,11 @@ class Course:
             # so at 1.6 it is still against the core and finds its anchor -- and
             # the *body*, which stands on the landing rather than on the column,
             # is no longer close enough to the wall to fill the lens with it.
+            # 2.0 and not 1.6 since the face grew its lean: the brow bulges
+            # up to a block outward near the soffit, and a ride at 1.6 put
+            # the body's shoulders through it at the top of tall climbs.
             self._node(style, arc=2.4, step_y=need + 1, kind=climb,
-                       climb_style=ASCENT_SOFT[kind], hug=1.6,
+                       climb_style=ASCENT_SOFT[kind], hug=2.0,
                        pedestal=False, spread=0, label="ascent", orbs=2),
             self._crossing(rng, lv),
         ]
