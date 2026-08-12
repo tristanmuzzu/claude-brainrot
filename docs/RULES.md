@@ -215,7 +215,12 @@ The levers, in the order they are worth reaching for:
    number.
 3. **`pedestal=False`** floats a landing with nothing under it. A run of
    floating landings over the drop cannot be walked by construction.
-4. **`moat=True`** cuts the theme's liquid under the jump.
+4. **`moat=True`** cuts the theme's liquid under the jump — a radius-3 disc of
+   ground dug out and filled. Verified: two `moat=True` nodes put about **70
+   liquid cells** into a level, and `profile="channel"` roughly doubles it.
+   `pedestal_style="lava"` picks the liquid where the theme's own is wrong.
+   This is the reference's single most-used mechanic and this tower barely has
+   it.
 5. **`form="floor"`** is the opposite and must be used deliberately: it places
    *no block*, requires the cell to be solid ground already, and is how a beat
    says "run along the terrace here". Every `form="floor"` landing is a metre
