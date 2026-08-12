@@ -314,7 +314,10 @@ def report(index: int, runs: int, blocks: int, seed: int,
             "",
             "CAN IT BE WALKED -- the complaint this tower keeps failing on",
             f"  covered without a jump   mean {100 * got['mean']:.0f}%,"
-            f" worst {100 * got['worst']:.0f}%   of {got['n']} walks",
+            f" worst {100 * got['worst']:.0f}%   of {got['n']} walks"
+            + ("   <-- no walk seeded: this level has no standable ground at"
+               " its entry at all, which is a fact about it, not a zero"
+               if not got["n"] else ""),
             f"  walked end to end        {got['full']} of {got['n']}",
             "  the rule: mean at or under 55%, never end to end"
             "   (the real map: 46%, 0 of 43)"]
