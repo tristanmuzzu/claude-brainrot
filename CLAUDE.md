@@ -626,16 +626,16 @@ touching any of it — the reasoning is there, this is the short list:
    fallback it already is; the reliability guarantee lives in `_climb_on` and
    `_grab_the_wall`, not in `_ascent_stair`, so an authored exit that fails is
    already caught.
-1. **A wall fills the lens on 1.6% of frames** (2.3% in `spiral`; measured by
-   `spiral_probe`'s five-by-five ray grid, and separately by the edge density
-   of rendered frames, 1 in 75 against 1 in 20). Better than it was and still
-   the worst visible thing. It is a *camera* problem -- see "The camera is pure
-   geometry" -- not a course one: the body runs outside a convex core, and
-   standing nearer the wall to make it visible at all is what puts it in the
-   lens when the course turns inward. Widening the tower halved it without
-   aiming at it, which says the residue is specific arrangements rather than a
-   constant being wrong. The way in is to render a sheet, find the frames, and
-   ask what the *course* was doing at each -- not to move `BAND`.
+1. **A wall fills the lens on 0.7% of frames** in `tower` and 1.7% in
+   `spiral`, down from 1.6% and 2.3%. What closed most of it was measuring
+   *which segment the body was in* when it happened: 10% of exit-climb frames
+   and **0% of every designed beat**. So it was never a camera constant that
+   was wrong everywhere -- it was one arrangement the aim had no answer for,
+   the course hugging the core for the whole climb, and the fix is an inner
+   clamp on the aim point (`AIM_INSET`) matching the outer one that had always
+   been there. The residue is the same shape and the same method will find it:
+   `scratchpad`-style harness that walks a run, calls `spiral_probe._lens_jammed`
+   every few frames and buckets by `blk["segment"]`.
 2. **The spiral's move mix is 94% plain hop.** The exit climb is 47% of all
    landings and can only ever be hops, so this is bounded by what the *kernel*
    can express, not by the feature table -- reweighting `FEATURES` was tried

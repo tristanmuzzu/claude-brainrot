@@ -105,6 +105,19 @@ AXIS_BIAS = 0.05
 TANGENT_MIX = 0.45
 TANGENT_LOOK = 15.0
 PITCH_BIAS = 0.30
+#: The furthest *in* the camera's aim point may be, measured from the rim. The
+#: outer clamp beside it has always existed; this is the same rule at the other
+#: end and it was missing.
+#:
+#: The aim is the weighted next few landings, so wherever the course hugs the
+#: core the camera is aimed at the core -- and the course hugs it for the whole
+#: exit climb, a third of every run. Measured by segment, masonry filled the
+#: lens on 10% of climb frames and 0% of every designed beat: one arrangement
+#: the aim had no answer for, not a constant that was wrong everywhere. Swept:
+#: 3.5 halves it and 2.5 buys almost nothing more while pushing the aim toward
+#: the rim, which is the failure at the other end of this axis (see
+#: ``AXIS_BIAS`` -- at -0.16 every frame was sky and horizon).
+AIM_INSET = 3.5
 
 ORB_SCALE = 0.24
 ORB_COLOR = (120, 240, 190)
@@ -511,6 +524,22 @@ class SpiralScene(Scene):
         if flat_r > far:
             aim[0] *= far / flat_r
             aim[2] *= far / flat_r
+        # ...and never further *in* than a few metres off the core, which is
+        # the same rule at the other end and was missing.
+        #
+        # The aim is the weighted next few landings, so wherever the course
+        # hugs the wall the camera is aimed at the wall -- and the course hugs
+        # the wall for the whole exit climb, which is over a third of a run.
+        # Measured by segment, the lens was filled by masonry on 10% of climb
+        # frames and on **0%** of every designed beat in the tower; that is not
+        # a camera constant being wrong everywhere, it is one arrangement the
+        # aim had no answer for. Pushing the aim point out to the middle of the
+        # band leaves the wall where a wall belongs, along the inboard edge of
+        # the frame, without turning the head off the course.
+        near = self.cone.outer_at(self.course.u) - AIM_INSET
+        if flat_r < near:
+            aim[0] *= near / max(1e-6, flat_r)
+            aim[2] *= near / max(1e-6, flat_r)
 
         self._flick = max(0.0, self._flick - dt * 5.5)
         rate = min(1.0, (5.0 + 22.0 * self._flick ** 2) * dt)

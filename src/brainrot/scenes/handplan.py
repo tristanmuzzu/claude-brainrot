@@ -148,7 +148,7 @@ LEVELS: tuple[Level, ...] = (
     # daylight, wide platforms, a pond dug into the terrace so the long jump
     # is over water. The fence posts are the first one-cell landings a run
     # sees and they weave, so the corridor is read as having width.
-    Level("MEADOW GATE", "plains", rise=5, gap=3.0, exit="stair", beats=[
+    Level("MEADOW GATE", "plains", rise=5, gap=3.0, exit="stair", step=("oak", "hop"), beats=[
         ("meadow", [n("rock", arc=4.5, lift=2, spread=1, orbs=1),
                     n("rock", arc=4.6, lift=2, spread=1, moat=True)]),
         ("posts", [n("accent", arc=3.0, lift=3, spread=0, radial=1.5),
@@ -165,7 +165,7 @@ LEVELS: tuple[Level, ...] = (
     # with nothing else in it. The whole level is one question asked six
     # times, which no weighted table will ever produce and which is exactly
     # what a rank of bales in a field looks like.
-    Level("THE LONG FURROW", "farm", rise=4, gap=2.8, exit="stair", beats=[
+    Level("THE LONG FURROW", "farm", rise=4, gap=2.8, exit="stair", step=("hay", "hop"), beats=[
         ("furrow", [n("rock", arc=4.6, lift=1, spread=0, orbs=1),
                     n("rock", arc=4.6, lift=1, spread=0),
                     n("rock", arc=4.6, lift=1, spread=0, orbs=1)]),
@@ -184,7 +184,7 @@ LEVELS: tuple[Level, ...] = (
     # keep the jumps flat -- the level is crossed almost entirely under
     # something. It runs against the core so the houses read as built into
     # the wall rather than as blocks in a corridor.
-    Level("ROOFTOPS", "village", rise=6, gap=3.2, exit="ladder", beats=[
+    Level("ROOFTOPS", "village", rise=6, gap=3.2, exit="ladder", step=("brick", "hop"), beats=[
         ("eaves", [n("rock", arc=3.3, lift=2, hug=2.6, spread=1, ceiling=2),
                    n("accent", arc=3.4, lift=3, hug=2.6, spread=0, orbs=1)]),
         ("ridge", [n("rock", arc=3.5, lift=4, hug=3.0, spread=0),
@@ -203,7 +203,7 @@ LEVELS: tuple[Level, ...] = (
     # Dunes, then the tower's first genuinely mean sequence: four one-cell
     # sandstone pillars at the top of the up-jump, alternating in and out,
     # with a beam over the middle two. Bright, open, nowhere to hide.
-    Level("SUNSTRUCK", "desert", rise=5, gap=3.4, exit="stair", beats=[
+    Level("SUNSTRUCK", "desert", rise=5, gap=3.4, exit="stair", step=("sandstone", "hop"), beats=[
         ("dunes", [n("rock", arc=4.4, lift=2, spread=1, pedestal_style="sand"),
                    n("rock", arc=3.6, lift=3, spread=1,
                      pedestal_style="sand", orbs=1)]),
@@ -223,7 +223,7 @@ LEVELS: tuple[Level, ...] = (
     # spires with nothing between them, out toward the rim so the fall is
     # visible under every one. Rhythm is deliberately uneven: up, up, up,
     # then all the way down in one go.
-    Level("RED SPIRES", "mesa", rise=7, gap=3.6, exit="stair", beats=[
+    Level("RED SPIRES", "mesa", rise=7, gap=3.6, exit="stair", step=("terra_white", "hop"), beats=[
         ("spires", [n("rock", arc=3.4, lift=3, spread=0, hug=5.4,
                       pedestal_style="terra_orange"),
                     n("accent", arc=3.3, lift=4, spread=0, hug=5.8),
@@ -239,7 +239,7 @@ LEVELS: tuple[Level, ...] = (
     # Two storeys. Logs at floor level, a vine to gain the canopy, leaf
     # platforms up in the soffit, then a long drop back down through it.
     # The only level that uses the full height of the corridor.
-    Level("CANOPY", "jungle", rise=4, gap=3.0, exit="vine", beats=[
+    Level("CANOPY", "jungle", rise=4, gap=3.0, exit="vine", step=("junglelog", "hop"), beats=[
         ("logs", [n("rock", arc=3.6, lift=1, spread=1, orbs=1),
                   n("rock", arc=3.5, lift=2, spread=1)]),
         ("liana", [n("rock", arc=3.0, lift=2, hug=2.2, spread=1),
@@ -262,7 +262,7 @@ LEVELS: tuple[Level, ...] = (
     # between them are at the limit, which is a different kind of hard from
     # the pillar levels and reads completely differently. A slime pad in the
     # middle throws you up onto the last one.
-    Level("SPORE DECK", "mushroom", rise=5, gap=3.0, exit="vine", beats=[
+    Level("SPORE DECK", "mushroom", rise=5, gap=3.0, exit="vine", step=("mushroomstem", "hop"), beats=[
         ("caps", [n("accent", arc=5.4, lift=2, form="wide", spread=1,
                     pedestal_style="mushroomstem", orbs=1),
                   n("accent", arc=5.6, lift=2, form="wide", spread=1,
@@ -281,7 +281,7 @@ LEVELS: tuple[Level, ...] = (
     # cannot see coming, the floor is water you cross on calcite stepping
     # stones, and the way up is a bubble column out of the pool. Tall, so
     # the exit is a genuine ride rather than a flight of steps.
-    Level("THE DRIP", "dripstone", rise=8, gap=2.8, exit="bubble", beats=[
+    Level("THE DRIP", "dripstone", rise=8, gap=2.8, exit="bubble", step=("calcite", "hop"), beats=[
         ("stones", [n("accent", arc=3.4, lift=1, spread=0, moat=True),
                     n("accent", arc=3.5, lift=1, spread=0, moat=True,
                       orbs=1),
@@ -298,7 +298,7 @@ LEVELS: tuple[Level, ...] = (
     # wade through, and it is dark. Almost no height variation on purpose --
     # this is the flattest level in the tower and it is the ceiling that
     # makes it hard.
-    Level("CUT AND COVER", "mine", rise=4, gap=2.6, exit="ladder", beats=[
+    Level("CUT AND COVER", "mine", rise=4, gap=2.6, exit="ladder", step=("oak", "hop"), beats=[
         ("gallery", [n("rock", arc=3.2, lift=1, hug=3.0, spread=0, ceiling=2),
                      n("rock", arc=3.3, lift=1, hug=3.0, spread=0, ceiling=2,
                        orbs=1),
@@ -318,7 +318,7 @@ LEVELS: tuple[Level, ...] = (
     # the only light is the amethyst on the blocks themselves. Everything is
     # floating -- no pedestals -- so there is no terrain to read the course
     # against, which is the point.
-    Level("SCULK", "deepdark", rise=5, gap=3.2, exit="ladder", beats=[
+    Level("SCULK", "deepdark", rise=5, gap=3.2, exit="ladder", step=("deepslate", "hop"), beats=[
         ("void", [n("rock", arc=4.4, lift=3, spread=0, pedestal=False),
                   n("accent", arc=4.5, lift=3, spread=0, pedestal=False,
                     orbs=1)]),
@@ -337,7 +337,7 @@ LEVELS: tuple[Level, ...] = (
     # Ice. The move is a slide rather than a hop and it reaches further for
     # the same rise, so this level's jumps are longer than anything else in
     # the tower and the body is visibly quicker across them.
-    Level("GLACIER RUN", "ice", rise=5, gap=3.4, exit="stair", beats=[
+    Level("GLACIER RUN", "ice", rise=5, gap=3.4, exit="stair", step=("packedice", "slide"), beats=[
         ("shelf", [n("rock", arc=5.0, lift=1, kind="slide", form="ice",
                      spread=0, orbs=1),
                    n("rock", arc=5.2, lift=1, kind="slide", form="ice",
@@ -356,7 +356,7 @@ LEVELS: tuple[Level, ...] = (
     # Lava under every jump, magma columns to land on, and one stretch of
     # soul sand in the middle that drops the pace to a crawl. The slow beat
     # is the design: everything either side of it reads faster for it.
-    Level("LAVA LEAP", "nether", rise=6, gap=3.6, exit="stair", beats=[
+    Level("LAVA LEAP", "nether", rise=6, gap=3.6, exit="stair", step=("soulsand", "hop"), beats=[
         ("leap", [n("rock", arc=4.6, lift=2, spread=0, moat=True, orbs=1),
                   n("accent", arc=4.7, lift=2, spread=0, moat=True)]),
         ("columns", [n("accent", arc=3.3, lift=3, spread=0, radial=1.5),
@@ -373,7 +373,7 @@ LEVELS: tuple[Level, ...] = (
     # of it, and wide warped caps above. The lift in the middle is what makes
     # this different from every other themed terrace: the level has an upper
     # half you are carried to.
-    Level("WARPED GROVE", "warped", rise=5, gap=3.0, exit="bubble", beats=[
+    Level("WARPED GROVE", "warped", rise=5, gap=3.0, exit="bubble", step=("warped", "hop"), beats=[
         ("nylium", [n("rock", arc=3.6, lift=1, spread=1, orbs=1),
                     n("rock", arc=3.5, lift=2, spread=1)]),
         ("lift", [n("rock", arc=3.0, lift=2, hug=2.2, spread=1),
@@ -395,7 +395,7 @@ LEVELS: tuple[Level, ...] = (
     # Obsidian pillars standing in nothing, purpur slabs between them, and
     # the terrace itself barely used. The most exposed level in the tower:
     # it runs out at the rim with the whole drop under it.
-    Level("ENDPILLARS", "end", rise=7, gap=3.4, exit="bubble", beats=[
+    Level("ENDPILLARS", "end", rise=7, gap=3.4, exit="bubble", step=("purpur", "hop"), beats=[
         ("pillars", [n("accent", arc=3.4, lift=4, spread=0, hug=6.0,
                        pedestal=False),
                      n("accent", arc=3.3, lift=5, spread=0, hug=6.4,
@@ -419,7 +419,7 @@ LEVELS: tuple[Level, ...] = (
     # The candy level, and the one place in the tower where floating blocks
     # over nothing are the *theme* rather than a failure. Wool checks, a
     # slime pad, quartz slabs. Bright, weightless, and short.
-    Level("WOOLWORK", "rainbow", rise=4, gap=2.8, exit="stair", beats=[
+    Level("WOOLWORK", "rainbow", rise=4, gap=2.8, exit="stair", step=("quartz", "hop"), beats=[
         ("check", [n("wool_pink", arc=3.6, lift=3, spread=0, pedestal=False),
                    n("wool_lime", arc=3.5, lift=3, spread=0, pedestal=False,
                      radial=1.6),
@@ -444,7 +444,7 @@ LEVELS: tuple[Level, ...] = (
     # Plains again and nothing like level 1. A water channel is cut the
     # length of the terrace and crossed on stepping stones barely above it,
     # then one long leap at the very limit onto the far bank.
-    Level("THE WEIR", "plains", rise=5, gap=3.0, exit="stair", beats=[
+    Level("THE WEIR", "plains", rise=5, gap=3.0, exit="stair", step=("cobble", "hop"), beats=[
         ("ford", [n("cobble", arc=3.0, lift=1, spread=0, moat=True),
                   n("cobble", arc=3.0, lift=1, spread=0, moat=True, orbs=1),
                   n("cobble", arc=3.1, lift=1, spread=0, moat=True),
@@ -461,7 +461,7 @@ LEVELS: tuple[Level, ...] = (
     # a scaffold. The level is eight blocks tall and you climb nearly all of
     # them, which is the only way this format ever reads as being *inside*
     # something rather than running along a ledge.
-    Level("THE SHAFT", "mine", rise=8, gap=2.6, exit="ladder", beats=[
+    Level("THE SHAFT", "mine", rise=8, gap=2.6, exit="ladder", step=("oak", "hop"), beats=[
         ("footing", [n("rock", arc=3.4, lift=1, hug=2.8, spread=1, orbs=1)]),
         ("rungs", [n("rock", arc=3.0, lift=1, hug=2.2, spread=1),
                    n("oak", arc=2.4, step_y=4, kind="climb",
@@ -485,7 +485,7 @@ LEVELS: tuple[Level, ...] = (
     # Ice again, and this one is relentless: no floor beat anywhere in it,
     # every landing a slide at close to the limit, out at the rim. The
     # fastest thirty seconds in the tower.
-    Level("BLUE ICE", "ice", rise=4, gap=3.2, exit="stair", beats=[
+    Level("BLUE ICE", "ice", rise=4, gap=3.2, exit="stair", step=("blueice", "slide"), beats=[
         ("run", [n("blueice", arc=5.4, lift=1, kind="slide", form="ice",
                    spread=0, hug=5.6, orbs=1),
                  n("blueice", arc=5.6, lift=1, kind="slide", form="ice",
@@ -505,7 +505,7 @@ LEVELS: tuple[Level, ...] = (
     # steps, and come back out. Every jump in the middle of it is a drop, and
     # a drop is the only way this motion model reaches past four and a half
     # metres -- so the level is also the tower's longest single jump.
-    Level("THE QUARRY", "desert", rise=5, gap=3.0, exit="stair", beats=[
+    Level("THE QUARRY", "desert", rise=5, gap=3.0, exit="stair", step=("chiselled", "hop"), beats=[
         ("benches", [n("rock", arc=3.4, lift=4, spread=0,
                        pedestal_style="sand"),
                      n("rock", arc=4.6, lift=3, spread=0, orbs=1),
@@ -522,7 +522,7 @@ LEVELS: tuple[Level, ...] = (
     # underneath and nothing on either side. Nothing here is difficult to
     # land; all of it is difficult to watch, which for a strip that is on
     # screen while somebody waits is the same thing.
-    Level("ROPE BRIDGE", "jungle", rise=6, gap=3.4, exit="vine", beats=[
+    Level("ROPE BRIDGE", "jungle", rise=6, gap=3.4, exit="vine", step=("oak", "hop"), beats=[
         ("planks", [n("oak", arc=3.2, lift=2, spread=0, hug=6.4,
                       pedestal=False),
                     n("oak", arc=3.2, lift=2, spread=0, hug=6.6,
@@ -549,7 +549,7 @@ LEVELS: tuple[Level, ...] = (
     # every one of them under a lid, and magma glowing under the gaps. The
     # opposite design to Lava Leap with the same materials, which is the
     # point of having the theme twice.
-    Level("BASALT DELTAS", "nether", rise=5, gap=2.8, exit="stair", beats=[
+    Level("BASALT DELTAS", "nether", rise=5, gap=2.8, exit="stair", step=("blackstone", "hop"), beats=[
         ("deltas", [n("rock", arc=3.0, lift=2, spread=0, ceiling=2),
                     n("rock", arc=3.0, lift=2, spread=0, ceiling=2, orbs=1),
                     n("rock", arc=3.1, lift=2, spread=0, ceiling=2)]),
@@ -567,7 +567,7 @@ LEVELS: tuple[Level, ...] = (
     # The hardest level in the tower. Every landing is one cell, floating,
     # unlit except for its own vein, and every jump is at the top of its
     # envelope. There is no floor beat and no rest.
-    Level("SILENCE", "deepdark", rise=6, gap=3.6, exit="ladder", beats=[
+    Level("SILENCE", "deepdark", rise=6, gap=3.6, exit="ladder", step=("sculk", "hop"), beats=[
         ("reach", [n("rock", arc=4.8, lift=3, spread=0, pedestal=False),
                    n("rock", arc=4.8, lift=3, spread=0, pedestal=False,
                      orbs=1)]),
@@ -593,7 +593,7 @@ LEVELS: tuple[Level, ...] = (
     # ladder in the middle of it rather than at the end. Eight blocks gained
     # in a level you barely travel along -- the second of the two vertical
     # levels and deliberately nothing like the mine.
-    Level("BELFRY", "village", rise=8, gap=2.6, exit="ladder", beats=[
+    Level("BELFRY", "village", rise=8, gap=2.6, exit="ladder", step=("plaster", "hop"), beats=[
         ("sill", [n("rock", arc=3.4, lift=1, hug=2.6, spread=1, orbs=1),
                   n("rock", arc=3.4, lift=2, hug=2.6, spread=0)]),
         ("beams", [n("oak", arc=3.6, lift=3, form="slab", spread=0, hug=3.4,
@@ -622,7 +622,7 @@ LEVELS: tuple[Level, ...] = (
     # across the corridor, you go under it and off the end, and the level
     # above is the meadow again a hundred and thirty blocks higher. Short and
     # deliberately calm: it is a threshold, not a test.
-    Level("THE GATE", "end", rise=4, gap=3.0, exit="stair", beats=[
+    Level("THE GATE", "end", rise=4, gap=3.0, exit="stair", step=("obsidian", "hop"), beats=[
         ("approach", [n("ground", arc=4.4, lift=0, form="floor", orbs=1),
                       n("rock", arc=3.4, lift=1, spread=1)]),
         ("arch", [n("accent", arc=3.2, lift=2, spread=0, ceiling=3),

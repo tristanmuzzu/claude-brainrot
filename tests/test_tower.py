@@ -83,6 +83,22 @@ def test_the_tower_is_twenty_four_distinct_places() -> None:
         assert lv.theme != nxt.theme, f"{lv.name} and {nxt.name} are both {lv.theme}"
 
 
+def test_every_level_climbs_out_on_its_own_footing() -> None:
+    """The staircase is over a third of every run, so one stone and one hop in
+    all twenty-four places is the largest single source of sameness available.
+
+    Asserted as *most levels differ*, not all: a mine and a shaft may honestly
+    both climb oak. What is not allowed is the default, where the tread
+    material comes from the base theme and the two levels that share a theme
+    climb the same stairs.
+    """
+    steps = [lv.skin.get("step") for lv in hp.LEVELS]
+    assert all(steps), "a level climbs out on the theme's default footing"
+    assert len(set(steps)) >= len(hp.LEVELS) * 0.7
+    moves = {move for _, move in steps}
+    assert len(moves) > 1, "every staircase is climbed the same way"
+
+
 def test_every_level_has_a_loop_safe_filler() -> None:
     """A filler repeats, so the jump from its last landing back to its first
     has to be one a body can make. The default filler is the level's last two

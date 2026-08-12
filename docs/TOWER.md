@@ -226,7 +226,7 @@ Measured, 16 runs × 340 landings and 6 runs × 40 s:
 | unchecked emergency placements | 0.30% | **0.18%** |
 | cells claimed twice / off the lattice | 0 | **0** |
 | climbable without the parkour | 0 m | **0 m** |
-| frames mostly filled by a wall | 2.3% | **1.6%** |
+| frames mostly filled by a wall | 1.7% | **0.7%** |
 | seconds on one place | 7.3 s | **10.7 s** |
 | per frame | 2.34 ms | **2.80 ms** |
 
