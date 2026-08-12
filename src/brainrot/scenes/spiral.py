@@ -554,7 +554,10 @@ class SpiralScene(Scene):
         # ...and never further out than the rim, or the camera swings off the
         # tower altogether on the frames where the next landing is already
         # near the edge.
-        far = self.cone.outer_at(self.course.u) + 3.0
+        # +6.5 and not +3: landings may now stand well past the rim on spurs
+        # and piers, and an aim clamped to the old silhouette turned the head
+        # away from exactly the landings that are the most worth watching.
+        far = self.cone.outer_at(self.course.u) + 6.5
         flat_r = math.hypot(aim[0], aim[2])
         if flat_r > far:
             aim[0] *= far / flat_r

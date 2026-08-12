@@ -152,6 +152,15 @@ table may only name things on this list or things that already existed.
    booked until landing, the aim blends hard toward the actual landing
    block; the corridor-tangent blend applies only while running. This is
    F4, and it is a renderer change, not a course change.
+7. **Radial wandering** (added after mining the real map, whose course
+   swings radius 28–52). Outward: a landing whose ``hug`` exceeds the band
+   width stands *past the rim* on floating spurs and piers — ``band()``
+   gives way upward, and the aim's outer clamp follows. Inward:
+   ``shell="grotto"`` carves a lamplit bay into the core face beside the
+   move, lined as it is cut because the cone's interior is analytic and
+   was never painted — a bare carve is a window onto invisible rock.
+   Measured across the roster: landings sit 0.7 to 10.8 blocks off the
+   core wall (band is 9.5), with 2% out past the old rim margin.
 
 ## The tower
 

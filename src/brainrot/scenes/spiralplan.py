@@ -1647,9 +1647,18 @@ class Course:
         ``hug`` lets a landing sit one cell off the core instead of the usual
         margin, which is what a ladder or a vine needs: the thing it hangs on
         is the tower.
+
+        The upper bound gives way when a landing *asks* to stand beyond the
+        rim: the real map's course wanders between radius 28 and 52 around a
+        tower whose own silhouette is narrower -- spurs and piers jutting out
+        over the sea are half of how its levels read as places rather than a
+        corridor. A hug past the band width is exactly that ask, and such a
+        landing is necessarily floating or authored structure, because there
+        is no ground past the rim for a pedestal to reach.
         """
         out = self.cone.outer_at(u)
-        return out - BAND + (hug or BAND_MARGIN), out - BAND_MARGIN
+        lo = out - BAND + (hug or BAND_MARGIN)
+        return lo, max(out - BAND_MARGIN, lo + 0.8)
 
     @property
     def difficulty(self) -> float:
@@ -3155,6 +3164,9 @@ class Course:
         if kind == "shaft":
             self._shell_shaft(blk, theme)
             return
+        if kind == "grotto":
+            self._shell_grotto(prev, blk, theme)
+            return
         off, roof_h = {"tunnel": (2, 4), "hall": (3, 6), "cave": (2, 4)}[kind]
         x0, y0, z0 = self.takeoff_point(prev)
         x1, y1, z1 = self.land_point(blk)
@@ -3200,6 +3212,66 @@ class Course:
                 rx = iround(x + px * lat)
                 rz = iround(z + pz * lat)
                 self.write((rx, by + h_roof, rz), roof)
+
+    def _shell_grotto(self, prev: dict, blk: dict, theme: Theme) -> None:
+        """Open the core wall into a bay beside the move: the inward half of
+        radial wandering, where the spur past the rim is the outward half.
+
+        The course itself stays legal against the *uncarved* wall -- a
+        landing is checked before its shell paints, so a course that entered
+        the rock would be refused before the grotto existed. What moves is
+        the wall: carved two cells deep along the move, three and a bit
+        high, and then *lined*, because the cone's interior is analytic and
+        was never painted -- a bare carve would open a window into nothing.
+        A lamp on the back wall makes the bay read as a place.
+        """
+        x0, y0, z0 = self.takeoff_point(prev)
+        x1, y1, z1 = self.land_point(blk)
+        d = math.hypot(x1 - x0, z1 - z0)
+        if d < 0.5:
+            return
+        steps = max(2, int(d / 0.7))
+        cone = self.cone
+        lined = theme.sub
+        for i in range(steps + 1):
+            f = i / steps
+            x = x0 + (x1 - x0) * f
+            z = z0 + (z1 - z0) * f
+            by = ifloor(min(y0, y1) + abs(y1 - y0) * f + 0.01)
+            th = math.atan2(z, x)
+            ix, iz = math.cos(th), math.sin(th)     # outward radial unit
+            u = cone.unwrap(x, z, by)
+            face = cone.core_r(u, by)
+            for depth in (0.4, -0.6, -1.6):
+                cx = iround(ix * (face + depth))
+                cz = iround(iz * (face + depth))
+                for h in range(4):
+                    self.carve((cx, by + h, cz))
+                # The bay's floor: the cell under a carve is cone interior,
+                # solid but never painted. Line it or the bay looks
+                # bottomless.
+                self.write((cx, by - 1, cz), theme.ground)
+            # The lining, written unconditionally: the bay's back and roof
+            # are inside the cone, which is *analytically* solid but was
+            # never painted -- the skin is all the emitter draws -- so an
+            # unlined carve opens a window onto invisible rock, which is the
+            # oldest landmine this project has. Writing makes it visible;
+            # it was already solid.
+            bx = iround(ix * (face - 2.6))
+            bz = iround(iz * (face - 2.6))
+            for h in range(5):
+                self.write((bx, by + h, bz), lined)
+            rx = iround(ix * (face - 1.0))
+            rz = iround(iz * (face - 1.0))
+            self.write((rx, by + 4, rz), lined)
+            self.write((iround(ix * (face - 1.8)), by + 4,
+                        iround(iz * (face - 1.8))), lined)
+            if i % 6 == 3:
+                lamp = (iround(ix * (face - 1.8)), by + 2,
+                        iround(iz * (face - 1.8)))
+                if not self.blocked(lamp):
+                    self.write(lamp, theme.glow)
+                    cone.lamps.append(lamp)
 
     def _shell_shaft(self, blk: dict, theme: Theme) -> None:
         """A tube of the theme's rock around a climb: the belfry, the mine
