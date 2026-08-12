@@ -241,6 +241,15 @@ scripts live beside the session that produced them.
   This is the islands-not-a-ribbon rule, measured; the in-level floor
   breaks exist to hold this tower to the same standard, and the probe's
   `runnable` metric prints both numbers side by side.
+- **Its course band is still 96.1% ordinary cubes.** Within five blocks of
+  the checkpoint-to-checkpoint lines: slabs 0.7%, snow 0.8%, fences 0.2%,
+  stairs 0.1%, trapdoors/walls/panes/carpets under 0.1% each. The famous
+  sub-block obstacles are *seasoning* — a couple of appearances per level —
+  and the craft that actually separates the real map is what its cubes are
+  arranged as: buildings, terrain, rooms. Which is to say: profiles, shells
+  and landmarks are the right counterpart, and the fence/wall/trapdoor
+  forms should stay at the seasoning rate they now have, not become a
+  staple.
 
 ## What "difficult" can mean here, honestly
 
