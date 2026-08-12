@@ -90,6 +90,16 @@ Three consequences worth having in your head:
   under it is refused every time. `ceiling=` lids sit at three. This is why a
   doorway is *walked* through, never jumped through.
 
+**The one place the reference beats this envelope, and the way round it.** The
+real map routinely jumps **four metres while gaining a block**; here, up-one
+stops at 3.10 m. The mechanics that buy it there are ones this kernel does not
+have (half-block slab and stair surfaces as *landing heights*, head-hitting to
+cancel a jump, ice momentum). What you *can* do is split the climb:
+`form="slab"` lands at **+0.5** and reaches **3.78 m**, so two slab steps gain
+a block across seven metres of ground where one hop could only manage 3.10 —
+and a slab step reads as a deliberate half-height ledge rather than a fudge.
+`kind="slide"` off ice is the other answer: 4.36 m gaining a block.
+
 **Hard rule.** Every authored hop and slide legal on paper:
 `python tools/tower_probe.py --design-only` — 0.2 s, run it after every edit.
 It names level, beat and node index.
