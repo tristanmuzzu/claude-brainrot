@@ -313,6 +313,10 @@ GAP_ARC = (2.8, 3.9)
 #: enters the frame about nine metres ahead, which is inside the distance over
 #: which the trough's own curvature carries it away again.
 BAND = 9.5
+#: The widest corridor any level may ask for. The continuous face check in
+#: ``_path_clear`` uses it as its cheap radial bound, so a level wider than
+#: this would put its course outside the guard.
+BAND_MAX = 13.5
 #: Cells of terrace floor slab -- which is also, seen from the trough below,
 #: the thickness of your ceiling.
 #:
@@ -729,13 +733,15 @@ class Section:
     floor. Those two are the whole reason the parkour is not optional.
     """
 
-    __slots__ = ("breaks", "gap", "hard", "index", "landmark", "profile",
-                 "rise", "shelf", "signature", "theme", "u0", "u1", "y")
+    __slots__ = ("band", "breaks", "gap", "hard", "index", "landmark",
+                 "profile", "rise", "shelf", "signature", "theme", "u0",
+                 "u1", "y")
 
     def __init__(self, index: int, theme: Theme, u0: float, u1: float,
                  y: int, rise: int, gap: float, hard: float = 1.0,
                  signature: str = "", profile: str = "plaza",
-                 shelf: float = 4.0, landmark: str = "") -> None:
+                 shelf: float = 4.0, landmark: str = "",
+                 band: float = BAND) -> None:
         self.index = index
         self.theme = theme
         self.u0 = u0
@@ -778,6 +784,11 @@ class Section:
         #: remember needs one thing to remember it by, and no amount of good
         #: parkour is that thing. Painted during dressing, off the course.
         self.landmark = landmark
+        #: How wide this level's corridor is, core face to rim. The global
+        #: constant is only the default: the real map's levels visibly vary
+        #: between tight galleries and broad courts, and one width for all
+        #: thirty-three places was the last global left in the geometry.
+        self.band = band
         #: How many breaks the level's own floor has: short mini-chasms cut
         #: *inside* the level, so the ground is islands rather than a ribbon.
         #: The owner's complaint, verbatim: you could run ninety per cent of
@@ -982,9 +993,13 @@ class Cone:
         """The trough's outer edge: the last radius with ground under it."""
         return self.rim_at(self.floor_at(u)) + self.wobble(u)
 
+    def band_at(self, u: float) -> float:
+        """This bearing's corridor width: the level's own, not a constant."""
+        return self.level(self.level_index(u)).band
+
     def inner_at(self, u: float) -> float:
         """The trough's inner edge: the foot of the flank above."""
-        return self.outer_at(u) - BAND
+        return self.outer_at(u) - self.band_at(u)
 
     def floor_range(self, u: float, apron: bool = True) -> tuple[float, float]:
         """The radial extent of the ground at this bearing.
@@ -1000,8 +1015,9 @@ class Cone:
         out = self.outer_at(u)
         lv = self.level(self.level_index(u))
         if lv.profile == "ledge":
-            w = max(3.0, lv.shelf + 0.9 * math.sin(u * 1.7 + self._w2)
-                    + 0.4 * math.sin(u * 4.3 + self._w3))
+            w = max(3.0, min(lv.band - 2.0,
+                             lv.shelf + 0.9 * math.sin(u * 1.7 + self._w2)
+                             + 0.4 * math.sin(u * 4.3 + self._w3)))
             # The apron: one stretch of every ledge swells out to hold the
             # level's landmark. A shelf four cells wide has no room for a
             # windmill beside the course, and a constant-width ribbon reads
@@ -1015,8 +1031,8 @@ class Cone:
                 d = abs(u - au) * max(6.0, self.rim_at(lv.y))
                 if d < 5.0:
                     w += 4.5 * (1.0 - d / 5.0)
-            return out - BAND, out - BAND + w
-        return out - BAND, out
+            return out - lv.band, out - lv.band + w
+        return out - lv.band, out
 
     def apron_u(self, lv: Section) -> float:
         """Where this level's ledge swells, in unwrapped angle."""
@@ -1036,7 +1052,7 @@ class Cone:
         if lv.profile != "channel":
             return None
         out = self.outer_at(u)
-        mid = out - BAND + 3.6 + 1.1 * math.sin(u * 1.3 + self._w1)
+        mid = out - lv.band + 3.6 + 1.1 * math.sin(u * 1.3 + self._w1)
         return mid, mid + 2.2
 
     def core_r(self, u: float, y: int) -> float:
@@ -1052,7 +1068,7 @@ class Cone:
         +1 is unreachable, and the walkability probe holds that at zero).
         """
         lv = self.level(self.level_index(u))
-        inner = self.outer_at(u) - BAND
+        inner = self.outer_at(u) - lv.band
         if not self.has_floor(u + 2 * math.pi):
             # No ceiling overhead means a bulge would have open air above its
             # top cell -- a standable shelf on the cliff face, which is
@@ -1247,7 +1263,7 @@ class Cone:
             lv = self.level(self.level_index(u))
             above = self.level(lv.index + LEVELS_PER_TURN)
             h = y - lv.y
-            inner = self.outer_at(u) - BAND
+            inner = self.outer_at(u) - lv.band
             # The core, at every height: the wall at the back of the trough,
             # fluted, browed and knuckled -- ``core_r`` is the collision
             # radius, so the mesh follows it and the two cannot disagree.
@@ -1280,14 +1296,15 @@ class Cone:
         """
         theme = self.section_at(up).theme
         out = self.floor_range(up)[1]
+        upband = self.band_at(up)
         if depth == 0:
-            style, r0 = theme.ground, self.outer_at(up) - BAND - SKIN
+            style, r0 = theme.ground, self.outer_at(up) - upband - SKIN
         elif depth == 1:
             # The cut face under the ground: a slice through the place, which
             # is what stops the rim reading as a painted line.
-            style, r0 = theme.sub, self.outer_at(up) - BAND - SKIN
+            style, r0 = theme.sub, self.outer_at(up) - upband - SKIN
         elif depth == FLOOR_T - 1:
-            style, r0 = "conesoffit", self.outer_at(up) - BAND - SKIN
+            style, r0 = "conesoffit", self.outer_at(up) - upband - SKIN
         else:
             style, r0 = "conestone", out - 2.0
         ch = self.channel_range(up) if depth <= 1 else None
@@ -1657,7 +1674,7 @@ class Course:
         is no ground past the rim for a pedestal to reach.
         """
         out = self.cone.outer_at(u)
-        lo = out - BAND + (hug or BAND_MARGIN)
+        lo = out - self.cone.band_at(u) + (hug or BAND_MARGIN)
         return lo, max(out - BAND_MARGIN, lo + 0.8)
 
     @property
@@ -1822,8 +1839,10 @@ class Course:
                                 # and its ``radial`` is never read, so nudging
                                 # that would be nudging nothing. Move the lane
                                 # instead, and keep it inside the margins.
-                                trial["hug"] = min(max(node["hug"] + side, 2.0),
-                                                   BAND - BAND_MARGIN)
+                                trial["hug"] = min(
+                                    max(node["hug"] + side, 2.0),
+                                    self.cone.section_at(self.u).band
+                                    - BAND_MARGIN)
                             else:
                                 trial["radial"] = node["radial"] + side
                         for cell in self._targets(prev, trial):
@@ -2390,7 +2409,7 @@ class Course:
             # is enough: the face only ever leans outward going up, so a
             # clear waist means a clear knee.
             r = math.hypot(x, z) - 0.30
-            if r < self.cone.rim_at(y) - BAND + 3.0:
+            if r < self.cone.rim_at(y) - BAND_MAX + 3.0:
                 # Near the wall (cheap flare arithmetic; no unwrap): now the
                 # real question, with the real face.
                 u = self.cone.unwrap(x, z, y + 0.9)

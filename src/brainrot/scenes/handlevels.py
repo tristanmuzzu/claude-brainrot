@@ -56,14 +56,15 @@ class Level:
     is recognised by. ``skin`` re-skins the base theme.
     """
 
-    __slots__ = ("beats", "breaks", "exit", "exit_beats", "filler", "gap",
-                 "landmark", "name", "profile", "rise", "shelf", "skin",
-                 "theme")
+    __slots__ = ("band", "beats", "breaks", "exit", "exit_beats", "filler",
+                 "gap", "landmark", "name", "profile", "rise", "shelf",
+                 "skin", "theme")
 
     def __init__(self, name: str, theme: str, rise: int, gap: float,
                  exit: str, beats, filler=(), profile: str = "ledge",
                  shelf: float = 4.0, landmark: str = "",
-                 exit_beats=(), breaks: int | None = None, **skin) -> None:
+                 exit_beats=(), breaks: int | None = None,
+                 band: float = 9.5, **skin) -> None:
         self.name = name
         self.theme = theme
         self.rise = rise
@@ -81,6 +82,10 @@ class Level:
         #: two for a full floor, unless the level says otherwise.
         self.breaks = breaks if breaks is not None else \
             (3 if profile == "ledge" else 2)
+        #: The corridor's width for this level, core face to rim: a tight
+        #: gallery at 7.5 and a broad court at 13 are different places
+        #: before a single block is laid. Capped by ``BAND_MAX``.
+        self.band = band
         self.skin = skin
 
 
@@ -98,7 +103,7 @@ LEVELS: tuple[Level, ...] = (
     # rounds, and the tower's first one-cell landings kept mild. The arch at
     # the end frames the run ahead.
     Level("THE GATEHOUSE", "plains", rise=5, gap=2.8, exit="stair",
-          shelf=5.0, landmark="arch", step=("oak", "hop"), beats=[
+          band=11.0, shelf=5.0, landmark="arch", step=("oak", "hop"), beats=[
         ("lawn", [n("ground", arc=4.6, lift=0, form="floor", orbs=1),
                   n("rock", arc=3.4, lift=1, spread=1)]),
         ("hedge", [n("accent", arc=3.2, lift=2, spread=0, radial=1.2),
@@ -122,7 +127,7 @@ LEVELS: tuple[Level, ...] = (
     # and the windmill standing on its apron. The rhythm is a metronome --
     # the same big jump asked four times, which no dice ever ask.
     Level("WINDMILL REACH", "farm", rise=4, gap=2.8, exit="stair",
-          landmark="windmill", step=("hay", "hop"), beats=[
+          band=10.0, landmark="windmill", step=("hay", "hop"), beats=[
         ("rank", [n("hay", arc=4.4, lift=1, spread=0, orbs=1),
                   n("hay", arc=4.4, lift=1, spread=0),
                   n("hay", arc=4.4, lift=1, spread=0, orbs=1),
@@ -146,7 +151,7 @@ LEVELS: tuple[Level, ...] = (
     # core, awning slabs, and one stretch crossed inside a house -- the
     # tower's first interior, twenty seconds in.
     Level("MARKET STREET", "village", rise=6, gap=3.0, exit="ladder",
-          profile="plaza", landmark="watchtower", step=("brick", "hop"),
+          band=12.5, profile="plaza", landmark="watchtower", step=("brick", "hop"),
           beats=[
         ("street", [n("ground", arc=4.6, lift=0, form="floor", orbs=1),
                     n("rock", arc=3.4, lift=1, spread=1)]),
@@ -175,7 +180,7 @@ LEVELS: tuple[Level, ...] = (
     # interior level -- with rails underfoot, one cobweb wade, and the
     # course brushing a headframe at the door. Dark, lamp-lit.
     Level("THE TIMBERWORKS", "mine", rise=5, gap=2.6, exit="ladder",
-          profile="plaza", landmark="crane", step=("oak", "hop"), beats=[
+          band=7.5, profile="plaza", landmark="crane", step=("oak", "hop"), beats=[
         ("adit", [n("rock", arc=3.2, lift=1, hug=3.0, spread=0,
                     shell="tunnel"),
                   n("rock", arc=3.3, lift=1, hug=3.0, spread=0,
@@ -205,7 +210,7 @@ LEVELS: tuple[Level, ...] = (
     # doorway lids that keep every arc flat. Bright at the openings, dim in
     # the middle, and the temple front stands where the course turns.
     Level("SUNKEN TEMPLE", "desert", rise=6, gap=3.0, exit="stair",
-          profile="plaza", landmark="arch", step=("sandstone", "hop"),
+          band=12.0, profile="plaza", landmark="arch", step=("sandstone", "hop"),
           liquid="lava", beats=[
         ("porch", [n("ground", arc=4.4, lift=0, form="floor", orbs=1),
                    n("rock", arc=3.4, lift=1, spread=1)]),
@@ -231,7 +236,7 @@ LEVELS: tuple[Level, ...] = (
     # the biggest drops so far under every jump, and one slab bridge out
     # over the rim. Uneven rhythm on purpose -- up, up, then one long fall.
     Level("THE BALCONIES", "mesa", rise=7, gap=3.4, exit="stair",
-          shelf=4.5, landmark="hoodoo", step=("terra_white", "hop"), beats=[
+          band=9.0, shelf=4.5, landmark="hoodoo", step=("terra_white", "hop"), beats=[
         ("ledges", [n("rock", arc=3.4, lift=2, spread=0),
                     n("accent", arc=3.3, lift=3, spread=0, orbs=1),
                     n("rock", arc=3.4, lift=4, spread=0)]),
@@ -257,7 +262,7 @@ LEVELS: tuple[Level, ...] = (
     # leaf decks at the soffit, then a deliberate long drop back through
     # the leaves. The giant tree is the landmark and the level.
     Level("CANOPY WALK", "jungle", rise=7, gap=3.0, exit="vine",
-          shelf=5.0, landmark="tree", step=("junglelog", "hop"), beats=[
+          band=11.5, shelf=5.0, landmark="tree", step=("junglelog", "hop"), beats=[
         ("roots", [n("rock", arc=3.6, lift=1, spread=1, orbs=1),
                    n("rock", arc=3.5, lift=2, spread=1)]),
         ("liana", [n("rock", arc=3.0, lift=2, hug=2.2, spread=1),
@@ -285,7 +290,7 @@ LEVELS: tuple[Level, ...] = (
     # teeth low enough to lid the jumps, and the way out is a bubble
     # column ridden up a stone well.
     Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
-          profile="plaza", step=("calcite", "hop"), beats=[
+          band=11.0, profile="plaza", step=("calcite", "hop"), beats=[
         ("stones", [n("accent", arc=3.4, lift=1, spread=0, moat=True),
                     n("accent", arc=3.5, lift=1, spread=0, moat=True,
                       orbs=1),
@@ -309,7 +314,7 @@ LEVELS: tuple[Level, ...] = (
     # crevasse: a stretch where the shelf itself is missing and the course
     # floats over the blue. Fast and bright after the cave.
     Level("GLACIER SHELF", "ice", rise=4, gap=3.2, exit="stair",
-          shelf=4.5, step=("packedice", "slide"), beats=[
+          band=10.5, shelf=4.5, step=("packedice", "slide"), beats=[
         ("sheet", [n("rock", arc=5.0, lift=1, kind="slide", form="ice",
                      spread=0, orbs=1),
                    n("rock", arc=5.2, lift=1, kind="slide", form="ice",
@@ -333,7 +338,7 @@ LEVELS: tuple[Level, ...] = (
     # that drops the pace to a crawl, and a slime pad that throws the body
     # onto the high comb. Sticky, golden, unlike anything beside it.
     Level("THE APIARY", "honey", rise=5, gap=2.8, exit="stair",
-          shelf=4.5, landmark="comb", step=("honeycomb", "hop"), beats=[
+          band=9.5, shelf=4.5, landmark="comb", step=("honeycomb", "hop"), beats=[
         ("combs", [n("rock", arc=3.4, lift=1, spread=0, orbs=1),
                    n("rock", arc=3.3, lift=2, spread=0)]),
         ("honey", [n("honey", arc=3.3, lift=1, spread=0),
@@ -353,7 +358,7 @@ LEVELS: tuple[Level, ...] = (
     # floor of a black cave, glowstone knots in the walls, and every jump
     # has the glow underneath it.
     Level("THE CRUCIBLE", "nether", rise=7, gap=3.2, exit="stair",
-          profile="plaza", landmark="totem", step=("blackstone", "hop"),
+          band=12.0, profile="plaza", landmark="totem", step=("blackstone", "hop"),
           beats=[
         ("mouth", [n("rock", arc=3.4, lift=1, spread=1, orbs=1)]),
         ("vault", [n("rock", arc=3.3, lift=1, hug=2.6, spread=0,
@@ -378,7 +383,7 @@ LEVELS: tuple[Level, ...] = (
     # the parkour, sea lanterns in the water, and a water channel crossed
     # twice. The palette does the work here and the jumps stay honest.
     Level("REEF GARDEN", "coral", rise=5, gap=3.0, exit="stair",
-          profile="channel", step=("coral_red", "hop"), beats=[
+          band=11.5, profile="channel", step=("coral_red", "hop"), beats=[
         ("shallows", [n("coral_pink", arc=3.4, lift=1, spread=0, moat=True),
                       n("coral_blue", arc=3.5, lift=1, spread=0, moat=True,
                         orbs=1)]),
@@ -400,7 +405,7 @@ LEVELS: tuple[Level, ...] = (
     # side of the shelf, amethyst the only light. Quiet, slow to look at,
     # genuinely hard -- every landing one cell, every gap at reach.
     Level("THE SILENCE", "deepdark", rise=6, gap=3.4, exit="ladder",
-          shelf=3.5, landmark="cluster", step=("deepslate", "hop"), beats=[
+          band=8.0, shelf=3.5, landmark="cluster", step=("deepslate", "hop"), beats=[
         ("hush", [n("rock", arc=4.6, lift=2, spread=0, pedestal=False),
                   n("rock", arc=4.6, lift=2, spread=0, pedestal=False,
                     orbs=1)]),
@@ -427,7 +432,7 @@ LEVELS: tuple[Level, ...] = (
     # ladder in the middle of the level rather than at its end, and the
     # bell hanging where the climb tops out. Eight blocks gained.
     Level("THE BELFRY", "village", rise=8, gap=2.6, exit="ladder",
-          profile="plaza", landmark="bell", step=("plaster", "hop"),
+          band=9.5, profile="plaza", landmark="bell", step=("plaster", "hop"),
           rock="brick", accent="plaster", beats=[
         ("porch", [n("rock", arc=3.4, lift=1, hug=2.6, spread=1, orbs=1)]),
         ("sills", [n("rock", arc=3.4, lift=2, hug=2.6, spread=0,
@@ -458,7 +463,7 @@ LEVELS: tuple[Level, ...] = (
     # drop, a slime pad in the middle. Short, loud, and gone -- the candy
     # level earns its keep by being the only one.
     Level("WOOLWORKS", "rainbow", rise=4, gap=2.8, exit="stair",
-          shelf=4.0, landmark="stripes", step=("quartz", "hop"), beats=[
+          band=10.0, shelf=4.0, landmark="stripes", step=("quartz", "hop"), beats=[
         ("check", [n("wool_pink", arc=3.6, lift=2, spread=0, pedestal=False),
                    n("wool_lime", arc=3.0, lift=3, spread=0, pedestal=False,
                      radial=1.5),
@@ -480,7 +485,7 @@ LEVELS: tuple[Level, ...] = (
     # where the lamplight lands, and one ledge crossed over lava with the
     # glow on the ceiling. Interior, warm-dark, greedy.
     Level("THE VAULT", "gold", rise=5, gap=2.8, exit="stair",
-          profile="plaza", landmark="hoard", step=("rawgold", "hop"), beats=[
+          band=10.5, profile="plaza", landmark="hoard", step=("rawgold", "hop"), beats=[
         ("adit", [n("rock", arc=3.4, lift=1, spread=1, orbs=1)]),
         ("strongroom", [n("rock", arc=3.3, lift=1, hug=2.6, spread=0,
                           shell="grotto"),
@@ -505,7 +510,7 @@ LEVELS: tuple[Level, ...] = (
     # course lives in it: stepping stones barely above the surface, the
     # mill wheel turning at the bank, and one long leap onto the far side.
     Level("THE WEIR", "plains", rise=5, gap=3.0, exit="stair",
-          profile="channel", landmark="watchtower", rock="cobble",
+          band=12.0, profile="channel", landmark="watchtower", rock="cobble",
           accent="oak", step=("cobble", "hop"), beats=[
         ("ford", [n("cobble", arc=3.0, lift=1, spread=0, moat=True),
                   n("cobble", arc=3.0, lift=1, spread=0, moat=True, orbs=1),
@@ -528,7 +533,7 @@ LEVELS: tuple[Level, ...] = (
     # then the shelf pinches and the last stretch is a blue ice tunnel cut
     # into the cliff. The fastest level, and the exit slides too.
     Level("BLUE RUN", "ice", rise=6, gap=3.2, exit="stair",
-          shelf=4.0, ground="packedice", rock="frost", accent="snow",
+          band=9.0, shelf=4.0, ground="packedice", rock="frost", accent="snow",
           step=("blueice", "slide"), beats=[
         ("run", [n("blueice", arc=4.6, lift=1, kind="slide", form="ice",
                    spread=0, hug=4.6, pedestal=False, orbs=1),
@@ -553,7 +558,7 @@ LEVELS: tuple[Level, ...] = (
     # under them -- then climbs back over the crane. The tower's one
     # descent, and the longest jumps in it are the drops.
     Level("THE QUARRY", "desert", rise=4, gap=3.0, exit="stair",
-          shelf=3.5, landmark="crane", rock="chiselled", accent="sandstone",
+          band=9.5, shelf=3.5, landmark="crane", rock="chiselled", accent="sandstone",
           step=("chiselled", "hop"), beats=[
         ("brink", [n("rock", arc=3.6, lift=1, spread=1, orbs=1)]),
         ("undercut", [n("rock", arc=4.4, step_y=-2, hug=6.8,
@@ -586,7 +591,7 @@ LEVELS: tuple[Level, ...] = (
     # at the rim on posts, sags a block in the middle, and comes back.
     # Nothing here is hard to land; all of it is hard to watch.
     Level("ROPE BRIDGE", "jungle", rise=5, gap=3.4, exit="vine",
-          shelf=4.0, rock="junglelog", accent="jungleleaf",
+          band=8.5, shelf=4.0, rock="junglelog", accent="jungleleaf",
           step=("oak", "hop"), beats=[
         ("post", [n("rock", arc=3.4, lift=2, spread=0, hug=6.0,
                     pedestal=False, orbs=1)]),
@@ -617,7 +622,7 @@ LEVELS: tuple[Level, ...] = (
     # every jump under a lid, magma glowing in the gaps. The opposite
     # design to the Crucible with the same palette -- tight, not cavern.
     Level("BASALT FLUES", "nether", rise=7, gap=2.8, exit="stair",
-          shelf=4.5, ground="blackstone", rock="blackstone", accent="magma",
+          band=7.5, shelf=4.5, ground="blackstone", rock="blackstone", accent="magma",
           step=("blackstone", "hop"), beats=[
         ("flues", [n("rock", arc=3.0, lift=2, spread=0, ceiling=2),
                    n("rock", arc=3.0, lift=2, spread=0, ceiling=2, orbs=1),
@@ -646,7 +651,7 @@ LEVELS: tuple[Level, ...] = (
     # between them, chorus light, and the whole drop under every arc. The
     # most exposed level, left by a bubble ride.
     Level("THE PILLARS", "end", rise=6, gap=3.4, exit="bubble",
-          shelf=3.5, landmark="totem", step=("purpur", "hop"), beats=[
+          band=10.5, shelf=3.5, landmark="totem", step=("purpur", "hop"), beats=[
         ("pillars", [n("accent", arc=3.4, lift=3, spread=0, hug=6.8,
                        pedestal=False),
                      n("accent", arc=3.3, lift=4, spread=0, hug=8.4,
@@ -675,7 +680,7 @@ LEVELS: tuple[Level, ...] = (
     # columns carry the course, shroomlight does the lighting. Soft
     # shapes, low light, bouncy middle.
     Level("SPORE HOLLOW", "mushroom", rise=5, gap=3.0, exit="vine",
-          profile="plaza", landmark="greatcap",
+          band=11.0, profile="plaza", landmark="greatcap",
           step=("mushroomstem", "hop"), beats=[
         ("litter", [n("ground", arc=4.4, lift=0, form="floor", orbs=1),
                     n("rock", arc=3.4, lift=1, spread=1)]),
@@ -701,7 +706,7 @@ LEVELS: tuple[Level, ...] = (
     # beams over a reading room, and the ladder out is behind the shelves.
     # Warm interior light and not one block of stone parkour.
     Level("THE ARCHIVE", "library", rise=6, gap=2.8, exit="ladder",
-          profile="plaza", step=("spruce", "hop"), beats=[
+          band=10.0, profile="plaza", step=("spruce", "hop"), beats=[
         ("lobby", [n("ground", arc=4.4, lift=0, form="floor", orbs=1),
                    n("oak", arc=3.4, lift=1, spread=1)]),
         ("stacks", [n("rock", arc=3.3, lift=1, hug=3.0, spread=0,
@@ -727,7 +732,7 @@ LEVELS: tuple[Level, ...] = (
     # scarecrow's cousin standing guard as a lantern post, and the farm
     # read the second time round with the lights on.
     Level("PUMPKIN ROWS", "farm", rise=4, gap=2.8, exit="stair",
-          landmark="cabin", glow="glowstone", step=("pumpkin", "hop"),
+          band=10.5, landmark="cabin", glow="glowstone", step=("pumpkin", "hop"),
           beats=[
         ("rows", [n("pumpkin", arc=3.6, lift=1, spread=0, orbs=1),
                   n("pumpkin", arc=3.5, lift=1, spread=0),
@@ -748,7 +753,7 @@ LEVELS: tuple[Level, ...] = (
     # in the middle of the level that carries the body to an upper storey
     # of caps before the drop back down.
     Level("THE GROVE", "warped", rise=6, gap=3.0, exit="bubble",
-          shelf=5.0, step=("warped", "hop"), beats=[
+          band=11.0, shelf=5.0, step=("warped", "hop"), beats=[
         ("nylium", [n("rock", arc=3.6, lift=1, spread=1, orbs=1),
                     n("rock", arc=3.5, lift=2, spread=1)]),
         ("lift", [n("rock", arc=3.0, lift=2, hug=2.2, spread=1),
@@ -772,7 +777,7 @@ LEVELS: tuple[Level, ...] = (
     # the biggest single drops in the tower, and a rhythm that never
     # settles -- three up, one long fall, two up, gone.
     Level("DUST DEVILS", "mesa", rise=7, gap=3.6, exit="stair",
-          shelf=3.5, landmark="hoodoo", step=("terra_white", "hop"), beats=[
+          band=12.5, shelf=3.5, landmark="hoodoo", step=("terra_white", "hop"), beats=[
         ("spires", [n("rock", arc=3.4, lift=3, spread=0,
                       pedestal_style="terra_orange"),
                     n("accent", arc=3.3, lift=4, spread=0,
@@ -798,7 +803,7 @@ LEVELS: tuple[Level, ...] = (
     # slots in the floor, and the gate arch the course passes through at
     # the end. Cool, ordered, symmetrical where the mesa was chaos.
     Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="stair",
-          profile="plaza", landmark="arch",
+          band=12.0, profile="plaza", landmark="arch",
           step=("darkprismarine", "hop"), beats=[
         ("steps", [n("ground", arc=4.4, lift=0, form="floor", orbs=1),
                    n("rock", arc=3.4, lift=1, spread=1)]),
@@ -825,7 +830,7 @@ LEVELS: tuple[Level, ...] = (
     # the fog, and halfway along -- a lit cabin crossed *inside*, three
     # seconds of warm lamplight between two cold exposures.
     Level("THE CORNICE", "snow", rise=5, gap=3.0, exit="stair",
-          shelf=4.0, landmark="cabin", step=("spruce", "hop"), beats=[
+          band=8.5, shelf=4.0, landmark="cabin", step=("spruce", "hop"), beats=[
         ("ridge", [n("rock", arc=3.6, lift=1, spread=0, hug=5.8, orbs=1),
                    n("rock", arc=3.5, lift=2, spread=0, hug=6.0),
                    n("accent", arc=3.4, lift=2, spread=0, hug=5.6,
@@ -850,7 +855,7 @@ LEVELS: tuple[Level, ...] = (
     # fungus trunks against the wall, and the exit is a ladder up one of
     # them. The loudest colour in the tower, kept brief.
     Level("WART FIELDS", "crimson", rise=6, gap=3.0, exit="ladder",
-          shelf=4.5, step=("crimson", "hop"), beats=[
+          band=9.5, shelf=4.5, step=("crimson", "hop"), beats=[
         ("fields", [n("accent", arc=3.5, lift=1, spread=0, orbs=1),
                     n("accent", arc=3.4, lift=1, spread=0),
                     n("accent", arc=3.5, lift=2, spread=0, orbs=1)]),
@@ -870,7 +875,7 @@ LEVELS: tuple[Level, ...] = (
     # amethyst light partway, the hardest one-cell landings in the tower
     # at the top. Eight blocks gained in near-silence.
     Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="ladder",
-          profile="plaza", landmark="cluster", rock="deepslate",
+          band=8.0, profile="plaza", landmark="cluster", rock="deepslate",
           accent="sculk", step=("sculk", "hop"), beats=[
         ("lip", [n("rock", arc=3.4, lift=1, hug=2.8, spread=1, orbs=1)]),
         ("well", [n("rock", arc=3.0, lift=2, hug=2.2, spread=1),
@@ -899,7 +904,7 @@ LEVELS: tuple[Level, ...] = (
     # gold trims, diorite underfoot. Deliberately elegant and mild -- the
     # breath before the gate, and the light after the dark shaft.
     Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="stair",
-          profile="plaza", landmark="arch", step=("diorite", "hop"),
+          band=13.0, profile="plaza", landmark="arch", step=("diorite", "hop"),
           beats=[
         ("gallery", [n("ground", arc=4.6, lift=0, form="floor", orbs=1),
                      n("rock", arc=3.4, lift=1, spread=1)]),
@@ -920,7 +925,7 @@ LEVELS: tuple[Level, ...] = (
     # it, and the meadow again a hundred and eighty blocks higher. Short
     # and calm: a threshold, not a test, and the one place the loop shows.
     Level("THE GATE", "end", rise=4, gap=3.0, exit="stair",
-          shelf=5.0, landmark="totem", rock="purpur", accent="obsidian",
+          band=11.0, shelf=5.0, landmark="totem", rock="purpur", accent="obsidian",
           step=("obsidian", "hop"), beats=[
         ("approach", [n("ground", arc=4.4, lift=0, form="floor", orbs=1),
                       n("rock", arc=3.4, lift=1, spread=1)]),

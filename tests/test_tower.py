@@ -258,7 +258,7 @@ def test_the_tower_still_cannot_be_walked_up() -> None:
     cone = hp.Cone(random.Random(5), 0)
     lv = cone.level(6)
     start_u = lv.u0 + sp.LEVEL_ARC * 0.2
-    r = cone.outer_at(start_u) - sp.BAND * 0.5
+    r = cone.outer_at(start_u) - cone.level(6).band * 0.5
     th = start_u * cone.wind
     start = (pk.iround(math.cos(th) * r), lv.y,
              pk.iround(math.sin(th) * r))

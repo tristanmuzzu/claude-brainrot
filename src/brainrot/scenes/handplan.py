@@ -103,7 +103,8 @@ class Cone(sp.Cone):
             # The design *is* the difficulty here, so nothing is scaled by a
             # pitch drawn per level. Held at one so that the exit climb and the
             # dressing behave as they do at the top of the generated range.
-            1.0, "", design.profile, design.shelf, design.landmark)
+            1.0, "", design.profile, design.shelf, design.landmark,
+            design.band)
         section.breaks = design.breaks
         self.sections.append(section)
 

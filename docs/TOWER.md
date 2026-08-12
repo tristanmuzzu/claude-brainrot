@@ -152,7 +152,14 @@ table may only name things on this list or things that already existed.
    booked until landing, the aim blends hard toward the actual landing
    block; the corridor-tangent blend applies only while running. This is
    F4, and it is a renderer change, not a course change.
-7. **Radial wandering** (added after mining the real map, whose course
+7. **Per-level corridor geometry** (`Level.band`, 7.5–13 across the roster,
+   capped by `BAND_MAX`). The corridor's width itself is a design decision:
+   the timberworks is a 7.5-block gallery whose walls press in, the white
+   stair a 13-block court, and the two are different buildings before a
+   single block is laid. Every geometry site asks the level
+   (`Cone.band_at`), and the old constant is only the generated tower's
+   default.
+8. **Radial wandering** (added after mining the real map, whose course
    swings radius 28–52). Outward: a landing whose ``hug`` exceeds the band
    width stands *past the rim* on floating spurs and piers — ``band()``
    gives way upward, and the aim's outer clamp follows. Inward:
