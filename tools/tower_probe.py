@@ -94,6 +94,10 @@ def check_design() -> list[str]:
         if lv.exit not in sp.ASCENTS:
             bad.append(f"{lv.name}: exit {lv.exit!r} is not one of "
                        f"{sorted(sp.ASCENTS)}")
+        for key, val in lv.skin.items():
+            if isinstance(val, str) and key in hp.ROLES \
+                    and val not in pk.MATERIALS:
+                bad.append(f"{lv.name}: skin {key}={val!r} is no material")
         # Across beat boundaries as well as within them, because beats play in
         # the order they are written and the jump from the last landing of one
         # to the first of the next is a jump like any other. Checking only
@@ -107,8 +111,18 @@ def check_design() -> list[str]:
         for beat, specs in list(lv.beats) + list(lv.filler) * 2:
             for k, spec in enumerate(specs):
                 style = spec["style"]
-                if style not in hp.ROLES and style not in pk.MATERIALS \
-                        and not style.startswith("candy"):
+                # No escape hatch for "it looks like a colour". The renderer
+                # builds one face-strip recipe per entry in ``MATERIALS`` and
+                # asks for a landing's style by name at draw time, so a style
+                # that is not in there is a ``KeyError`` a hundred and forty
+                # frames into a run -- which is exactly how this check came to
+                # be strict.
+                for extra in ("pedestal_style", "climb_style"):
+                    val = spec.get(extra)
+                    if val and val not in hp.ROLES and val not in pk.MATERIALS:
+                        bad.append(f"{lv.name}/{beat}[{k}]: {extra}="
+                                   f"{val!r} is no material")
+                if style not in hp.ROLES and style not in pk.MATERIALS:
                     bad.append(f"{lv.name}/{beat}[{k}]: no material {style!r}")
                 kind = spec.get("kind", "hop")
                 was, surf = surf, _surface(spec, surf)

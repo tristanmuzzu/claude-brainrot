@@ -47,7 +47,6 @@ from __future__ import annotations
 
 from . import spiralplan as sp
 from .spiralplan import (  # noqa: F401  -- the renderer reads these off the plan
-    AHEAD,
     HANGING,
     PROP_BUDGET,
     PROP_KINDS,
@@ -56,6 +55,13 @@ from .spiralplan import (  # noqa: F401  -- the renderer reads these off the pla
     Section,
     Theme,
 )
+
+#: How many landings generation keeps in front of the body, and higher than the
+#: generated tower's sixteen because the terraces are half as long again. A
+#: section is dressed when the *generator* leaves it, so with sixteen the body
+#: was standing in an undressed section a third of the time and the terraces
+#: came back swept. Read by the renderer off the plan module.
+AHEAD = 26
 
 #: Material roles a level may name instead of a material. Writing ``"rock"``
 #: rather than ``"cobble"`` is what lets one design be re-skinned by giving its
@@ -414,13 +420,13 @@ LEVELS: tuple[Level, ...] = (
     # over nothing are the *theme* rather than a failure. Wool checks, a
     # slime pad, quartz slabs. Bright, weightless, and short.
     Level("WOOLWORK", "rainbow", rise=4, gap=2.8, exit="stair", beats=[
-        ("check", [n("candy0", arc=3.6, lift=3, spread=0, pedestal=False),
-                   n("candy1", arc=3.5, lift=3, spread=0, pedestal=False,
+        ("check", [n("wool_pink", arc=3.6, lift=3, spread=0, pedestal=False),
+                   n("wool_lime", arc=3.5, lift=3, spread=0, pedestal=False,
                      radial=1.6),
-                   n("candy2", arc=3.5, lift=3, spread=0, pedestal=False,
+                   n("wool_cyan", arc=3.5, lift=3, spread=0, pedestal=False,
                      radial=-1.6, orbs=1)]),
         ("bounce", [n("slime", arc=4.6, lift=1, form="slime", spread=0),
-                    n("candy1", arc=3.6, lift=2, spread=0, pedestal=False,
+                    n("wool_yellow", arc=3.6, lift=2, spread=0, pedestal=False,
                       orbs=2)]),
         ("quartz", [n("rock", arc=4.2, lift=2, form="slab", spread=0,
                       pedestal=False),
@@ -428,9 +434,9 @@ LEVELS: tuple[Level, ...] = (
                       pedestal=False, orbs=1)]),
         ("deck", [n("ground", arc=5.2, lift=0, form="floor", orbs=1)]),
     ], filler=[
-        ("ribbon", [n("candy0", arc=3.4, lift=1, spread=0,
+        ("ribbon", [n("wool_orange", arc=3.4, lift=1, spread=0,
                      pedestal=False),
-                    n("candy2", arc=3.8, lift=1, spread=0,
+                    n("wool_purple", arc=3.8, lift=1, spread=0,
                       pedestal=False, orbs=1)]),
     ]),
 
@@ -747,6 +753,8 @@ class Course(sp.Course):
         self.authored = 0
         self.as_designed = 0
         super().__init__(rng, cone, hop_rng)
+
+    ahead = AHEAD
 
     def _level_budget(self):
         """As the generator's, except that a climb out is not a staircase.

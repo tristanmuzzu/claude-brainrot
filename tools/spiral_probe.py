@@ -310,18 +310,54 @@ def _lens_clearance(scene) -> float:
     clearance of 0.12 m on every frame of every run, which looked like a
     catastrophe and was an artefact of the harness.
     """
+    rays = _lens_rays(scene)
+    return rays[len(rays) // 2]
+
+
+#: The lens sampled across the frame rather than dead ahead: five by five
+#: directions spanning most of the field of view.
+#:
+#: One ray was not enough and the contact sheets said so. A frame can be
+#: nine tenths flat wall with a gap of corridor straight down the middle,
+#: and a single centre ray reports that as eight metres of clear air. What
+#: the eye calls "the lens is jammed" is *most of the frame* being one near
+#: surface, so most of the frame is what has to be measured.
+LENS_GRID = 5
+LENS_HFOV = 0.46
+LENS_VFOV = 0.62
+
+
+def _lens_rays(scene) -> list[float]:
+    """Distance to the first solid thing along each sampled direction."""
     eye = (scene.pos[0], scene.pos[1] + pk.EYE, scene.pos[2])
-    flat = math.cos(scene.pitch)
-    fx = math.sin(scene.yaw) * flat
-    fy = -math.sin(scene.pitch)
-    fz = -math.cos(scene.yaw) * flat
-    for i in range(1, 67):
-        t = i * 0.12
-        p = (eye[0] + fx * t, eye[1] + fy * t, eye[2] + fz * t)
-        if scene.course.blocked((pk.iround(p[0]), pk.ifloor(p[1]),
-                                 pk.iround(p[2]))):
-            return t
-    return 8.0
+    out: list[float] = []
+    half = LENS_GRID // 2
+    for gy in range(-half, half + 1):
+        for gx in range(-half, half + 1):
+            yaw = scene.yaw + gx * LENS_HFOV / half
+            pitch = scene.pitch + gy * LENS_VFOV / half
+            flat = math.cos(pitch)
+            fx = math.sin(yaw) * flat
+            fy = -math.sin(pitch)
+            fz = -math.cos(yaw) * flat
+            hit = 8.0
+            for i in range(1, 67):
+                t = i * 0.12
+                p = (eye[0] + fx * t, eye[1] + fy * t, eye[2] + fz * t)
+                if scene.course.blocked((pk.iround(p[0]), pk.ifloor(p[1]),
+                                         pk.iround(p[2]))):
+                    hit = t
+                    break
+            out.append(hit)
+    out.sort()
+    return out
+
+
+def _lens_jammed(scene) -> bool:
+    """Is most of the frame one near surface? The contact-sheet complaint,
+    counted: over half the sampled directions inside three metres."""
+    rays = _lens_rays(scene)
+    return sum(1 for d in rays if d < 3.0) > len(rays) * 0.5
 
 
 def motion(runs: int, seconds: float) -> dict:
@@ -333,6 +369,7 @@ def motion(runs: int, seconds: float) -> dict:
     idles: list[float] = []
     moves: Counter = Counter()
     lens: list[float] = []
+    jammed = 0
     frozen = body_frames = 0
     body_worst = 0.0
     body_where = ""
@@ -361,7 +398,9 @@ def motion(runs: int, seconds: float) -> dict:
             here = math.atan2(scene.pos[2], scene.pos[0])
             turned += abs(_wrap(here - angle))
             angle = here
-            lens.append(_lens_clearance(scene))
+            rays = _lens_rays(scene)
+            lens.append(rays[len(rays) // 2])
+            jammed += sum(1 for d in rays if d < 3.0) > len(rays) * 0.5
             depth, what = _body_depth(scene)
             if depth > 0.02:
                 body_frames += 1
@@ -396,6 +435,7 @@ def motion(runs: int, seconds: float) -> dict:
         "frozen": frozen / max(1, total_frames),
         "lens": stats(lens),
         "lens_tight": sum(1 for d in lens if d < 0.8) / max(1, len(lens)),
+        "lens_jammed": jammed / max(1, len(lens)),
         "body_frames": body_frames, "body_worst": body_worst,
         "body_where": body_where,
         "orbs_taken": orbs_taken, "orbs_missed": orbs_missed,
@@ -498,6 +538,8 @@ def report(geo: dict, mot: dict | None, walk: dict | None = None) -> str:
         out.append(f"  lens to the nearest surface       "
                    f"median {mot['lens']['med']:.2f} m,"
                    f" {100 * mot['lens_tight']:.2f}% of frames under 0.8 m")
+        out.append(f"  frames mostly filled by a wall    "
+                   f"{100 * mot['lens_jammed']:.1f}%")
     return "\n".join(out)
 
 
@@ -515,8 +557,12 @@ def main() -> None:
                          "hand-built one in scenes/handplan.py")
     args = ap.parse_args()
     if args.plan == "tower":
+        # Rebound, not imported at the top, so that measuring the generated
+        # tower never pays for importing the hand-built one's level table.
         global sp, SCENE
-        from brainrot.scenes import handplan as sp   # noqa: F811
+        from brainrot.scenes import handplan
+
+        sp = handplan
         SCENE = "tower"
 
     geo = geometry(args.runs, args.blocks)

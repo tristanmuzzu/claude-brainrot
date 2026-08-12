@@ -181,6 +181,47 @@ def test_the_emergency_answer_is_effectively_never_reached() -> None:
     assert total / laid < 0.01, f"{total} unchecked placements in {laid}"
 
 
+def test_the_tower_draws_all_the_way_through_several_levels() -> None:
+    """Built, updated and *drawn* for long enough to cross several levels.
+
+    Not a picture test -- ``test_generation`` covers that the frame is covered
+    and deterministic. This is here because the one bug hand-authoring produced
+    that no geometry check could see was a level naming a material the renderer
+    has no recipe for: growing the course was fine, and the run died with a
+    ``KeyError`` a hundred and forty frames in, the first time that block came
+    into view. The design checker now refuses an unknown material outright and
+    this is the belt to that pair of braces.
+    """
+    from brainrot.engine import scene as scene_api
+    from brainrot.engine.window import HeadlessWindow
+    from brainrot.config import Config
+    from brainrot.palette import generate as generate_palette
+    from brainrot.rng import Seed
+
+    cfg = Config()
+    cfg.width, cfg.height = 180, 320
+    window = HeadlessWindow()
+    window.create(cfg)
+    try:
+        for run in (4, 17):
+            seed = Seed.for_run(run)
+            ctx = scene_api.SceneContext(cfg.width, cfg.height,
+                                         generate_palette(seed), seed)
+            scene = scene_api.build("tower", ctx)
+            for frame in range(900):
+                scene.update(1 / 60)
+                scene.elapsed += 1 / 60
+                if frame % 45 == 0:
+                    # Drawn *along the way* and not once at the end. The
+                    # failure this guards against is a block the renderer
+                    # cannot draw, and it only fires on the frame that block
+                    # comes into view -- a single draw at the end would sample
+                    # one such frame out of nine hundred.
+                    window.present(scene.draw)
+    finally:
+        window.destroy()
+
+
 def test_every_level_is_reached_and_left() -> None:
     """A level nobody arrives at is a level not worth designing, and one
     nobody leaves is a run that stops."""

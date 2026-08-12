@@ -1059,6 +1059,15 @@ class Course:
     the world first and then negotiated with it.
     """
 
+    #: How many landings generation keeps in front of the body. A class
+    #: attribute because it is really "how far ahead of the camera the world is
+    #: finished", and that is a distance: a tower with longer terraces needs
+    #: more landings to cover the same stretch of corridor, and dressing a
+    #: section is triggered by the *generator* leaving it. Measured on the
+    #: hand-built tower at sixteen, the section the body was standing in had
+    #: not been dressed yet a third of the time.
+    ahead = AHEAD
+
     def __init__(self, rng, cone: Cone, hop_rng=None) -> None:
         self.rng = rng
         self.hop_rng = hop_rng or rng
@@ -1134,7 +1143,7 @@ class Course:
         self.headroom.update((first["x"], y + h, first["z"])
                              for h in range(HEADROOM))
         self.ground.add((first["x"], y - 1, first["z"]))
-        while len(self.blocks) < AHEAD:
+        while len(self.blocks) < self.ahead:
             self.spawn()
 
     # -- the world ---------------------------------------------------------

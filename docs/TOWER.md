@@ -55,9 +55,17 @@ designed badly, and the fix is to change the design, not to widen a tolerance.
 
 ## The tower
 
-Unchanged from the generated version, because its shape was not the problem: a
-solid inverted cone, `BASE_R = 24`, flaring 0.05 per block, with a helical
-trough cut round it and one-cell ribs for a skin. You are always in a corridor
+The same shape as the generated version, because its shape was not the problem:
+a solid inverted cone flaring 0.05 per block, with a helical trough cut round it
+and one-cell ribs for a skin. It is **half as wide again** (`Cone.base_r = 36`
+against 24) and that is a design requirement rather than a preference: a level
+is a third of a revolution, its exit climb needs a fixed run-up in *blocks*, and
+what is left over is the design. At the generated radius that left about four
+authored landings a level against seven for the climb — a hand-built tower that
+was three fifths staircase, which is the thing hand-building it was meant to
+stop. A bigger circle lengthens every terrace and changes nothing else. It also
+straightens the corridor, which is why fewer frames come back looking into a
+wall. You are always in a corridor
 — drop and sky outboard, fluted core inboard, the floor slab of the level three
 above as a ceiling.
 
@@ -76,10 +84,15 @@ and chasm widths come from the table instead of from dice:
   repeats. The last level is designed as a gate for that reason — it is the one
   place the loop is legible, and making it legible is better than pretending.
 
-Level heights vary from 3 to 11 by design rather than 4 to 6 at random, which
-is most of what makes one level feel like a different building from the next:
-a three-block rise is a step up between two rooms, an eleven-block rise is a
-shaft.
+Level heights vary from 4 to 8 by design rather than 4 to 6 at random, which is
+most of what makes one level feel like a different building from the next: a
+four-block rise is a step up between two rooms and an eight-block rise is a
+shaft. The range is bounded at both ends and neither bound is taste. Below, the
+ceiling over a level is the floor slab of the level *three* above it, so three
+consecutive rises are literally the head-room and a run of short levels puts the
+soffit inside the parkour. Above, a single ladder spans nine and a half blocks,
+so a taller level cannot be left by one and falls back to a staircase that eats
+the terrace.
 
 ## What "difficult" can mean here, honestly
 
@@ -188,19 +201,48 @@ on any of them; they are what the roster would like *next*.
 
 ## Verifying it
 
-`python tools/tower_probe.py` prints two blocks of numbers.
+Two probes, two questions.
 
-**Fidelity** — did the tower come out as designed? Per level: landings
-authored, landings placed as authored, landings placed on a fallback, landings
-refused, and the arc actually spent against the arc designed. Anything refused
-is a design bug and is named.
+`python tools/tower_probe.py` asks **did it come out as designed**, which is the
+question only a hand-built tower can fail. It checks every authored jump
+against `hop_span` *on paper* first — that costs nothing and catches the whole
+class of "I wrote a four-block up-jump" before anything is built — then reports
+fidelity per level and per beat. `--design-only` is instant.
 
-**Safety and feel** — the same measurements `tools/spiral_probe.py` makes, so
-the hand-built tower is held to the standards the generated one reached: no
-cell claimed twice, nothing off the lattice, the body never inside the world,
-the cone alone still unclimbable without the parkour, and the pacing, hop
-distribution and move mix.
+`python tools/spiral_probe.py --plan tower` asks **is it safe**, using exactly
+the measurements the generated tower is held to. Nothing there is special-cased
+for this one; it is the same building, the same physics and the same renderer.
 
-`tests/test_tower.py` holds the invariants that must never lapse, including one
-that every level in the table is reachable, exits, and is distinct from its
-neighbours on at least three of the seven axes.
+Measured, 16 runs × 340 landings and 6 runs × 40 s:
+
+| | generated | hand-built |
+|---|---|---|
+| designed landings placed **as authored** | n/a | **97.5%** |
+| designed content, as a share of the course | n/a | **63%** |
+| the exit climb, as a share of the course | 47% | **37%** |
+| distinct named beats in a run | 38 kinds | **98 kinds** |
+| named places | 15 shuffled themes | **24 designed levels** |
+| mean jump / share over 4 m | 2.90 m / — | **3.19 m / 21%** |
+| unchecked emergency placements | 0.30% | **0.18%** |
+| cells claimed twice / off the lattice | 0 | **0** |
+| climbable without the parkour | 0 m | **0 m** |
+| frames mostly filled by a wall | 2.3% | **1.6%** |
+| seconds on one place | 7.3 s | **10.7 s** |
+| per frame | 2.34 ms | **2.80 ms** |
+
+Two of those deserve a note. **Fidelity is not 100% and should not be**: the
+tower is round and the world is whole cells, so some authored point always
+falls between two of them and placement takes the nearer. What the number
+guards against is *sag* — a design change that quietly stops arriving. And the
+**exit climb is still more than a third of the course**, which is the largest
+remaining gap between this and a real map; the levels own which of the four
+shapes they use, but not the shape itself.
+
+`tests/test_tower.py` holds the invariants that must never lapse: the design is
+legal on paper, three consecutive rises are the head-room, no two neighbouring
+levels share a theme, every level is reached, the tower loops, fidelity stays
+over 90%, and — the one that would have caught the only bug hand-authoring
+actually produced — the scene is *drawn* all the way through several levels,
+because a level naming a material the renderer has no recipe for is a
+`KeyError` a hundred and forty frames into a run and no geometry check can see
+it.

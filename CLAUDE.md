@@ -13,14 +13,17 @@ pygame → raylib + baked-light glTF assets, both original scenes rebuilt to
 match the real reel formats, animation overhaul (rig with knees/elbows,
 world-axis pose system, ballistic parkour hops with ground beats) — and a
 **third scene, `spiral`**, which is the other Minecraft reel format, Parkour
-Spiral. It has its own section below. There is no `tower` scene: the ring
-tower and the platform-stack spiral were both attempts at that format, both
-had the reference wrong, and both are deleted along with `towerplan.py`,
-`tower_probe.py` and `test_tower.py`.
+Spiral — and, since 2026-08-12, a **fourth, `tower`**, which is that scene's
+renderer against a *hand-built* course of twenty-four designed levels. `tower`
+is what the default rotation plays. Both have their own sections below. (The
+old ring tower and platform-stack spiral were earlier, deleted attempts at the
+same format with the reference wrong; nothing of them survives, and the current
+`tower_probe.py` / `test_tower.py` are new files about the new scene, not
+resurrections.)
 
 **Now verified on real Windows hardware with a GPU**, which turned up several
 things the software-rasteriser cloud sessions could not have seen — see
-"Landmines" below. 605 passed, 34 skipped, including a Win32 suite that
+"Landmines" below. 621 passed, 34 skipped, including a Win32 suite that
 exercises the real window API.
 
 The runner has a real collision model. Obstacles carry hitboxes derived from
@@ -492,6 +495,103 @@ answers, and bucketing it by how much terrace was left and how far below the
 next level the body was -- two lines of context that turned one undifferentiated
 pile into four separate bugs.
 
+## The hand-built tower: `tower` (added 2026-08-12)
+
+**The scene the rotation plays.** Same building, same physics, same renderer,
+same placement checks as `spiral` — and the course is *written down* instead of
+chosen. `docs/TOWER.md` is the design; `scenes/handplan.py` is that design as
+data. Read the doc before touching a level.
+
+Why: the generator is safe and is not memorable. Its levels are a different
+*mix* of one thirty-five-entry vocabulary rather than different *places*, so
+every run has the same shape. Two numbers said it — the exit climb was 47% of
+all landings and one of four shapes, and the move mix was 94% plain hop.
+
+**`SpiralScene.plan` was already a class attribute**, and that is the whole
+mechanism: `TowerScene` is `class TowerScene(SpiralScene): plan = handplan`.
+`handplan.Cone` overrides one method (`_extend_section`, reading the level table
+instead of rolling) and `handplan.Course` overrides three (`_choose_feature`,
+`_feat_ascent`, `_level_budget`). Nothing else is forked. To make that possible
+`spiralplan._plan_feature` was split into `_level_budget` / `_choose_feature` /
+`_truncate`, and `Cone.base_r`, `Cone.flare` and `Course.ahead` became class
+attributes.
+
+**Authored intent, mechanical placement, verified physics.** Every landing is
+written down. The lattice is resolved by `_targets` as it always was — the
+*shape* is authored and the machine only picks the nearest cell. `_attempt` is
+untouched, so an authored jump no body can make is refused exactly as a
+generated one would be. **Fidelity is the acceptance criterion for the design;
+safety is the acceptance criterion for the code**, they are different numbers,
+and both are printed.
+
+`tools/tower_probe.py` asks the question only a hand-built tower can fail: did
+it come out as designed. It checks every authored jump against `hop_span` **on
+paper** before building anything (`--design-only` is instant), then reports
+fidelity per level and per beat. It found **nineteen real errors** on the first
+pass, and the most valuable thing about it is what it found *second*: the
+mistakes hand-authoring makes are not the ones you look for.
+
+- Half of them were **at a beat boundary**, not inside a beat. Beats play in
+  order and the jump from the last landing of one to the first of the next is a
+  jump like any other.
+- The largest single class was **the filler loop seam**. A level's filler
+  repeats when the terrace outlasts the script, and `filler` defaults to the
+  last two beats — which for a level that *ends* on a five-block fall is
+  exactly the wrong choice. Eight of the twenty-four needed their own.
+- The checker was itself wrong twice before it was right: it read `lift` off a
+  climb node (climbs use `step_y`, measured from the landing before, so every
+  jump after a climb was checked against the wrong height), and it used a flat
+  0.68 m edge inset when `wide` is 1.05 at each end — a five-block gap between
+  two mushroom caps is a three-block jump, and reading it as five condemns a
+  good design.
+
+Four things the design needed that are not the design:
+
+- **The tower is half as wide again** (`Cone.base_r = 36`). A level is a third
+  of a revolution, its exit climb needs a fixed run-up in *blocks*, and what is
+  left is the design; at the generated radius that was four authored landings a
+  level against seven for the climb. A bigger circle lengthens every terrace and
+  changes nothing else — and straightens the corridor, which the camera likes.
+- **The exit reserve knows which of the four shapes the level uses.** A ladder
+  costs three landings whatever the height; reserving seven for one threw away
+  sixteen blocks of a forty-block terrace.
+- **Generation runs twenty-six landings ahead, not sixteen** (`Course.ahead`).
+  A section is dressed when the *generator* leaves it, and with longer terraces
+  the body was standing in an undressed section a third of the time.
+- **A mid-level climb gets a launch block hard against the core**, the way the
+  exit climb always has. Without it the ladder has nothing to hang on and is
+  refused every single time — two beats measured 0% fidelity and the fix took
+  them to 60-67%.
+
+Measured, 16 runs x 340 landings and 6 runs x 40 s, against the generated tower
+on the same probes:
+
+| | generated | hand-built |
+|---|---|---|
+| designed landings placed **as authored** | n/a | **97.5%** |
+| designed content / the exit climb | n/a / 47% | **63% / 37%** |
+| distinct named beats in a run | 38 | **98** |
+| named places | 15 shuffled themes | **24 designed levels** |
+| mean jump / share over 4 m | 2.90 m / — | **3.19 m / 21%** |
+| unchecked emergency placements | 0.30% | **0.18%** |
+| cells twice-claimed / off-lattice | 0 | **0** |
+| climbable without the parkour | 0 m | **0 m** |
+| frames mostly filled by a wall | 2.3% | **1.6%** |
+| seconds on one place | 7.3 s | **10.7 s** |
+| per frame | 2.34 ms | **2.80 ms** |
+
+Fidelity is not 100% and should not be: the tower is round and the world is
+whole cells, so some authored point always falls between two of them. What the
+number guards is *sag*.
+
+**The one bug hand-authoring produced that no geometry check could see** was a
+level naming a material the renderer has no recipe for (`candy0`, which this
+scene deliberately does not define). Growing the course was fine; the run died
+with a `KeyError` a hundred and forty frames in, the first time that block came
+into view. Two guards now: the design checker refuses an unknown material
+outright, and `tests/test_tower.py` builds, updates and **draws** the scene
+every forty-five frames for nine hundred, across two seeds.
+
 ## Linux (added 2026-08-09, verified on the owner's Ubuntu box)
 
 Runs on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200% scaling) with the same
@@ -518,19 +618,25 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
-0. **The spiral's lens is jammed against a surface on 1.24% of frames**, and a
-   contact sheet of twenty says worse than the number does: three or four
-   frames looking straight into a wall or into one enormous close-up face.
-   That is the largest remaining defect in the scene and it is a *camera*
-   problem -- see "The camera is pure geometry" -- not a course one: the body
-   runs outside a convex core in a nine-and-a-half-wide corridor, and standing
-   nearer the wall to make it visible at all is exactly what puts it in the
-   lens when the course turns inward. It halved with the difficulty work
-   (2.41% -> 1.24%, same twelve runs) without anything aiming at it, which
-   suggests the residue is a small number of specific arrangements rather than
-   a constant that is wrong. The way in is to render a sheet, find the frames,
-   and ask what the *course* was doing at each -- not to move `BAND`.
-1. **The spiral's move mix is 94% plain hop.** The exit climb is 47% of all
+0. **The exit climb is still 37% of the hand-built tower.** The levels own
+   *which* of the four shapes they leave by, and that is worth a lot -- 98
+   distinct beats against 38 -- but not the shape itself, so a third of every
+   run is machinery rather than design. The way in is to let a level author its
+   exit the way it authors a beat, with the generated climb kept as the
+   fallback it already is; the reliability guarantee lives in `_climb_on` and
+   `_grab_the_wall`, not in `_ascent_stair`, so an authored exit that fails is
+   already caught.
+1. **A wall fills the lens on 1.6% of frames** (2.3% in `spiral`; measured by
+   `spiral_probe`'s five-by-five ray grid, and separately by the edge density
+   of rendered frames, 1 in 75 against 1 in 20). Better than it was and still
+   the worst visible thing. It is a *camera* problem -- see "The camera is pure
+   geometry" -- not a course one: the body runs outside a convex core, and
+   standing nearer the wall to make it visible at all is what puts it in the
+   lens when the course turns inward. Widening the tower halved it without
+   aiming at it, which says the residue is specific arrangements rather than a
+   constant being wrong. The way in is to render a sheet, find the frames, and
+   ask what the *course* was doing at each -- not to move `BAND`.
+2. **The spiral's move mix is 94% plain hop.** The exit climb is 47% of all
    landings and can only ever be hops, so this is bounded by what the *kernel*
    can express, not by the feature table -- reweighting `FEATURES` was tried
    and is not it. Two things did move it, both in this session: a level's
@@ -554,7 +660,7 @@ touching any of it — the reasoning is there, this is the short list:
      which is a deliberate, load-bearing feature of the flat scene too.
    - **Two-leg steered jumps** (the neo family) and **ice accumulation** are
      both real and both still untried.
-2. **`tools/depth_probe.py` does not know about the spiral.** It patches
+3. **`tools/depth_probe.py` does not know about the spiral or the tower.** It patches
    `parkour`'s own draw methods by name. The spiral's translucent draws --
    water, cobweb, lava glow, every emissive -- do all go through
    `fx.no_depth_write` / `fx.glow_pass`, and `tests/test_rendering.py` proves
@@ -562,7 +668,7 @@ touching any of it — the reasoning is there, this is the short list:
    many pixels each individual draw in *this* scene would hide, which is what
    the probe would tell you. The tower's version of that coverage went with
    `tests/test_tower.py` and has not been replaced.
-3. **DPI**: measured 2026-08-07 on the owner's 1920x1080 at 125%. The daemon
+4. **DPI**: measured 2026-08-07 on the owner's 1920x1080 at 125%. The daemon
    *is* per-monitor DPI aware — GLFW sets that at `InitWindow` — so every
    `GetWindowRect`/`SetWindowPos`/work-area number inside it is in **physical
    pixels**, and placement is self-consistent. What is still open is that
@@ -571,7 +677,7 @@ touching any of it — the reasoning is there, this is the short list:
    against an outside probe: a plain script is DPI-*un*aware and reads the
    same window back scaled (1920 → 1536), which looks exactly like a bug and
    is not. Call `SetProcessDpiAwareness(2)` in probes.
-4. Per-frame cost at sustained top speed, vsync off, against a 16.7 ms
+5. Per-frame cost at sustained top speed, vsync off, against a 16.7 ms
    budget. `python tools/frame_cost.py` is the harness and it does the things
    that have to be right: `HeadlessWindow` + `SetTargetFPS(0)` (`DesktopWindow`
    has vsync on and reports a flat 16.6 ms that tells you nothing), and the two
@@ -715,6 +821,15 @@ long jumps you need a different motion model, not a bigger number.
   minute, and "surface pops" — a body teleported upward by a surface, which is
   what a badly built ramp looks like). `--safety-runs 60 --safety-seconds 180`
   is the full sweep the collision model is held to.
+- `python tools/tower_probe.py --runs 16 --blocks 340` is the hand-built
+  tower's acceptance test *for the design*: every authored jump checked against
+  the physics on paper (`--design-only` needs nothing built and is instant),
+  then how much of the design survived being placed, per level and per beat.
+  Run it after touching a level. A beat under 98% is a design to look at.
+- `python tools/spiral_probe.py --plan tower ...` is the same probe's *safety*
+  half pointed at the hand-built tower. The two towers are the same building
+  and the same physics, so every number means the same thing for both and the
+  hand-built one is held to what the generated one reached.
 - `python tools/spiral_probe.py --runs 24 --blocks 280 --motion-runs 6
   --seconds 35 --walk-runs 6` is the spiral scene's acceptance test in numbers,
   and it is self-contained -- it imports nothing from another probe. Four
@@ -954,7 +1069,7 @@ long jumps you need a different motion model, not a bigger number.
   nothing can walk up the tower without touching the parkour).
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~140s). **605
+- Run `python -m pytest tests/` before committing; it is fast (~150s). **621
   passed, 34 skipped.** The Win32 suite skips off Windows and the X11 suite
   skips without a display, so a green run means less on the other platform's
   machine -- check the count.
