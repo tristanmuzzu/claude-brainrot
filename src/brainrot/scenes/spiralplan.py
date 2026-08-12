@@ -890,6 +890,14 @@ COURSE_PULL = 0.34
 
 #: How a level may be left, and how likely each is where a theme allows it.
 #:
+#: There is no slime here and there was, briefly. Dropping onto a slime pad and
+#: launching out of the level is the most spectacular exit this vocabulary can
+#: build, and measured it cost 0.46 points of unchecked placements to buy 0.2%
+#: more bounces -- a bounce only works when the fall that fed it was big enough,
+#: and an exit is *mandatory*. A mandatory move has to be the most reliable one
+#: available rather than the best one. Slime stays where it belongs, as a
+#: feature inside a level (``_feat_slimebounce``), which is free to fail.
+#:
 #: The staircase is weighted well above the vertical climbs, and not for looks.
 #: Measured over ten runs: stair-only exits fall through to the unchecked hop on
 #: 2.35% of landings, mixed exits on 3.05% -- a ladder needs a free column, an
