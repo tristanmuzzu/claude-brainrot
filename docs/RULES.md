@@ -510,7 +510,57 @@ levels are being rewritten in parallel. Everything else is yours: every beat,
 
 ---
 
-## 7. The checklist
+## 7. Field notes — things that only turn up when you build a level
+
+Measured by agents rebuilding levels against this document. Each cost real
+time; none is guessable from the source.
+
+- **An in-body `climb` needs `pedestal=True`.** `_climb_move` wants solid rock
+  beside the ladder column at its middle *and* its top, and out in the lane the
+  only candidate is the landing's own pedestal stack. The generated climbs get
+  away with `pedestal=False` because a `shaft` shell supplies the wall.
+  Measured: 89% of the beat placed with the pedestal, 43% without, and the
+  climb silently degrades to hops. **`hug=2.4` works** for a climb, wider than
+  the 1.6–2.0 quoted in §2.
+- **`step_y` on a climb is not freely tunable.** The same node at `step_y=4`
+  fires; at `step_y=3` the beat fell to 43%, `climb` vanished from the move mix
+  entirely, and the level's *exit* ladder fell back to a staircase with it. No
+  explanation found — if a climb will not fire, try moving `step_y` before
+  assuming the position is wrong.
+- **A gated landmark cannot stand on a `channel` level.** The liquid cut runs
+  where the lane runs and `Cone.rock` is False under it, so the structure's
+  base cells fail: 1 reservation in 8 runs on a channel against 8 in 8 on a
+  ledge.
+- **`walk` gates almost never reserve on a `ledge`** — windmill, watchtower and
+  cabin came in at 0–2 of 8 across every band and shelf tried, where the `hop`
+  gates (arch, totem, bell, hoodoo, crane, hoard, tree, greatcap) reserve 8 of
+  8 in the same conditions. And an *ungated* landmark cannot reserve on a ledge
+  at all. So a ledge level's real choice is **a hop gate or nothing**.
+- **Any `breaks >= 1` forces the lock**, because a level's first floor break is
+  always 5.5–6.7 m wide. The lock plus a landmark crossing can be two thirds of
+  a level's landings — designed content fell 56% to 27–39% purely by turning
+  breaks on. `breaks=0` is legitimate when moats and a wobbling shelf already
+  hold the walk number down; one level measured 27% covered with no breaks at
+  all.
+- **A shell's roof builds even where its walls find no footing**, because the
+  roof loop sits outside the footing check. On a narrow ledge that hands you
+  the reference's groove for free — lid overhead, wall on the core side, drop
+  outboard. But **three shelled landings in a row jam the lens** on 10% of
+  frames (`tunnel`) to 21% (`hall`). One shell is a pinch; three is a corridor.
+- **`--design-only` checks `hop` and `slide` only.** Note that
+  `spiralplan.BALLISTIC` is a *different* set that also contains `walk` — that
+  one is the placement-time "nothing rises two blocks" clamp, not the paper
+  check. A `walk`, `climb`, `bubble`, `web` or `bounce` is still only ever
+  proved by a placement count.
+- **`ceiling=3` over a `kind="walk"` leg is a real head-hitter** that the arc
+  clearance test never refuses, because a walk has no arc. This is the genre's
+  `2bc` — the lid you sprint under — expressible today.
+- **`form="floor"` clamps `lift` to zero.** It places no block; the cell must
+  already be solid ground. Writing `lift=1, form="floor"` used to pass the
+  paper check and build a block lower, taking every jump after it in the beat
+  with it; the checker now clamps the same way `Course._node` does.
+
+## 8. The checklist
 
 Run in this order. The first is free and catches most mistakes; the last is
 the only one that actually decides.

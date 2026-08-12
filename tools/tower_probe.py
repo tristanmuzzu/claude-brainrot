@@ -66,7 +66,16 @@ def _surface(node: dict, was: float) -> float:
     """
     if node.get("step_y") is not None:
         return was + node["step_y"]
-    return node.get("lift", 1) + pk.FORMS.get(node.get("form", "full"), 1.0)
+    form = node.get("form", "full")
+    lift = node.get("lift", 1)
+    # ``form="floor"`` places no block: the cell must already be solid ground,
+    # so ``Course._node`` clamps its lift to exactly zero. A checker that reads
+    # the authored value instead measures a landing a whole block above the one
+    # that gets built, passes it on paper, and then every jump after it in the
+    # beat is checked against a height the body never reaches.
+    if form == "floor":
+        lift = 0
+    return lift + pk.FORMS.get(form, 1.0)
 
 
 def _beats(lv) -> list:
