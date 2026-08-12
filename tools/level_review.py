@@ -154,17 +154,58 @@ def grow(run: int, blocks: int):
 # The numbers
 # ---------------------------------------------------------------------------
 
-def measure(index: int, runs: int, blocks: int) -> dict:
-    """Fidelity, beats, move mix and walkability for this level alone."""
+def walk(name: str, runs: int, blocks: int) -> dict:
+    """How much of this level a walker covers without jumping. **Unpinned.**
+
+    Deliberately measured in an unpinned world, which is why it is its own
+    entry point and gets its own process: a pinned run *opens* on the level,
+    a fifth of the way along it and often on a floating landing with nothing
+    standable under it, and the walk then reads zero -- not because the level
+    is unwalkable but because the walker had nowhere to stand. Entered
+    normally, off the level below's exit climb, it is the real number and it
+    is the one ``bypass_probe`` prints tower-wide.
+    """
     import bypass_probe
 
+    covers: list[float] = []
+    full = 0
+    for run in range(1, runs + 1):
+        cone, course, seen, starts = grow(run, blocks)
+        for i in sorted(starts):
+            if i == 0 or cone.design(i).name != name:
+                continue
+            cover, done = bypass_probe.walk_level(course, cone.level(i),
+                                                  starts[i])
+            if cover <= 0.0:
+                continue        # this level's landings are already retired
+            covers.append(cover)
+            full += done
+    covers.sort()
+    return {"mean": sum(covers) / max(1, len(covers)),
+            "worst": covers[-1] if covers else 0.0,
+            "full": full, "n": len(covers)}
+
+
+def _walk_unpinned(index: int, runs: int, blocks: int) -> dict:
+    """``walk`` in a fresh process, because this one is pinned and it must not
+    be."""
+    r = subprocess.run(
+        [sys.executable, str(ROOT / "tools/level_review.py"), "--level",
+         str(index + 1), "--walk-json", "--runs", str(runs), "--blocks",
+         str(blocks)], capture_output=True, text=True, cwd=ROOT)
+    for line in r.stdout.splitlines():
+        if line.startswith("{"):
+            return json.loads(line)
+    return {"mean": 0.0, "worst": 0.0, "full": 0, "n": 0}
+
+
+def measure(index: int, runs: int, blocks: int) -> dict:
+    """Fidelity, beats and move mix for this level alone."""
     name = hp.LEVELS[index].name
     beats: dict[str, list] = defaultdict(lambda: [0, 0])
     tally: Counter = Counter()
     moves: Counter = Counter()
     forms: Counter = Counter()
-    covers: list[float] = []
-    full = 0
     for run in range(1, runs + 1):
         cone, course, seen, starts = grow(run, blocks)
         for blk in seen:
@@ -189,22 +230,8 @@ def measure(index: int, runs: int, blocks: int) -> dict:
             if blk["exact"]:
                 beats[key][1] += 1
                 tally["exact"] += 1
-        # walkability: the level's own arc, over the world as built
-        for i, lv in ((i, cone.level(i)) for i in starts):
-            if cone.design(i).name != name:
-                continue
-            cover, done = bypass_probe.walk_level(course, lv, starts[i])
-            if cover > 0.0:
-                covers.append(cover)
-                full += done
-    covers.sort()
-    return {
-        "name": name, "runs": runs, "beats": dict(beats), "tally": dict(tally),
-        "moves": dict(moves), "forms": dict(forms),
-        "walk_mean": sum(covers) / max(1, len(covers)),
-        "walk_worst": covers[-1] if covers else 0.0,
-        "walk_full": full, "walk_n": len(covers),
-    }
+    return {"name": name, "runs": runs, "beats": dict(beats),
+            "tally": dict(tally), "moves": dict(moves), "forms": dict(forms)}
 
 
 def motion(index: int, seed: int, seconds: float) -> dict:
@@ -249,6 +276,7 @@ def report(index: int, runs: int, blocks: int, seed: int,
            seconds: float, with_motion: bool = True) -> str:
     lv = hp.LEVELS[index]
     got = measure(index, runs, blocks)
+    got.update(_walk_unpinned(index, runs, blocks))
     t, n = got["tally"], max(1, got["tally"].get("landings", 1))
     des = max(1, t.get("design", 1))
     out = [f"LEVEL {index + 1}  {lv.name}   theme={lv.theme} "
@@ -285,9 +313,9 @@ def report(index: int, runs: int, blocks: int, seed: int,
             f" ({100 * t.get('floating', 0) / n:.0f}%)",
             "",
             "CAN IT BE WALKED -- the complaint this tower keeps failing on",
-            f"  covered without a jump   mean {100 * got['walk_mean']:.0f}%,"
-            f" worst {100 * got['walk_worst']:.0f}%   of {got['walk_n']} walks",
-            f"  walked end to end        {got['walk_full']} of {got['walk_n']}",
+            f"  covered without a jump   mean {100 * got['mean']:.0f}%,"
+            f" worst {100 * got['worst']:.0f}%   of {got['n']} walks",
+            f"  walked end to end        {got['full']} of {got['n']}",
             "  the rule: mean at or under 55%, never end to end"
             "   (the real map: 46%, 0 of 43)"]
     if with_motion:
@@ -693,6 +721,8 @@ def main() -> int:
     ap.add_argument("--all", action="store_true",
                     help="report + blueprint + sheet + seam (not --outside)")
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--walk-json", action="store_true",
+                    help="internal: the unpinned walk, as one JSON line")
     args = ap.parse_args()
 
     if args.list:
@@ -703,6 +733,9 @@ def main() -> int:
         return 0
 
     index = resolve(args.level)
+    if args.walk_json:              # no pin: see walk()'s docstring
+        print(json.dumps(walk(hp.LEVELS[index].name, args.runs, args.blocks)))
+        return 0
     slug = hp.LEVELS[index].name.lower().replace(" ", "_").replace("the_", "")
     out = Path(args.out or ROOT / "shots/review" / f"l{index + 1:02d}_{slug}")
     out.mkdir(parents=True, exist_ok=True)
