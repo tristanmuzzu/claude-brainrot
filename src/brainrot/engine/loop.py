@@ -157,7 +157,13 @@ class Overlay:
         try:
             while self.running:
                 now = time.monotonic()
-                dt = min(now - last, 0.1)  # clamp so a stall never teleports the world
+                # Clamp so a stall never teleports the world. 0.05 and not
+                # 0.1: at slide speed a tenth of a second is 0.7 m in one
+                # frame, and on a machine busy with video the strip hitches
+                # exactly often enough for that to read as the body cutting
+                # forward -- the owner reported teleports the headless probe
+                # could not reproduce, because headless never stalls.
+                dt = min(now - last, 0.05)
                 last = now
 
                 if self.window.should_close() or rl.IsKeyPressed(rl.KEY_ESCAPE):

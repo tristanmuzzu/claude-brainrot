@@ -977,6 +977,25 @@ class Cone:
             # Spread across the first two thirds of the level: entry landing
             # zone ends at 0.14, the exit reserve begins past ~0.66.
             f = 0.14 + (k + h) * (0.52 / n)
+            if k == 0:
+                # The lock wanders: pinned to the first third it stopped
+                # every walker at the same early beat and the tower read as
+                # one trick; spread over the middle half it lands like the
+                # real map's own stops, whose walkable coverage averages
+                # 50% with no leg passable end to end. And it never skips:
+                # a level that loses its lock to the apron is a level a
+                # walker covers end to end, so collide means move, not drop.
+                h2 = (math.sin((lv.index * 11 + 5) * 12.9898)
+                      * 43758.5453) % 1.0
+                f = 0.18 + 0.45 * h2
+                for shift in (0.0, 0.16, -0.16, 0.3):
+                    fc = min(0.62, max(0.16, f + shift))
+                    c = lv.u0 + span * fc
+                    if abs(c - au) * radius >= 5.5:
+                        break
+                w = (5.5 + 1.2 * ((h * 7.13) % 1.0)) / radius
+                out.append((c - w / 2, c + w / 2))
+                continue
             c = lv.u0 + span * f
             if abs(c - au) * radius < 5.5:
                 continue                # never under the landmark's apron
@@ -1778,6 +1797,13 @@ class Course:
         time never got below two per cent.
         """
         i = self.cone.level_index(u)
+        lv = self.cone.level(i)
+        if u < lv.u_edge:
+            # A floor *break*, not the end chasm: the same level continues a
+            # hop away on both sides, so its own ground is the stranding
+            # bound -- against the next level's floor every island over a
+            # break would be refused as too low.
+            return lv.y
         return self.cone.level(i + 1).y
 
     def _u_at(self, u_ref: float, x: float, z: float) -> float:

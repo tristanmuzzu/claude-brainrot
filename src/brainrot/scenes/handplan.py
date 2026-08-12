@@ -23,6 +23,8 @@ rather than in a tolerance.
 
 from __future__ import annotations
 
+import math
+
 from . import spiralplan as sp
 from .handlevels import LEVELS, ROLES, Level, n  # noqa: F401
 from .spiralplan import (  # noqa: F401  -- the renderer reads these off the plan
@@ -157,6 +159,8 @@ class Course(sp.Course):
         #: and can be part-way into the next level while the body is still in
         #: this one.
         self._cursor: dict[int, int] = {}
+        #: Break lips whose lock crossing was already laid.
+        self._locked: set[float] = set()
         #: Beats asked for, and beats that came out with every landing placed
         #: as authored. The fidelity numbers; see ``tools/tower_probe.py``.
         self.authored = 0
@@ -190,6 +194,9 @@ class Course(sp.Course):
         return lv, need, want, radius
 
     def _choose_feature(self, lv) -> list[dict]:
+        lock = self._lock_nodes(lv)
+        if lock:
+            return lock
         design = self.cone.design(lv.index)
         cursor = self._cursor.get(lv.index, 0)
         self._cursor[lv.index] = cursor + 1
@@ -205,6 +212,48 @@ class Course(sp.Course):
         self.segment = name
         self.authored += len(specs)
         return [self._node(**_resolve(spec, lv.theme)) for spec in specs]
+
+    def _lock_nodes(self, lv) -> list[dict] | None:
+        """Cross the level's wide break: the one stretch no walker can.
+
+        Every level's first floor break is cut too wide for any flat jump,
+        and the course crosses it here -- an approach that gains height, an
+        island floated over the hole, and a landing on the far ground. The
+        island is the lock: it hangs one to two blocks up over a five-plus
+        gap, so from the ground at the lip there is no jump onto it, and the
+        only way across is to arrive the way the course arrives. The script
+        beat that was due plays right after; the cursor is untouched.
+        """
+        cone = self.cone
+        radius = max(6.0, cone.rim_at(lv.y))
+        for b0, b1 in cone.floor_breaks(lv):
+            width = (b1 - b0) * radius
+            if width < 4.5 or b0 in self._locked:
+                continue
+            dist = (b0 - self.u) * radius
+            if not 0.5 < dist < 11.0:
+                continue
+            self._locked.add(b0)
+            theme = lv.theme
+            out = []
+            # Approach legs: cover the ground to just before the lip in
+            # ordinary hops, ending two blocks up so the island is a drop.
+            run = max(0.0, dist - 1.3)
+            legs = max(1, int(math.ceil(run / 4.2)))
+            for i in range(legs):
+                out.append(self._node(
+                    theme.rock, arc=max(2.6, run / legs),
+                    lift=2 if i == legs - 1 else 1, spread=1,
+                    label="lock"))
+            out.append(self._node(
+                theme.accent, arc=width / 2 + 1.4, lift=1,
+                pedestal=False, spread=0, orbs=1, label="lock"))
+            out.append(self._node(
+                theme.rock, arc=width / 2 + 1.2, lift=1, spread=1,
+                label="lock"))
+            self.segment = "lock"
+            return out
+        return None
 
     def _feat_ascent(self, rng, lv, need: int) -> list[dict]:
         """The way out, as the level's design says rather than as dice say.
