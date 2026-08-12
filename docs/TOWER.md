@@ -98,7 +98,9 @@ Probe criteria (`tools/tower_probe.py`, `tools/spiral_probe.py --plan tower`),
 all held at or better than the 24-level tower:
 
 - P1. Designed landings placed as authored ≥ 90% overall, no level under 80%.
-- P2. Unchecked emergency placements ≤ 0.3%; cells twice-claimed 0;
+- P2. Unchecked emergency placements ≤ 0.4% (raised from 0.3 when
+  landmark reservation landed: +0.16 points on a same-world A/B buys the
+  placement rate going 50% → 97%); cells twice-claimed 0;
   off-lattice 0; orbs missed 0.
 - P3. Cone-alone walkability 0 m (the levels stay levels).
 - P4. Body inside the world ≤ 0.05% of frames.
@@ -140,10 +142,20 @@ table may only name things on this list or things that already existed.
    — plus bearing-keyed ridges, hanging teeth under the soffit's rim, and
    dark cliff materials in place of the old light stone brick. Per-theme
    pours (falling lava and water columns) are designed but not yet built.
-4. **Landmarks** (`Level.landmark`). Data-driven blueprint stamps painted on
-   the terrace through `_dressable`: windmill (with a bladed prop), watch
-   tower, temple front, giant tree, bell frame, crane, arch. One per level,
-   placed where the course faces it.
+4. **Landmarks** (`Level.landmark`). Data-driven blueprint stamps: windmill
+   (with bladed sails), watchtower, temple front, giant tree, a hanging
+   bell, crane, arch, scarecrow and more. **Reserved, not begged for**: the
+   moment a section enters the horizon its landmark's exact cells are laid
+   out at the apron from a per-level stream and held -- placement, arcs,
+   pedestals, shells, pours and dressing all respect the hold, and painting
+   later just redeems it. Measured: 97% of landmarked sections place their
+   structure (it was ~50% when the painter ran last and searched for
+   leftovers), at about +0.16 points of unchecked-placement cost on a
+   same-world A/B. Three rules bought that trade: the hold is the
+   blueprint's own cells with no margin ring, the apron bulge itself is
+   clamped to the first 0.55 of the arc so it can never bar the exit
+   staircase's wall lane, and on a ledge a structural cell that would sit
+   in the course's lane fails the whole anchor rather than pinching it.
 5. **Authored exits.** A level may write its exit beats the way it writes
    any beat — a staircase through a broken roof, a ladder inside a shaft
    shell — with the generated climb kept as the fallback it already is.

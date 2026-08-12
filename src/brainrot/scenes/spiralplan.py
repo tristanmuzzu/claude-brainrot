@@ -62,6 +62,7 @@ where the *building* grows into a solved arc is gone by construction.
 
 from __future__ import annotations
 
+import random
 import math
 
 from .parkourkit import (  # noqa: F401
@@ -658,7 +659,7 @@ def _lm_hoard(rng, theme):
 
 def _lm_stripes(rng, theme):
     cells: list = []
-    for i, dt in enumerate(range(-2, 4)):
+    for i, dt in enumerate(range(-1, 3)):
         _lm_box(cells, dt, dt, 0, 3, 1, 1, WOOLS[i % len(WOOLS)])
     return cells
 
@@ -692,9 +693,8 @@ def _lm_arch(rng, theme):
 def _lm_cluster(rng, theme):
     cells: list = []
     _lm_box(cells, 0, 0, 0, 1, 0, 0, "amethyst")
-    cells.append((1, 0, 0, "amethyst"))
+    cells.append((1, 0, 1, "amethyst"))
     cells.append((0, 2, 0, "amethyst"))
-    cells.append((-1, 0, 1, "amethyst"))
     return cells
 
 
@@ -1043,8 +1043,15 @@ class Cone:
         return out - lv.band, out
 
     def apron_u(self, lv: Section) -> float:
-        """Where this level's ledge swells, in unwrapped angle."""
-        f = 0.3 + 0.4 * ((math.sin(lv.index * 12.9898) * 43758.5453) % 1.0)
+        """Where this level's ledge swells, in unwrapped angle.
+
+        Between 0.22 and 0.55 of the arc: past that the exit staircase owns
+        the wall lane, and a landmark reserved inside the ascent's ground
+        bars the one climb a run cannot do without. Clamping the *bulge*
+        rather than the reservation keeps the two at the same bearing, so
+        every reserve anchors on a full-width peak instead of a thin edge.
+        """
+        f = 0.22 + 0.33 * ((math.sin(lv.index * 12.9898) * 43758.5453) % 1.0)
         return lv.u0 + (lv.u1 - lv.u0) * f
 
     def on_floor(self, u: float, r: float) -> bool:
@@ -1545,6 +1552,17 @@ class Course:
         #: Ladders, vines, water columns, cobweb. Drawn, never solid, but
         #: reserved -- a wall built through a ladder is a ladder in a wall.
         self.softcells: set[tuple[int, int, int]] = set()
+        #: Per-section landmark reservations: index -> (cells+styles, props,
+        #: frame). Computed the moment a section enters the horizon, *before*
+        #: the course can claim the apron -- the landmark used to arrive last
+        #: and beg for leftovers, and placed only half the time. The union of
+        #: held cells is what placement, shells, pours and dressing respect.
+        self.landmark_hold: dict[int, tuple] = {}
+        self._hold_cells: set[tuple[int, int, int]] = set()
+        #: Sections whose reservation was already attempted -- retrying a
+        #: failed one every spawn is a builder call and a few hundred rock
+        #: tests per landing, forever.
+        self._hold_tried: set[int] = set()
         #: Cells that are load-bearing *under* a landing. Head-room reserves
         #: what is over a landing and the path reserves what the body passes
         #: through; neither covers the ground a ``floor`` landing stands on,
@@ -1664,7 +1682,8 @@ class Course:
 
     def reserved(self, cells) -> bool:
         soft = self.softcells
-        return any(c in soft for c in cells)
+        hold = self._hold_cells
+        return any(c in soft or c in hold for c in cells)
 
     def band(self, u: float, hug: bool = False) -> tuple[float, float]:
         """The radial range a landing may stand in at this bearing.
@@ -1777,6 +1796,16 @@ class Course:
     def spawn(self) -> dict:
         """Lay the next landing. Never fails, and counts it when it nearly
         does."""
+        # Bounded to the frontier's neighbourhood, and NOT an iteration
+        # over ``cone.sections``: reserving a section asks for trough
+        # heights, which lazily creates the section three above -- iterate
+        # the growing list itself and the tower never stops being built.
+        here = self.cone.section_at(self.u).index
+        for i in range(max(0, here - 1), here + 3):
+            lv = self.cone.level(i)
+            if lv.landmark and lv.index not in self._hold_tried:
+                self._hold_tried.add(lv.index)
+                self._reserve_landmark(lv)
         if not self._pending:
             self._plan_feature()
         prev = self.blocks[-1]
@@ -2400,11 +2429,13 @@ class Course:
         leaving = set(leaving)
         points = move.points(ARC_SAMPLES)
         early = len(points) // 3
+        hold = self._hold_cells
         for i, (x, y, z) in enumerate(points):
             for cell in body_cells(x, y, z):
                 if cell in exempt:
                     continue
-                if cell not in extra and not self.blocked(cell):
+                if cell not in extra and cell not in hold \
+                        and not self.blocked(cell):
                     continue
                 if i <= early and cell in leaving:
                     continue
@@ -2560,7 +2591,8 @@ class Course:
         spending.
         """
         if cell in self.softcells or cell in self.pathcells \
-                or cell in self.headroom or cell in self.ground:
+                or cell in self.headroom or cell in self.ground \
+                or cell in self._hold_cells:
             return
         self.struct[cell] = style
         self.writes.append((cell, style))
@@ -2571,7 +2603,7 @@ class Course:
     def carve(self, cell) -> None:
         """Dig a cell out of the cone: a pond, a lava channel, a doorway."""
         if cell in self.pathcells or cell in self.headroom \
-                or cell in self.ground:
+                or cell in self.ground or cell in self._hold_cells:
             return
         self.carved.add(cell)
         self.solid.discard(cell)
@@ -2952,95 +2984,136 @@ class Course:
 
     # -- painting the place ------------------------------------------------
 
-    def _landmark(self, section: Section) -> None:
-        """Paint the level's signature structure, if it names one.
+    def _reserve_landmark(self, section: Section) -> None:
+        """Claim the landmark's exact cells before the course can.
 
-        Placed on the level's own ground, off the course (every cell goes
-        through :meth:`_dressable` with a margin, and every base cell must
-        have support), and tried at a handful of bearings before giving up --
-        a landmark half-built where the course happened to be is worse than
-        none. Structures are authored in the trough's own frame: ``dt`` along
-        the corridor, ``dy`` up, ``dr`` outward toward the rim.
+        The painter used to run last and search for leftover room, and found
+        it about half the time. The order is inverted now: the moment a
+        section enters the horizon its landmark is laid out -- at the apron,
+        deterministically, from a per-level stream so reserve and paint agree
+        -- and its cells go into the hold that placement, arcs, pedestals,
+        shells, pours and dressing all respect. Painting later is redeeming
+        the reservation, not negotiating.
+
+        Support is checked against the cone alone, which is all there is this
+        early, and the anchor steps inboard twice before giving up -- the one
+        case with no answer is a shelf too narrow for the blueprint, and the
+        legacy search below still covers it.
         """
-        name = section.landmark
-        build = LANDMARKS.get(name)
+        build = LANDMARKS.get(section.landmark)
         if not build:
             return
-        rng = self.rng
         cone = self.cone
+        rng = random.Random(section.index * 977 + cone.wind * 31)
         built = build(rng, section.theme)
-        # A builder returns cells, or (cells, props) when the structure
-        # carries a model that whole cells cannot say.
         if isinstance(built, tuple) and len(built) == 2 \
                 and isinstance(built[0], list):
             cells, props = built
         else:
             cells, props = built, ()
-        for attempt in range(14):
-            # The apron first: on a ledge level it is the one place with room.
-            if attempt < 5 and section.profile == "ledge":
-                u = cone.apron_u(section) + rng.uniform(-0.4, 0.4) \
-                    / max(6.0, cone.rim_at(section.y))
-            else:
-                f = 0.2 + 0.6 * rng.random()
-                u = section.u0 + (section.u1 - section.u0) * f
-            if not cone.has_floor(u):
-                continue
-            r0f, r1f = cone.floor_range(u)
-            r = min(r0f + 1.8, r1f - 2.2)
-            if section.profile == "ledge":
-                r = max(r0f + 1.2, r1f - 3.0)
-            th = u * cone.wind
-            ct, st = math.cos(th), math.sin(th)
-            tx, tz = -st * cone.wind, ct * cone.wind
-            top = cone.trough_height(u) - 1
-            y = cone.floor_at(u)
+        radius_here = max(6.0, cone.rim_at(section.y))
+        # Never past 0.55 of the arc: the exit staircase owns the wall lane
+        # from about two thirds in, and a hold there bars the one climb a
+        # run cannot do without -- measured as three quarters of the stuck
+        # cost this reservation ever had.
+        span = section.u1 - section.u0
+        cap = section.u0 + span * 0.55
+        for du in (0.0, -1.5, 1.5, -3.0, -4.5):
+            u = min(cone.apron_u(section) + du / radius_here, cap)
+            if self._try_reserve_at(section, u, cells, props):
+                return
+
+    def _try_reserve_at(self, section: Section, u: float, cells,
+                        props) -> bool:
+        cone = self.cone
+        if not cone.has_floor(u):
+            return False
+        r0f, r1f = cone.floor_range(u)
+        base_r = min(r0f + 1.8, r1f - 2.2)
+        if section.profile == "ledge":
+            base_r = max(r0f + 1.2, r1f - 2.4)
+        th = u * cone.wind
+        ct, st = math.cos(th), math.sin(th)
+        tx, tz = -st * cone.wind, ct * cone.wind
+        top = cone.trough_height(u) - 1
+        y = cone.floor_at(u)
+        # A ledge level's hold must never reach the course's own lane: the
+        # shelf is three to five cells wide, and a hold ring across it bars
+        # the level's only way through -- the course then grinds its whole
+        # recovery chain against a wall that is not even built yet. The
+        # landmark lives on the apron's bulge, outboard of the lane; inboard
+        # pulls are for plazas only.
+        pulls = (0.0,) if section.profile == "ledge" else (0.0, 1.0, 2.0)
+        for pull in pulls:
+            r = base_r - pull
             placed = []
             ok = True
-            skipped = 0
             for dt, dy, dr, style in cells:
                 if dy > top:
-                    continue            # truncated against the soffit
+                    continue
                 x = iround(ct * r + tx * dt + ct * dr)
                 z = iround(st * r + tz * dt + st * dr)
                 cell = (x, y + dy, z)
-                if not self._dressable(cell, margin=1):
-                    # An accent reaching toward the course -- a doorway lamp,
-                    # a cap's rim -- may be dropped alone; a structural cell
-                    # failing moves the whole structure. *Bounded*: skipping
-                    # freely hollowed a whole windmill out cell by cell and
-                    # left its sails floating over a sugarcane, which is why
-                    # more than a quarter gone means try elsewhere.
-                    if dy > 0:
-                        skipped += 1
-                        if skipped > max(2, len(cells) // 4):
-                            ok = False
-                            break
-                        continue
+                if cone.rock(cell):
                     ok = False
                     break
-                if dy == 0 and not self.blocked((x, y - 1, z)):
-                    ok = False          # a base cell over the drop
+                if dy == 0 and not cone.rock((x, y - 1, z)):
+                    ok = False
                     break
+                if section.profile == "ledge" and dy <= 2:
+                    # On a shelf a few cells wide, a structure crossing the
+                    # course's own lane is a wall across the level: the
+                    # course grinds its recovery chain against the hold and
+                    # the stuck rate pays. A cell in the lane fails the
+                    # anchor; the bearing retries find a fatter stretch of
+                    # bulge or the level goes without.
+                    cu = cone.unwrap(x, z, y + dy)
+                    lane = cone.floor_range(cu, apron=False)[1]
+                    if math.hypot(x, z) < lane - 0.4:
+                        ok = False
+                        break
                 placed.append((cell, style))
             if not ok:
                 continue
-            seen: set[tuple[int, int, int]] = set()
-            for cell, style in placed:
-                if cell in seen:
-                    continue
-                seen.add(cell)
-                self.write(cell, style)
-                if style == section.theme.glow:
-                    cone.lamps.append(cell)
+            prop_at = []
             for dt, dy, dr, kind in props:
                 px = iround(ct * r + tx * dt + ct * dr)
                 pz = iround(st * r + tz * dt + st * dr)
-                # Facing the corridor: the model's front looks outward from
-                # the wall, which is where the course and the camera are.
-                yaw = math.atan2(-ct, st)
-                cone.props.append(((px, y + dy, pz), kind, yaw))
+                prop_at.append(((px, y + dy, pz), kind,
+                                math.atan2(-ct, st)))
+            # The hold is the blueprint's own cells and nothing more. A
+            # margin ring read as politeness and measured as a lane pinch:
+            # it doubled the stuck rate on landmarked levels, and a course
+            # that runs right past a windmill's wall is exactly what the
+            # real map's streets do anyway.
+            held = {c for c, _ in placed}
+            self.landmark_hold[section.index] = (placed, prop_at)
+            self._hold_cells |= held
+            return True
+        return False
+
+    def _landmark(self, section: Section) -> None:
+        """Paint the level's signature structure: redeem the reservation.
+
+        The cells were claimed when the section entered the horizon, so this
+        is a plain write -- release the hold first, because ``write`` refuses
+        held cells for everyone including us.
+        """
+        plan = self.landmark_hold.pop(section.index, None)
+        if plan is None:
             return
+        placed, prop_at = plan
+        self._hold_cells -= {c for c, _ in placed}
+        seen: set[tuple[int, int, int]] = set()
+        for cell, style in placed:
+            if cell in seen:
+                continue
+            seen.add(cell)
+            self.write(cell, style)
+            if style == section.theme.glow:
+                self.cone.lamps.append(cell)
+        for at, kind, yaw in prop_at:
+            self.cone.props.append((at, kind, yaw))
 
     def _pour(self, section: Section) -> None:
         """A column of the theme's liquid falling down the core face.
@@ -3187,7 +3260,8 @@ class Course:
         a boulder nobody meant to put there.
         """
         if (cell in self.headroom or cell in self.ground
-                or cell in self.softcells or cell in self.struct):
+                or cell in self.softcells or cell in self.struct
+                or cell in self._hold_cells):
             return False
         x, y, z = cell
         for dx in range(-margin, margin + 1):
