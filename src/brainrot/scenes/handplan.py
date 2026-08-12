@@ -158,6 +158,12 @@ LEVELS: tuple[Level, ...] = (
         ("bank", [n("ground", arc=5.2, lift=0, form="floor", orbs=2)]),
         ("weir", [n("rock", arc=3.6, lift=1, spread=0, moat=True, orbs=1),
                   n("rock", arc=4.4, lift=1, spread=1)]),
+        ("orchard", [n("accent", arc=3.7, lift=2, spread=1, orbs=1),
+                     n("accent", arc=4.7, lift=2, spread=1),
+                     n("rock", arc=4.7, lift=2, spread=1)]),
+        ("stile", [n("accent", arc=3.4, lift=3, spread=0),
+                   n("accent", arc=3.2, lift=3, spread=0, radial=1.4,
+                     orbs=1)]),
     ]),
 
     # ---- 2 ---------------------------------------------------------------
@@ -174,6 +180,11 @@ LEVELS: tuple[Level, ...] = (
         ("stack", [n("rock", arc=3.2, lift=2, spread=0),
                    n("rock", arc=3.4, lift=3, spread=0, orbs=2)]),
         ("drop", [n("rock", arc=5.2, lift=1, spread=0, orbs=1)]),
+        ("gate", [n("rock", arc=3.4, lift=1, spread=1, ceiling=1),
+                  n("accent", arc=4.8, lift=1, spread=1, orbs=1)]),
+        ("byre", [n("rock", arc=3.7, lift=2, spread=0),
+                  n("rock", arc=4.7, lift=2, spread=0, orbs=1),
+                  n("rock", arc=4.7, lift=2, spread=0)]),
     ], filler=[
         ("furrow", [n("rock", arc=4.6, lift=1, spread=0, orbs=1),
                     n("rock", arc=4.6, lift=1, spread=0)]),
@@ -197,6 +208,12 @@ LEVELS: tuple[Level, ...] = (
         ("yard", [n("ground", arc=5.0, lift=0, form="floor", orbs=2)]),
         ("gable", [n("rock", arc=3.4, lift=1, hug=2.8, spread=1),
                    n("rock", arc=3.5, lift=2, hug=2.8, spread=0, ceiling=2)]),
+        ("chimney", [n("rock", arc=3.4, lift=3, hug=2.8, spread=0,
+                       ceiling=2),
+                     n("accent", arc=4.7, lift=3, hug=2.8, spread=0,
+                       orbs=1)]),
+        ("dormer", [n("accent", arc=3.7, lift=4, hug=3.2, spread=0),
+                    n("rock", arc=4.2, lift=3, hug=3.2, spread=0, orbs=1)]),
     ]),
 
     # ---- 4 ---------------------------------------------------------------
@@ -216,6 +233,11 @@ LEVELS: tuple[Level, ...] = (
         ("slip", [n("ground", arc=6.0, lift=0, form="floor", orbs=2)]),
         ("scarp", [n("rock", arc=3.6, lift=1, spread=1),
                    n("rock", arc=3.6, lift=2, spread=0, ceiling=1)]),
+        ("hardpan", [n("rock", arc=3.7, lift=3, spread=1),
+                     n("accent", arc=3.4, lift=3, spread=0, radial=-1.5,
+                       orbs=1)]),
+        ("wind", [n("rock", arc=3.7, lift=4, spread=0, ceiling=1),
+                  n("rock", arc=4.7, lift=4, spread=0, orbs=1)]),
     ]),
 
     # ---- 5 ---------------------------------------------------------------
@@ -233,6 +255,9 @@ LEVELS: tuple[Level, ...] = (
                   n("rock", arc=3.5, lift=2, spread=0, hug=4.6, orbs=1)]),
         ("shelf", [n("ground", arc=5.4, lift=0, form="floor"),
                    n("rock", arc=3.5, lift=1, spread=1, orbs=1)]),
+        ("stack", [n("rock", arc=3.4, lift=2, hug=5.2, spread=0),
+                   n("accent", arc=3.6, lift=3, hug=5.6, spread=0, orbs=1)]),
+        ("ledge", [n("rock", arc=4.8, lift=3, hug=5.2, spread=0, orbs=1)]),
     ]),
 
     # ---- 6 ---------------------------------------------------------------
@@ -252,6 +277,10 @@ LEVELS: tuple[Level, ...] = (
         ("fall", [n("rock", arc=6.6, lift=1, spread=1, orbs=2)]),
         ("floor", [n("ground", arc=4.6, lift=0, form="floor"),
                    n("rock", arc=3.5, lift=1, spread=1, orbs=1)]),
+        ("roots", [n("rock", arc=4.2, lift=1, spread=1),
+                   n("accent", arc=3.7, lift=2, spread=1, orbs=1)]),
+        ("bough", [n("rock", arc=3.4, lift=3, spread=0),
+                   n("rock", arc=4.7, lift=2, spread=0, orbs=1)]),
     ], filler=[
         ("understory", [n("rock", arc=3.6, lift=1, spread=1, orbs=1),
                         n("rock", arc=4.4, lift=1, spread=1)]),
@@ -274,6 +303,11 @@ LEVELS: tuple[Level, ...] = (
                    orbs=2)]),
         ("litter", [n("ground", arc=5.0, lift=0, form="floor"),
                     n("rock", arc=3.6, lift=1, spread=1)]),
+        ("gills", [n("accent", arc=4.4, lift=2, form="wide", spread=1),
+                   n("accent", arc=6.2, lift=2, form="wide", spread=1,
+                     orbs=1)]),
+        ("ring", [n("rock", arc=3.9, lift=3, spread=0),
+                  n("rock", arc=4.7, lift=3, spread=0, orbs=1)]),
     ]),
 
     # ---- 8 ---------------------------------------------------------------
@@ -291,6 +325,11 @@ LEVELS: tuple[Level, ...] = (
         ("pool", [n("ground", arc=5.2, lift=0, form="floor", orbs=2)]),
         ("shelf", [n("rock", arc=3.6, lift=1, hug=2.8, spread=1),
                    n("rock", arc=3.5, lift=2, hug=2.8, spread=0)]),
+        ("column", [n("rock", arc=3.4, lift=3, spread=1),
+                    n("accent", arc=4.7, lift=3, spread=1, orbs=1)]),
+        ("basin", [n("accent", arc=5.2, lift=2, spread=0, moat=True),
+                   n("accent", arc=3.6, lift=2, spread=0, moat=True,
+                     orbs=1)]),
     ]),
 
     # ---- 9 ---------------------------------------------------------------
@@ -311,6 +350,11 @@ LEVELS: tuple[Level, ...] = (
                         orbs=1)]),
         ("floor", [n("ground", arc=4.2, lift=0, form="floor"),
                    n("rock", arc=3.4, lift=1, spread=1, ceiling=1)]),
+        ("props", [n("rock", arc=3.4, lift=1, hug=3.4, spread=0, ceiling=2),
+                   n("rock", arc=3.4, lift=1, hug=3.4, spread=0, ceiling=2,
+                     orbs=1)]),
+        ("cage", [n("accent", arc=3.7, lift=2, spread=0, ceiling=1),
+                  n("accent", arc=4.7, lift=2, spread=0, orbs=1)]),
     ]),
 
     # ---- 10 --------------------------------------------------------------
@@ -331,6 +375,12 @@ LEVELS: tuple[Level, ...] = (
         ("catwalk", [n("accent", arc=4.2, lift=1, form="slab", spread=0),
                      n("accent", arc=4.0, lift=1, form="slab", spread=0,
                        orbs=1)]),
+        ("shriek", [n("rock", arc=3.4, lift=1, spread=0, pedestal=False),
+                    n("accent", arc=3.7, lift=2, spread=0, pedestal=False,
+                      orbs=1)]),
+        ("deep", [n("rock", arc=4.7, lift=2, spread=0, pedestal=False),
+                  n("rock", arc=4.8, lift=2, spread=0, pedestal=False,
+                    orbs=1)]),
     ]),
 
     # ---- 11 --------------------------------------------------------------
@@ -350,6 +400,10 @@ LEVELS: tuple[Level, ...] = (
         ("bergs", [n("rock", arc=3.4, lift=1, spread=1),
                    n("rock", arc=5.4, lift=1, kind="slide", form="ice",
                      spread=0, orbs=1)]),
+        ("crevasse", [n("rock", arc=5.4, lift=1, kind="slide", form="ice",
+                        spread=0, orbs=1)]),
+        ("serac", [n("accent", arc=4.6, lift=2, kind="slide", form="ice",
+                     spread=0, orbs=1)]),
     ]),
 
     # ---- 12 --------------------------------------------------------------
@@ -366,6 +420,8 @@ LEVELS: tuple[Level, ...] = (
                   n("soulsand", arc=2.9, lift=1, spread=0, orbs=1)]),
         ("basalt", [n("ground", arc=5.0, lift=0, form="floor"),
                     n("rock", arc=3.6, lift=1, spread=1, moat=True, orbs=1)]),
+        ("cinder", [n("accent", arc=3.7, lift=2, spread=0, moat=True),
+                    n("rock", arc=4.7, lift=2, spread=0, orbs=1)]),
     ]),
 
     # ---- 13 --------------------------------------------------------------
@@ -386,6 +442,10 @@ LEVELS: tuple[Level, ...] = (
                       pedestal=False, orbs=1)]),
         ("descent", [n("rock", arc=6.4, lift=2, spread=1, orbs=1),
                      n("ground", arc=5.0, lift=0, form="floor")]),
+        ("fungus", [n("rock", arc=3.4, lift=1, spread=1),
+                    n("accent", arc=4.7, lift=1, spread=1, orbs=1)]),
+        ("bloom", [n("accent", arc=3.7, lift=2, spread=0),
+                   n("rock", arc=4.7, lift=2, spread=0, orbs=1)]),
     ], filler=[
         ("thicket", [n("rock", arc=3.4, lift=1, spread=1, orbs=1),
                      n("accent", arc=3.6, lift=1, spread=1)]),
@@ -409,6 +469,11 @@ LEVELS: tuple[Level, ...] = (
         ("void", [n("rock", arc=6.4, lift=1, spread=0, hug=5.0, orbs=2)]),
         ("stone", [n("ground", arc=4.8, lift=0, form="floor"),
                    n("accent", arc=3.4, lift=1, spread=1, orbs=1)]),
+        ("rods", [n("accent", arc=3.4, lift=2, hug=5.6, spread=0,
+                    pedestal=False),
+                  n("accent", arc=3.6, lift=3, hug=6.0, spread=0,
+                    pedestal=False, orbs=1)]),
+        ("shelf", [n("rock", arc=4.8, lift=2, hug=5.6, spread=0, orbs=1)]),
     ], filler=[
         ("shards", [n("accent", arc=3.6, lift=1, spread=0, hug=5.4),
                     n("rock", arc=4.4, lift=1, spread=0, hug=5.8,
@@ -433,6 +498,13 @@ LEVELS: tuple[Level, ...] = (
                     n("rock", arc=4.0, lift=2, form="slab", spread=0,
                       pedestal=False, orbs=1)]),
         ("deck", [n("ground", arc=5.2, lift=0, form="floor", orbs=1)]),
+        ("check2", [n("wool_yellow", arc=3.4, lift=1, spread=0,
+                      pedestal=False),
+                    n("wool_purple", arc=3.6, lift=1, spread=0, radial=1.5,
+                      pedestal=False, orbs=1)]),
+        ("tower", [n("wool_red", arc=3.7, lift=2, spread=0, pedestal=False),
+                   n("wool_lime", arc=4.7, lift=2, spread=0, pedestal=False,
+                     orbs=1)]),
     ], filler=[
         ("ribbon", [n("wool_orange", arc=3.4, lift=1, spread=0,
                      pedestal=False),
@@ -454,6 +526,11 @@ LEVELS: tuple[Level, ...] = (
         ("leap", [n("oak", arc=4.8, lift=1, spread=0, moat=True, orbs=2)]),
         ("mill", [n("oak", arc=3.4, lift=2, spread=1, ceiling=1),
                   n("cobble", arc=3.5, lift=3, spread=0, orbs=1)]),
+        ("sluice", [n("cobble", arc=3.7, lift=3, spread=1),
+                    n("cobble", arc=3.6, lift=3, spread=0, moat=True,
+                      orbs=1)]),
+        ("race", [n("oak", arc=5.2, lift=2, spread=0, moat=True),
+                  n("oak", arc=3.6, lift=2, spread=1, orbs=1)]),
     ], rock="cobble", accent="oak"),
 
     # ---- 17 --------------------------------------------------------------
@@ -479,6 +556,8 @@ LEVELS: tuple[Level, ...] = (
                       hug=3.4, pedestal=False, ceiling=1),
                     n("rock", arc=3.8, lift=6, form="slab", spread=0,
                       hug=4.2, pedestal=False, orbs=1)]),
+        ("catwalk", [n("rock", arc=3.6, lift=6, form="slab", hug=4.6,
+                       spread=0, pedestal=False, orbs=1)]),
     ], rock="deepslate", accent="oak"),
 
     # ---- 18 --------------------------------------------------------------
@@ -498,6 +577,10 @@ LEVELS: tuple[Level, ...] = (
                        spread=0, hug=6.2, orbs=1)]),
         ("crevasse", [n("blueice", arc=6.2, lift=1, kind="slide", form="ice",
                         spread=0, hug=5.4, orbs=2)]),
+        ("floe", [n("blueice", arc=5.2, lift=1, kind="slide", form="ice",
+                    spread=0, hug=6.2, orbs=1)]),
+        ("shear", [n("rock", arc=4.4, lift=2, kind="slide", form="ice",
+                     spread=0, hug=5.6, orbs=1)]),
     ], ground="packedice", rock="frost", accent="snow"),
 
     # ---- 19 --------------------------------------------------------------
@@ -515,6 +598,10 @@ LEVELS: tuple[Level, ...] = (
         ("haul", [n("accent", arc=3.4, lift=1, spread=1),
                   n("accent", arc=3.4, lift=2, spread=0),
                   n("accent", arc=3.5, lift=3, spread=0, orbs=1)]),
+        ("bench", [n("rock", arc=4.4, lift=3, spread=0),
+                   n("rock", arc=5.4, lift=2, spread=0, orbs=1)]),
+        ("ramp", [n("accent", arc=3.4, lift=3, spread=0),
+                  n("accent", arc=4.2, lift=3, spread=0, orbs=1)]),
     ], rock="chiselled", accent="sandstone"),
 
     # ---- 20 --------------------------------------------------------------
@@ -537,6 +624,12 @@ LEVELS: tuple[Level, ...] = (
                     pedestal=False, orbs=2)]),
         ("land", [n("ground", arc=5.4, lift=0, form="floor"),
                   n("rock", arc=3.5, lift=1, spread=1, orbs=1)]),
+        ("guy", [n("rock", arc=3.4, lift=2, hug=6.0, spread=0,
+                   pedestal=False),
+                 n("oak", arc=3.4, lift=2, hug=6.4, spread=0,
+                   pedestal=False, orbs=1)]),
+        ("gap", [n("oak", arc=4.8, lift=2, hug=6.4, spread=0,
+                   pedestal=False, orbs=2)]),
     ], filler=[
         ("cable", [n("oak", arc=3.4, lift=1, spread=0, hug=6.2,
                     pedestal=False, orbs=1),
@@ -561,6 +654,11 @@ LEVELS: tuple[Level, ...] = (
                       ceiling=1),
                     n("rock", arc=3.2, lift=1, spread=0, radial=-1.4,
                       ceiling=1, orbs=1)]),
+        ("vents", [n("rock", arc=3.2, lift=2, spread=0, ceiling=2),
+                   n("rock", arc=3.0, lift=2, spread=0, ceiling=2, orbs=1)]),
+        ("flow", [n("accent", arc=3.7, lift=3, spread=0, moat=True),
+                  n("accent", arc=3.6, lift=3, spread=0, moat=True,
+                    orbs=1)]),
     ], ground="blackstone", rock="blackstone", accent="magma"),
 
     # ---- 22 --------------------------------------------------------------
@@ -581,6 +679,11 @@ LEVELS: tuple[Level, ...] = (
         ("ledge", [n("rock", arc=4.6, lift=2, spread=0, pedestal=False),
                    n("rock", arc=3.5, lift=3, spread=0, pedestal=False,
                      orbs=1)]),
+        ("null", [n("rock", arc=3.7, lift=4, spread=0, pedestal=False),
+                  n("rock", arc=4.9, lift=4, spread=0, pedestal=False,
+                    orbs=1)]),
+        ("edge", [n("accent", arc=3.5, lift=4, spread=0, pedestal=False,
+                    radial=1.7, orbs=1)]),
     ], filler=[
         ("dark", [n("accent", arc=4.7, lift=3, spread=0,
                    pedestal=False),
@@ -610,6 +713,8 @@ LEVELS: tuple[Level, ...] = (
                     pedestal=False, orbs=1)]),
         ("bell", [n("rock", arc=4.4, lift=5, form="slab", spread=0, hug=3.8,
                     pedestal=False, ceiling=1, orbs=1)]),
+        ("louvre", [n("rock", arc=3.6, lift=5, form="slab", hug=4.2,
+                      spread=0, pedestal=False, ceiling=1, orbs=1)]),
     ], filler=[
         ("joists", [n("oak", arc=3.5, lift=5, form="slab", spread=0,
                       hug=3.4, pedestal=False, orbs=1),
@@ -630,6 +735,10 @@ LEVELS: tuple[Level, ...] = (
                     orbs=2)]),
         ("threshold", [n("rock", arc=4.6, lift=1, spread=1),
                        n("ground", arc=5.0, lift=0, form="floor", orbs=1)]),
+        ("pylon", [n("accent", arc=3.4, lift=1, spread=1),
+                   n("rock", arc=3.7, lift=2, spread=0, orbs=1)]),
+        ("span", [n("accent", arc=4.7, lift=2, spread=1),
+                  n("rock", arc=4.7, lift=2, spread=1, orbs=1)]),
     ], filler=[
         ("court", [n("rock", arc=3.6, lift=1, spread=1, orbs=1),
                    n("accent", arc=4.4, lift=1, spread=1)]),

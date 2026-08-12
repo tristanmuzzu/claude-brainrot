@@ -568,15 +568,15 @@ on the same probes:
 
 | | generated | hand-built |
 |---|---|---|
-| designed landings placed **as authored** | n/a | **97.5%** |
-| designed content / the exit climb | n/a / 47% | **63% / 37%** |
-| distinct named beats in a run | 38 | **98** |
+| designed landings placed **as authored** | n/a | **97.1%** |
+| designed content / the exit climb | n/a / 47% | **68% / 33%** |
+| distinct named beats in a run | 38 | **137** |
 | named places | 15 shuffled themes | **24 designed levels** |
-| mean jump / share over 4 m | 2.90 m / — | **3.19 m / 21%** |
-| unchecked emergency placements | 0.30% | **0.18%** |
+| mean jump / share over 4 m | 2.90 m / — | **3.12 m / 17%** |
+| unchecked emergency placements | 0.30% | **0.13%** |
 | cells twice-claimed / off-lattice | 0 | **0** |
 | climbable without the parkour | 0 m | **0 m** |
-| frames mostly filled by a wall | 2.3% | **1.6%** |
+| frames mostly filled by a wall | 1.7% | **0.4%** |
 | seconds on one place | 7.3 s | **10.7 s** |
 | per frame | 2.34 ms | **2.80 ms** |
 
@@ -618,7 +618,7 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
-0. **The exit climb is still 37% of the hand-built tower.** The levels own
+0. **The exit climb is still a third of the hand-built tower.** The levels own
    *which* of the four shapes they leave by, and that is worth a lot -- 98
    distinct beats against 38 -- but not the shape itself, so a third of every
    run is machinery rather than design. The way in is to let a level author its

@@ -154,6 +154,12 @@ least three:
 Levels are listed in climb order. "Rise" is how far above this level the next
 one sits; "exit" is the designed way out of it.
 
+Each level runs six to nine beats before its exit climb, and every one of them
+plays: measured over sixteen runs, no beat in the table is ever skipped and the
+median level gets through its whole script and into its filler. The scripts
+were lengthened once for exactly that reason — at three to five beats a level
+spent half its terrace repeating filler.
+
 | # | theme | name | the idea | rise | exit |
 |---|---|---|---|---|---|
 | 1 | plains | Meadow Gate | wide grass humps at full reach over a carved pond, then fence posts | 5 | oak ledges |
@@ -217,16 +223,16 @@ Measured, 16 runs × 340 landings and 6 runs × 40 s:
 
 | | generated | hand-built |
 |---|---|---|
-| designed landings placed **as authored** | n/a | **97.5%** |
-| designed content, as a share of the course | n/a | **63%** |
-| the exit climb, as a share of the course | 47% | **37%** |
-| distinct named beats in a run | 38 kinds | **98 kinds** |
+| designed landings placed **as authored** | n/a | **97.1%** |
+| designed content, as a share of the course | n/a | **68%** |
+| the exit climb, as a share of the course | 47% | **33%** |
+| distinct named beats in a run | 38 kinds | **137 kinds** |
 | named places | 15 shuffled themes | **24 designed levels** |
-| mean jump / share over 4 m | 2.90 m / — | **3.19 m / 21%** |
-| unchecked emergency placements | 0.30% | **0.18%** |
+| mean jump / share over 4 m | 2.90 m / — | **3.12 m / 17%** |
+| unchecked emergency placements | 0.30% | **0.13%** |
 | cells claimed twice / off the lattice | 0 | **0** |
 | climbable without the parkour | 0 m | **0 m** |
-| frames mostly filled by a wall | 1.7% | **0.7%** |
+| frames mostly filled by a wall | 1.7% | **0.4%** |
 | seconds on one place | 7.3 s | **10.7 s** |
 | per frame | 2.34 ms | **2.80 ms** |
 
@@ -234,9 +240,11 @@ Two of those deserve a note. **Fidelity is not 100% and should not be**: the
 tower is round and the world is whole cells, so some authored point always
 falls between two of them and placement takes the nearer. What the number
 guards against is *sag* — a design change that quietly stops arriving. And the
-**exit climb is still more than a third of the course**, which is the largest
-remaining gap between this and a real map; the levels own which of the four
-shapes they use, but not the shape itself.
+**exit climb is still a third of the course**, which is the largest remaining
+gap between this and a real map; the levels own which of the four shapes they
+use and what the treads are made of, but not the shape itself. Measured: giving
+four more levels a ladder exit buys 0.2 points of non-hop share for 0.13 points
+of unchecked placement, so the fix is structural, not a reweighting.
 
 `tests/test_tower.py` holds the invariants that must never lapse: the design is
 legal on paper, three consecutive rises are the head-room, no two neighbouring
