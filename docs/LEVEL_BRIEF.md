@@ -117,6 +117,19 @@ the rest and is worth reading in full.
   repeat a `moat` in `filler`** — the filler loops and the second lap digs away
   the ground the first lap's pedestals stand on.
 - Changing `breaks` moves *every* break, not just how many.
+- **`moat` and `pedestal_style` on the same node dig a pond full of that
+  material.** `Course._moat` fills the bowl with `pedestal_style or
+  theme.liquid`, so a landing written `moat=True, pedestal_style="log"` cuts a
+  hole and fills it with solid, walkable logs — no error, no rejection, and
+  your unwalkability quietly gone. Writing both on one node is a natural thing
+  to do; do not.
+- **A level whose `landmark` is gate-capable cannot really use
+  `profile="channel"`.** The channel cuts its liquid exactly where the running
+  line goes, so there is no footing for the gate, the reservation fails and the
+  level pays for it and gets nothing — one level measured its structure on
+  screen at 0.4 s until it moved to `plaza`, then 2.4 s. Since `landmark` is
+  frozen, treat `channel` as available only if you are prepared for the
+  structure never to be seen.
 - `_targets` can return nothing and record no rejection. The cause is always
   `wants_ground` over a floor break, or `hug` past the shelf edge.
   `pedestal=False` is the fix.
