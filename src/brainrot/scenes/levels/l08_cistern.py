@@ -101,7 +101,7 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     #      so the rise is measured from where the body actually is, and
     #      floating -- the moat one landing back digs a bowl of radius
     #      three that a plinth 3.2 m along would have to stand in.
-    ("coping", [n("glow", arc=3.0, lift=1, spread=1, deco="lamp", orbs=1,
+    ("coping", [n("glow", arc=3.0, lift=1, spread=2, deco="lamp", orbs=1,
                   ceiling=3, pedestal_style="dripstone"),
                 n("rock", arc=2.9, lift=1, kind="walk", spread=0,
                   ceiling=3, moat=True),
@@ -136,9 +136,11 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     # tidiness: machinery is inserted between beats and leaves the body
     # back at lift 1, so a beat that opens by dropping off the height
     # the beat before it climbed to drops nothing about half the time.
-    ("tank", [n("rock", arc=3.4, lift=3, spread=1, ceiling=3, orbs=1,
+    ("tank", [n("rock", arc=3.2, lift=2, spread=1, ceiling=3, orbs=1,
                 pedestal_style="dripstone"),
-              n("slime", arc=4.6, step_y=-2, spread=1, pedestal=False,
+              n("rock", arc=3.2, step_y=1, spread=0, orbs=1,
+                pedestal_style="dripstone"),
+              n("slime", arc=4.6, lift=1, spread=0, pedestal=False,
                 moat=True, orbs=2),
               n("amethyst", arc=3.4, lift=3, kind="bounce", spread=1,
                 pedestal=False, orbs=3)]),

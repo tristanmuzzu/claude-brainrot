@@ -117,6 +117,12 @@ the rest and is worth reading in full.
   repeat a `moat` in `filler`** — the filler loops and the second lap digs away
   the ground the first lap's pedestals stand on.
 - Changing `breaks` moves *every* break, not just how many.
+- **Your exit climb's *launch* block is most of your jammed-lens number.**
+  One level measured 69 wall-jammed frames of 1,293 with the launch landing at
+  `hug=2.2`, and **0 of 1,280** at `hug=2.8`. Only the launch landing matters:
+  `hug` on the climb node itself is inert (2.0, 2.2, 2.6 and 3.0 all produce
+  worlds identical to the frame). If your sheet has a flat wall filling it
+  during the climb, move the launch block out before you try anything else.
 - **A `step_y` descent must not land at surface 1.0.** That is the terrace's
   own top cell: solid, so the landing is refused, the rest of the beat is
   abandoned, and the recovery drops a plain cube a block lower *under the

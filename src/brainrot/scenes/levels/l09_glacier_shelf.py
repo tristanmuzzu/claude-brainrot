@@ -70,8 +70,19 @@ from ._base import Level, n
 # half of the frame, the cliff is the darkest in the upper, and the two
 # lanterns -- the threshold and the foot of the moulin -- are the only
 # warm things in the level and both of them are doing a job.
+#
+# **The corridor is nine wide and that is measured too.** It was 11.5,
+# which is a court, and a crevasse is not a court: over four seeds and
+# ten seconds each, 11.5 frames 47.7% empty, 10.0 frames 45.9%, and 9.0
+# frames **42.3%** -- and the narrow one lays *more* design, 151 landings
+# of 260 against 141 of 238, because a pedestal on a ledge has ground to
+# find. It costs 2.0% of frames with a wall in the lens against nothing
+# at 11.5, and on this level that is the level working: two of four
+# seeds jam no frame at all and the worst streak is a third of a second
+# at a corridor bend. It also makes this the tight level between two
+# broad ones -- THE CISTERN below is 10.5 and THE APIARY above is 11.0.
 LEVEL = Level("GLACIER SHELF", "ice", rise=5, gap=3.2, exit="bubble",
-              band=11.5, shelf=5.0, breaks=0, landmark="arch",
+              band=9.0, shelf=5.0, breaks=0, landmark="arch",
               ground="snow", sub="packedice", rock="blueice",
               accent="calcite", liquid="water", glow="lantern",
               candy=("blueice", "packedice"),

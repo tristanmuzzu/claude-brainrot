@@ -12,21 +12,26 @@ from ._base import Level, n
 # obsidian furnace standing over the whole thing, and a brick flue at
 # the far end that you climb out of on a ladder.
 #
-# The route is a tap, a pit and a deck, and it goes down before it goes
-# up. You come in over a glowstone sill set flush in the black floor and
-# walk under the charging beam -- one block at which the palette stops
-# being the apiary's honey and grass and becomes blackstone, magma and
-# obsidian. Two steps up the bank of the tap-hole, with lava cut in
-# under the second of them. Then **off the bank, four metres out and
-# down into the casting pit**, whose floor is the melt; a walk through
-# the furnace door under its lintel; the charging stair up the inside of
-# the furnace, two treads, the top one glowstone and the brightest thing
-# in the level; and then off the front of that deck, **two blocks down
-# and 4.6 of arc out** -- the long jump of the level and the only kind
-# of long jump this motion model has, because falling takes time and the
-# body does not slow down while it falls. The slag run repeats after it
-# for as long as the terrace lasts: a lit pier, a soul-sand stride at
-# 2.5 m/s against a normal 5.6, and a magma step back up.
+# The route is a bank, a pit and a deck, and it goes up, falls, goes up
+# again, falls again, and only then leaves. You come in over a glowstone
+# sill set flush in the black floor -- one block at which the palette
+# stops being the apiary's honey and grass and becomes blackstone, magma
+# and obsidian -- cross the tap lip on foot under a duct beam, jump the
+# lava cut onto the bank of the runner, walk the bank under the next
+# duct, and take two treads up to its head, which is lit and is the
+# highest ground in the body of the level. Then **off the head of the
+# bank, three blocks down and 4.6 of arc out into the casting pit**,
+# whose floor is the melt; through the furnace door on foot under its
+# lintel; the charging stair up the inside of the furnace, two treads,
+# the top one glowstone and the brightest thing here; and off the front
+# of that deck, **two blocks down and 4.6 of arc out again** -- the long
+# jump of the level, and the only kind of long jump this motion model
+# has, because falling takes time and the body does not slow down while
+# it falls. The slag run repeats after it for as long as the terrace
+# lasts: a lit pier, a soul-sand stride at 2.51 m/s against a normal
+# 5.612, and a magma step back up. The way out is the flue: a lit
+# landing hard against the core, four blocks of ladder, and a magma lip
+# out over the chasm.
 #
 # The one thing you would remember is the **obsidian gate**. ``totem``
 # renders as two three-wide obsidian piers under a lintel with the
@@ -225,11 +230,18 @@ LEVEL = Level("THE CRUCIBLE", "nether", rise=5, gap=3.0, exit="ladder",
     # missing, this is a staircase again.
     #
     # Three landings. The foot of the flue, lit and hugged in against
-    # the core; four blocks of ladder; and a magma lip out over the
-    # chasm with a beam over it, so the last thing before the leap is a
-    # floor and not a wall -- a single climb of the level's whole rise
-    # is nine consecutive frames of flat brick at arm's length, which is
-    # the one thing a strip this narrow cannot afford.
+    # the core; four blocks of ladder; and a magma lip **out over the
+    # chasm at hug 3.8**, so the last thing before the leap is a lit
+    # floor with sky behind it and not a wall -- a single climb of the
+    # level's whole rise is nine consecutive frames of flat brick at
+    # arm's length, which is the one thing a strip this narrow cannot
+    # afford. The lip is written far out rather than at 3.0 because the
+    # camera locks onto the landing through take-off and flight: a lip
+    # tucked against the core aims the whole ride at the cliff, and the
+    # four frames after this ladder were the level's only jammed ones.
+    # Measured over four seeds, jam 2.4% -> 2.3% and empty frame 51.3%
+    # -> 50.3%, at identical fidelity, unchecked count and move mix --
+    # small, and free, and in the right direction on both.
     #
     # `pedestal=True` on the column is the load-bearing line and the
     # reason this branch fires at all: standing the landing on its own
@@ -248,6 +260,6 @@ LEVEL = Level("THE CRUCIBLE", "nether", rise=5, gap=3.0, exit="ladder",
     n("blackstone", arc=2.4, step_y=4, kind="climb", climb_style="ladder",
       hug=2.0, pedestal=True, pedestal_style="netherbrick", spread=0,
       orbs=2),
-    n("accent", arc=3.2, step_y=1, hug=3.0, spread=0, pedestal=False,
+    n("accent", arc=3.2, step_y=1, hug=3.8, spread=0, pedestal=False,
       ceiling=3, orbs=2),
 ])

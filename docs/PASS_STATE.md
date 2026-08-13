@@ -90,6 +90,21 @@ its own A/B, never while agents run.
     probably explains the 59%-mean / 1-of-16-fully reading at the batch-1
     merge. Sort the frontier; re-measure the watch item afterwards.
 
+11. **The generated exit climb launches at `hug=2.2` and that is most of the
+    wall-in-lens number.** Measured on one level: 69 jammed frames of 1,293 at
+    2.2, **0 of 1,280** at 2.8. `_ascent_climb`'s first node is written
+    `hug=2.2`, so this is one constant across the whole tower and is the most
+    promising single fix left for "a surface owns half the frame". Needs its
+    own A/B — it moves every world.
+12. **A beat's first node is effectively pinned at lift 1**, so a level's
+    opening landings are on the floor whatever the design wants: one level
+    measured an opener at lift 2 placing 67% against 100% at lift 1. That is
+    an engine property and it is a direct contributor to the "55% of landings
+    at lift 0-1" complaint the whole pass exists for.
+13. **`hug` on a climb node is inert** — 2.0 through 3.0 give identical
+    worlds. Only the launch landing's hug does anything. Either make it work
+    or reject it loudly.
+
 ## Watch list
 
 - **No-jump walk coverage rose to 59% mean with 1 of 16 levels fully
