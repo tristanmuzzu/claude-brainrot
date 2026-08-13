@@ -138,6 +138,13 @@ the rest and is worth reading in full.
 - `frame empty` and `lens jammed` are seed-noisy. Average several seeds, and
   remember that changing your level re-rolls the levels above it, so a ±10
   point move on one seed is not evidence.
+- **Your absolutes are not stable while your neighbours are being rewritten.**
+  Thirty-two other levels are changing under you: one agent measured the same
+  unchanged design at 63%, 57% and 44% designed content across three worlds
+  that differed only in the levels *below* it. So take every decision on an
+  **in-process A/B** — same roster, same seeds, both variants swapped on the
+  live `Level` object inside one run — and quote absolutes only as
+  approximate. Only the A/B is evidence.
 
 ## What to report back
 

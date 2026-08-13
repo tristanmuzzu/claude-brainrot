@@ -784,7 +784,20 @@ def seam(index: int, run: int = 1, blocks: int = 300) -> str:
 # ---------------------------------------------------------------------------
 
 def shoot(index: int, seed: int, frames: int, every: int, out: Path) -> str:
-    """The game camera, in a subprocess -- the pin is per-process."""
+    """The game camera, in a subprocess -- the pin is per-process.
+
+    The frame directory is **emptied first**, and that is not tidiness. A run
+    that lays fewer frames than the last one leaves the older PNGs behind,
+    ``--sheet`` tiles whatever is in the directory, and the contact sheet you
+    judge is then half the level you just changed and half the one you
+    replaced. An agent redesigning MARKET STREET judged a whole round against
+    a sheet like that and concluded the level was unchanged. The sheet is the
+    judge of this whole rebuild; it may not show stale frames.
+    """
+    frames_dir = out / "frames"
+    if frames_dir.is_dir():
+        for old in frames_dir.glob("*.png"):
+            old.unlink()
     r = subprocess.run(
         [sys.executable, str(ROOT / "tools/level_shot.py"),
          "--level", str(index + 1), "--seed", str(seed), "--frames",
