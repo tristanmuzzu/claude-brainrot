@@ -593,3 +593,79 @@ interiors and the lids.
 6. **Levels 21–33 have not been through this pass.** They are the roster as it
    was: two or three materials, monotonic climbs, and `arc` values written
    against the old reading of the jump envelope.
+
+## Measured against the reference, four ways (2026-08-13)
+
+The owner watched the rebuilt tower live and said ninety per cent of the levels
+were bad. Every acceptance number this tower had was green at the time, so the
+first job was to find a number that was not. Four were tried. **Three of them
+say we already match the real Parkour Spiral, and the fourth says we lose
+badly** -- and the fourth is the one `docs/RESEARCH.md` had already written
+down as never used.
+
+**1. The pixels of a frame: no gap.** `tools/frame_probe.py` reads rendered
+images and runs unchanged over a `brainrot shoot` directory and over the 122
+real frames in `docs/reference/frames`. Over 100 frames of the tower against
+the real map, every single-frame statistic says ours matches or beats it: unlit
+28% against 38 and 49, biggest single surface 35% against 31 and 39, materials
+on screen 8.4 against 10.2 and 8.3, edge detail 6.3% against 6.0 and 5.1, empty
+ninths 24% against 34 and 40, lopsidedness 41% against 39 and 45. **There is no
+aggregate of one frame's pixels on which this tower is worse than the one it
+copies.** Use those numbers as a regression guard -- they will catch a level
+going dark, blank or monochrome -- and never as a definition of good.
+
+Two things had to be fixed on the way in and both would have read as plausible
+results: an adaptive quantiser finds its N colours in any picture whatsoever,
+so the palette count read 20-23 materials for a black cliff and for a market
+square alike, and both sources wear a heads-up display inside the crop.
+
+**2. The groove: no gap either.** `docs/RESEARCH.md` §4 measured the real
+corridor as a shelf with rock off one shoulder, the drop off the other and a
+lid overhead almost always. Sampled at 1,596 landings over six runs, ours is
+the same building:
+
+| | ours | real map |
+|---|---|---|
+| a rock lid somewhere overhead | 98% | 98% |
+| median lid height | 9 blocks | 8 blocks |
+| roof within 6 | 26% | 25% |
+| nothing overhead within 40 | 2% | 2% |
+| a wall within 4 m on a side | 73% | 71% |
+| median distance to it | 4 m | 3 m |
+
+So "it feels like a thin layer wrapped around one big undifferentiated tower"
+is **not** the corridor's proportions. Do not go looking for it there again.
+
+**3. The exit climb: a real gap, and now closed by one keyword.** See the
+commit that stands the exit ladder on a pillar. Designed content 42% -> 46% of
+the course, the exit climb 38% -> 33%, climb moves 2% -> 4% of the mix, at no
+cost to placement, walkability, twice-claimed cells or the test suite. The
+overruns in item 3 of the previous section are gone with it: over 12 runs, a
+level visit is now min 11, median 20, max **30** landings, against the 171, 209
+and 210 recorded before.
+
+**4. The floor palette: the gap.** `docs/RESEARCH.md` line 365 --
+*"palette is the identity lever, and it has never been used"* -- and it still
+has not been. Measured over 54 level-visits, counting the top solid cell of
+every column of written terrain and keeping materials that hold at least 1% of
+that level's floor:
+
+| | ours | real map |
+|---|---|---|
+| materials on a level's floor | **median 6** | **median 14** |
+| share held by the commonest one | **55%** | **26%** |
+
+That is the only axis on which this tower loses to the reference, it is the
+one the research predicted, and it is what the owner is describing when he says
+the ground has to be reshaped rather than the jump blocks. Two more unused
+levers sit beside it in the same table and cost nothing once a floor has a
+palette: the real map **paints its route** as a stripe of another floor
+material down the middle of wide ground, and it marks a level's beginning with
+an emissive block flush in the floor with the palette changing completely at
+it.
+
+**The standing lesson.** Three of four probes said we were fine. The last pass
+was not wrong to measure; it was wrong to conclude from green numbers that the
+thing was good. A probe can only ever say *this particular difference is not
+the one* -- which is worth knowing, and is why all four are written down here
+including the three that found nothing.
