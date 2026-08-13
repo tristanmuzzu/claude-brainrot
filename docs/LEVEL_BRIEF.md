@@ -117,6 +117,13 @@ the rest and is worth reading in full.
   repeat a `moat` in `filler`** — the filler loops and the second lap digs away
   the ground the first lap's pedestals stand on.
 - Changing `breaks` moves *every* break, not just how many.
+- **A `step_y` descent must not land at surface 1.0.** That is the terrace's
+  own top cell: solid, so the landing is refused, the rest of the beat is
+  abandoned, and the recovery drops a plain cube a block lower *under the
+  beat's own name* — so the beat still reads as placed and the per-beat table
+  cannot tell you why it is stuck at 85%. One agent lost two passes to it. The
+  same rule with teeth: a bounce pad that is not at the bottom of a **two**
+  block fall will not throw two, because the pad needs an arrival over 11 m/s.
 - **`moat` and `pedestal_style` on the same node dig a pond full of that
   material.** `Course._moat` fills the bowl with `pedestal_style or
   theme.liquid`, so a landing written `moat=True, pedestal_style="log"` cuts a
