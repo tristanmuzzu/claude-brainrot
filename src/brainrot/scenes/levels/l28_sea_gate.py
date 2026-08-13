@@ -7,28 +7,149 @@ and ``docs/TOWER.md``.
 
 from ._base import Level, n
 
-# The sea gate. A monument hall: prismarine, sea lantern light, water
-# slots in the floor, and the gate arch the course passes through at
-# the end. Cool, ordered, symmetrical where the mesa was chaos.
+# A drowned causeway through a monument gate.
+#
+# The idea in one line: the sea has come in over the terrace, and you
+# cross it on the monument's own piers -- past a lit gold marker, through
+# a lamplit bay cut into the cliff, and out along the broken causeway.
+#
+# The old one was a **plaza**: a full floor twelve blocks wide, unbroken
+# for the whole eighty-two metres of the level. The blueprint's plan view
+# was one continuous grey plate from end to end, which is the thing the
+# owner has rejected three times in a sentence -- *you can just run past
+# half the obstacles*. It measured 45% covered by a no-jump walker and
+# 58% at worst, inside the rule only by accident, on 25% designed content
+# and 100% plain hop.
+#
+# It is a ``ledge`` now: four blocks of shelf against the core with the
+# drop genuinely outboard, which is what the real map's walking surface
+# measures as -- median four blocks wide, drop directly beside it -- and
+# moats cut into the shelf on top of that. The plan view is three islands
+# with real water and real holes between them, and the walker is down to
+# 29%.
+#
+# The palette is the other half of it. Prismarine on prismarine is one
+# value and reads as a teal plate, so the *accent is gold* -- the
+# monument's own block, and the one warm thing in a cold level. Six roles
+# set, four literals on top (sand, coral, calcite, dark prismarine), four
+# props. Every light here is doing a job: the threshold lantern and the
+# gold marker at the mouth of the bay. There is no ambient decorative
+# lighting anywhere in the reference and there is none here.
+#
+# Against DUST DEVILS below (hot orange, band 9.5, dry, a tight canyon)
+# and THE CORNICE above (white snow, band 8.5, an exposed rim) this is
+# dark blue-green, the widest band of the three, half of it standing in
+# water, and the only one of the three with a lamplit interior in it.
+#
+# Things here that only the per-beat table would tell you:
+#
+# * **The threshold lantern carries no moat**, and that one keyword was
+#   eight points of the beat's fidelity: a moat digs a radius-three disc
+#   the moment its landing commits, and the stride onto the sand bar
+#   2.9 m later lands *inside the hole*. The water is in the nave, where
+#   the jump onto it is long enough to clear the bowl.
+# * **The interior is a ``grotto``, not a ``hall``.** A hall or a tunnel
+#   on a *ledge* grows its walls only where the terrain gives them a
+#   footing, which on a shelf is the core side -- so it stands a wall
+#   right beside the lens and jammed it on 7% of frames, against 0% on
+#   the plaza it replaced. A grotto is carved *into* the cliff instead:
+#   same two-metre pinch, same lid, and it takes rock away rather than
+#   adding it.
+# * **The level ends at lift 3 on purpose.** The exit staircase is one
+#   landing per block and ``need`` is measured from wherever the body is
+#   when the climb triggers, so a level that finishes on its own high
+#   ground hands the machinery a two-step job instead of a five-step one
+#   -- and every frame of that staircase is sky.
+# * **The arch is a hop gate**, the only kind that reserves on a ledge:
+#   the walk gates (watchtower, windmill, cabin) want five supported
+#   cells across the corridor and are refused on every bearing here.
 LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="stair",
-              band=12.0, profile="plaza", landmark="arch",
+              band=12.0, profile="ledge", shelf=4.0, breaks=2,
+              landmark="arch",
+              ground="prismarine", sub="darkprismarine", rock="prismarine",
+              accent="gold", glow="sealantern", liquid="water",
+              candy=("sealantern", "gold"),
+              props=("lilypad", "coralfan", "pebbles", "lanternpost"),
+              sky=(96, 158, 168),
               step=("darkprismarine", "hop"), beats=[
-    ("steps", [n("ground", arc=4.4, lift=0, form="floor", orbs=1),
-               n("rock", arc=3.4, lift=1, spread=1)]),
-    ("hall", [n("rock", arc=3.3, lift=1, hug=3.2, spread=0,
-                shell="hall"),
-              n("rock", arc=3.4, lift=1, hug=3.2, spread=0,
-                shell="hall", orbs=1),
-              n("rock", arc=3.3, lift=2, hug=3.2, spread=0,
-                shell="hall")]),
-    ("slots", [n("accent", arc=3.5, lift=1, spread=0, moat=True),
-               n("accent", arc=3.4, lift=1, spread=0, moat=True,
-                 orbs=1)]),
-    ("court", [n("ground", arc=4.8, lift=0, form="floor", orbs=1)]),
-    ("dark", [n("darkprismarine", arc=3.4, lift=1, spread=0,
-                radial=1.3),
-              n("darkprismarine", arc=3.3, lift=2, spread=0,
-                radial=-1.3, orbs=1)]),
-    ("gate", [n("rock", arc=3.4, lift=2, spread=0, ceiling=2),
-              n("accent", arc=4.6, lift=2, spread=0, orbs=1)]),
+    # The threshold: a sea lantern flush in the floor on a rise, a stride
+    # onto the sand bar the tide has left, under the lintel of the old
+    # sea wall -- and then the drop into the flooded court. The palette
+    # changes completely at that lantern: red sand to dark teal in one
+    # frame.
+    #
+    # **The threshold is written at lift 1 and that is the whole of why
+    # it places.** Machinery is inserted between beats and leaves the body
+    # back at lift 1, so a first node asking for lift 2 is asking for a
+    # rise it only sometimes gets -- and the ``walk`` after it then needs
+    # its predecessor within half a block and does not have it. Measured
+    # on this beat alone: lift 2 with one walk, 67%; lift 2 with two,
+    # 50%; the same beat at lift 1 with one, below.
+    ("tideline", [n("glow", arc=3.2, lift=1, hug=3.4, spread=1,
+                    deco="lamp", orbs=1),
+                  n("sand", arc=2.9, lift=1, hug=3.4, kind="walk",
+                    spread=0, ceiling=5),
+                  n("prismarine", arc=3.4, lift=2, hug=3.6, spread=0,
+                    orbs=1),
+                  n("ground", arc=4.6, lift=0, hug=3.6, form="floor",
+                    spread=0, orbs=1)]),
+    # The nave, and the showpiece, about half way: a pier standing in the
+    # water, the gold marker over it under a checked lid, a stride, and
+    # the lamplit bay cut into the cliff. The rise and the water are
+    # inside one beat on purpose -- written across a beat boundary the
+    # machinery lands the body back at lift 1 and the moat digs nothing.
+    #
+    # **The node a ``walk`` steps off is pinned at the same ``lift`` as
+    # the tolerant one before it**, and that is the whole recipe. A beat's
+    # first node has to carry ``spread`` because it is placed from
+    # wherever the machinery left the body; the node after it therefore
+    # sits a block high or low about a fifth of the time. Asking for
+    # ``lift + 1`` there is asking for a rise of two on that fifth, which
+    # nothing can make -- this beat measured 78%. Asking for the *same*
+    # lift is a hop of +1, level or -1, all three of which are legal, and
+    # the walk after it then has its predecessor at a known height.
+    ("nave", [n("darkprismarine", arc=3.5, lift=1, hug=3.2, spread=1,
+                moat=True, orbs=1),
+              n("accent", arc=3.4, lift=1, hug=3.2, spread=0, ceiling=3,
+                deco="lamp"),
+              n("prismarine", arc=2.9, lift=1, hug=3.2, kind="walk",
+                spread=0),
+              n("darkprismarine", arc=3.3, lift=1, hug=3.6, spread=0,
+                shell="grotto", orbs=1)]),
+    # Out along the broken causeway: a half-height slab of the monument's
+    # facing stone -- stairs and slabs are the reference's commonest
+    # non-cube form by a wide margin and this tower has almost none -- a
+    # calcite step, and a coral-crusted pier hung out over the water with
+    # nothing under it. It ends on the level's high ground.
+    #
+    # There is no ``form="slab"`` here and the reason is worth recording
+    # honestly, because the first reading of it was wrong. A slab on this
+    # level came with 15 frames of "body 0.75 m inside the cone" and 7% of
+    # frames with the lens jammed, and dropping the slab took both to
+    # zero -- but a later revision with no slab at all brought both back
+    # at exactly the same magnitude. So the slab is **not** the cause: the
+    # camera check is one seed's run, the world is re-rolled by *any*
+    # change to any node, and the residue is machinery -- the lock's
+    # island, the landmark crossing, the exit staircase -- not the design.
+    # Read that row as noisy at this sample size and check it twice before
+    # attributing it to a keyword.
+    ("causeway", [n("prismarine", arc=3.4, lift=2, hug=3.8, spread=1),
+                  n("calcite", arc=3.4, lift=2, hug=3.6, spread=0),
+                  n("coral_blue", arc=3.4, lift=3, hug=3.6, spread=0,
+                    pedestal=False, deco="post", orbs=1)]),
+], filler=[
+    # The character, repeated: a long drop back into the flooded court, a
+    # wade between two piers, the gold marker again under its lid, and a
+    # coral stack standing free out towards the rim. Every lap ends at
+    # lift 3, so the climb out is asked for from the top of the level.
+    #
+    # No moat in here. The filler loops, and the second lap digs away the
+    # ground the first lap's pedestals are standing on.
+    ("piers", [n("darkprismarine", arc=3.9, lift=1, hug=3.2, spread=2,
+                 orbs=1),
+               n("prismarine", arc=2.9, lift=1, hug=3.2, kind="walk",
+                 spread=0, ceiling=3),
+               n("accent", arc=3.5, lift=2, hug=3.0, spread=0),
+               n("coral_blue", arc=3.4, lift=3, hug=3.8, spread=0,
+                 pedestal=False, orbs=1)]),
 ])

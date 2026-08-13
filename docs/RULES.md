@@ -778,6 +778,40 @@ time; none is guessable from the source.
   must find ground under a shelf that wobbles about ±1.3 and has holes in it.
   Floating the two ledge-dependent landings in three beats took one level from
   90% exact with beats at 89/90/90 to **98% with every script beat at 100%**.
+- **The node after a beat's opener must ask for the *same* `lift`.** A beat's
+  first node carries `spread` (it is placed from wherever machinery left the
+  body), so it sits a block high or low about a fifth of the time — and
+  `lift + 1` on the node after it is then a rise of two, which nothing makes.
+  The same `lift` is +1 / level / −1, all legal. Measured on one beat:
+  78% → 92%. For the same reason, **write a threshold beat at `lift 1`, not
+  `lift 2`**: the identical beat read 67% at lift 2 and **100%** at lift 1.
+- **`form="slab"` stands half a block *down* in its own cell.** `FORMS["slab"]`
+  is 0.5 against a full block's 1.0, so a slab written at the *same* `lift` as
+  the block before it is a **−0.5 step**, and the node after it then asks for
+  +1.5, which `--design-only` rejects as "rises +1.5 on a hop". A half-height
+  step **up** is `lift + 1, form="slab"`.
+- **Know what `frame empty` can and cannot see.** It is
+  `spiral_probe._lens_rays`: 25 rays, ±26° horizontal and ±36° vertical, against
+  voxels within an **8 m horizon**. So the steepest up-ray reaches only **4.6 m
+  above the eye**, and *anything higher than that over the head cannot move the
+  number* — nor can props, which are models rather than cells. **This is a
+  limitation of the metric, not a design rule**: the reference's own lid sits a
+  median eight blocks up, fills the top of its frames, and would read as "empty"
+  to this probe. Build the roof the composition rule asks for, and use the
+  contact sheet — not this number — to judge whether the frame is full.
+- **A beat's fidelity has about ±14 points of resolution at the default 8
+  runs**, because a level only gets about three visits and one landing is a
+  seventh of a beat. The same beat definition read 78 / 92 / 78 across runs that
+  differed only in an unrelated node. The "no beat under 98%" criterion is not
+  measurable there: use `--report --runs 24 --no-motion`, which needs no window
+  and takes seconds.
+- **Two non-findings, recorded so nobody repeats them.** The core's overhang
+  does *not* eat close hugs — `Cone.core_r` moves 0.13 blocks over four of
+  height, and a cell at `hug` 1.8–4.2 is rock 0.1% of the time over 1,320
+  samples, because `outer_at − band_at` **is** `core_r`. And the `body inside
+  the world` and `lens jammed` rows are one seed's run: they flipped between 0
+  and 15 frames across revisions that could not have caused it. Treat both as
+  noisy at that sample size.
 - **Three things that were reported by agents and are *not* true**, both checked
   by the parent and recorded so they do not get rediscovered: `kind="walk"`
   **can** be authored (six levels use it with `--design-only` clean; the
