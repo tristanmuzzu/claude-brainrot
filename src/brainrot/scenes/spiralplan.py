@@ -3981,9 +3981,20 @@ class Course:
             # 2.0 and not 1.6 since the face grew its lean: the brow bulges
             # up to a block outward near the soffit, and a ride at 1.6 put
             # the body's shoulders through it at the top of tall climbs.
+            # ``pedestal=True`` and it is the whole reason this branch ever
+            # fires. A ladder hangs on something: :meth:`_climb_move` looks for
+            # solid rock or pedestal within one cell of the column at its
+            # middle and at its top, and out here the core's lean reaches
+            # neither. Floated, the climb was refused essentially always --
+            # measured at 1 anchored column in 1,559 candidates, and 11,097 of
+            # 13,000 refused on a bubble exit -- so a level whose ``exit`` said
+            # ladder silently got an eight-landing staircase and was not told.
+            # Standing the landing on its own stack gives the column a pillar
+            # to hang on, which is also what a ladder in the reference map
+            # hangs on.
             self._node(style, arc=2.4, step_y=need + 1, kind=climb,
                        climb_style=ASCENT_SOFT[kind], hug=2.0,
-                       pedestal=False, spread=0, label="ascent", orbs=2),
+                       pedestal=True, spread=0, label="ascent", orbs=2),
             self._crossing(rng, lv),
         ]
 
