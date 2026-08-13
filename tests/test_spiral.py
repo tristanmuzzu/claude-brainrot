@@ -70,6 +70,15 @@ def test_the_trough_is_walkable_all_the_way_round() -> None:
             # against either one is the world working, not a hole in it.
             lo = out - sp.BAND + sp.BAND_MARGIN
             hi = out - sp.BAND_MARGIN
+            # ...and stopping short of the outer wall, where this stretch has
+            # one. The wall is solid on purpose -- it is the outboard side of
+            # the groove, and the reference has rock there a third of the way
+            # round -- so sampling past it is asking whether a cliff is clear
+            # air. Everything inboard of it still has to be, which is what
+            # this test is for.
+            face = c.buttress_face(u)
+            if face < float("inf"):
+                hi = max(lo + 0.8, min(hi, face - sp.BUTTRESS_STANDOFF))
             if not c.has_floor(u):
                 continue            # the chasm at the end of a level
             for frac in (0.2, 0.5, 0.8):

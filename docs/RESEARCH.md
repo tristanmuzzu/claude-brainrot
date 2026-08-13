@@ -166,14 +166,20 @@ the real map's 71% and looked nothing like it. `tools/mapdig/enclosure.py`
 asks the two-sided question against the save — it reproduces the 71% row as
 72.4%, which is what says the two measurements are the same measurement:
 
-| along the route | real map | ours |
-|---|---|---|
-| rock within 4 m on **both** sides | **22.6%** | **3.9%** |
-| inward (the core) only | 39.0% | **71.3%** |
-| **outward only** | **11.0%** | 1.8% |
-| neither | 27.6% | 23.1% |
-| **rock outboard at all** | **33.6%** | **5.6%** |
-| a canyon: both sides *and* a lid within 12 | **22.2%** | **3.3%** |
+| along the route | real map | ours, before | ours, after |
+|---|---|---|---|
+| rock within 4 m on **both** sides | **22.6%** | **3.9%** | **20.5%** |
+| inward (the core) only | 39.0% | **71.3%** | 55.5% |
+| **outward only** | **11.0%** | 1.8% | 9.3% |
+| **rock outboard at all** | **33.6%** | **5.6%** | **29.8%** |
+| a canyon: both sides *and* a lid within 12 | **22.2%** | **3.3%** | 16.7% |
+
+The "after" column is `Cone.buttress_*`, added 2026-08-13: an outer wall on the
+drop side, present on stretches and absent on stretches, closed form like
+everything else about the building. Cost: unchecked placements 0.16% → 0.27%,
+designed content 46% → 44%, and frame cost went *down* (2.65 → 2.40 ms, ratio
+to parkour 1.17) because a wall occludes the world behind it. Walkability held
+at 0 m, twice-claimed cells at 0, 628 tests green.
 
 **A third of the real route has rock on its outboard shoulder. Ours has the
 drop there essentially always.** That is the measured form of "it feels like a

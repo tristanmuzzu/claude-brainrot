@@ -203,6 +203,15 @@ MATERIALS.update({
     # into the material. The soffit is the single largest surface in the format
     # and it has to read as stone.
     "conesoffit": ((206, 202, 194), "cobble", 0.03),
+    # The outer wall of the groove, and it is deliberately far lighter than the
+    # core it faces -- for exactly the reason written above the soffit. It is a
+    # vertical face turned *inward*, so the renderer's directional shading
+    # takes it down again, and at the core's own 74 it came out near black:
+    # measured on the frame probe, adding the wall in `conerib` took unlit from
+    # 28% of the frame to 44% against vanilla Minecraft's 17%, and the biggest
+    # single surface from 35% to 42%. The wall is meant to enclose the corridor,
+    # not to black it out.
+    "conebutt": ((152, 147, 139), "cobble", 0.03),
 })
 
 #: Props whose origin is at the *top* of the model, so they hang from the cell
@@ -338,6 +347,79 @@ FLOOR_T = 5
 #: How many cells deep the flank and the core are actually built. The inside
 #: of a solid cone is never seen; :meth:`Cone.rock` still says it is rock.
 SKIN = 2
+
+# ---------------------------------------------------------------------------
+# The outer wall
+# ---------------------------------------------------------------------------
+#
+# The largest single thing this building was missing, and it took measuring
+# the real map twice to see it. ``docs/RESEARCH.md`` §4 asked whether there
+# was a wall within 4 m **on at least one side** and got 71% for the reference
+# and 73% for this tower -- a match, from a question the core wall answers on
+# its own. Asked two-sided against the world save (``tools/mapdig/
+# enclosure.py``), the real route has rock on its *outboard* shoulder 33.6% of
+# the way and rock on both sides 22.6%. This tower had 5.6% and 3.9%: the
+# corridor was a ribbon cantilevered off a core with the drop on one side and
+# nothing whatever on the other, so every frame was composed identically --
+# cliff down one edge, sky down the other -- and no level design could move it,
+# because it was the building. That is the owner's "a thin layer wrapped
+# around one big undifferentiated tower", and this is the fix.
+#
+# Note what the reference does *not* do: it is not a canyon everywhere either.
+# 39% of it is the one-sided shelf, 27.6% has nothing close on either side.
+# The point is that the enclosure keeps changing, so the buttress is present
+# on stretches and absent on stretches rather than run round the whole rim.
+
+#: How far in from the rim the outer wall's inner face may reach, at full
+#: strength. Five puts the face about two metres outboard of a course hugging
+#: the core at 3, which is what "within 4 m" needs, and leaves the shelf
+#: itself untouched.
+#: "No wall here", as a radius nothing can be outboard of.
+_INF = float("inf")
+
+BUTTRESS_MAX = 5.0
+#: How far short of the wall the *course* keeps its lane. The ground runs all
+#: the way to the wall's foot, but a landing hard against a cliff face puts
+#: that face across the lens on the frame it is jumped from.
+BUTTRESS_STANDOFF = 1.2
+#: How much floor a stretch with a wall must keep, core face to the wall's
+#: foot. The authored courses hug the core between 2 and 4.8, so this has to
+#: clear the widest of them with a body's width to spare.
+BUTTRESS_KEEP = 5.5
+#: How high the wall stands above its level's floor, in blocks.
+#:
+#: The minimum is three and that is a safety property, not a look: a body
+#: steps up one block without thinking, so a parapet whose top is one or two
+#: above the floor is a stair onto it, and the walkability probe would find a
+#: route over the wall and along the rim. Three cannot be stepped onto.
+#: The top is also **flat along a whole level** for the same reason -- a top
+#: that varied smoothly with bearing would be a staircase built out of its own
+#: skyline, which is exactly the regression :meth:`Cone.core_r` records having
+#: had once already.
+#: The top of the range is eight rather than the soffit: a wall that reaches
+#: the ceiling closes the corridor into a tube, and the frame probe reads that
+#: straight off -- at ten the biggest single surface went to 42% of the frame
+#: against vanilla Minecraft's 33%. Eight leaves the slot of sky the reference
+#: has and still stands three times a body's step.
+BUTTRESS_H = (3, 8)
+#: The per-level appetite for a wall, before the along-arc modulation. The low
+#: end is negative so that a level can have none at all.
+BUTTRESS_BIAS = (-0.30, 1.95)
+#: What fraction of a level's arc the wall takes to fade in at each end.
+BUTTRESS_FADE = 0.12
+#: Metres of arc either side of a level's apron kept clear of the wall. The
+#: gated landmarks are three to four times the cells of the plain ones and the
+#: course is steered through their doorways, so this is the same scale as the
+#: nine blocks a lock is kept clear of one.
+BUTTRESS_APRON = 11.0
+#: ...and how much *approach* to a gated doorway is kept clear on top of it.
+#: The run-up is laid along the lane and a narrower lane moves where it
+#: finishes, and the leg onto the first stored cell is an ordinary jump from
+#: wherever that was. Suppressing the whole upstream half of every gated level
+#: -- which is nearly every level, twelve of the fourteen blueprints having a
+#: gated variant -- cost two thirds of the wall: outboard coverage 34% down to
+#: 22%. This is the run-up and no more.
+BUTTRESS_RUNUP = 26.0
 #: Ribs round the circumference. At the base that is a rib every 1.9 cells,
 #: which is what the reference's corduroy measures.
 RIBS = 56
@@ -1243,8 +1325,52 @@ class Cone:
         """The trough's inner edge: the foot of the flank above."""
         return self.outer_at(u) - self.band_at(u)
 
+    def buttress_face(self, u: float) -> float:
+        """Radius of the outer wall's inner face, or ``inf`` for no wall.
+
+        Deliberately independent of :meth:`floor_range`, because floor_range
+        subtracts *this* to stop the ground running under the wall and the two
+        would otherwise call each other forever. The ordering is: the shelf
+        decides how wide it wants to be, the wall stands clear outboard of
+        that, and the ground is then trimmed back to the wall's foot.
+        """
+        d = self.buttress_d(u)
+        if d <= 0.0:
+            return _INF
+        lv = self.level(self.level_index(u))
+        out = self.outer_at(u)
+        # Never closer in than ``BUTTRESS_KEEP`` of floor. Deliberately *not*
+        # measured off the shelf the level asked for: that would call
+        # :meth:`floor_range`, which subtracts this, and the two would recurse.
+        face = max(out - d, out - lv.band + BUTTRESS_KEEP)
+        return face if face <= out - 0.5 else _INF
+
     def floor_range(self, u: float, apron: bool = True) -> tuple[float, float]:
-        """The radial extent of the ground at this bearing.
+        """The radial extent of the **standable** ground at this bearing.
+
+        The shelf the level asked for, trimmed back wherever the outer wall
+        stands. Everything that paints, walks, reserves or plants goes through
+        here, so trimming once at the source is what stops the wall growing
+        ground underneath itself -- and it is what keeps the trough-walkable
+        test honest, since that test's whole premise is that this range is
+        clear air above solid floor.
+        """
+        lo, hi = self._shelf_range(u, apron)
+        face = self.buttress_face(u)
+        if face < _INF:
+            # The ground runs out to meet the wall, exactly: a ledge widens to
+            # its foot, a plaza is cut back to it. Not *nearly* -- a gutter of
+            # void between the two leaves a slot of open sky between the
+            # ceiling's edge and the wall standing above it, which is what the
+            # trough-open-to-the-sky test found the first time this was built
+            # with one. It also means the wall stands on something instead of
+            # hanging over a crack.
+            hi = face
+        return lo, max(lo + 3.0, hi)
+
+    def _shelf_range(self, u: float, apron: bool = True) \
+            -> tuple[float, float]:
+        """The ground the *level* asked for, before the wall trims it.
 
         The full band for a ``plaza`` level -- every generated level, and the
         designed streets and halls that dress a wide floor as a place. A
@@ -1342,6 +1468,90 @@ class Cone:
                  + 0.35 * (0.5 + 0.5 * math.sin(u * 7.7 + self._w1)))
         return inner + ridge * t
 
+    def buttress_d(self, u: float) -> float:
+        """How far in from the rim the outer wall reaches here, 0 for none.
+
+        Closed form, like everything else about this building, so the mesh and
+        the collision test cannot disagree and a wall cannot appear behind a
+        jump that was already solved. Two terms: a per-level appetite drawn
+        off the level's own index -- which is what makes one level a canyon
+        and the next an open ledge -- and a slow modulation along the bearing,
+        so a level that has a wall does not have it for its whole length.
+        """
+        if not self.has_floor(u):
+            return 0.0          # never across the chasm: that hole is the level
+        lv = self.level(self.level_index(u))
+        bias = (math.sin(lv.index * 78.233 + 1.7) * 43758.5453) % 1.0
+        wave = (math.sin(u * 2.7 + self._w1)
+                + 0.7 * math.sin(u * 6.3 + self._w2))
+        s = BUTTRESS_BIAS[0] + (BUTTRESS_BIAS[1] - BUTTRESS_BIAS[0]) * bias \
+            + 0.42 * wave
+        if s <= 0.0:
+            return 0.0
+        # Faded out at both ends of the level, and it earns its keep three
+        # times over. A cell near a seam rounds into the level *next door*,
+        # whose wall is at its own radius and whose floor is four to six
+        # blocks away, so without this the trough-walkable test finds 31
+        # samples of 1,368 standing inside a neighbour's masonry. It also
+        # keeps the wall off the two things at a level's ends that a run
+        # cannot do without: the exit climb and the crossing.
+        t = (u - lv.u0) / max(1e-6, lv.u1 - lv.u0)
+        fade = min(1.0, min(t, 1.0 - t) / BUTTRESS_FADE)
+        if fade <= 0.0:
+            return 0.0
+        # And kept off the apron, which is the swell of shelf a level's
+        # landmark stands on and -- for the twelve blueprints with a gated
+        # variant -- the ground the course is steered through. A wall there
+        # takes the room the structure needs and the crossing falls through to
+        # the unchecked answer, which ``test_the_course_goes_through_the_
+        # landmarks_it_gates`` catches. The first draft got this for free by
+        # measuring the wall off the shelf's own edge, which the apron widens;
+        # it has to be said out loud now the two are independent.
+        au = self.apron_u(lv)
+        near = abs(u - au) * max(6.0, self.rim_at(lv.y))
+        if near < BUTTRESS_APRON:
+            fade = min(fade, near / BUTTRESS_APRON)
+            if fade <= 0.0:
+                return 0.0
+        # On a level whose landmark carries a passage, the wall is kept off
+        # everything *before* the structure as well, because the run-up to a
+        # doorway is laid along the lane and a narrower lane moves where it
+        # finishes. The leg onto the first stored cell is an ordinary jump
+        # from wherever the approach got to and ``no move: hop`` is the whole
+        # of its rejection table; one crossing in six runs fell through to the
+        # unchecked answer with the wall merely upstream of it. Downstream of
+        # the apron the wall is free, which is most of a level.
+        if lv.landmark in GATED and u < au:
+            return 0.0
+        return min(1.0, s) * BUTTRESS_MAX * fade
+
+    def buttress_top(self, lv: Section) -> int:
+        """The wall's top for a whole level, in absolute ``y``.
+
+        One height per level and flat along its arc. A top that drifted with
+        bearing would be a flight of stairs a body could walk up beside the
+        course, which is the one thing the shape of this tower may never do.
+        """
+        f = (math.sin(lv.index * 31.7 + 4.1) * 24634.6345) % 1.0
+        return lv.y + BUTTRESS_H[0] + int(f * (BUTTRESS_H[1] - BUTTRESS_H[0]))
+
+    def buttress_r(self, u: float, y: int) -> float:
+        """The outer wall at one cell's height, or ``inf`` for open drop.
+
+        :meth:`buttress_face` says where; this says how far up. It rises from
+        its own level's floor and stands on it, because
+        :meth:`floor_range` runs the ground out to exactly the wall's foot --
+        so a stretch with a wall is a corridor with ground under both edges,
+        and a stretch without one is the ledge with the drop off it. That
+        alternation is the finding: the reference is not a canyon everywhere
+        either, it has rock outboard a third of the way and open air for the
+        rest.
+        """
+        lv = self.level(self.level_index(u))
+        if y < lv.y or y > self.buttress_top(lv):
+            return _INF
+        return self.buttress_face(u)
+
     def tooth(self, u: float) -> bool:
         """Does the ceiling slab hang a tooth at this bearing? The soffit's
         underside is dead flat otherwise, and a flat plate overhead is the
@@ -1410,6 +1620,12 @@ class Cone:
                 r1f = self.floor_range(up)[1]
                 if r1f - 1.6 <= r <= r1f:
                     return True
+        # The outer wall of the groove, on the stretches that have one. Guarded
+        # on a cheap radial bound first: this is the hottest predicate in the
+        # module and nothing within the shelf can ever be buttress.
+        if r > self.rim_at(y) - BUTTRESS_MAX - 2.0 \
+                and r >= self.buttress_r(u, y):
+            return True
         return r <= self.core_r(u, y)           # the core, behind your back
 
     def surface_y(self, x: float, z: float, y_hint: float) -> int:
@@ -1522,6 +1738,22 @@ class Cone:
             self._ring(ct, st, inner - SKIN, self.core_r(u, y), y,
                        lv.theme.sub if 0 <= h < 2 else "conerib",
                        seen, place, rib=True)
+            # The outer wall of the groove, where this stretch has one. Styled
+            # like the core so the two read as one cut, and painted through
+            # ``rock`` itself rather than by the march's own float radius --
+            # a cut profile decided twice is how a course grows invisible
+            # walls, and this one is a wall on the side the body falls off.
+            br = self.buttress_r(u, y)
+            if br < _INF:
+                # Banded, and the band at head height is the level's *own*
+                # stone. One flat grey face is what the first draft was and it
+                # cost three points of materials-on-screen; a groove cut
+                # through a themed layer shows that layer in its wall, which
+                # is both what the reference looks like and free identity.
+                face = (lv.theme.sub if h < 2 else
+                        lv.theme.rock if h < 4 else "conebutt")
+                self._ring(ct, st, br, br + SKIN, y, face, seen, place,
+                           styler=lambda c, s=face: s if self.rock(c) else None)
             if y == above.y - FLOOR_T - 1 and self.tooth(u) \
                     and self.has_floor(u + 2 * math.pi):
                 r1f = self.floor_range(u + 2 * math.pi)[1]
@@ -1944,7 +2176,16 @@ class Course:
         """
         out = self.cone.outer_at(u)
         lo = out - self.cone.band_at(u) + (hug or BAND_MARGIN)
-        return lo, max(out - BAND_MARGIN, lo + 0.8)
+        hi = max(out - BAND_MARGIN, lo + 0.8)
+        # ...and stop short of the outer wall where this stretch has one. The
+        # wall is rock, so a candidate out there would be refused anyway; what
+        # this buys is not correctness but the refusals never happening, which
+        # is the difference between a lane that is narrower here and a lane
+        # that spends a third of its candidates on cells inside a cliff.
+        face = self.cone.buttress_face(u)
+        if face < _INF:
+            hi = max(lo + 0.8, min(hi, face - BUTTRESS_STANDOFF))
+        return lo, hi
 
     @property
     def difficulty(self) -> float:
@@ -2185,6 +2426,7 @@ class Course:
         no longer exists.
         """
         self._pending = []
+        self._abandon(prev)
         theme = self.cone.section_at(self.u).theme
         if self.segment == "ascent":
             got = self._climb_on(prev, theme)
@@ -2230,6 +2472,17 @@ class Course:
                     if got is not None:
                         return got
         return None
+
+    def _abandon(self, prev: dict) -> None:
+        """The feature being given up on gets a chance to clean up after itself.
+
+        Nothing to do for a generated feature: its remaining nodes are already
+        thrown away by the caller. The hand-built tower overrides this because
+        one of its features holds *world* open while it runs -- a gated
+        landmark's doorway -- and cells held open are treated as solid by
+        :meth:`_path_clear`, so a crossing that dies with its passage still
+        held has left the recovery a wall to argue with.
+        """
 
     def _climb_on(self, prev: dict, theme) -> dict | None:
         """Recovery for a failed exit climb that does not throw the climb away.

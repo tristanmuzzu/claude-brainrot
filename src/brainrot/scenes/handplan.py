@@ -375,19 +375,49 @@ class Course(sp.Course):
             lv = self.cone.level(idx)
             if self._gate_ahead(lv):
                 continue            # there is still a way through to take
-            self._crossed.add(idx)
-            if idx in self._gate_hit:
-                # The body went through it. Taking down a building the course
-                # has already run into is the one thing worse than leaving a
-                # wall standing.
-                continue
-            self._retired.add(idx)
-            self.landmark_cross.pop(idx, None)
-            held = self.landmark_hold.pop(idx, None)
-            self._hold_cells -= set(plan[1])
-            if held is not None:
-                self._hold_cells -= {c for c, _ in held[0]}
+            self._take_down(idx, lv, plan)
+
+    def _take_down(self, idx: int, lv, plan, replace: bool = True) -> None:
+        """Mark a gate crossed and, unless the body got through it, remove it."""
+        self._crossed.add(idx)
+        if idx in self._gate_hit:
+            # The body went through it. Taking down a building the course has
+            # already run into is the one thing worse than leaving a wall
+            # standing.
+            return
+        self._retired.add(idx)
+        self.landmark_cross.pop(idx, None)
+        held = self.landmark_hold.pop(idx, None)
+        self._hold_cells -= set(plan[1])
+        if held is not None:
+            self._hold_cells -= {c for c, _ in held[0]}
+        if replace:
             self._replace_landmark(lv)
+
+    def _abandon(self, prev: dict) -> None:
+        """A crossing that has run out of answers takes its doorway with it.
+
+        The passage is *held* while the crossing is live, and a held cell is
+        solid to :meth:`_path_clear`. So a crossing whose leg cannot be placed
+        used to leave the recovery chain arguing with the very wall the
+        crossing existed to get through, and the run fell all the way to the
+        one unchecked placement -- which is what
+        ``test_the_course_goes_through_the_landmarks_it_gates`` asserts can
+        never happen. Taking the gate down here hands those cells back before
+        the first recovery hop is tried, which is the module's own rule
+        (:meth:`_retire_gates`) applied one step earlier.
+        """
+        if self.segment != "landmark":
+            return
+        idx = self.cone.level_index(self.u_of(prev))
+        plan = self.landmark_cross.get(idx)
+        if plan is None or idx in self._crossed:
+            return
+        # ...and *without* standing the small landmark in its place. That
+        # replacement is reserved ahead of the frontier, which is exactly
+        # where the body is when a crossing dies, so it would hand the
+        # recovery a fresh obstacle in the same breath as clearing one.
+        self._take_down(idx, self.cone.level(idx), plan, replace=False)
 
     def _replace_landmark(self, lv) -> None:
         """Stand the *small* landmark ahead of the body instead.
