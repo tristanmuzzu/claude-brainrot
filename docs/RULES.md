@@ -94,8 +94,9 @@ solved routes (`docs/RESEARCH.md` §3): 122 jumps, **modal 3.0 m, median 3.16,
 mean 3.20, p90 4.12, max 5.10** — and 60% of them are level or up one. This is
 the single most useful number here, because the temptation with an envelope in
 front of you is to sit at the top of it, and the reference does not. Write your
-ordinary jump at **3.0–3.5 m**, let the level's harder beats run to 4.0–4.3,
-and keep anything past that for one showpiece.
+ordinary jump at **`arc` 3.0–3.5**, let the level's harder beats run to
+`arc` 4.0–4.4, and keep anything past that for one showpiece — but read the
+next section first, because `arc` is not the distance the physics checks.
 
 The reference also **almost never jumps down**: 2 of 122 jumps drop more than
 one block. Our envelope is *more* generous below the horizontal than the real
