@@ -35,8 +35,39 @@ from ._base import Level, n
 #
 # Against PUMPKIN ROWS below it: nine metres of band against twelve, hot
 # orange lamplight against cold cyan, a low weaving field against a
-# three-block fall and a seven-block climb, and a stair out against a
+# two-block fall and a six-block climb, and a stair out against a
 # spring. Against DUST DEVILS above it: teal against terracotta.
+#
+# **The frame pass (2026-08-13), against a rule that is now under 48%
+# rather than under 55%.** This level measured 51.3% over six seeds. The
+# ray fan bucketed by the feature under the body said where it was:
+# ``canopy`` 30% of the frames at 60% empty, ``spores`` 15% at 69%, and
+# the exit climb -- already the fullest thing here at 44% -- 29%. Three
+# changes, each measured on identical worlds, and **not** the obvious
+# one: a single ``ceiling`` or ``shell`` added to a script beat moved
+# the total by under half a point every time it was tried, because on a
+# ledge a shell's two wall columns land one cell inside the cliff and
+# one cell past the shelf edge, so it is a ten-cell roof and nothing
+# else. (The one on the threshold's stride stays because it took that
+# beat from 94% placed to 98%, not because it is visible.)
+#
+# * **``shelf`` 4.5 -> 6.0, worth 1.4 points**, and the row it moves is
+#   the bottom of the frame: the fan's two lower rows were spending the
+#   drop beside a four-and-a-half-block ribbon on the sea. It also
+#   *improved* fidelity -- ``canopy`` 82% -> 93%, exact 91% -> 96% --
+#   because a pedestal on a ledge has to find ground under a shelf that
+#   wobbles about a block and a half either way, and a wider one has it.
+# * **The canopy runs at lift 2, not lift 3, worth 2.2 points.** Height
+#   is the biggest single lever on this metric and it is not subtle: at
+#   lift 3 the shallow down-rows of the fan fly over the shelf edge into
+#   the void, at lift 2 they land on the terrace. The fall off the shelf
+#   is two blocks now instead of three, which is still a fall.
+# * **A ``ceiling=7`` on the lit step at the foot of the spring**, on the
+#   drop into the hollow, and on the threshold. Individually noise;
+#   together with the two above, **45.3% over six seeds, worst 47.8%.**
+#   The lid count is deliberately kept near half the landings -- a lid
+#   inside eight blocks of the head sends ``_indoor_want`` to 0.85 and
+#   takes 27% off every tint in the frame.
 #
 # The things that are not free choices:
 #
@@ -90,7 +121,7 @@ from ._base import Level, n
 #   that -- and there is **no moat in the filler**, because the loop's
 #   second lap digs out the first lap's footings.
 LEVEL = Level("THE GROVE", "warped", rise=6, gap=3.0, exit="bubble",
-              band=12.0, shelf=4.5, breaks=2, landmark="greatcap",
+              band=12.0, shelf=6.0, breaks=2, landmark="greatcap",
               ground="warpednylium", sub="soulsand", rock="warped",
               accent="shroomlight", liquid="water", glow="sealantern",
               candy=("shroomlight", "warped"),
@@ -102,31 +133,31 @@ LEVEL = Level("THE GROVE", "warped", rise=6, gap=3.0, exit="bubble",
     # to teal at that one block -- and then up onto the first stem under
     # the first cap.
     ("spores", [n("glow", arc=3.2, lift=1, hug=3.4, spread=0, deco="lamp",
-                  moat=True, orbs=1),
-                n("rock", arc=3.4, lift=2, hug=3.2, spread=1, ceiling=3,
+                  moat=True, ceiling=7, orbs=1),
+                n("rock", arc=3.4, lift=2, hug=3.2, spread=1, ceiling=5,
                   pedestal_style="warped"),
                 n("warped", arc=2.9, lift=2, hug=3.2, kind="walk",
-                  spread=0)]),
+                  spread=0, ceiling=3, shell="tunnel")]),
     # The grove itself, and the level's one idea: three landings with a
     # cap over every one of them, the middle one crossed at soul-sand
-    # pace, and then the drop off the shelf into the hollow -- three
+    # pace, and then the drop off the shelf into the hollow -- two
     # blocks, the reference's own way of losing height, which is to fall
     # off an edge rather than to jump down.
     #
     # The climb and the fall are in one beat because machinery is
     # inserted *between* beats and puts the body back at lift 1; written
     # across a boundary the fall is not a fall.
-    ("canopy", [n("accent", arc=3.4, lift=3, hug=3.2, spread=0,
+    ("canopy", [n("accent", arc=3.4, lift=2, hug=3.2, spread=0,
                   pedestal=False, ceiling=5,
                   pedestal_style="shroomlight"),
-                n("soulsand", arc=2.9, lift=3, hug=3.2, kind="walk",
+                n("soulsand", arc=2.9, lift=2, hug=3.2, kind="walk",
                   spread=0, ceiling=3, pedestal_style="shroomlight",
                   orbs=1),
-                n("soulsand", arc=2.9, lift=3, hug=3.4, kind="walk",
-                  spread=0),
+                n("soulsand", arc=2.9, lift=2, hug=3.4, kind="walk",
+                  spread=0, ceiling=3, pedestal_style="shroomlight"),
                 n("ground", arc=5.4, lift=0, hug=3.4, form="floor",
-                  orbs=2),
-                n("rock", arc=3.4, lift=1, hug=3.2, spread=1,
+                  ceiling=7, orbs=2),
+                n("rock", arc=3.4, lift=1, hug=3.2, spread=1, ceiling=5,
                   moat=True)]),
 ], filler=[
     # The thicket, which is most of what the terrace actually plays: stem,
@@ -161,6 +192,6 @@ LEVEL = Level("THE GROVE", "warped", rise=6, gap=3.0, exit="bubble",
     # landings rather than the staircase's seven -- on a level this
     # length that one line is worth about fifteen points of designed
     # content.
-    n("rock", arc=3.0, lift=1, hug=2.2, spread=2, deco="lamp"),
+    n("rock", arc=3.0, lift=1, hug=2.2, spread=2, deco="lamp", ceiling=7),
     n("warped", arc=3.0, step_y=6, kind="bubble", spread=0, orbs=2),
 ])

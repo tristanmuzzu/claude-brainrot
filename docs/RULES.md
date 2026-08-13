@@ -796,6 +796,27 @@ time; none is guessable from the source.
   almost never laid — two beats contributed one landing each per run — so a
   shell or a lid written last is written and never seen. Same shape as the
   non-hop-verb rule above.
+- **Widening the `shelf` is the frame lever on a narrow level, and it is free
+  or better.** The ground *beside* the lane is what the down-rays miss: 4.5→6.0
+  moved the fan's bottom row from 32% empty to 19% and the row below the horizon
+  from 44% to 33%, and it **improved** fidelity, because a pedestal on a ledge
+  then has ground to find. This contradicts the "a wide shelf costs the exit
+  climb its lane" note above — that was measured at `band=9.0`, and with a block
+  of band to spare it does not hold. Check both before choosing.
+- **Lids and shells are near-noise on a narrow `ledge`.** A shell's two wall
+  columns land one cell inside the cliff and one cell past the shelf edge, so it
+  writes about thirteen cells, all roof — `cave`, `hall` and `tunnel` produced
+  worlds identical to the last decimal on one level, and `ceiling=` beams bought
+  0.7 and 0.2 points. The "two shells on the highest landings are worth five"
+  measurement was taken on a wide level and does not transfer to a four-block
+  shelf.
+- **An authored `exit_beats` list shorter than `need` is discarded whole.** The
+  crossing is refused and `_pending` is replaced by the unlidded generated
+  stair — four treads left one level at 59% empty where eight roofed,
+  pedestalled treads at `hug=1.8` reached 49%, at identical exactness, unchecked
+  count and move mix. And `need` does not shrink because your design ends high:
+  machinery between beats puts the body back at lift 1, so it is 6–7 whatever
+  the level does.
 - **A wider `shelf` can break the gated-landmark crossing.** Measured on one
   level: `shelf=5.0` passes `test_the_course_goes_through_the_landmarks_it_gates`
   and 5.2 and 5.5 both fail it, with a crossing falling through to the unchecked
