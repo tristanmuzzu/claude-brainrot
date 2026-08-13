@@ -315,10 +315,14 @@ The levers, in the order they are worth reaching for:
 
 1. **`profile="ledge"`** (the default). Ground is a shelf `shelf` cells wide
    against the core wall with the drop genuinely outboard. `shelf` floors at
-   3.0 and is capped at `band - 2.0`. **`profile="plaza"` is a full floor and
-   is the thing that killed the last tower** — use it only for a level that
-   dresses the floor as a real place (a street, a temple hall) and then break
-   it hard.
+   3.0 and is capped at `band - 2.0`. **`profile="plaza"` is a full floor and a bare
+   one is the thing that killed the last tower** — but a plaza *with breaks and
+   hazard cut through it* is the reference's own "wide ground, whole width
+   hazard", and it measures well: ledge → plaza on one level, with `breaks` 3→4
+   and three lava moats, took the no-jump walker from 41% to **31%** and the
+   empty frame from 60% to **50%**. Use it for a level that dresses the floor
+   as a real place, and then break it hard. What fails is the *undressed*
+   plaza, not the profile.
 2. **`breaks=`** — in-level floor gaps. Three for a ledge, two for a full
    floor, by default. The first break wider than 4.5 m gets a *lock*: an
    approach at height, an island floated over the hole, a landing on the far
@@ -744,6 +748,21 @@ time; none is guessable from the source.
 - **A pedestal cannot stand in a `channel` cut**, and `hug` on a `ledge` is
   load-bearing — unhugged, `_targets` pulls the course to the *outer* edge of
   its own shelf.
+- **A bounce pad's material is free.** `SPRINGY` is imported by `spiralplan`
+  and **never read**; the physics is entirely `kind="bounce"` on the next node
+  against `prev["impact"]`. So `n("magma", form="slime", pedestal=False)`
+  bounces exactly like slime does, which is what lets a bounce stay on theme —
+  a green slime cube in a nether vent field is not a place. (Earlier drafts of
+  §2 said first the `form` and then the *material* made a pad. Neither does.)
+- **Empty frame is driven by `lift` more than by band or lids.** The ray fan is
+  ±36° vertical inside 8 m, so at `lift 1` the ground a metre below is hit by
+  two whole rows of it, and at `lift 4` the shallow down-rows fly over the
+  shelf into the void. A level that must run high — a tall `rise` with a stair
+  exit — starts about **10 points of empty frame down** before anything else is
+  decided. And `ceiling=n` is a one-cell beam that answers only the centre
+  column of the fan; a `shell` roof is five to seven cells wide and is the only
+  real lid. Two shells added anywhere moved it under half a point; the two on
+  the *highest* landings were worth five.
 - **A slime pad must be `pedestal=False`.** With a pedestal it is only offered
   cells that have ground under them, and at the foot of a fall there are none:
   3 of 6 placed became 7 of 7.
