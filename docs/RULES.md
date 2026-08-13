@@ -695,6 +695,18 @@ time; none is guessable from the source.
   not move at any value. This is why almost every level's way out is a
   staircase whatever its `exit` says, and it is the same anchor problem as the
   in-body climb above.
+- **A water moat is a pit; a lava moat is a floor.** Water is in `SEE_THROUGH`,
+  so the walker drops into the bowl the moat digs and cannot step back out —
+  that is the 65.8% → 25.8% below. Lava is **solid**, so the walker simply walks
+  across the top of it: a lava moat buys atmosphere and nothing at all for
+  walkability. If your theme's liquid is lava and you need the walk number
+  down, you need holes.
+- **Never repeat a `moat` in a `filler`.** The filler loops, and the second lap
+  digs away the ground the first lap's pedestals stand on: 27,859 "pedestal
+  will not stand" refusals from one keyword.
+- **A pedestal cannot stand in a `channel` cut**, and `hug` on a `ledge` is
+  load-bearing — unhugged, `_targets` pulls the course to the *outer* edge of
+  its own shelf.
 - **A slime pad must be `pedestal=False`.** With a pedestal it is only offered
   cells that have ground under them, and at the foot of a fall there are none:
   3 of 6 placed became 7 of 7.
