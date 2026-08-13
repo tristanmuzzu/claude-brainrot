@@ -262,6 +262,59 @@ table may only name things on this list or things that already existed.
    Measured across the roster: landings sit 0.7 to 10.8 blocks off the
    core wall (band is 9.5), with 2% out past the old rim margin.
 
+## Levels 1–20, rebuilt against the research (2026-08-13)
+
+Twenty levels redesigned a pair at a time, each against `docs/RULES.md` and
+judged from rendered frames rather than from probes. `name`, `theme` and `rise`
+were frozen; everything else — every beat, filler, profile, shelf, band,
+landmark, breaks, exit and skin — was rewritten, most of them from scratch.
+
+| | 24-level tower | before this pass | **after** |
+|---|---|---|---|
+| designed landings placed as authored | 94.5% | 94.1% | **94.7%** |
+| designed content, share of the course | 49% | 48% | 42% |
+| the exit climb | 39% | 35% | 37% |
+| unchecked emergency placements | 0.28% | — | **0.35%** |
+| cells twice-claimed / off-lattice / orbs missed | 0 | 0 | **0** |
+| climbable without the parkour | 0 m | 0 m | **0 m** |
+| walkable along a level, built world | 47% mean, 0 of 42 | — | **43% mean, 0 of 52** |
+| body inside the world | 0.00% | — | 0.02% (1 frame of 6,000) |
+| **non-hop share of the move mix** | ~6% | ~6% | **14.3%** |
+| move mix | hop 94% | hop 94% | **hop 86, walk 5, climb 4, slide 3, bounce 2, bubble 1** |
+| levels holding their structure at 25° | 52% | — | 50% |
+| ...at 40° | 29% | — | 30% |
+| structures seen per minute | 2.75 | — | 2.50 |
+| seconds on one theme | — | — | **10.7–13.0 s** (the reference is 10–15) |
+| moves per minute / median idle | 100.6 / 0.53 s | — | 101.4 / 0.53 s |
+| dead air / frozen frames | 0.6% / 0.00% | — | **0.0% / 0.00%** |
+| frames mostly filled by a wall | 1.8% | 1.8% | 3.6% |
+| **per frame** (vs parkour, same process) | 3.74 ms (×1.53) | — | **2.65 ms (×1.32)** |
+| tests | — | 628 pass | **628 pass, 34 skip** |
+
+Four honest notes.
+
+**The frame budget is met for the first time.** 3.74 ms was the one criterion
+the gated-landmark pass missed; it is 2.65 now, comfortably inside the 3.5 the
+criteria ask for. Nothing was optimised — the levels simply stopped hanging
+floating cubes over the drop and started building on the ground they have.
+
+**Designed content fell, 48% to 42%, and that is not what it looks like.** Six
+points of it is a measurement fix: `level_review` was computing fidelity in the
+*pinned* process, where a run opens on the level and lays its script from the
+first landing. Measured the way `tower_probe` and the tests do, the same levels
+read lower and always did.
+
+**Wall-filled frames doubled, 1.8% to 3.6%**, and the cause is known and was
+chosen: a ladder ride is a solid column one cell from the camera for two or
+three seconds, and levels that never had a working climb now have one. It is
+the price of the exit climb finally firing.
+
+**And the empty-frame number, which is the one the rebuild existed for, is not
+in this table because no probe carried it before.** It is now
+`level_review --report`'s `frame empty`, and across the twenty it went from
+43–77% of the view to 44–56%, with the two worst (THE QUARRY 77%, ROPE BRIDGE
+65%) coming in at 54% and 53%.
+
 ## The tower
 
 Same building: solid inverted cone, `base_r = 36`, flare 0.05, one-cell ribs,
@@ -452,3 +505,42 @@ bucket `_lens_jammed` frames by segment, and now by whether a shell or a gate
 encloses the body. Per-theme pours, the windmill's blades, a bell, coral fans
 and a scarecrow are still the assets the roster wants, and authored
 `exit_beats` are still written for no level yet.
+
+
+## What this pass leaves open
+
+1. **An authored exit that cannot complete loops instead of falling back.**
+   THE CISTERN with `profile="channel"` and an authored bubble `exit_beats`
+   never left its own level: the course circled the tower at constant height
+   and came back over its own cells one, two and three laps later, which the
+   twice-claimed test caught as 157 doubled cells. Either change alone is
+   fine. The authored exit was dropped to close it, but the real defect is
+   that `exit_beats` has no working fallback when its climb cannot be built.
+2. **The generated exit ladder essentially never fires**, and it is the
+   biggest single thing left. `_ascent_climb` writes its column at `hug=2.0`
+   with `pedestal=False`, and a climb anchors on solid rock within one cell of
+   the column at its middle index and at its top — which at these bands the
+   core's lean never reaches. Measured on a vine: 1 success in 1,559 "no
+   anchor" refusals without a pedestal, 5 in 9 with one and `step_y >= 4`. On
+   a generated bubble exit, 11,097 of 13,000 candidates refused. So a level
+   whose `exit` says ladder gets an eight-landing staircase and is not told.
+   **The one-line change is measured and not applied**: standing the column on
+   its own pedestal takes designed content 47.7% → 50.1%, the exit climb 35.9%
+   → 32.8%, climb-moves 107 → 125 and mean ascent 8.3 → 7.6 landings a level,
+   at a cost of 4 → 6 unchecked placements. It touches the generated `spiral`
+   scene as well as this one, so it wants its own pass and its own A/B.
+3. **8.5% of level visits overrun** — 12 of 141 over six runs, worst cases 171,
+   209 and 210 landings against a design of nine to twelve, with zero unchecked
+   placements to show for it. It is the exit climb failing to leave, laying 50
+   to 68 ascent landings in one place. Same root cause as (2); the strip can
+   sit in one level for two minutes instead of eight seconds.
+4. **A block records the theme of wherever it physically is**, so a level that
+   leaves its own band donates its landings to whoever owns the air it lands
+   in: THE QUARRY's rim descent passes one revolution above THE VAULT and is
+   attributed to it, worth eight points of that level's designed-content
+   figure. Any per-level number should be read with this in mind.
+5. **Wall-filled frames are 3.6%, up from 1.8%**, and it is the ladder rides.
+   Worth a look at whether a climb can be framed better rather than lit better.
+6. **Levels 21–33 have not been through this pass.** They are the roster as it
+   was: two or three materials, monotonic climbs, and `arc` values written
+   against the old reading of the jump envelope.
