@@ -1,0 +1,145 @@
+# Redesigning one level
+
+You own **one** module in `src/brainrot/scenes/levels/`. Nothing else in the
+repository is yours. Read this whole file, then `docs/RULES.md` §1 and §7, then
+`src/brainrot/scenes/levels/_base.py`, then your own module — before you change
+a line.
+
+## Why you are here
+
+The owner watched the tower live and said, close to verbatim:
+
+- Ninety per cent of the levels are bad. The jumps are not thought out.
+- Half the jumps are at ground level or lower — you can walk much of a level
+  and only start jumping later.
+- There are not many non-standard jumps: a couple of ground-level hops, then a
+  couple higher, then stairs, then you drop back down.
+- The levels are too long and too thin. They keep going without much
+  happening. **They should be shorter and feel longer** — more complex in what
+  happens, not more metres of it.
+- Every level must have exactly one way to the end. No walking half of it.
+- Every jump should be *planned*: why from this block to that one, what the
+  physics of it are, what it asks of the player.
+
+The building underneath you was rebuilt on 2026-08-13 and is not the one the
+older docs describe. It now has an outer wall on the drop side about a third
+of the way round (so a stretch of your level is a corridor with rock on both
+shoulders and a stretch is a shelf with the drop), a floor made of ten-odd
+materials instead of one, a banded cliff instead of a grey slab, and an exit
+ladder that actually anchors. Those were the engine's failures. What is left
+is design, and that is your job.
+
+## What is fixed and what is yours
+
+**Fixed. Do not change these, they are assigned across the whole tower:**
+
+- `rise` — the tower's vertical rhythm, assigned so any three consecutive
+  levels sum to a legal head-room.
+- `landmark` — assigned so no blueprint repeats within four levels.
+- `theme` and the level's name.
+
+**Yours, all of it:** `beats`, `filler`, `exit_beats`, `exit`, `gap`,
+`profile`, `shelf`, `band`, `breaks`, and every material override in the skin.
+
+## What to aim at
+
+1. **Get off the floor.** 55% of authored landings across the roster sit at
+   `lift` 0 or 1. That is the "half the jumps are at ground level" complaint,
+   measured. A level that spends its first four beats at lift 0–1 reads as a
+   walk with decorations on it.
+2. **Author your own way out.** `Level.exit_beats` is live and tested and *no
+   level uses it*. Without it your level ends in a generated staircase that is
+   about a third of everything the viewer sees. Write the exit: a ladder up a
+   chimney, a bubble column, a spiral of ledges — whatever your place has.
+   The generated climb stays underneath as the fallback if yours cannot be
+   built, so this is safe to attempt.
+3. **Density, not length.** Fewer metres, more happening per metre. A beat
+   that is three hops in a row at the same height is one idea; a beat that is
+   a duck under a lintel, a drop onto a slab and a jump over a pour is three.
+4. **One route.** No stretch of your level should be walkable past the
+   parkour. `--all` prints the no-jump walk coverage for your level; the real
+   map averages 46% and no level of it is passable end to end.
+5. **Be a place.** The theme's floor palette is built for you now; use
+   `deco`, `moat`, `shell`, `ceiling`, props and the liquid to make the level
+   about something. Say what it is in the module docstring, in prose, the way
+   the existing ones do.
+
+## The physics, in one paragraph
+
+One jump impulse, one horizontal speed. Flat, a hop reaches 2.00–4.26 m
+stand-point to stand-point; rising one block, 2.00–3.10; descending one,
+2.35–4.98. **Nothing rises two blocks in one ballistic move** — the
+discriminant has no solution, exactly as in vanilla. A rising hop's `arc`
+stays at or under 3.6; a flat one under 4.9; only a descending jump may ask
+more. A head-hitter lid sits at **three** above the take-off, not the genre's
+two, because a jump's apex sweeps the two cells above every take-off. All of
+this is in `docs/RULES.md` §1 with the derivations.
+
+## How to verify
+
+```bash
+python tools/level_review.py --level N --all
+```
+
+Four artefacts in `shots/review/lNN_slug/`: the game camera over your level and
+into the next (**this is the judge**), a blueprint of the built world in
+elevation and plan (the only view that shows ground running unbroken past your
+jumps), a Blender three-view, and your level's numbers. `--seam` prints what
+the level below hands you and what the level above opens with.
+
+**Judge the contact sheet with your own eyes before you look at any number.**
+Three separate metrics were green on this tower while the owner called it bad,
+and two of them were mine. A number's job here is to catch a regression, not
+to tell you the level is good.
+
+## Hard rules
+
+- **One level per process.** `level_review` pins the phase with a class-level
+  patch and refuses a second level in the same run.
+- **Never run `tests/test_tower.py` or the full suite.** They measure the whole
+  tower and will report other agents' work in progress. The coordinator runs
+  them at merge.
+- **Never edit `spiralplan.py`, `handplan.py`, `_base.py`, any other level, any
+  tool or any doc.** If your level needs an engine change, *do not make it* —
+  say so in your report and design around it.
+- `python tools/tower_probe.py --design-only` is instant, needs nothing built,
+  and checks every authored jump in the roster against the physics. Run it
+  after every edit; it is the fastest way to catch an illegal `arc`.
+
+## Landmines that will cost you an hour each
+
+These are the ones that bite level authors specifically; `docs/RULES.md` §7 has
+the rest and is worth reading in full.
+
+- A `shell=` or `moat=` is painted the moment its landing commits and blocks
+  the **next** landing of the same beat. Put `shell=` on a beat's *last* node.
+- Two `moat=True` landings must be more than three cells apart, and **never
+  repeat a `moat` in `filler`** — the filler loops and the second lap digs away
+  the ground the first lap's pedestals stand on.
+- Changing `breaks` moves *every* break, not just how many.
+- `_targets` can return nothing and record no rejection. The cause is always
+  `wants_ground` over a floor break, or `hug` past the shelf edge.
+  `pedestal=False` is the fix.
+- A beat's tail is almost never laid — put a shell, a lid or your non-hop verb
+  on a beat's **first two** nodes, not its last.
+- Anything past about the fifth authored beat is never built: a level lays
+  9–12 landings and the exit climb takes some of those.
+- `frame empty` and `lens jammed` are seed-noisy. Average several seeds, and
+  remember that changing your level re-rolls the levels above it, so a ±10
+  point move on one seed is not evidence.
+
+## What to report back
+
+Short, and in this order:
+
+1. **What the level is now**, in two or three sentences. The place, the route
+   through it, and the one thing a viewer would remember.
+2. **The jumps, in a list.** For each: from what to what, the rise, the
+   distance, and *why* — what it asks of the player. This is the thing the
+   owner said was missing.
+3. **Your judgement of the contact sheet.** What looks right, what does not,
+   in your own words. Be honest; a level you are not happy with is more useful
+   reported than hidden.
+4. **The numbers** from `--all`: per-beat fidelity, lift distribution, no-jump
+   walk coverage, and whether your `exit_beats` was built or fell back.
+5. **Anything you wanted from the engine and could not have.**
