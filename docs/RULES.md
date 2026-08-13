@@ -783,6 +783,19 @@ time; none is guessable from the source.
   reserved climb cells for free; `shell="shaft"` closes the gap completely and
   is rejected, because it puts the body 0.46 m inside the tube wall on three
   frames of every six hundred.
+- **A `ceiling=n` beam is spread *along the direction of travel* and checked
+  against the feet**, so a climbing tread takes one as happily as a `walk`
+  does. That reconciles the two measurements above: **one** lid is worth about
+  a tenth of a point, but **chained beat to beat** it fills the one column of
+  the ray fan that looks where you are going — beams on an exit climb alone
+  took it from 64% to 55% empty.
+- **A `shell` roof sits in the cell the head sweeps at a hop's apex**, so
+  `write` refuses it there: a tunnel over a jump is a roof with a hole in the
+  middle of it. It only survives whole over a `walk`.
+- **Overhead mass belongs on a beat's first two nodes.** A beat's tail is
+  almost never laid — two beats contributed one landing each per run — so a
+  shell or a lid written last is written and never seen. Same shape as the
+  non-hop-verb rule above.
 - **A wider `shelf` can break the gated-landmark crossing.** Measured on one
   level: `shelf=5.0` passes `test_the_course_goes_through_the_landmarks_it_gates`
   and 5.2 and 5.5 both fail it, with a crossing falling through to the unchecked

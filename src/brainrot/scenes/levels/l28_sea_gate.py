@@ -21,12 +21,23 @@ from ._base import Level, n
 # 58% at worst, inside the rule only by accident, on 25% designed content
 # and 100% plain hop.
 #
-# It is a ``ledge`` now: four blocks of shelf against the core with the
-# drop genuinely outboard, which is what the real map's walking surface
-# measures as -- median four blocks wide, drop directly beside it -- and
-# moats cut into the shelf on top of that. The plan view is three islands
-# with real water and real holes between them, and the walker is down to
-# 29%.
+# It is a ``ledge`` now: a shelf against the core with the drop genuinely
+# outboard, and moats cut into the shelf on top of that. The plan view is
+# three islands with real water and real holes between them.
+#
+# **The shelf is six blocks and not four, and that one number is most of
+# this level's empty frame.** The owner picked it out of a contact sheet as
+# a couple of cubes against a pale wash, and the rule tightened to *under
+# 48% of the view empty*. At ``shelf=4.0`` with every landing hugged
+# 3.2-3.8 the body ran along the outer edge of its own shelf with the rim
+# half a block away, so the whole lower-outboard half of the ray fan flew
+# off into the sea: **51.0% empty over eight seeds**. Widening the shelf to
+# six, pulling every hug in by about 0.6 so the body stands *mid*-shelf,
+# and putting a checked ``ceiling`` over the arcs of all four beats gives
+# **47.4%** -- and the lens stops being jammed as well (4.3% -> 1.7%),
+# because the wall that used to be at the lens is now a shelf's width away.
+# The bill is the walker, 32% -> 38% against a limit of 55, which is what
+# the third break is doing here; the reference's own number is 46%.
 #
 # The palette is the other half of it. Prismarine on prismarine is one
 # value and reads as a teal plate, so the *accent is gold* -- the
@@ -63,8 +74,24 @@ from ._base import Level, n
 # * **The arch is a hop gate**, the only kind that reserves on a ledge:
 #   the walk gates (watchtower, windmill, cabin) want five supported
 #   cells across the corridor and are refused on every bearing here.
+# * **A ``ceiling`` is a one-cell beam along the arc, not a lid across the
+#   corridor**, and that is why every beat here carries ``ceiling=5``
+#   rather than one or two beats carrying a shell. ``_ceiling_cells``
+#   spreads ``n`` cells along the *direction of travel* over the middle of
+#   the jump, so five of them roof nearly the whole arc in the one column
+#   of the ray fan that is looking where you are going -- and chained from
+#   beat to beat they read as the lintels of a sea wall. A ``shell`` roof
+#   is five cells wide but is punched out over the apex of every hop,
+#   because the body's head sweeps the same cell the roof wants; it only
+#   survives whole over a ``walk``.
+# * **The causeway's middle landing is a ``walk``.** It is the level's
+#   only non-hop besides the two strides, it sits at position two of the
+#   beat where truncation still reaches it, and it is what keeps the hop
+#   share from rising when the third break eats a filler lap: 90% -> 89%.
+#   A ``shell="tunnel"`` on it was tried and refused the +1 hop out of it,
+#   taking the beat from 80% to 73%; the ``ceiling`` alone does not.
 LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="stair",
-              band=12.0, profile="ledge", shelf=4.0, breaks=2,
+              band=12.0, profile="ledge", shelf=6.0, breaks=3,
               landmark="arch",
               ground="prismarine", sub="darkprismarine", rock="prismarine",
               accent="gold", glow="sealantern", liquid="water",
@@ -85,14 +112,14 @@ LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="stair",
     # its predecessor within half a block and does not have it. Measured
     # on this beat alone: lift 2 with one walk, 67%; lift 2 with two,
     # 50%; the same beat at lift 1 with one, below.
-    ("tideline", [n("glow", arc=3.2, lift=1, hug=3.4, spread=1,
-                    deco="lamp", orbs=1),
-                  n("sand", arc=2.9, lift=1, hug=3.4, kind="walk",
+    ("tideline", [n("glow", arc=3.2, lift=1, hug=2.8, spread=1,
+                    deco="lamp", ceiling=5, orbs=1),
+                  n("sand", arc=2.9, lift=1, hug=2.8, kind="walk",
                     spread=0, ceiling=5),
-                  n("prismarine", arc=3.4, lift=2, hug=3.6, spread=0,
-                    orbs=1),
-                  n("ground", arc=4.6, lift=0, hug=3.6, form="floor",
-                    spread=0, orbs=1)]),
+                  n("prismarine", arc=3.4, lift=2, hug=3.0, spread=0,
+                    ceiling=5, orbs=1),
+                  n("ground", arc=4.6, lift=0, hug=3.0, form="floor",
+                    spread=0, ceiling=5, orbs=1)]),
     # The nave, and the showpiece, about half way: a pier standing in the
     # water, the gold marker over it under a checked lid, a stride, and
     # the lamplit bay cut into the cliff. The rise and the water are
@@ -108,14 +135,14 @@ LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="stair",
     # nothing can make -- this beat measured 78%. Asking for the *same*
     # lift is a hop of +1, level or -1, all three of which are legal, and
     # the walk after it then has its predecessor at a known height.
-    ("nave", [n("darkprismarine", arc=3.5, lift=1, hug=3.2, spread=1,
-                moat=True, orbs=1),
-              n("accent", arc=3.4, lift=1, hug=3.2, spread=0, ceiling=3,
+    ("nave", [n("darkprismarine", arc=3.5, lift=1, hug=2.6, spread=1,
+                moat=True, ceiling=5, orbs=1),
+              n("accent", arc=3.4, lift=1, hug=2.6, spread=0, ceiling=5,
                 deco="lamp"),
-              n("prismarine", arc=2.9, lift=1, hug=3.2, kind="walk",
-                spread=0),
-              n("darkprismarine", arc=3.3, lift=1, hug=3.6, spread=0,
-                shell="grotto", orbs=1)]),
+              n("prismarine", arc=2.9, lift=1, hug=2.6, kind="walk",
+                spread=0, ceiling=5),
+              n("darkprismarine", arc=3.3, lift=1, hug=3.0, spread=0,
+                shell="grotto", ceiling=5, orbs=1)]),
     # Out along the broken causeway: a half-height slab of the monument's
     # facing stone -- stairs and slabs are the reference's commonest
     # non-cube form by a wide margin and this tower has almost none -- a
@@ -133,10 +160,11 @@ LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="stair",
     # island, the landmark crossing, the exit staircase -- not the design.
     # Read that row as noisy at this sample size and check it twice before
     # attributing it to a keyword.
-    ("causeway", [n("prismarine", arc=3.4, lift=2, hug=3.8, spread=1),
-                  n("calcite", arc=3.4, lift=2, hug=3.6, spread=0),
-                  n("coral_blue", arc=3.4, lift=3, hug=3.6, spread=0,
-                    pedestal=False, deco="post", orbs=1)]),
+    ("causeway", [n("prismarine", arc=3.2, lift=2, hug=3.2, spread=1),
+                  n("calcite", arc=2.9, lift=2, hug=3.0, kind="walk",
+                    spread=0, ceiling=5),
+                  n("coral_blue", arc=3.2, lift=3, hug=3.0, spread=0,
+                    pedestal=False, deco="post", ceiling=5, orbs=1)]),
 ], filler=[
     # The character, repeated: a long drop back into the flooded court, a
     # wade between two piers, the gold marker again under its lid, and a
@@ -145,11 +173,12 @@ LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="stair",
     #
     # No moat in here. The filler loops, and the second lap digs away the
     # ground the first lap's pedestals are standing on.
-    ("piers", [n("darkprismarine", arc=3.9, lift=1, hug=3.2, spread=2,
-                 orbs=1),
-               n("prismarine", arc=2.9, lift=1, hug=3.2, kind="walk",
-                 spread=0, ceiling=3),
-               n("accent", arc=3.5, lift=2, hug=3.0, spread=0),
-               n("coral_blue", arc=3.4, lift=3, hug=3.8, spread=0,
-                 pedestal=False, orbs=1)]),
+    ("piers", [n("darkprismarine", arc=3.9, lift=1, hug=2.6, spread=2,
+                 ceiling=5, orbs=1),
+               n("prismarine", arc=2.9, lift=1, hug=2.6, kind="walk",
+                 spread=0, ceiling=5),
+               n("accent", arc=3.5, lift=2, hug=2.6, spread=0,
+                 ceiling=5),
+               n("coral_blue", arc=3.4, lift=3, hug=3.2, spread=0,
+                 pedestal=False, ceiling=5, orbs=1)]),
 ])
