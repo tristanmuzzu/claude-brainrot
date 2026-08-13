@@ -748,6 +748,29 @@ time; none is guessable from the source.
 - **A pedestal cannot stand in a `channel` cut**, and `hug` on a `ledge` is
   load-bearing — unhugged, `_targets` pulls the course to the *outer* edge of
   its own shelf.
+- **`shell="shaft"` around an authored exit climb is expensive and not needed.**
+  Taking it off one vine took *body inside the world* from 3 frames of 556 to
+  **0** and the jammed lens from 18.2% to 10.4%, and the climb still anchored —
+  the pedestal plus `step_y >= 4` recipe is sufficient on its own, and the tube
+  is what puts the body in the wall. A second agent independently reverted a
+  shaft shell for the same symptom.
+- **On a `ledge`, *every* landing needs a `hug`, not just the climbs.** An
+  unhugged landing is pulled to the middle of the **band**, which on a 4-block
+  shelf inside a 10-block band is out over the drop. Two beats came out at 67%
+  and 0% placed with an unchecked emergency behind them; hugging everything to
+  2.4–3.2 took the same design to 100% and zero.
+- **The exit climb's reserve is what decides how much design a level gets.**
+  `want = (need + 1) * ASCENT_ARC + gap + …` with `ASCENT_ARC = 3.2`, measured
+  from wherever the body is standing — so a tall `rise` eats the terrace before
+  a single beat is laid, and a beat that leaves the body low costs the *next*
+  beat several metres of room. Short beats that gain height early are worth
+  more than long ones, and since a beat is truncated in the middle, whatever it
+  is about must be in its first two nodes.
+- *Unverified hypothesis:* a single `moat` on a beat's **first** node may eat
+  the ground about 2.5 m downstream and cost that beat's next landing. It
+  follows from the radius-3 bowl and the two-moats-apart rule above, but moving
+  the moat did not fix the beat it was proposed for. Treat as a lead, not a
+  rule.
 - **A bounce pad's material is free.** `SPRINGY` is imported by `spiralplan`
   and **never read**; the physics is entirely `kind="bounce"` on the next node
   against `prev["impact"]`. So `n("magma", form="slime", pedestal=False)`
