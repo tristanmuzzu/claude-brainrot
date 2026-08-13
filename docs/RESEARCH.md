@@ -459,12 +459,17 @@ and 125 shader:
 
 Four rows separate and the rest do not:
 
-- **The picture changes at half the rate.** Ours 9.8% against vanilla's 20.3%,
-  and the shader walkthrough — a *slower* run than the speedrun — is higher
-  still at 29.4%, so this is not the speedrunner's pace. A real player whips
-  the camera constantly; ours is on rails with a smoothed tangent blend and
-  moves like a tram. This is the largest single difference the frames show and
-  it is a **camera** finding, not a level-design one.
+- ~~**The picture changes at half the rate.**~~ **Retracted the same day, and
+  the retraction is the useful part.** That column was built by taking every
+  seventh frame of a 2.22 fps extraction — **3.15 s apart** — and comparing it
+  against ours at 0.45 s, so churn was measured across gaps seven times
+  longer. At matched spacing ours is **13.9% against vanilla's 14.2%**, and
+  the two track within a point at every lag from 0.1 s to 0.9 s. Instrumented
+  directly, this scene's camera turns at a median 42 deg/s in flight and 84
+  deg/s on a ground run, and produces *more* pixel change per unit of measured
+  view rotation than the reference. There was never a camera finding.
+  `frame_probe.parse_dir` now refuses to print churn without a stated frame
+  spacing. Every other row here is a per-frame statistic and was unaffected.
 - **Ours is more lopsided** (41% against 33%), which is the enclosure table in
   §4 arriving in the pixels.
 - **Ours is darker than vanilla** (28% against 17%). The old reading that ours

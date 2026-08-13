@@ -607,10 +607,12 @@ down as never used.
 > below.** Both were compared to `frames/ps1` and `frames/ps3`, and both of
 > those videos run a **shader pack** — see `docs/reference/README.md`, where
 > the provenance is now read off the titles instead of assumed. Against a
-> vanilla control at matched sampling (`frames/vanilla_2hz/`), four rows do
-> separate: our picture changes at **half** the rate (9.8% against 20.3%), we
-> are **more lopsided** (41% against 33%), **darker** (28% unlit against 17%)
-> and carry **less overhead** (4.5% against 6.9%). And the corridor question
+> vanilla control at matched sampling (`frames/vanilla_2hz/`), three rows do
+> separate: we are **darker** (39% unlit against 18%), a single surface owns
+> **more of the frame** (49% against 34%) and we are **more lopsided** (44%
+> against 34%). A fourth — "our picture changes at half the rate" — was
+> **retracted**: that vanilla column had been subsampled to 3.15 s against our
+> 0.45 s, and at matched spacing the two are 13.9% and 14.2%. And the corridor question
 > was underdetermined: asked two-sided, the real route has rock outboard
 > **33.6%** of the way against our **5.6%**. `docs/RESEARCH.md` §4 and §10
 > carry both. The paragraphs below are left standing as the record of what

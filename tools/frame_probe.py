@@ -51,12 +51,24 @@ finally comparable too. Against *it*, four rows separate --
     unlit                   ours 28.3%   vanilla 17.3%
     detail overhead         ours  4.5%   vanilla  6.9%
 
--- and the biggest of them is a **camera** finding: a real player whips the
-view constantly and this scene moves like a tram. The rows that still do not
-separate (surface dominance, materials on screen, empty ninths, edge detail)
-are genuinely level with the real map. Always check what a reference *is*
-before concluding from it; the paragraphs below are kept as the record of
-getting that wrong.
+-- and **the churn row of that table was wrong, and it was wrong because of
+how the column was built, not because of anything in this tool.** The vanilla
+frames were taken as every seventh frame of a 2.22 fps extraction, which is
+3.15 s apart, and compared against ours at 0.45 s. Measured at matched
+spacing, ours is 13.9% against vanilla's 14.2%, and the two track each other
+within a point at every lag from 0.1 s to 0.9 s. **This scene's camera does
+not move less than a real player's**: instrumented directly it turns at a
+median 42 deg/s in flight and 84 deg/s on a ground run, and per unit of
+measured view rotation it produces *more* pixel change than the reference
+does. There is no camera finding. ``parse_dir`` now requires a spacing before
+churn is printed at all.
+
+The other three rows are per-frame statistics and were unaffected by the
+sampling error. Re-measured correctly, the gaps that remain are **unlit 39%
+against 18%** and **biggest single surface 49% against 34%** -- the near walls
+are too dark and own too much of the frame -- with materials on screen 7.4
+against 9.8. Always check what a reference *is*, and how it was sampled,
+before concluding from it.
 
 **What this tool found first, and it is not what it was built to find.**
 Measured over 100 frames of the hand-built tower against 122 frames of the
@@ -268,6 +280,26 @@ def _pct(values: list[float], q: float) -> float:
     return s[min(len(s) - 1, int(q * len(s)))]
 
 
+def parse_dir(spec: str) -> tuple[Path, float]:
+    """``path`` or ``path:seconds`` -- how far apart that directory's frames are.
+
+    Required for ``churn`` and the reason it is required is a mistake that got
+    all the way into three documents. A vanilla column was built by taking
+    every seventh frame of a 2.22 fps extraction, which is **3.15 s apart**,
+    and compared against our own frames at 0.45 s; churn came out at 20.3%
+    against our 9.8% and was written up as "our picture changes at half the
+    rate ... a camera finding". It is not: measured at matched spacing the two
+    are within a point of each other at every lag from 0.1 s to 0.9 s. Every
+    other row in that table is a *per-frame* statistic and was unaffected --
+    only the pairwise ones were wrong, which is exactly the class of error a
+    tool should refuse rather than a reader should catch.
+    """
+    if ":" in spec and not spec[1:2] == ":":
+        path, _, secs = spec.rpartition(":")
+        return Path(path), float(secs)
+    return Path(spec), 0.0
+
+
 def frames_in(d: Path) -> list[Path]:
     got = sorted(p for p in d.iterdir()
                  if p.suffix.lower() in (".png", ".jpg", ".jpeg"))
@@ -323,8 +355,19 @@ def report(columns: list[tuple[str, dict]]) -> None:
     width = max(len(lbl) for _, lbl, _, _ in LABELS) + 2
     head = "".join(f"{name:>14}" for name, _ in columns)
     print(f"\n{'':{width}}{head}")
+    spacing = {round(d.get("spacing", 0.0), 3) for _, d in columns}
+    print("".join([f"{'frame spacing':{width}}"]
+                  + [f"{d.get('spacing', 0.0):>13.2f}s" for _, d in columns]))
     print("-" * (width + 14 * len(columns)))
+    # ``churn`` is the only pairwise row here and it is meaningless across
+    # columns sampled at different rates. Suppressed rather than printed with a
+    # caveat, because a caveat next to a number gets read as the number.
+    comparable = len(spacing) == 1 and 0.0 not in spacing
     for key, label, unit, scale in LABELS:
+        if key.startswith("churn") and not comparable:
+            note = "unknown spacing" if 0.0 in spacing else "spacings differ"
+            print(f"{label:{width}}{('  n/a -- ' + note):>{14 * len(columns)}}")
+            continue
         cells = ""
         for _, data in columns:
             v = data.get(key, 0.0) * scale
@@ -335,8 +378,10 @@ def report(columns: list[tuple[str, dict]]) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__ and __doc__.split("\n")[0])
-    ap.add_argument("--dir", type=Path, action="append", default=[],
-                    help="a directory of frames; repeatable")
+    ap.add_argument("--dir", action="append", default=[],
+                    help="a directory of frames as PATH or PATH:SECONDS, "
+                         "where SECONDS is how far apart its frames are; "
+                         "repeatable. Without it, churn is suppressed")
     ap.add_argument("--shoot", metavar="SCENE",
                     help="render this scene first (tower/spiral/parkour)")
     ap.add_argument("--seed", type=int, action="append", default=[],
@@ -352,11 +397,19 @@ def main() -> int:
     if args.shoot:
         for seed in (args.seed or [7]):
             d = shoot(args.shoot, seed, args.frames, args.every)
-            columns.append((f"{args.shoot}/{seed}", survey(frames_in(d))))
-    for d in args.dir:
-        columns.append((d.name or str(d), survey(frames_in(d))))
+            got = survey(frames_in(d))
+            # Known exactly: the renderer runs at a fixed step.
+            got["spacing"] = args.every / 60.0
+            columns.append((f"{args.shoot}/{seed}", got))
+    for spec in args.dir:
+        d, secs = parse_dir(spec)
+        got = survey(frames_in(d))
+        got["spacing"] = secs
+        columns.append((d.name or str(d), got))
     if args.reference:
-        columns.append(("REAL MAP", survey(reference_frames())))
+        got = survey(reference_frames())
+        got["spacing"] = 0.0        # ps1 is 15 s apart and ps3 is 30 s
+        columns.append(("REAL MAP", got))
 
     if not columns:
         ap.error("give --dir, --shoot or --reference")
