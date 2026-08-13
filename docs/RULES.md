@@ -648,12 +648,38 @@ time; none is guessable from the source.
   the terrace floor is analytic rather than in `course.struct`, so this is
   recorded as a **symptom to look for** rather than a rule: if the floor under
   the body reads as grey cone stone in a contact sheet, try the band.
-- **Two things that were reported by agents and are *not* true**, both checked
+- **A `shell=` or `moat=` is painted the moment its landing commits, and blocks
+  the *next* landing of the same beat.** Put `shell=` on a beat's **last** node,
+  and keep two `moat=True` landings more than the pond's radius (3 cells) apart
+  or the second stands in the hole the first dug. One level's nave sat at 81%
+  through four passes on exactly this.
+- **`_targets` can return nothing and record no rejection**, so a beat reads 0%
+  placed with an empty trace. The cause is always `wants_ground` over a floor
+  break, or `hug` past the shelf edge — and a ledge's shelf wobbles about ±1.3
+  around `shelf`. `pedestal=False` is the fix; it took one gallery from 0% to
+  100%.
+- **Changing `breaks` moves *every* break, not just how many.** The position is
+  `f = 0.14 + (k + h) * (0.52 / n)`, so a beat at 100% with `breaks=4` can be at
+  0% with `breaks=3` for no other reason.
+- **The generated exit ladder essentially never fires.** `_ascent_climb` swept
+  across `hug` 1.4–3.0 gave at best 12 successful climb-moves in 2,751
+  candidates — "no wall to hang on" every time — and the exit climb's length did
+  not move at any value. This is why almost every level's way out is a
+  staircase whatever its `exit` says, and it is the same anchor problem as the
+  in-body climb above.
+- **Three things that were reported by agents and are *not* true**, both checked
   by the parent and recorded so they do not get rediscovered: `kind="walk"`
   **can** be authored (six levels use it with `--design-only` clean; the
   confusion is `spiralplan.BALLISTIC`, which contains `walk`, against
-  `tower_probe.BALLISTIC`, which does not), and `moat=True` **does** dig
-  (three moat nodes add about 54 liquid cells a run, not four).
+  `tower_probe.BALLISTIC`, which does not); `moat=True` **does** dig (three moat
+  nodes add about 54 liquid cells a run, not four); and moats **do** stop the
+  no-jump walker — measured on identical worlds with `breaks=0`, coverage falls
+  from **65.8% to 25.8%** with moats on. The mechanism is worth knowing though,
+  because the agent who doubted it was right about the *reason*: `water` is in
+  `SEE_THROUGH` and `lava` is solid, so neither liquid blocks the walker. What
+  stops it is the **pit the moat digs** — the walker can enter the bowl and
+  cannot step back out. Liquid on its own is atmosphere; liquid in a hole is a
+  barrier.
 - **`form="floor"` clamps `lift` to zero.** It places no block; the cell must
   already be solid ground. Writing `lift=1, form="floor"` used to pass the
   paper check and build a block lower, taking every jump after it in the beat
