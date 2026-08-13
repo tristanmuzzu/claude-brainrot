@@ -81,10 +81,10 @@ from ._base import Level, n
 # to ``flues`` and to ``vents`` lengthened those beats, so fewer of
 # them were laid whole, so the staircase grew -- designed content 40%
 # -> 37% and hop share 89% -> 90%. The lever that would actually work
-# is not in this file: it is ``rise=7`` (frozen, and cyclic across all
+# is not in this file: it is ``rise=8`` (frozen, and cyclic across all
 # thirty-three levels) with a stair exit (mandated -- this tower has
 # seventeen climb exits of twenty and must not gain another).
-LEVEL = Level("BASALT FLUES", "nether", rise=7, gap=2.8, exit="stair",
+LEVEL = Level("BASALT FLUES", "nether", rise=7, gap=2.8, exit="stair", landmark="totem",
               band=9.0, profile="plaza", breaks=4,
               ground="netherrack", sub="crimsonnylium", rock="blackstone",
               accent="magma", glow="shroomlight", liquid="lava",

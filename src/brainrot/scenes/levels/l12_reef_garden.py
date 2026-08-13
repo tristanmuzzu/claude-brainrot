@@ -24,8 +24,8 @@ from ._base import Level, n
 # reference's commonest non-cube form by a wide margin, and a slab is
 # worth reach as well as looks: two slab steps gain a block across
 # seven metres of ground where one hop could only manage 3.10.
-LEVEL = Level("REEF GARDEN", "coral", rise=5, gap=2.8, exit="bubble",
-              band=12.5, profile="channel", breaks=3, landmark="arch",
+LEVEL = Level("REEF GARDEN", "coral", rise=6, gap=2.8, exit="bubble",
+              band=12.5, profile="channel", breaks=3, landmark="greatcap",
               ground="sand", sub="sandstone", rock="prismarine",
               accent="coral_blue", glow="sealantern", liquid="water",
               props=("coralfan", "lilypad", "pebbles", "grasstuft",

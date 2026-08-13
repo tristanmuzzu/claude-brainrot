@@ -25,7 +25,7 @@ from ._base import Level, n
 # features -- the lock across its break and the crossing through the
 # totem -- take a good half of those; a long script is a design whose
 # last two thirds is never built, which is exactly what stood here.
-LEVEL = Level("THE CRUCIBLE", "nether", rise=7, gap=3.0, exit="ladder",
+LEVEL = Level("THE CRUCIBLE", "nether", rise=5, gap=3.0, exit="ladder",
               band=9.0, profile="ledge", shelf=5.0, breaks=2,
               landmark="totem",
               # Fourteen materials, not three: the floor is what a level

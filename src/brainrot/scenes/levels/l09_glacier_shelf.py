@@ -38,7 +38,7 @@ from ._base import Level, n
 # and the one that runs to 4.6 is the fall into the crevasse. Short jumps
 # are not only more faithful; they are what buys a designed level enough
 # landings to outnumber the machinery inserted between its beats.
-LEVEL = Level("GLACIER SHELF", "ice", rise=4, gap=3.2, exit="stair",
+LEVEL = Level("GLACIER SHELF", "ice", rise=5, gap=3.2, exit="stair",
               band=11.5, shelf=5.0, breaks=0, landmark="arch",
               ground="snow", sub="packedice", rock="blueice",
               accent="calcite", liquid="water", glow="lantern",

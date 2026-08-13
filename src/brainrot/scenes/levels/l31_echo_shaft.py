@@ -69,7 +69,7 @@ from ._base import Level, n
 #   written as a beat's first node is not a fall.
 LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="ladder",
               band=8.5, shelf=3.5, profile="plaza", breaks=3,
-              landmark="arch",
+              landmark="crane",
               ground="sculk", sub="tuff", rock="deepslate",
               accent="calcite", glow="amethyst", liquid="water",
               props=("pebbles", "dripstone", "chain", "torch"),

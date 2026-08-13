@@ -43,7 +43,7 @@ from ._base import Level, n
 #   will carry the body *along* but not up: the +1 version of this
 #   beat placed its pad twenty-two times and fired the bounce zero
 #   times, silently, while reading as 100% placed.
-LEVEL = Level("WOOLWORKS", "rainbow", rise=4, gap=2.4, exit="bubble",
+LEVEL = Level("WOOLWORKS", "rainbow", rise=6, gap=2.4, exit="bubble",
               band=9.0, shelf=4.0, profile="ledge", breaks=3,
               landmark="stripes",
               # Eleven materials, one committed hue: pink underfoot,

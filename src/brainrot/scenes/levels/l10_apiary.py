@@ -36,7 +36,7 @@ from ._base import Level, n
 # against 51%, two unchecked placements against none, hop 84% against
 # 75%, and the bounce beat stopped being reached at all), so the trough
 # stays and the structure is the small comb frame beside the course.
-LEVEL = Level("THE APIARY", "honey", rise=5, gap=3.0, exit="ladder",
+LEVEL = Level("THE APIARY", "honey", rise=4, gap=3.0, exit="ladder",
               profile="channel", band=10.5, breaks=4, landmark="comb",
               ground="hay", sub="darkoak", rock="honeycomb",
               accent="honey", liquid="water", glow="shroomlight",

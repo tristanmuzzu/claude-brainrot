@@ -43,7 +43,7 @@ from ._base import Level, n
 # it descends twice -- once off the deck on to the creeper, once off the
 # top of the pier.
 LEVEL = Level("ROPE BRIDGE", "jungle", rise=5, gap=3.4, exit="vine",
-              band=10.0, shelf=5.0, breaks=3, landmark="tree",
+              band=10.0, shelf=5.0, breaks=3, landmark="cabin",
               ground="moss", sub="podzol", rock="junglelog",
               accent="oak", glow="lantern", liquid="water",
               step=("junglelog", "hop"), beats=[

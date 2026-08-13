@@ -34,9 +34,9 @@ from ._base import Level, n
 # * a landing that needs ground under it is refused outright wherever
 #   one of the level's floor breaks happens to fall, which is why the
 #   dais and the drowned columns are ``pedestal=False``.
-LEVEL = Level("SUNKEN TEMPLE", "desert", rise=6, gap=2.6, exit="bubble",
+LEVEL = Level("SUNKEN TEMPLE", "desert", rise=4, gap=2.6, exit="bubble",
               band=9.0, profile="plaza", shelf=4.0, breaks=4,
-              landmark="watchtower",
+              landmark="arch",
               ground="sandstone", sub="terracotta", rock="chiselled",
               accent="gold", glow="glowstone", liquid="water",
               props=("deadbush", "mcfence"),

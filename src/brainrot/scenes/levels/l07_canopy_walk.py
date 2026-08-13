@@ -46,7 +46,7 @@ from ._base import Level, n
 # read as being inside a bush; the ladder's brown lattice reads as a climb
 # and lets the level below show through it. Judged off the sheet, not off a
 # number -- ``lens jammed`` is 0.3% either way.
-LEVEL = Level("CANOPY WALK", "jungle", rise=7, gap=3.0, exit="ladder",
+LEVEL = Level("CANOPY WALK", "jungle", rise=6, gap=3.0, exit="ladder",
               band=7.5, shelf=5.0, breaks=0, landmark="tree",
               ground="moss", sub="podzol", rock="junglelog",
               accent="jungleleaf", liquid="water", glow="lantern",

@@ -31,7 +31,7 @@ from ._base import Level, n
 # showpiece are all inside the first three, and the character lives in
 # the filler, which repeats: gutter, threshold stone, stall rail,
 # paving. The tail is there for the wide turns higher up the flare.
-LEVEL = Level("MARKET STREET", "village", rise=6, gap=3.0, exit="ladder",
+LEVEL = Level("MARKET STREET", "village", rise=7, gap=3.0, exit="ladder",
               band=8.5, profile="plaza", breaks=1, landmark="watchtower",
               ground="terracotta", sub="brick", rock="plaster", accent="roof",
               glow="lantern", liquid="water", step=("brick", "hop"),

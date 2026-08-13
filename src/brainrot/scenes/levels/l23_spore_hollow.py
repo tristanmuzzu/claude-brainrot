@@ -92,7 +92,7 @@ from ._base import Level, n
 #   not fire here, because on a narrow ledge the down rays clear the
 #   shelf into the void at any height -- but it took exactness from 91%
 #   to 98% and hop share from 81% to 79%, so it stays on its own merits.
-LEVEL = Level("SPORE HOLLOW", "mushroom", rise=5, gap=3.0, exit="vine",
+LEVEL = Level("SPORE HOLLOW", "mushroom", rise=4, gap=3.0, exit="vine",
               band=10.0, shelf=5.0, profile="ledge", breaks=2,
               landmark="greatcap",
               # Violet ground, bone-white stem, one red roof and the

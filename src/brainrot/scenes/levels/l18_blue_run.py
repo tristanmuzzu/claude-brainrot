@@ -46,7 +46,7 @@ from ._base import Level, n
 # Against THE WEIR below (green-grey wet masonry, full-band channel,
 # water, waded and bounced) this is blue ice on a narrow shelf, taken at
 # slide speed, half of it enclosed.
-LEVEL = Level("BLUE RUN", "ice", rise=6, gap=3.2, exit="stair",
+LEVEL = Level("BLUE RUN", "ice", rise=4, gap=3.2, exit="stair",
               band=9.0, shelf=5.0, breaks=0, landmark="arch",
               ground="packedice", sub="deepslate", rock="blueice",
               accent="frost", glow="sealantern", liquid="water",

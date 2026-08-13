@@ -30,7 +30,7 @@ from ._base import Level, n
 #   a third of them; beats three, four and five were writing for a strip
 #   nobody sees. Three beats and a filler that carries the character.
 # * **The exit climb was 40% of the level and every frame of it was
-#   sky.** ``rise=7`` is the tallest in the tower and the staircase is one
+#   sky.** ``rise=6`` is the tallest in the tower and the staircase is one
 #   landing per block, so the way out was eight landings of one terracotta
 #   column against a blue sky.
 #

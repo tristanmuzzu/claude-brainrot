@@ -41,7 +41,7 @@ from ._base import Level, n
 # eleven of them are already spoken for by the lock, the landmark
 # crossing and the climb out. Long jumps here buy nothing but a level
 # made of machinery.
-LEVEL = Level("THE QUARRY", "desert", rise=4, gap=3.2, exit="ladder",
+LEVEL = Level("THE QUARRY", "desert", rise=6, gap=3.2, exit="ladder",
               band=9.0, shelf=5.0, breaks=3, landmark="crane",
               ground="terracotta", sub="sandstone", rock="chiselled",
               accent="sandstone", glow="lantern", liquid="water",

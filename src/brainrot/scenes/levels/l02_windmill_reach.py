@@ -21,7 +21,7 @@ from ._base import Level, n
 # this level's wide breaks. The exit is a ladder for that reason -- a
 # staircase reserves six more metres than a ladder does, and six metres
 # is two landings of design.
-LEVEL = Level("WINDMILL REACH", "farm", rise=4, gap=3.0, exit="ladder",
+LEVEL = Level("WINDMILL REACH", "farm", rise=6, gap=3.0, exit="ladder",
               band=9.5, shelf=5.0, breaks=4, landmark="windmill",
               ground="farmland", sub="coarse", rock="hay", accent="oak",
               liquid="water", glow="lantern",

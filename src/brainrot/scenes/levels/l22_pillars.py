@@ -87,8 +87,8 @@ from ._base import Level, n
 #   moved the number by one tenth of a point. It is one cell wide and
 #   answers the centre column of the fan only; the shells are what carry
 #   this. Keep them for the head-hitter they are, not for the sky.
-LEVEL = Level("THE PILLARS", "end", rise=6, gap=3.4, exit="bubble",
-              band=12.0, shelf=5.5, breaks=3, landmark="totem",
+LEVEL = Level("THE PILLARS", "end", rise=7, gap=3.4, exit="bubble",
+              band=12.0, shelf=5.5, breaks=3, landmark="hoodoo",
               ground="endstone", sub="purpur", rock="obsidian",
               accent="chorus", glow="sealantern", liquid="water",
               props=("chorus", "endrod", "pebbles", "lanternpost"),

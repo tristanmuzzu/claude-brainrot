@@ -33,8 +33,8 @@ from ._base import Level, n
 # to 27%. A beat short of budget is *truncated*, not skipped, so a
 # three-node showpiece loses its third node and the bounce with it. Hence
 # short beats with the identity in the first three.
-LEVEL = Level("THE GATEHOUSE", "plains", rise=5, gap=2.8, exit="ladder",
-              band=12.0, shelf=5.0, breaks=0, landmark="arch",
+LEVEL = Level("THE GATEHOUSE", "plains", rise=4, gap=2.8, exit="ladder",
+              band=12.0, shelf=5.0, breaks=0, landmark="cabin",
               ground="grass", sub="podzol", rock="mossy", accent="oak",
               liquid="water", glow="lantern",
               props=("grasstuft", "flower", "mcfence", "lilypad"),

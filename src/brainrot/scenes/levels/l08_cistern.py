@@ -35,7 +35,7 @@ from ._base import Level, n
 # water, which is what a cistern should be recognised by. Check what a
 # blueprint is made of before choosing it; about half of them are literal.
 LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
-              band=10.5, profile="channel", breaks=0, landmark="arch",
+              band=10.5, profile="channel", breaks=0, landmark="cluster",
               ground="dripstone", sub="tuff", rock="calcite",
               accent="prismarine", liquid="water", glow="sealantern",
               props=("dripstone", "pebbles", "chain"),

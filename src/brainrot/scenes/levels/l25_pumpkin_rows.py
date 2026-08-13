@@ -74,7 +74,7 @@ from ._base import Level, n
 # * **No moat in the filler.** It loops, and the second lap digs out the
 #   ground the first lap's pedestals stand on.
 LEVEL = Level("PUMPKIN ROWS", "farm", rise=4, gap=2.8, exit="stair",
-              band=11.0, shelf=4.5, breaks=3, landmark="bell",
+              band=11.0, shelf=4.5, breaks=3, landmark="windmill",
               ground="farmland", sub="coarse", rock="hay",
               accent="pumpkin", liquid="water", glow="magma",
               candy=("pumpkin", "hay"),

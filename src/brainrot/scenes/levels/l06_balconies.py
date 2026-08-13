@@ -30,7 +30,7 @@ from ._base import Level, n
 # cuts the last beat of a level and always leaves exactly one node:
 # with the fall last, the sprung stone was laid every run and the
 # bounce off it never once was.
-LEVEL = Level("THE BALCONIES", "mesa", rise=7, gap=3.0, exit="ladder",
+LEVEL = Level("THE BALCONIES", "mesa", rise=8, gap=3.0, exit="ladder",
               band=9.0, profile="ledge", shelf=4.5, breaks=4,
               landmark="hoodoo",
               ground="terra_orange", sub="terra_red", rock="terra_white",

@@ -75,8 +75,8 @@ from ._base import Level, n
 # worse one. Left to the generated stair on purpose, too: it sizes
 # itself to what is actually left to climb, where an authored one is a
 # fixed number of steps against a starting height that moves.
-LEVEL = Level("THE ARCHIVE", "library", rise=6, gap=2.8, exit="stair",
-              band=8.5, profile="plaza", breaks=3, landmark="arch",
+LEVEL = Level("THE ARCHIVE", "library", rise=5, gap=2.8, exit="stair",
+              band=8.5, profile="plaza", breaks=3, landmark="watchtower",
               ground="plaster", sub="deepslate", rock="bookshelf",
               accent="oak", glow="lantern", liquid="water",
               candy=("bookshelf", "oak"),

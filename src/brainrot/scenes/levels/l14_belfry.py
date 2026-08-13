@@ -36,7 +36,7 @@ from ._base import Level, n
 # level does not need it -- the shelf is four cells with the drop
 # outboard, the trough and the well cut liquid through it, and a walker
 # gets a fifth of the way along.
-LEVEL = Level("THE BELFRY", "village", rise=8, gap=3.0, exit="ladder",
+LEVEL = Level("THE BELFRY", "village", rise=4, gap=3.0, exit="ladder",
               band=9.5, shelf=4.0, profile="ledge", breaks=0,
               landmark="bell",
               ground="terracotta", sub="brick", rock="plaster",

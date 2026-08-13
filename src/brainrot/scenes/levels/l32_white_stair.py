@@ -87,7 +87,7 @@ from ._base import Level, n
 # this level's structure: white piers in ranks with a gold architrave
 # over them, which is a thing you can name after two seconds and is
 # made out of the course itself.
-LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="stair",
+LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="stair", landmark="arch",
               band=13.0, shelf=4.5, profile="channel", breaks=1,
               ground="quartz", sub="deepslate", rock="calcite",
               accent="gold", glow="lantern", liquid="water",

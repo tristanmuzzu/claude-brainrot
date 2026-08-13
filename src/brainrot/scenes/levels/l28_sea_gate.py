@@ -92,7 +92,7 @@ from ._base import Level, n
 #   taking the beat from 80% to 73%; the ``ceiling`` alone does not.
 LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="stair",
               band=12.0, profile="ledge", shelf=6.0, breaks=3,
-              landmark="arch",
+              landmark="watchtower",
               ground="prismarine", sub="darkprismarine", rock="prismarine",
               accent="gold", glow="sealantern", liquid="water",
               candy=("sealantern", "gold"),

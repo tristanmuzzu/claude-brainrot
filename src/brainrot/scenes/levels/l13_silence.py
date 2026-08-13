@@ -46,9 +46,9 @@ from ._base import Level, n
 # because the exit climb needs them to be.** At shelf 5.0 the course
 # drifts outboard, the ladder out of the level loses its lane, and
 # emergency placements went from one in eight runs to fifteen.
-LEVEL = Level("THE SILENCE", "deepdark", rise=6, gap=3.0, exit="ladder",
+LEVEL = Level("THE SILENCE", "deepdark", rise=8, gap=3.0, exit="ladder",
               band=8.0, shelf=3.5, profile="ledge", breaks=5,
-              landmark="totem",
+              landmark="cluster",
               ground="sculk", sub="deepslate", rock="blackstone",
               accent="sculkvein", glow="amethyst", liquid="water",
               step=("deepslate", "hop"),

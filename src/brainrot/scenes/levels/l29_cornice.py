@@ -91,9 +91,9 @@ from ._base import Level, n
 # a fungus canopy) this is white timber-decked ground in the snow: a
 # different enclosure, a different verb, and a hue that shares nothing
 # with either.
-LEVEL = Level("THE CORNICE", "snow", rise=5, gap=3.0, exit="stair",
+LEVEL = Level("THE CORNICE", "snow", rise=6, gap=3.0, exit="stair",
               band=10.5, profile="plaza", shelf=4.5, breaks=3,
-              landmark="crane",
+              landmark="bell",
               ground="snow", sub="packedice", rock="spruce",
               accent="frost", glow="lantern", liquid="water",
               props=("chain", "mcfence", "lanternpost", "pebbles"),

@@ -54,7 +54,7 @@ from ._base import Level, n
 # BLUE RUN above (pale blue ice, ledge, slides, arch) this is green-grey
 # wet masonry, dark timber and open water: different enclosure,
 # different verb, different hue, different structure.
-LEVEL = Level("THE WEIR", "plains", rise=5, gap=3.0, exit="stair",
+LEVEL = Level("THE WEIR", "plains", rise=7, gap=3.0, exit="stair",
               band=12.0, profile="channel", breaks=0, landmark="tree",
               ground="mossy", sub="cobble", rock="stonebrick",
               accent="darkoak", glow="lantern", liquid="water",
