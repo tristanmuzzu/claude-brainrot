@@ -340,6 +340,43 @@ The levers, in the order they are worth reaching for:
 **Design rule.** No more than three consecutive `form="floor"` landings, and
 never a whole beat of them.
 
+### The net motion is up, and the ladder is not the answer to every level
+
+Owner's note on the first preview run, 2026-08-13: *"whenever there's some way
+you want to get up, it just puts a ladder there... and then from the high
+ladder point they just jump back down to a lower part than where the ladder
+was. The whole idea is that it keeps going up by level."* Both halves measured
+and both are real.
+
+**Too many ladders, and it is this document's fault.** §2 says the ladder is
+the one special block the reference leans on hard, and twenty levels took it:
+**17 of the 20 rebuilt levels now exit by a climb** — 12 ladder, 4 bubble, 1
+vine, against 3 by stair. The roster before this pass was the other way round.
+And the reference is nothing like either: **ladders appear in 7 of its 43
+legs**, about one level in six.
+
+> **Design rule.** A climb exit belongs on **about one level in five**. It is
+> for a level whose *idea* is the climb — a bell tower, a mine shaft, a well.
+> A level that merely needs to get out uses a stair, and a stair on a themed
+> footing (`step`) is not a worse ending, it is a quieter one.
+
+**And the run must not undo itself.** Measured over six runs: the level seam
+itself is fine — median +0 blocks, and only 4% of seams start the next level
+two or more below the top of the climb, which is the designed `hop_span(-1)`
+crossing doing its job. The problem is *inside* the level: **23% of levels drop
+three or more blocks after their own high point**, WINDMILL REACH by 4.5 and
+THE TIMBERWORKS by 4.0. Put a tall ladder at the end of a level that has just
+dropped four and the eye reads the whole thing as climb-then-fall.
+
+That descent came from the rule below, which is right — the reference travels
+eleven blocks vertically to gain four. What the reference does *not* do is
+spend the descent at the end. It falls off edges early and in the middle, and
+the last thing before the seam is the way out.
+
+> **Design rule.** A level's own descent belongs in its **first two thirds**.
+> The exit is the highest thing in the level, and nothing after it goes down.
+> Keep the drop after a level's high point under three blocks.
+
 ### A level goes down as well as up
 
 Measured on the real map: **36 of 43 legs descend somewhere, and 22 dip below
@@ -759,6 +796,8 @@ A level is done when **all** of these hold:
 | plain hop | ≤ 85% of moves, ≥ 1 non-hop verb firing **in the level's own body** |
 | liquid on or beside the walking line | at least one beat |
 | a threshold: light + complete material change at the first beat | yes |
+| exit by a climb | only if the climb is the level's idea — about 1 level in 5 |
+| drop after the level's own high point | under 3 blocks, and none after the exit |
 | the route painted wherever the ground is wide | yes |
 | the level descends somewhere | not a monotonic climb |
 | distinct materials named | ≥ 6 across roles, nodes and props |
