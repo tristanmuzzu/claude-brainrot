@@ -121,6 +121,22 @@ its own A/B, never while agents run.
     worlds. Only the launch landing's hug does anything. Either make it work
     or reject it loudly.
 
+16. **Re-test `shelf` above 5.0 centrally.** Two levels independently measured
+    a wider shelf as strictly better -- one at 5.6 read designed content 54.8
+    -> 56.1% with 100% exact and no unchecked -- and both left it at 5.0
+    because `docs/RULES.md` records 5.2 and 5.5 failing
+    `test_the_course_goes_through_the_landmarks_it_gates` on a *different*
+    level. That is a tower-wide test agents are forbidden to run, so nobody
+    can check whether the ceiling is real or was one level's accident. Free
+    content across the roster if it lifts. (5.9+ starts producing unchecked
+    placements on at least one level; do not go far.)
+17. **The climb's own pedestal is the wall in the lens.** An in-body ladder
+    anchors on the column it builds, and the body then rides with its face
+    against that column -- one level measured 9.7% jammed on a seed with every
+    jamming ray hitting its *own* brick, none of it the cliff. A `_climb_move`
+    that could anchor on the cliff at `hug` 1.6-2.0 without building a column
+    would remove it. Same defect family as backlog 11.
+
 ## Watch list
 
 - **No-jump walk coverage rose to 59% mean with 1 of 16 levels fully
