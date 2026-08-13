@@ -96,12 +96,28 @@ its own A/B, never while agents run.
     `hug=2.2`, so this is one constant across the whole tower and is the most
     promising single fix left for "a surface owns half the frame". Needs its
     own A/B — it moves every world.
-12. **A beat's first node is effectively pinned at lift 1**, so a level's
-    opening landings are on the floor whatever the design wants: one level
-    measured an opener at lift 2 placing 67% against 100% at lift 1. That is
-    an engine property and it is a direct contributor to the "55% of landings
-    at lift 0-1" complaint the whole pass exists for.
-13. **`hug` on a climb node is inert** — 2.0 through 3.0 give identical
+12. ~~**A beat's first node is effectively pinned at lift 1.**~~ **Narrowed by
+    a second agent, and the narrowing is the useful part.** One level measured
+    an opener at lift 2 placing 67% against 100% at lift 1; another measured a
+    `lift=2, spread=1` opener at **72/72, 100% exact over 24 runs**, genuinely
+    at lift 2 in the blueprint. The difference is what the beat *follows*: an
+    opener after a script beat is free, an opener after **machinery** — the
+    climb, the lock, a recovery — is not, because machinery leaves the body
+    wherever it happened to finish. So the real item is that machinery hands
+    over at an unstated height, which is also backlog 5. A level can and
+    should open its script beats above the floor.
+13. **`exit` becomes a reserve declaration once `exit_beats` exists.**
+    `_level_budget` reserves `(need+1)*3.2` for `"stair"` and a flat three
+    landings for anything else, so a level with a four-landing authored exit
+    has to *misdescribe its own exit kind* to get an honest reserve — one
+    level declared `"vine"` for an exit that is a walkway, because declaring
+    `"stair"` reserved ten blocks nothing would spend and truncated its
+    showpiece out of the run. Cost it from `len(exit_beats)` instead.
+14. **A shell has no per-node material** — `_shell` paints walls `theme.rock`
+    and roof `theme.sub`, so the only wide overhead mass available to any
+    level is brown. Letting `pedestal_style` paint a shell the way it already
+    paints a lid would give the jungle a real canopy for nothing.
+15. **`hug` on a climb node is inert** — 2.0 through 3.0 give identical
     worlds. Only the launch landing's hug does anything. Either make it work
     or reject it loudly.
 

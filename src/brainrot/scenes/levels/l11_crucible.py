@@ -246,9 +246,24 @@ LEVEL = Level("THE CRUCIBLE", "nether", rise=5, gap=3.0, exit="ladder",
     # `pedestal=True` on the column is the load-bearing line and the
     # reason this branch fires at all: standing the landing on its own
     # stack is what gives the ladder something to hang on for its whole
-    # height. There is deliberately **no** `shell="shaft"` round it --
-    # the tube is what puts the body inside the wall, and the pedestal
-    # plus a rise of at least four is sufficient on its own.
+    # height. Measured over twelve runs, same worlds, only this keyword
+    # moved: with the pedestal the move mix has `climb` 11 times, the
+    # exit costs 4.58 landings and the level is 80% plain hop; without
+    # it, `climb` 4, exit 5.08 and 83.5% -- the difference is the
+    # generated staircase quietly taking over on two runs in three.
+    # There is deliberately **no** `shell="shaft"` round it: the tube is
+    # what puts the body inside the wall, and the pedestal plus a rise
+    # of at least four is sufficient on its own.
+    #
+    # And the price of the pedestal is the one number on this level that
+    # is not green. It is a five-block netherbrick column and the body
+    # rides it, so on seed 3 the ride is 9.7% of the level's frames with
+    # a wall in the lens -- instrumented, every jamming ray hits this
+    # level's own `netherbrick` and `blackstone`, none of it the cliff.
+    # Over four seeds it is 2.3%, against the tower's 1.8%, and RULES 7
+    # measures 10.4% for a working climb with no tube at all. A ladder
+    # ride *is* a wall at the lens; the alternative measured above is a
+    # staircase.
     #
     # The arithmetic of the height: the flue's foot is lift 1, the
     # ladder gains four, the lip gains one, and the crossing into the

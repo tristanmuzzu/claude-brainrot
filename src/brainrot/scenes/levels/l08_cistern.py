@@ -63,7 +63,7 @@ from ._base import Level, n
 # with either from a single frame.
 LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
               band=10.0, profile="plaza", breaks=1, landmark="cluster",
-              ground="dripstone", sub="deepslate", rock="calcite",
+              ground="dripstone", sub="deepslate", rock="dripstone",
               accent="amethyst", liquid="water", glow="lantern",
               dark=0.32, sky=(102, 92, 116),
               candy=("amethyst", "calcite", "copper"),
@@ -103,9 +103,9 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     #      three that a plinth 3.2 m along would have to stand in.
     ("coping", [n("glow", arc=3.0, lift=1, spread=2, deco="lamp", orbs=1,
                   ceiling=3, pedestal_style="dripstone"),
-                n("rock", arc=2.9, lift=1, kind="walk", spread=0,
+                n("calcite", arc=2.9, lift=1, kind="walk", spread=0,
                   ceiling=3, moat=True),
-                n("rock", arc=3.2, step_y=1, spread=0, pedestal=False,
+                n("calcite", arc=3.2, step_y=1, spread=0, pedestal=False,
                   orbs=1)]),
     # The tank, and this is the level. It is the one beat that is worth
     # writing out jump by jump, because all three of its numbers are
@@ -136,9 +136,9 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     # tidiness: machinery is inserted between beats and leaves the body
     # back at lift 1, so a beat that opens by dropping off the height
     # the beat before it climbed to drops nothing about half the time.
-    ("tank", [n("rock", arc=3.2, lift=2, spread=1, ceiling=3, orbs=1,
+    ("tank", [n("calcite", arc=3.2, lift=2, spread=1, ceiling=3, orbs=1,
                 pedestal_style="dripstone"),
-              n("rock", arc=3.2, step_y=1, spread=0, orbs=1,
+              n("calcite", arc=3.2, step_y=1, spread=0, orbs=1,
                 pedestal_style="dripstone"),
               n("slime", arc=4.6, lift=1, spread=0, pedestal=False,
                 moat=True, orbs=2),
@@ -162,7 +162,7 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
                  pedestal_style="dripstone"),
                n("amethyst", arc=3.0, lift=2, kind="walk", spread=0,
                  shell="cave", deco="lamp"),
-               n("rock", arc=3.2, lift=3, spread=0, deco="lamp", orbs=2)]),
+               n("calcite", arc=3.2, lift=3, spread=0, deco="lamp", orbs=2)]),
 ], filler=[
     # The drip run, and this is where the level's character actually
     # lives: the filler repeats and a script's tail does not. Four
@@ -183,7 +183,7 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     # anywhere in here, and that is a rule rather than a preference --
     # the filler loops, and the second lap digs the ground out from
     # under the pedestals the first lap stood up.
-    ("drip", [n("rock", arc=3.2, lift=2, spread=1, ceiling=3, orbs=1,
+    ("drip", [n("calcite", arc=3.2, lift=2, spread=1, ceiling=3, orbs=1,
                 pedestal_style="dripstone"),
               n("ground", arc=2.9, lift=2, kind="walk", spread=0,
                 ceiling=3, deco="lamp"),
@@ -216,7 +216,7 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     # both cost designed content, because a lid that will not fit
     # refuses the launch landing outright and the fallback for a refused
     # ascent node is the generated staircase.
-    n("rock", arc=3.0, lift=1, hug=2.4, spread=2, deco="lamp", orbs=1),
-    n("rock", arc=3.0, step_y=6, kind="bubble", climb_style="water",
+    n("calcite", arc=3.0, lift=1, hug=2.4, spread=2, deco="lamp", orbs=1),
+    n("calcite", arc=3.0, step_y=6, kind="bubble", climb_style="water",
       spread=0, deco="lamp", orbs=2),
 ])

@@ -117,6 +117,16 @@ the rest and is worth reading in full.
   repeat a `moat` in `filler`** — the filler loops and the second lap digs away
   the ground the first lap's pedestals stand on.
 - Changing `breaks` moves *every* break, not just how many.
+- **Do not put your showpiece in the last beat.** `_truncate` spends a beat's
+  budget on `arc` and eats the *longest* arc in the last beat first — which is
+  always the level's best jump. One level's two-block fall laid **one** landing
+  of three as beat 3 and **4.8 of 5** when moved to beat 2.
+- **Open your script beats above the floor.** An opener at `lift=2,
+  spread=1` following another script beat measured 72/72, 100% exact over 24
+  runs. What is not free is an opener following *machinery* — the climb, the
+  lock, a recovery — because those hand the body over at whatever height they
+  happened to finish at. That distinction is the one real lever a level has
+  against "half the jumps are at ground level".
 - **Your exit climb's *launch* block is most of your jammed-lens number.**
   One level measured 69 wall-jammed frames of 1,293 with the launch landing at
   `hug=2.2`, and **0 of 1,280** at `hug=2.8`. Only the launch landing matters:
