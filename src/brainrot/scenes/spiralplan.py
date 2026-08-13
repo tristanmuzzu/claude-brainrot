@@ -192,8 +192,8 @@ MATERIALS.update({
     # course's own colours set against it, and the light stone brick this
     # used to be filled half of every frame with something that read as a
     # castle wall from a different game.
-    "conestone": ((88, 84, 82), "cobble", 0.03),
-    "conerib": ((74, 71, 69), "cobble", 0.03),
+    "conestone": ((118, 113, 109), "cobble", 0.03),
+    "conerib": ((104, 99, 96), "cobble", 0.03),
     # The soffit is its own material and its base is deliberately far brighter
     # than the stone beside it. Vanilla shades a downward face to 0.50 and this
     # project keeps that constant honestly, so a mid-grey ceiling measured
@@ -803,6 +803,25 @@ FLOOR_MIX: dict[str, tuple[tuple[str, int], ...]] = {
                ("stone", 2), ("sandstone", 1), ("plaster", 1), ("andesite", 1),
                ("gravel", 1), ("glass", 1)),
 }
+
+#: What the cliff is made of. The same argument as :data:`FLOOR_MIX` one
+#: surface over: the core face and the outer wall were each a single material
+#: across the largest areas in the format, and measured against vanilla
+#: Minecraft at matched sampling that is where two of the three remaining gaps
+#: live -- **unlit 39% of the frame against 18%**, and **a single surface owning
+#: 49% of it against 34%**. One grey cliff is both of those at once.
+#:
+#: Banded by height rather than scattered, because that is what rock does and
+#: because a cliff speckled per cell reads as gravel. The level's own ``rock``
+#: and ``sub`` are mixed in by :meth:`Cone.cliff_style`, so the face carries a
+#: little of the place it is cutting through.
+CLIFF_MIX: tuple[tuple[str, int], ...] = (
+    ("conerib", 4), ("conestone", 4), ("conebutt", 4), ("stone", 3),
+    ("andesite", 2), ("tuff", 2), ("cobble", 1), ("gravel", 1),
+)
+
+#: How many cells tall one stratum is.
+CLIFF_BAND = 3
 
 for _t in THEMES:
     _t.floor = FLOOR_MIX.get(_t.name, ())
@@ -1630,6 +1649,34 @@ class Cone:
                  + 0.35 * (0.5 + 0.5 * math.sin(u * 7.7 + self._w1)))
         return inner + ridge * t
 
+    def cliff_style(self, theme, x: int, y: int, z: int, h: int) -> str:
+        """One cell of cliff -- the core face or the outer wall.
+
+        ``h`` is height above the level's own floor. The lowest two cells stay
+        the theme's subsoil, so the wall reads as a cut bank through the level
+        rather than as masonry meeting grass; that was already true and is kept.
+        Above it, strata: the band is chosen by height so the courses run
+        horizontally like rock, with a coarse bearing term so a band does not
+        run the whole way round, and a fifth of cells re-roll alone for grit.
+
+        Pure function of the cell, like everything else about this building.
+        """
+        if h < 2:
+            return theme.sub
+        pal = CLIFF_MIX + ((theme.rock, 3), (theme.sub, 2))
+        total = sum(w for _, w in pal)
+        fine = _hash3(x, z, y * 7 + 11)
+        if fine > 0.2:
+            # The stratum: mostly height, plus a coarse patch of bearing so the
+            # band breaks up rather than ringing the tower.
+            fine = _hash3(y // CLIFF_BAND, (x + z) // 9, 5)
+        pick = fine * total
+        for mat, w in pal:
+            pick -= w
+            if pick < 0:
+                return mat
+        return pal[0][0]
+
     def buttress_d(self, u: float) -> float:
         """How far in from the rim the outer wall reaches here, 0 for none.
 
@@ -1898,8 +1945,9 @@ class Cone:
             # reads as a cut bank through the level rather than as bare
             # masonry meeting grass.
             self._ring(ct, st, inner - SKIN, self.core_r(u, y), y,
-                       lv.theme.sub if 0 <= h < 2 else "conerib",
-                       seen, place, rib=True)
+                       lv.theme.sub, seen, place, rib=True,
+                       styler=lambda c, t=lv.theme, hh=h:
+                       self.cliff_style(t, c[0], c[1], c[2], hh))
             # The outer wall of the groove, where this stretch has one. Styled
             # like the core so the two read as one cut, and painted through
             # ``rock`` itself rather than by the march's own float radius --
@@ -1912,10 +1960,10 @@ class Cone:
                 # cost three points of materials-on-screen; a groove cut
                 # through a themed layer shows that layer in its wall, which
                 # is both what the reference looks like and free identity.
-                face = (lv.theme.sub if h < 2 else
-                        lv.theme.rock if h < 4 else "conebutt")
-                self._ring(ct, st, br, br + SKIN, y, face, seen, place,
-                           styler=lambda c, s=face: s if self.rock(c) else None)
+                self._ring(ct, st, br, br + SKIN, y, lv.theme.sub, seen, place,
+                           styler=lambda c, t=lv.theme, hh=h:
+                           self.cliff_style(t, c[0], c[1], c[2], hh)
+                           if self.rock(c) else None)
             if y == above.y - FLOOR_T - 1 and self.tooth(u) \
                     and self.has_floor(u + 2 * math.pi):
                 r1f = self.floor_range(u + 2 * math.pi)[1]
