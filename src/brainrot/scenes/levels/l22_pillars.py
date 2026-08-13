@@ -60,8 +60,35 @@ from ._base import Level, n
 # motion model can express: a jump always rises 1.25 m and sweeps the
 # two cells over its own take-off, so a lid low enough to read as a beam
 # refuses every arc under it. A walk has no arc.
+#
+# **The frame pass (2026-08-13).** The rule went to *under 48%* empty, and
+# this level read 44% mean over eight seeds with three of those seeds at
+# 48. Measured with a 25-ray fan bucketed by direction, the emptiness was
+# almost all *overhead* -- the two up rows were 47-66% empty against the
+# two down rows' 13-48% -- and outboard, the drop side of the fan being
+# the worst column at every pitch. Three things moved it to **41% mean,
+# 48 worst**, and one thing that should have did not:
+#
+# * **``shelf`` 5.0 -> 5.5.** Ground outboard of the body is what the
+#   down rows hit; a metre of it was worth more than every lid here.
+#   5.5 and not 6.5: at 6.5 the frame is a point better again and one
+#   walk of twenty-three covers 58% of the level, over the 55% ceiling.
+#   At 5.5 the walker reads *better* than before the pass (mean 10% ->
+#   8%, worst 46% -> 33%).
+# * **A ``cave`` on the exit launch.** The ascent is a third of the run
+#   and the emptiest third of most levels; here it was already the
+#   fullest beat (30%) because the bubble rides inside a ``shaft``, and
+#   roofing the landing it launches from took the whole level another
+#   point and the jammed lens *down* (10.7% -> 8.9%).
+# * **The architrave dropped a block** (lift 2/3/3 -> 1/2/2). It gains
+#   nothing structurally -- the exit beat opens at lift 1 regardless --
+#   and a beat that opens at lift 1 is the documented fidelity lever.
+# * **Lids are not a frame lever.** ``ceiling=3`` on both filler landings
+#   moved the number by one tenth of a point. It is one cell wide and
+#   answers the centre column of the fan only; the shells are what carry
+#   this. Keep them for the head-hitter they are, not for the sky.
 LEVEL = Level("THE PILLARS", "end", rise=6, gap=3.4, exit="bubble",
-              band=12.0, shelf=5.0, breaks=3, landmark="totem",
+              band=12.0, shelf=5.5, breaks=3, landmark="totem",
               ground="endstone", sub="purpur", rock="obsidian",
               accent="chorus", glow="sealantern", liquid="water",
               props=("chorus", "endrod", "pebbles", "lanternpost"),
@@ -69,11 +96,15 @@ LEVEL = Level("THE PILLARS", "end", rise=6, gap=3.4, exit="bubble",
     # The threshold: a sea lantern flush in the endstone with the water
     # cut round it, then the walked step in between the first two
     # pillars, under their architrave. Everything about the frame
-    # changes here -- colour, width, light, lid -- in one block.
+    # changes here -- colour, width, light, lid -- in one block. The
+    # ``tunnel`` makes the architrave a thing you walk *through* rather
+    # than a beam near your head; its walls find no footing over the
+    # moat's pit, so what it really contributes is the roof.
     ("threshold", [n("glow", arc=3.4, lift=1, hug=3.6, spread=0,
                      deco="lamp", moat=True, orbs=1),
                    n("rock", arc=2.8, lift=1, hug=3.6, kind="walk",
-                     spread=0, ceiling=3, deco="post")]),
+                     spread=0, ceiling=3, deco="post",
+                     shell="tunnel")]),
     # The colonnade: up the beams a half block at a time. A slab landing
     # is the reference's commonest non-cube form by a wide margin, it
     # reads as deliberate architecture rather than as a fudge, and it
@@ -105,14 +136,18 @@ LEVEL = Level("THE PILLARS", "end", rise=6, gap=3.4, exit="bubble",
               n("sub", arc=2.8, lift=1, hug=4.4, kind="walk", spread=0),
               n("sub", arc=3.9, lift=1, hug=4.4, spread=0, moat=True,
                 orbs=1)]),
-    # Back up on to the architraves, in against the pillars. The last
-    # landing of the script is the highest ground in the level: the
-    # water column goes up from here and nothing after it comes down.
-    ("architrave", [n("rock", arc=3.4, lift=2, hug=3.4, spread=0,
-                      ceiling=2),
-                    n("sub", arc=3.4, lift=3, form="slab", hug=3.4,
+    # Back up on to the architraves, in against the pillars. A block
+    # lower than it was written: the exit beat opens at lift 1 whatever
+    # this beat reaches, so the height bought nothing and a beat opening
+    # at lift 2 is asking machinery for a rise it may not have. The shell
+    # goes on the beat's *last* node -- a shell is painted the moment its
+    # landing commits and its roof then refuses the next arc out of it.
+    ("architrave", [n("rock", arc=3.4, lift=1, hug=3.4, spread=0,
+                      ceiling=3),
+                    n("sub", arc=3.4, lift=2, form="slab", hug=3.4,
                       spread=0, orbs=1),
-                    n("accent", arc=3.4, lift=3, hug=3.4, spread=0)]),
+                    n("accent", arc=3.4, lift=2, hug=3.4, spread=0,
+                      shell="tunnel")]),
 ], filler=[
     # The court, for as long as it lasts: a fall back down to the
     # flooded floor, a wade across a submerged sill, and a chorus stone
@@ -124,9 +159,16 @@ LEVEL = Level("THE PILLARS", "end", rise=6, gap=3.4, exit="bubble",
     # ground the first lap is standing on. Every node carries some
     # ``spread`` because the first lap is entered from wherever the lock
     # or the gate crossing left the body.
+    #
+    # The two lids are honest head-hitters and nothing more: measured on
+    # eight seeds they moved empty frame by a tenth of a point, because
+    # ``ceiling=n`` is one cell wide and answers the centre column of the
+    # ray fan alone. What roofs a frame is a shell.
     ("court", [n("ground", arc=4.4, lift=1, hug=4.2, spread=1, orbs=1),
-               n("sub", arc=2.8, lift=1, hug=4.2, kind="walk", spread=1),
-               n("accent", arc=3.6, lift=1, hug=4.2, spread=1, orbs=1)]),
+               n("sub", arc=2.8, lift=1, hug=4.2, kind="walk", spread=1,
+                 ceiling=3),
+               n("accent", arc=3.6, lift=1, hug=4.2, spread=1, orbs=1,
+                 ceiling=3)]),
 ], exit_beats=[
     # Out up the water column inside the last pillar. Declared as the
     # level's exit as well, so the reserve is a climb's three landings
@@ -138,7 +180,14 @@ LEVEL = Level("THE PILLARS", "end", rise=6, gap=3.4, exit="bubble",
     # middle index and at its top, and hugged to a core that leans away
     # there is nothing there. Standing the landing on its own stack
     # gives the column something to hang on for its whole height.
-    n("rock", arc=3.2, lift=1, hug=2.6, spread=2, deco="lamp"),
+    #
+    # The launch carries a ``cave`` for the frame rather than for the
+    # climb: the ride already sits inside the ``shaft``, which is why
+    # this level's ascent measures 30% empty where its neighbour's bare
+    # vine measured 46, and roofing the landing it leaves from closes the
+    # seconds either side of it.
+    n("rock", arc=3.2, lift=1, hug=2.6, spread=2, deco="lamp",
+      shell="cave"),
     n("sub", arc=3.0, step_y=5, kind="bubble", spread=0, shell="shaft",
       orbs=2),
 ])

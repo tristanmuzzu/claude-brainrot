@@ -26,12 +26,38 @@ from ._base import Level, n
 #   it, a room whose floor is lava. The rill is that. It is also the
 #   only water in the quartz theme, which has none of its own, and the
 #   cut is what a no-jump walker falls into and cannot climb out of.
-# * **Eight materials on the floor, not two.** Quartz light, andesite
+# * **Eight materials on the floor, not two.** Quartz light, deepslate
 #   as the paved stripe down the middle -- the reference paints its
 #   route wherever ground could be read two ways -- calcite kerbs,
 #   diorite and chiselled quartz in the piers, gold at every trim, and
 #   the water blue under all of it. The dominant material still reads
 #   white; the tail is what stops it reading as cone stone.
+#
+#   **The stripe was andesite and andesite is the problem.** (150, 150,
+#   148) against quartz's (228, 226, 218) is one value with two names,
+#   and this level had *no dark element at all* -- the reference's own
+#   composition is the floor as the lightest thing low and the cliff as
+#   the darkest thing high, and a court whose every surface sits within
+#   thirty points of white cannot have either. ``sub`` is deepslate
+#   (92, 92, 100), which is the cone's own stone to within four points,
+#   so the stripe, the rim cut under the terrace and the hall's roof all
+#   read as the cliff laid into the court rather than as a third grey.
+# * **And the gold architraves were not gold.** ``pedestal_style``
+#   paints a landing's *ceiling* as well as its plinth, and left unset a
+#   ``ceiling=`` lid comes out as ``theme.rock`` -- which on this level
+#   is calcite, so every architrave the paragraph below claims was in
+#   fact one more white slab over a white court. The three lids over
+#   gold piers are gold now, so the trim carries; the one that is not
+#   trim is deepslate, because the dark value belongs *high*, the way
+#   the reference hangs its cliff over a light floor.
+#
+#   Both changes are paint and cost nothing -- proved rather than
+#   assumed, because the level below moved in the same pass and this
+#   level is the next terrace up: with ECHO SHAFT held at its old
+#   version, the same twenty runs read 56% designed / 98% exact / 85%
+#   plain hop **before and after**. What the contact sheet reads is
+#   frames carrying a dark *and* a light value at once: **11 of 30 ->
+#   15 of 30**.
 # * **Something overhead in every beat.** A gold architrave lidding the
 #   doorway, a lid over the piers, and one tall hall shell with its own
 #   lamps. A level with nothing above head height always frames as sky,
@@ -63,7 +89,7 @@ from ._base import Level, n
 # made out of the course itself.
 LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="stair",
               band=13.0, shelf=4.5, profile="channel", breaks=1,
-              ground="quartz", sub="andesite", rock="calcite",
+              ground="quartz", sub="deepslate", rock="calcite",
               accent="gold", glow="lantern", liquid="water",
               props=("lanternpost", "mcfence", "pebbles", "flower"),
               step=("calcite", "hop"), beats=[
@@ -90,7 +116,7 @@ LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="stair",
                n("ground", arc=2.4, lift=2, hug=2.6, kind="walk",
                  spread=0),
                n("accent", arc=3.3, lift=3, hug=2.8, spread=0,
-                 ceiling=2, orbs=1),
+                 ceiling=2, pedestal_style="gold", orbs=1),
                n("rock", arc=4.9, lift=1, hug=2.8, spread=0,
                  pedestal=False, orbs=2),
                n("sub", arc=3.4, lift=1, hug=2.6, form="slab",
@@ -108,7 +134,8 @@ LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="stair",
                    n("sub", arc=2.4, lift=1, hug=2.6, kind="walk",
                      spread=0),
                    n("accent", arc=3.3, lift=1, hug=2.6, spread=0,
-                     ceiling=2, deco="lamp", shell="hall", orbs=1)]),
+                     ceiling=2, pedestal_style="gold", deco="lamp",
+                     shell="hall", orbs=1)]),
     # The far end of the court. Two landings on the paving itself --
     # ``form="floor"`` places no block and asks the terrace to already
     # be there -- then calcite bars standing in the rill with the drop
@@ -144,9 +171,9 @@ LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="stair",
                n("ground", arc=2.4, lift=1, hug=2.6, kind="walk",
                  spread=0),
                n("accent", arc=3.3, lift=2, hug=2.8, spread=0,
-                 ceiling=2, deco="lamp", orbs=1),
+                 ceiling=2, pedestal_style="gold", deco="lamp", orbs=1),
                n("rock", arc=2.4, lift=2, hug=2.8, kind="walk",
-                 spread=0, ceiling=3)]),
+                 spread=0, ceiling=3, pedestal_style="deepslate")]),
 ], exit_beats=[
     # The white stair itself, which is what the level is called and the
     # only thing in the tower that is *meant* to be a staircase rather

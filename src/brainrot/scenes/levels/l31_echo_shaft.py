@@ -34,15 +34,36 @@ from ._base import Level, n
 # * **The climb must appear in the move mix by name.** ``_climb_move``
 #   wants solid rock within one cell of the column at its middle index
 #   and at its top; out in the lane there is nothing to grab and the
-#   ladder becomes a staircase with nothing reporting it. The in-body
-#   one therefore keeps its pedestal and hugs 2.4, and the exit one
-#   carries its own ``shell="shaft"`` tube, which is the wall the
-#   generated climbs borrow.
+#   ladder becomes a staircase with nothing reporting it. **Both climbs
+#   now use the same recipe** -- a pedestal under the column, ``hug``
+#   2.4, and a rise of at least four so the middle index lands on the
+#   landing rather than on the stack below. The exit one used to stand
+#   at ``hug=2.0, pedestal=False`` inside a ``shell="shaft"`` tube and
+#   was the level's largest silent failure: it borrowed the tube's wall
+#   only sometimes, so the way out was an eleven-landing staircase in
+#   open sky on most visits. Swapping the tube for the pedestal is worth
+#   three points of empty frame, took the unchecked placement and the
+#   one body-inside-the-world frame to zero, and dropped plain hop from
+#   86% to 85% -- and it is also the reason the level got *shorter*.
 # * **The old shaft was oak.** ``n("oak", ...)`` on a deep-dark level
 #   put a brown wooden tube round the one climb in it, and at 10 m the
 #   lens was full of plank -- three of the sixty-three frames on the old
 #   contact sheet are nothing but brown. The column is deepslate now and
 #   the ladder is the model on its face.
+# * **The level had never set its own light and was the darkest place in
+#   the tower by a long way.** ``deepdark`` carries ``dark=0.86`` and a
+#   sky of (34, 44, 56); every authored level that has an opinion sits at
+#   0.25-0.62, and PUMPKIN ROWS records a fifth of its sheet coming back
+#   solid black at 0.5. Inherited, this one was rendering its white
+#   calcite band -- the whole reason the palette has a light value in it
+#   -- as a mid grey. ``dark=0.62`` under a violet-blue cave sky is about
+#   a third more light on every surface and still the darkest level in
+#   the tower. What to watch when moving it is the *lid* penalty rather
+#   than the general one: ``_indoor_want`` returns ``max(theme.dark, 0.85
+#   if roofed)``, so at 0.86 a ceiling was worth **nothing at all** and
+#   at 0.62 it is worth nine per cent. That is the right way round -- a
+#   lidded frame should read as indoors -- and it is why the lids below
+#   are affordable but must not be on every landing.
 # * **The rise and the drop live in the same beat.** Machinery is
 #   inserted between beats and leaves the body back at lift 1, so a fall
 #   written as a beat's first node is not a fall.
@@ -52,6 +73,7 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="ladder",
               ground="sculk", sub="tuff", rock="deepslate",
               accent="calcite", glow="amethyst", liquid="water",
               props=("pebbles", "dripstone", "chain", "torch"),
+              dark=0.62, sky=(76, 88, 116),
               step=("calcite", "hop"), beats=[
     # The threshold: one amethyst block flush in the sculk with the
     # water cut out round it, and then the mouth of the well, walked
@@ -107,7 +129,7 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="ladder",
                n("deepslate", arc=2.4, step_y=4, kind="climb",
                  climb_style="ladder", hug=2.4, spread=0, orbs=2),
                n("accent", arc=3.4, lift=5, spread=0, ceiling=2,
-                 deco="lamp", orbs=1)]),
+                 pedestal_style="calcite", deco="lamp", orbs=1)]),
 ], filler=[
     # The voice, repeated, and it stays *up* -- calcite ledges hung off
     # the inside of the well a block under its head, looking down the
@@ -118,36 +140,65 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="ladder",
     #
     # No moat anywhere in it either: the filler loops, and the second
     # lap digs away the ground the first lap's pedestals stand on.
-    ("echo", [n("accent", arc=3.4, lift=4, spread=0, pedestal=False,
-                ceiling=2, orbs=1),
-              n("ground", arc=2.4, lift=4, kind="walk", spread=0,
-                ceiling=3),
-              n("glow", arc=3.3, lift=5, spread=0, pedestal=False,
+    #
+    # **A block lower than it was, and standing on its own stone.** The
+    # ray fan the empty-frame number is measured with is +/-36 degrees
+    # inside eight metres, so its shallow down-rows fly clean over the
+    # terrace from lift 4 and hit ground from lift 3; the two ledges are
+    # also pedestalled now, which puts a three-block calcite plinth in
+    # the lower frame where a floating cube had nothing under it. Both
+    # are the same lever -- terrain under the body -- and the white
+    # plinth is the geode's band doing the work the palette wrote it in
+    # for. The third lid is here for the same reason: ``pedestal_style``
+    # paints a lid as well as a plinth, so these cost a white ceiling
+    # each and nothing else.
+    #
+    # The opener's ``arc`` is 4.3 and not the 3.4 the other three carry
+    # because the drop out of the shaft's head is now **two** blocks, and
+    # a two-block descent cannot also be short: the arc is over four
+    # metres of ground before it arrives, so 3.4 is refused on paper at
+    # -2.0 and passes at -1.0. Move the filler's height and this number
+    # moves with it.
+    ("echo", [n("accent", arc=4.3, lift=3, spread=0,
+                pedestal_style="calcite", ceiling=2, orbs=1),
+              n("ground", arc=2.4, lift=3, kind="walk", spread=0,
+                ceiling=3, pedestal_style="calcite"),
+              n("glow", arc=3.3, lift=4, spread=0, pedestal=False,
                 deco="lamp"),
-              n("rock", arc=3.4, lift=5, spread=0, pedestal=False,
-                orbs=1)]),
+              n("rock", arc=3.4, lift=4, spread=0, pedestal=False,
+                ceiling=2, pedestal_style="calcite", orbs=1)]),
 ], exit_beats=[
     # Out of the well the way you came into it: a lit calcite footing
-    # hard against the wall and eight blocks of ladder in its own tube.
-    # Eight is the whole of this level's rise and the tallest climb in
-    # the tower, which is the one thing ECHO SHAFT is for.
+    # hard against the wall and six blocks of ladder on a pedestal, with
+    # the last two of the level's rise left to the generated climb. This
+    # is the tallest climb in the tower and it is the one thing ECHO
+    # SHAFT is for.
     #
-    # **Splitting it into three stone steps and a five-block ladder was
-    # tried and reverted.** It was aimed at the lens: a climb runs at
-    # 2.35 m/s, so eight blocks is three and a half seconds with a
-    # wooden stile a hand's width from an eighty-degree lens. It moved
-    # the jammed-frame count by *nothing at all* -- 116 of 640 frames
-    # both ways, to the frame -- because the frames it was aimed at are
-    # the **in-body** climb rather than this one, and it cost six points
-    # of fidelity and four of designed content in the shuffle. The lens
-    # bill for this level is the price of the verb, and the verb is what
-    # the level is.
+    # **Six and not eight, and the number was measured twice.** With the
+    # tube swapped for a pedestal the ladder actually fires, and at
+    # ``step_y=8`` that is *three and a half seconds of deepslate a
+    # hand's width from an eighty-degree lens*: nine consecutive frames
+    # of the contact sheet are a flat grey wall and the jammed-lens count
+    # went 11.5% -> 22.5%. At six it is 15.7% and five frames, and the
+    # frame budget still comes in at 46% against the 49% this level had
+    # when the exit was a staircase. The earlier note that splitting the
+    # climb "moved the lens by nothing at all" was measured while the
+    # ladder was *not firing*, so it was measuring the staircase; it is
+    # wrong and this replaces it.
+    #
+    # The other half of the number is the level above. Everything in the
+    # tower is one continuous run, so shortening this level moves where
+    # the frontier meets THE WHITE STAIR, and over forty runs that
+    # level's designed share read **56% with the old staircase exit, 43%
+    # at ``step_y=8`` and 62% at six**, with nothing of its own changed
+    # in any of the three. Six is the value that leaves the level above
+    # better than it found it. Re-measure it after touching this node.
     #
     # **Check the move mix in ``--report`` for the word ``climb``**: if
     # it is missing this is an eight-step staircase and the level has no
     # idea left in it.
     n("accent", arc=3.2, lift=1, hug=2.2, spread=2, confine=True,
       deco="lamp"),
-    n("deepslate", arc=2.4, step_y=8, kind="climb", climb_style="ladder",
-      hug=2.0, pedestal=False, spread=0, shell="shaft", orbs=2),
+    n("deepslate", arc=2.4, step_y=6, kind="climb", climb_style="ladder",
+      hug=2.4, pedestal=True, spread=0, orbs=2),
 ])

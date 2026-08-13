@@ -764,6 +764,33 @@ time; none is guessable from the source.
 - **A pedestal cannot stand in a `channel` cut**, and `hug` on a `ledge` is
   load-bearing — unhugged, `_targets` pulls the course to the *outer* edge of
   its own shelf.
+- **`frame empty` is seed-noisy: average it.** The same unchanged level read
+  45% on seed 3 and 38% on seed 5. Quote a mean over several seeds with the
+  range, never one seed — most of the numbers in this document's history are
+  single-seed and should be read with that in mind.
+- **Changing a level re-rolls the levels above it.** The tower is one
+  continuous run, so a neighbour's edit moves your numbers: the same unchanged
+  design measured 56 / 43 / 62% designed content and 98 / 96 / 95% exact across
+  three worlds that differed only in the level below it. **A before/after of
+  ±10 points on one seed is not evidence.** If a row moves and you did not
+  touch what it measures, hold the neighbour fixed and re-measure — that A/B is
+  the only way to tell your change from the re-roll.
+- **The emptiness is overhead, not underfoot.** Instrumented by ray direction:
+  the fan's two *up*-rows were 57–77% empty against the down-rows' 13–46%. And
+  by beat, the exit climb is the bill — 42% of the run at 42–46% empty. **The
+  single biggest win is roofing the exit's launch**, worth about four points on
+  its own. `shell="cave"` on the launch landing takes its chimney from the
+  reserved climb cells for free; `shell="shaft"` closes the gap completely and
+  is rejected, because it puts the body 0.46 m inside the tube wall on three
+  frames of every six hundred.
+- **A wider `shelf` can break the gated-landmark crossing.** Measured on one
+  level: `shelf=5.0` passes `test_the_course_goes_through_the_landmarks_it_gates`
+  and 5.2 and 5.5 both fail it, with a crossing falling through to the unchecked
+  answer. The frame cost of staying at 5.0 was under a point. Widening a shelf
+  is a tower-test change, not a local one.
+- **`lift` is not a universal frame lever.** It is worth about ten points where
+  the shelf is wide enough for the down-rays to land on, and **nothing at all on
+  a narrow ledge**, where they clear the shelf into the void at any height.
 - **Only five material names emit light.** `spiral._GLOWING` is `lantern`,
   `torch`, `glowstone`, `sealantern`, `magma` — and `magma` is the only warm
   one. `shroomlight`, `pumpkin` and the rest are bright *textures* that emit
@@ -772,7 +799,10 @@ time; none is guessable from the source.
 - **A `ceiling=` lid is the cheapest overhead mass, and it darkens the level.**
   The lid cells are real, so the lens probe counts them — but a lid within
   eight blocks of the head also makes `_indoor_want` return 0.85, which takes
-  27% off every tint in the frame. **Lid half the landings, not all of them.**
+  27% off every tint in the frame. **Lid half the landings, not all of them** — except above `dark=0.85`, where
+  `_indoor_want` returns `max(theme.dark, 0.85)` and a lid costs nothing at all.
+  A level inheriting `deepdark`'s 0.86 was being lit as a cave whatever it did;
+  every authored level with an opinion sits at 0.25–0.62.
   And `pedestal_style` paints the lid as well as the plinth, so a floating
   landing can carry a differently-coloured roof for free.
 - **A structure you run *between* beats one you run *under*, on the frame.**
@@ -883,11 +913,14 @@ time; none is guessable from the source.
   24 landings, and the last two script beats went from 2 and 1 landings to 6 and
   9 — the crossing is inserted between beats and eats whatever is due next. It
   bought 0.9 s of structure on screen.
-- **Splitting a long exit ladder into stairs plus a short climb does not move
-  the lens.** Measured at `step_y=8` against three steps plus `step_y=5`: **116
-  of 640 jammed frames both ways, to the frame**, and the split cost 6 points of
-  fidelity. The jammed frames are the *in-body* climb, not the exit. Recorded so
-  nobody spends another pass on it.
+- **Splitting a long exit ladder: the earlier negative result was wrong, and
+  why is instructive.** It was measured as "116 of 640 jammed frames both ways,
+  to the frame" — but the ladder was **not firing at all** in either arm, so
+  both were a staircase and of course they matched. Re-measured with the climb
+  actually anchoring: `step_y=8` is nine consecutive flat-grey frames on the
+  sheet and takes the jam to 22.5%, against `step_y=6`. **Shorten the exit
+  climb.** Before trusting any A/B on a climb, check the move mix shows
+  `climb`/`bubble` by name in *both* arms.
 - **`pedestal=False` also fixes the beat parked at 89-92%.** The note above
   offers it for a beat at 0% with an empty trace; the commoner symptom is a beat
   stuck just under target for several passes, because a pedestal on a `ledge`
