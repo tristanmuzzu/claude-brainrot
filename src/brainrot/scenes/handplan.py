@@ -538,6 +538,19 @@ class Course(sp.Course):
         ``_grab_the_wall`` -- sits underneath, because the climb out is the
         one move a run cannot do without.
         """
+        # **A climb with nothing left to climb is just the crossing.** The
+        # budget is the next level's floor minus wherever the body actually
+        # got to, and a designed level that ends at lift 4, or comes off a
+        # landing standing above its own terrace, arrives at the chasm already
+        # at or above the height it was aiming for. Measured, ``need`` is zero
+        # or negative on 13% of budget calls and 18.5% of level visits fire
+        # **two** separate ascents -- the second climbing ground already won,
+        # and the crossing then dropping the body back down. That is the
+        # owner's "it climbs and then drops back to where it started, on a new
+        # level", and two of the six agents rewriting levels reported it out of
+        # their own frames before it was measured here.
+        if need <= 0:
+            return [self._crossing(rng, lv)]
         design = self.cone.design(lv.index)
         if design.exit_beats:
             theme = THEME_BY_NAME[design.name]
