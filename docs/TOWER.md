@@ -518,6 +518,44 @@ and a scarecrow are still the assets the roster wants, and authored
 `exit_beats` are still written for no level yet.
 
 
+## All thirty-three rebuilt (2026-08-13)
+
+Levels 21–33 followed the first twenty, seven agents against the rules as they
+stood after the first pass — including the owner's two notes from watching a
+preview run (fewer ladders; a level's descent belongs in its first two thirds,
+with the exit as its highest point).
+
+| | before the pass | after 1–20 | **all 33** |
+|---|---|---|---|
+| designed landings placed as authored | 94.1% | 94.7% | **95.2%** |
+| unchecked emergency placements | — | 0.35% | **0.15%** |
+| cells twice-claimed / off-lattice | 0 | 0 | **0** |
+| climbable without the parkour | 0 m | 0 m | **0 m** |
+| walkable along a level, built world | — | 43%, 0 of 52 | **41%, 0 of 75** |
+| **non-hop share of the move mix** | ~6% | 14.3% | **18.5%** |
+| move mix | hop 94% | hop 86% | **hop 82, walk 8, slide 4, climb 3, bounce 2, bubble 1** |
+| seconds on one theme | — | 10.7–13.0 | **10.2–14.4** (reference 10–15) |
+| dead air | 0.6% | 0.0% | **0.6%** |
+| body inside the world | 0.00% | 0.02% | **0.17%** ✗ |
+| frames mostly filled by a wall | 1.8% | 3.6% | **6.3%** ✗ |
+| per frame (vs parkour, same process) | 3.74 ms (×1.53) | 2.65 ms (×1.32) | **3.40 ms (×1.60)** |
+| tests | 628 pass | 628 pass | **628 pass, 34 skip** |
+
+**Two criteria are missed and both have the same cause: the climbs now fire.**
+Wall-filled frames went 1.8% → 6.3% because a ladder ride is a solid column a
+cell from the camera for two or three seconds, and levels that never had a
+working climb now have one — measured per level at 10–19% on the ladder levels
+and 0% on the rest. Body-inside-the-world went 0.02% → 0.17% (10 frames of
+6,000, worst 0.75 m), almost all of it ECHO SHAFT, whose profile was forced
+from `ledge` to `plaza` to stop its exit staircase lapping the tower. Both are
+real regressions, both were taken knowingly, and the alternative in each case
+was worse: a silent staircase where a ladder was written, and a level that eats
+an entire run.
+
+Frame cost is 3.40 ms against the 3.5 the criteria ask for — inside the budget,
+but the ratio to parkour is 1.60, the highest it has been, and that is the
+interiors and the lids.
+
 ## What this pass leaves open
 
 1. **An authored exit that cannot complete loops instead of falling back.**
