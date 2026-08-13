@@ -102,10 +102,37 @@ one block. Our envelope is *more* generous below the horizontal than the real
 map ever needs. Levels descend by **falling off an edge**, which costs nothing
 and is free variety — see §3.
 
-**The jump envelope.** `hop_span(rise)` computes it; no design may sit outside
-it and `tools/tower_probe.py --design-only` refuses one that does. Distances
-are stand-point to stand-point, which is `hypot(arc, radial)` minus both
-landings' `EDGE`.
+### `arc` is not the jump. Write this table down.
+
+The number you write is `arc`; the number the physics checks is `arc` **minus
+both landings' `EDGE`**, which for two ordinary blocks is **0.68 m**. An agent
+lost a pass to this, so here it is explicitly:
+
+| `arc` you write | reach the physics sees | legal at +1 | level | −1 |
+|---|---|---|---|---|
+| 2.6 | 1.92 | — | — | — |
+| **2.8** | **2.12** | ok | ok | — |
+| 3.2 | 2.52 | ok | ok | ok |
+| 3.6 | 2.92 | ok | ok | ok |
+| **3.8** | **3.12** | — | ok | ok |
+| 4.4 | 3.72 | — | ok | ok |
+| 4.9 | 4.22 | — | ok | ok |
+| 5.4 | 4.72 | — | — | ok |
+
+So **`arc` below 2.68 is illegal at every rise**, and **a rising hop's `arc`
+cannot exceed 3.78**. An `arc=2.8` +1 hop — which much of the old roster was
+written as — is a reach of 2.12 against a minimum of 2.00: the shortest legal
+jump in the game, and the owner's "tiny jumps" complaint in one number.
+
+One honest caveat on comparing to the reference. Its modal 3.0 m is a
+*block-centre to block-centre* gap, which is the same quantity as `arc`, not as
+reach. So writing `arc` 3.0–3.5 matches the reference's spacing; it just means
+the *feet* only travel 2.3–2.8 m, because a body takes off and lands a third of
+a block in from each edge. Both readings are defensible — what is not
+defensible is `arc=2.8` everywhere, which is what the roster had.
+
+**The jump envelope.** `hop_span(rise)` computes it in **reach**; no design may
+sit outside it and `tools/tower_probe.py --design-only` refuses one that does.
 
 | rise | ordinary hop | on ice (`kind="slide"`) |
 |---|---|---|
@@ -667,6 +694,18 @@ time; none is guessable from the source.
   not move at any value. This is why almost every level's way out is a
   staircase whatever its `exit` says, and it is the same anchor problem as the
   in-body climb above.
+- **A slime pad must be `pedestal=False`.** With a pedestal it is only offered
+  cells that have ground under them, and at the foot of a fall there are none:
+  3 of 6 placed became 7 of 7.
+- **`shell=` on a landing blocks the move *out* of it**, because `_shell` wraps
+  the arc that *arrived* and its roof then refuses the next arc. Put the shell
+  on the landing **after** the move you want roofed — a `cave` on a bounce's own
+  landing killed the bounce.
+- **A `walk` gate can be refused on every bearing.** `GATE_NODES["walk"]` is
+  `(-3, 0, 3)` against a 1.4–3.05 m window, and it also wants five supported
+  cells across the corridor, so it fails "no support under base" on any narrow
+  or `ledge` level: refused 20 of 20 on one level where a `hop` gate reserved
+  4 of 4. The walk gates are `watchtower`, `windmill` and `cabin`.
 - **Three things that were reported by agents and are *not* true**, both checked
   by the parent and recorded so they do not get rediscovered: `kind="walk"`
   **can** be authored (six levels use it with `--design-only` clean; the
