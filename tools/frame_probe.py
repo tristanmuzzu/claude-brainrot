@@ -37,6 +37,27 @@ differs and cropping cannot fix that -- but it is an honest one, and it is
 applied to the reference rather than to us so our own frames are never
 touched.
 
+**Corrected 2026-08-13, and the correction is the lesson.** The paragraphs
+immediately below compared this tower against ``frames/ps1`` and
+``frames/ps3``, and *both of those videos run a shader pack* -- soft shadows,
+volumetric light, bloom and a colour grade. Comparing flat baked light against
+that measures the shader pack. ``docs/reference/frames/vanilla_2hz/`` is the
+control that was missing: 125 frames of the vanilla speedrun at 2.22 fps,
+which is the same 0.45 s spacing ``--every 27`` produces, so ``churn`` is
+finally comparable too. Against *it*, four rows separate --
+
+    frame-to-frame change   ours  9.8%   vanilla 20.3%   shaders 29.4%
+    lopsidedness            ours 41.3%   vanilla 32.6%
+    unlit                   ours 28.3%   vanilla 17.3%
+    detail overhead         ours  4.5%   vanilla  6.9%
+
+-- and the biggest of them is a **camera** finding: a real player whips the
+view constantly and this scene moves like a tram. The rows that still do not
+separate (surface dominance, materials on screen, empty ninths, edge detail)
+are genuinely level with the real map. Always check what a reference *is*
+before concluding from it; the paragraphs below are kept as the record of
+getting that wrong.
+
 **What this tool found first, and it is not what it was built to find.**
 Measured over 100 frames of the hand-built tower against 122 frames of the
 real Parkour Spiral, *every single-frame statistic here says our tower matches

@@ -603,6 +603,20 @@ say we already match the real Parkour Spiral, and the fourth says we lose
 badly** -- and the fourth is the one `docs/RESEARCH.md` had already written
 down as never used.
 
+> **Rows 1 and 2 were measured against the wrong reference and are corrected
+> below.** Both were compared to `frames/ps1` and `frames/ps3`, and both of
+> those videos run a **shader pack** — see `docs/reference/README.md`, where
+> the provenance is now read off the titles instead of assumed. Against a
+> vanilla control at matched sampling (`frames/vanilla_2hz/`), four rows do
+> separate: our picture changes at **half** the rate (9.8% against 20.3%), we
+> are **more lopsided** (41% against 33%), **darker** (28% unlit against 17%)
+> and carry **less overhead** (4.5% against 6.9%). And the corridor question
+> was underdetermined: asked two-sided, the real route has rock outboard
+> **33.6%** of the way against our **5.6%**. `docs/RESEARCH.md` §4 and §10
+> carry both. The paragraphs below are left standing as the record of what
+> was believed, and as the reason to check what a reference actually is
+> before drawing a conclusion from it.
+
 **1. The pixels of a frame: no gap.** `tools/frame_probe.py` reads rendered
 images and runs unchanged over a `brainrot shoot` directory and over the 122
 real frames in `docs/reference/frames`. Over 100 frames of the tower against
