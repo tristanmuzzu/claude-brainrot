@@ -161,7 +161,7 @@ floor".
 |---|---|---|---|
 | `hop` | the default | 7.10 in air | — |
 | `slide` | an ice jump: same arc time, **10.0 m/s across** | 10.0 | works flat out. `kind="slide"`, pair with `form="ice"` and an ice material. **Reaches 6.00 m level and 7.02 m down one** — half again a hop, and the easiest way to make a jump *read* as big |
-| `bounce` | off a slime pad — **the only way a landing gains two blocks** | steered 2.6–7.81 | a landing with `form="slime"`, then a node with `kind="bounce"` **and `spread` ≥ 1**. Gains **+2** with the arc anywhere from 3.2 to 6.5 m |
+| `bounce` | off a slime pad — **the only way a landing gains two blocks** | steered 2.6–7.81 | a landing whose **material** is slime (`n("slime", ...)`), then a node with `kind="bounce"` **and `spread` ≥ 1**. See §7 for the arrival speed it needs, which is the part that actually decides whether it fires. Note `form="slime"` is geometrically identical to `form="full"` — `SPRINGY` is imported by `spiralplan` and never read — so the *style* is what makes a pad, not the form |
 | `web` | wading through cobweb | **1.20** | `kind="web"`, `form="web"`; the whole line of cells must be clear; 3-D distance 1.4–3.6 m and within one block of level |
 | `walk` | crossing a threshold on foot | 5.612 | `kind="walk"`, ground distance ≤ 2.4 m, height change ≤ 0.55. This is how a body gets *through a doorway* |
 | `climb` | a ladder or vine | 2.35 | `kind="climb"`, `climb_style="ladder"|"vine"`, `step_y` between +1.5 and +9.5, `hug` 1.6–2.0, **short arc (2.4 works, 3.0 often does not)**. Needs a free column with solid rock behind it |
@@ -614,6 +614,25 @@ time; none is guessable from the source.
   back **one** block; **two** blocks needs `impact >= 11.0`, i.e. a two-block
   drop across 4.4 m or more. So a bounce pad must be at the bottom of a real
   fall, and how high it throws you is decided by that fall.
+- **...and the feed jump must survive its own *short fallback arc*.** `_node`
+  offers `arc * 0.84` as a fallback, and at that length a one-block drop lands
+  at impact 6.75 against the 6.72 threshold — the bounce is refused and
+  silently becomes a hop with the beat still reading as placed. Write the feed
+  at `arc=4.9–5.2`, near the top of the envelope, so the 0.84 fallback is still
+  about 4.2 m. `spread >= 1` on its own does not save it.
+- **A shell grows walls only at `lift=1`.** `_shell` skips any wall column with
+  nothing under it, so a higher beat gets a roof and open sides. And a walled
+  bay fills the two cells either side of the move four high, so the landing
+  *after* one must stay in the corridor: shelling a doorway at lift 1 and
+  stepping the next beat to lift 2 took that beat from 100% placed to 62%.
+- **A wide shelf costs the exit climb its lane.** `shelf=5.0, band=9.0` gave 15
+  unchecked placements in 8 runs; `shelf=3.5, band=8.0` with nothing else
+  changed gave 1 — and took walker coverage from 57% to 20% as well.
+- **A gated landmark moves the level's breaks** (kept 9 m clear, far side of
+  the apron only), which pushes the first uncrossable gap past halfway and
+  raises walker coverage by about 20 points. But removing the gate to get that
+  back was much worse on every other count: 6 of 8 runs looped and 14 unchecked
+  placements. The crossing is what keeps the frontier in its lane.
 - **Half the landmark blueprints name materials literally** (`_lm_g_hoodoo` is
   terracotta whatever your theme is) and half take `theme.rock`/`accent`/`glow`
   (`_lm_g_arch`, `_lm_g_bell`). Pick one that takes roles or the level gets a
@@ -629,6 +648,12 @@ time; none is guessable from the source.
   the terrace floor is analytic rather than in `course.struct`, so this is
   recorded as a **symptom to look for** rather than a rule: if the floor under
   the body reads as grey cone stone in a contact sheet, try the band.
+- **Two things that were reported by agents and are *not* true**, both checked
+  by the parent and recorded so they do not get rediscovered: `kind="walk"`
+  **can** be authored (six levels use it with `--design-only` clean; the
+  confusion is `spiralplan.BALLISTIC`, which contains `walk`, against
+  `tower_probe.BALLISTIC`, which does not), and `moat=True` **does** dig
+  (three moat nodes add about 54 liquid cells a run, not four).
 - **`form="floor"` clamps `lift` to zero.** It places no block; the cell must
   already be solid ground. Writing `lift=1, form="floor"` used to pass the
   paper check and build a block lower, taking every jump after it in the beat
