@@ -748,6 +748,35 @@ time; none is guessable from the source.
 - **A pedestal cannot stand in a `channel` cut**, and `hug` on a `ledge` is
   load-bearing — unhugged, `_targets` pulls the course to the *outer* edge of
   its own shelf.
+- **A beat's first node belongs at `lift=1`, and this is a *fidelity* lever.**
+  Machinery leaves the body at lift 1, so a beat opening at lift 2 is asking for
+  a rise it may not have. Measured on four separate beats by two agents:
+  86% → 100%, 81% → 100%, 78% → 92%, 67% → 100%. One line each.
+- **Centre a `+1` hop's `arc` at 3.2, not 3.6.** 3.6 is a reach of 2.92 against
+  a window topping out at 3.10, so it is the arc that has to fall back — and a
+  fallback is not `exact`. Worth several points a beat.
+- **`spread` cannot rescue exactness.** `exact` is `trial is node` in
+  `Course._attempt`, so *any* fallback — of lift **or** arc — counts as inexact.
+  Raising `spread` converts a lost landing into a fallback, which reads the same
+  in the fidelity number and better in the placement one. Know which you are
+  moving.
+- **Floor breaks are a *frame* lever, not only a walker lever.** One level read
+  58% empty with `breaks=0` and 53% with a single break, walker coverage
+  unchanged — the lock's approach stack and its island stand in the corridor
+  ahead of the body where an open shelf has nothing.
+- **A `ceiling=` lid is legal over a *level* hop, not only over a `walk`.** A
+  flat hop's apex is 1.25 m and the lid sits at 3, so a flat filler can be
+  roofed at every landing. It is the cheapest thing a level author has against
+  the sky. A `shell="tunnel"` on two treads of an exit stair is the other one:
+  56% → 54% empty at no fidelity cost, and the exit climb is the emptiest third
+  of a level.
+- **A tall `rise` on a narrow `ledge` makes the exit climb lap the tower.**
+  ECHO SHAFT at `rise=8` on a 3.5-cell shelf failed the twice-claimed
+  invariant: its exit staircase came back over its own cells one lap later.
+  `profile="plaza"` fixed it and cost only walkability (4% → 33%, against a 55%
+  ceiling). Reserve is `(need + 1) * 3.2` metres, so the tallest levels need the
+  widest ground — the opposite of the "narrow shelf helps the climb" note above,
+  which holds at ordinary rises.
 - **`shell="shaft"` around an authored exit climb is expensive and not needed.**
   Taking it off one vine took *body inside the world* from 3 frames of 556 to
   **0** and the jammed lens from 18.2% to 10.4%, and the climb still anchored —

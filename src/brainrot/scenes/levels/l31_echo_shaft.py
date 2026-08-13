@@ -47,7 +47,7 @@ from ._base import Level, n
 #   inserted between beats and leaves the body back at lift 1, so a fall
 #   written as a beat's first node is not a fall.
 LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="ladder",
-              band=8.5, shelf=3.5, profile="ledge", breaks=3,
+              band=8.5, shelf=3.5, profile="plaza", breaks=3,
               landmark="arch",
               ground="sculk", sub="tuff", rock="deepslate",
               accent="calcite", glow="amethyst", liquid="water",
