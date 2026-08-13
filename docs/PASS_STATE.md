@@ -79,6 +79,17 @@ its own A/B, never while agents run.
    the reservation fails, the level pays and gets nothing. With `landmark`
    frozen this pass, `channel` now carries that cost.
 
+9. **`moat=True` on a `kind="walk"` node looks like a no-op.** Measured in one
+   position over eight runs: identical worlds on every figure. If general, a
+   plank across water cannot be authored, which is a hole in the vocabulary.
+   Check `Course._moat` against walk landings.
+10. **The no-jump walker is not deterministic across processes.** The same
+    unchanged design read 41.8 / 45.0 / 47.9 / 53.2% coverage in four runs —
+    set iteration order in the flood. That is ±6 points of noise on the one
+    number the owner's "exactly one way to the end" rule is judged by, and it
+    probably explains the 59%-mean / 1-of-16-fully reading at the batch-1
+    merge. Sort the frontier; re-measure the watch item afterwards.
+
 ## Watch list
 
 - **No-jump walk coverage rose to 59% mean with 1 of 16 levels fully

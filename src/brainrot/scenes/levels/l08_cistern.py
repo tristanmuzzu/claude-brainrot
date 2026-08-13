@@ -7,98 +7,214 @@ and ``docs/TOWER.md``.
 
 from ._base import Level, n
 
-# A flooded rock tank, and the water is the level. ``profile="channel"``
-# cuts the theme's liquid down the whole length of the floor rather than
-# leaving it as two decorative moats -- which is the reference's single
-# most-used mechanic and its answer to a wide floor: where the ground
-# widens, its width is hazard and the landings are isolated blocks standing
-# in it. The old design was an eleven-cell brown plate with white cubes on
-# it and no water in shot anywhere, which is a cistern with nothing in it.
+# The tower's water tank, cut into the dripstone -- and its wall has
+# cracked open into an amethyst geode.
 #
-# The band can afford to be wide here where CANOPY WALK's could not. The
-# cliff at your back belongs to SUNKEN TEMPLE three levels below, whose band
-# is 12.0, so the overhang stands at about ``out - 10.9`` and anything up to
-# 10.5 is this level's own ground rather than the level below's rock -- the
-# opposite of level 7's problem and the reason these two neighbours want
-# opposite numbers. The lid is THE CRUCIBLE's floor slab, a full plaza, so
-# this level is roofed end to end ten blocks up: the tower's one real
-# interior of the turn, and the loudest possible contrast with the jungle
-# ledge before it.
+# One sentence: *you go down into the tank before you can get out of it.*
+# You arrive over the coping on a lantern set flush in the stone, sprint
+# under a stalactite with the water already dug out beside you, climb the
+# tank's inner wall two blocks -- and then go off the top of it, two down
+# and four and a half metres out, onto the one algae-covered stone lying
+# in the bottom. It throws you two blocks straight back up onto the
+# crystal, which is the only place in this motion model where a landing
+# gains two. Then the wall opens: a white calcite chamber roofed in
+# amethyst, crossed on foot. You leave up the overflow well in the
+# corner, on a bubble column.
 #
-# The landmark is an ``arch`` and not the ``hoodoo`` this level was first
-# given, for a reason worth writing down: ``_lm_g_hoodoo`` names
-# ``terra_red``/``terra_orange`` literally rather than taking the level's
-# roles, so it stood two brick-orange mesa columns in a grey-and-teal
-# cistern. ``_lm_g_arch`` is built from ``theme.rock``, ``theme.accent`` and
-# ``theme.glow``, so here it comes out as two calcite piers carrying a
-# prismarine lintel with sea lanterns on it -- a broken aqueduct over the
-# water, which is what a cistern should be recognised by. Check what a
-# blueprint is made of before choosing it; about half of them are literal.
+# **The landmark changed from ``arch`` to ``cluster``, and that is why
+# this level was rebuilt rather than patched.** ``cluster`` is the
+# amethyst geode -- four cells and three blocks tall, the *only* one of
+# the fifteen blueprints with no gated variant, on purpose
+# (``spiralplan.GATED``'s footnote: its two deep-dark levels measured
+# worse with a five-cell gate across them). So there is no crossing to
+# steer the course through it and nothing to make it big. A four-cell
+# structure cannot be a level's identity, and the reference agrees --
+# the median biggest mass on a real terrace is twelve cells and four
+# blocks tall (RESEARCH 4). So the crystal is the level's *palette*
+# rather than its monument, and it is everywhere:
+#
+# * ``sub="amethyst"`` puts it in the lowest two cells of the cliff at
+#   every bearing (``Cone.cliff_style``, ``h < 2``) -- a purple seam
+#   running along the tank's waterline for the whole level -- in the cut
+#   face under the terrace lip (``_slab``, depth 1), and in the roof of
+#   the one shell (``_shell``'s ``roof = theme.sub``). A white-walled
+#   chamber with a purple crystal ceiling *is* a geode; nothing had to
+#   be built for it.
+# * the geode blueprint itself then reads as one more outcrop of the
+#   same seam rather than as a lilac ornament dropped on a grey plate.
+#
+# ``profile`` was ``channel`` and this is the second-largest change.
+# A channel cuts its liquid two cells wide at 3.6 out from the core --
+# where ``Course.lane_radius`` puts the running line -- and an *ungated*
+# landmark cannot reserve on a ``ledge`` at all (RULES 7). Between them
+# that left the only two profiles this level could have as ``channel``,
+# where the structure measured **0.4 s** on screen against the 1.5 s
+# rule, and ``plaza``. A plaza is also what a cistern actually is: the
+# reference's answer to a wide floor is not to narrow it but to make its
+# whole width hazard (RESEARCH 8), and this floor is water in holes,
+# floating stones and one lock across a break.
+#
+# The identity is the floor, thirteen materials with no one of them over
+# a fifth: brown dripstone and grey tuff, blue-grey clay silt, deepslate
+# where it stays wet, gravel and moss and mossy cobble at the waterline,
+# one copper fitting, and amethyst speckled through all of it. Against
+# CANOPY WALK's jungle green below and GLACIER SHELF's snow-and-blue-ice
+# above, this level is brown, white and purple and is not confusable
+# with either from a single frame.
 LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
-              band=10.5, profile="channel", breaks=0, landmark="cluster",
-              ground="dripstone", sub="tuff", rock="calcite",
-              accent="prismarine", liquid="water", glow="sealantern",
-              props=("dripstone", "pebbles", "chain"),
-              sky=(72, 96, 104), dark=0.62,
-              candy=("calcite", "prismarine", "darkprismarine"),
-              step=("calcite", "hop"), beats=[
-    # The sluice gate. A sea lantern set in the sill on a rise, then the sill
-    # itself crossed on foot -- the palette goes from jungle green to wet
-    # white-and-teal in one block, which is what the reference's seams do.
-    ("sluice", [n("glow", arc=3.0, lift=1, hug=3.2, spread=1, ceiling=3,
-                  shell="tunnel", orbs=1),
-                n("calcite", arc=2.2, lift=1, hug=3.2, kind="walk",
-                  spread=0)]),
-    # Stepping stones out over the tank, climbing as they go. Each one digs
-    # its own pool, so the water is genuinely *under* the jump rather than a
-    # blue patch beside it -- and the last one is high enough for the drop
-    # that follows to be worth something.
-    ("stones", [n("calcite", arc=3.4, lift=2, hug=3.4, spread=1, moat=True,
-                  ceiling=3),
-                n("darkprismarine", arc=3.4, lift=1, hug=3.0, spread=1,
-                  moat=True, ceiling=3, orbs=1),
-                n("calcite", arc=3.4, lift=2, hug=3.4, spread=1, moat=True,
-                  ceiling=3)]),
-    # The drain: onto the tank wall, a block down onto slime lying in the
-    # bottom, and back out.
+              band=10.0, profile="plaza", breaks=1, landmark="cluster",
+              ground="dripstone", sub="deepslate", rock="calcite",
+              accent="amethyst", liquid="water", glow="lantern",
+              dark=0.32, sky=(102, 92, 116),
+              candy=("amethyst", "calcite", "copper"),
+              step=("calcite", "hop"),
+              props=("dripstone", "chain", "lilypad", "pebbles",
+                     "vinehang", "lanternpost"),
+              # A cistern floor: rock under silt under water. ``tuff``
+              # carries it with the dripstone, and the tail is what
+              # stands in the bottom of a tank -- clay, gravel, moss and
+              # mossy cobble along the waterline, deepslate in the wet,
+              # one copper fitting. Thirteen kinds, dominant 21%,
+              # against the reference's median fourteen and 26%.
+              floor=(("tuff", 3), ("dripstone", 2), ("calcite", 2),
+                     ("gravel", 2), ("clay", 2), ("amethyst", 1),
+                     ("mossy", 1), ("cobble", 1), ("andesite", 1),
+                     ("stone", 1), ("moss", 1), ("copper", 1)),
+              beats=[
+    # The coping. Three ideas in three landings, which is the density the
+    # complaint asked for rather than three hops at one height:
     #
-    # The rise and the drop are inside *one* beat and that is not tidiness.
-    # A lock or a landmark crossing is inserted between script beats and
-    # leaves the body back on the floor at lift 1, so a beat that opens by
-    # dropping off the height the beat before it climbed to is a beat that
-    # drops nothing about half the time. Measured: with the climb in
-    # ``stones`` the slime landed level with its take-off in every run, the
-    # bounce silently became an ordinary hop, and the beat read 50%.
+    #   0. a lantern set flush in the coping, on a rise, with a
+    #      stalactite three cells over it. The threshold -- a light to
+    #      aim at, mass over the head in the level's *first* frame, and
+    #      the complete change of palette from the jungle below.
+    #   1. the coping itself, **walked** under a second stalactite with
+    #      the tank's water dug out beneath. A lid at three is the
+    #      genre's 2bc and the only honest form of it here: one impulse
+    #      always rises 1.25 m, so the head sweeps the two cells above
+    #      every take-off and a beam low enough to read as a beam
+    #      refuses every arc under it. Over a leg that never leaves the
+    #      ground it is exact. The walk is at position two and never
+    #      first: first in a beat it follows machinery at an arbitrary
+    #      height, and a walk needs its predecessor within half a metre.
+    #   2. up the tank's inner wall, on ``step_y`` rather than ``lift``
+    #      so the rise is measured from where the body actually is, and
+    #      floating -- the moat one landing back digs a bowl of radius
+    #      three that a plinth 3.2 m along would have to stand in.
+    ("coping", [n("glow", arc=3.0, lift=1, spread=1, deco="lamp", orbs=1,
+                  ceiling=3, pedestal_style="dripstone"),
+                n("rock", arc=2.9, lift=1, kind="walk", spread=0,
+                  ceiling=3, moat=True),
+                n("rock", arc=3.2, step_y=1, spread=0, pedestal=False,
+                  orbs=1)]),
+    # The tank, and this is the level. It is the one beat that is worth
+    # writing out jump by jump, because all three of its numbers are
+    # forced:
     #
-    # It gains one block and not two, and that is the arithmetic rather than
-    # timidity: a bounce is thrown by the speed it arrived with, and one
-    # block of drop across a four-and-a-half-metre arc arrives at 9.2 m/s --
-    # enough to be thrown back a block, not two. Two would want a two-block
-    # drop, which wants a second rise, which makes this a four-node beat, and
-    # a four-node beat here is truncated to three every single run.
-    ("drain", [n("calcite", arc=3.4, lift=2, hug=3.0, spread=1,
-                 shell="hall"),
-               n("slime", arc=4.4, lift=1, hug=3.0, spread=0,
-                 pedestal_style="tuff", moat=True),
-               n("prismarine", arc=3.4, lift=2, hug=3.0, kind="bounce",
-                 spread=1, orbs=3)]),
-    # The gallery: a lamplit bay carved back into the core wall, and the
-    # level's one enclosed pinch. Two metres of interior, not fifteen
-    # seconds of tunnel (RESEARCH.md 4 -- the real map is fully enclosed 6%
-    # of the way, in runs with a median length of two metres).
-    ("gallery", [n("calcite", arc=3.6, lift=2, hug=2.2, spread=1,
-                   shell="grotto"),
-                 n("dripstone", arc=3.4, lift=1, hug=2.2, spread=1,
-                   shell="grotto", orbs=1)]),
-    # Under the teeth. A checked lid at three, which is where a lid is
-    # honest in this kernel: the head sweeps two cells above every take-off,
-    # so a beam at two refuses every arc under it.
-    ("teeth", [n("dripstone", arc=3.6, lift=1, spread=0, ceiling=3),
-               n("calcite", arc=3.6, lift=1, spread=0, ceiling=3, orbs=1)]),
+    #   0. the top of the tank wall, +1 at ``arc`` 3.2-3.4 -- a reach of
+    #      2.72 against a +1 window that shuts at 3.10. The highest dry
+    #      stone in the level and the thing you aim at from the door.
+    #   1. **off the front of it: two blocks down, 3.92 m of reach.**
+    #      The longest jump here and the only way to buy one -- nothing
+    #      rises two in one impulse, but falling takes time and the body
+    #      does not slow down while it does, so -2 reaches 5.56 where
+    #      level reaches 4.26. Written on ``step_y`` because a descent
+    #      has to be a descent from wherever the beat above left the
+    #      body, and at 4.6 its two fallback arcs (5.24, 5.89 -- a
+    #      ``step_y`` node falls back *longer*, never shorter) both stay
+    #      inside the -2 window of 3.80-6.24.
+    #   2. and the fall is what pays for the next jump. A bounce is
+    #      thrown by the speed it arrived with: this arc lands at 11.35
+    #      m/s, and ``bounce_launch`` keeps 96% of it, which is 10.90
+    #      against the 10.58 a **two-block** gain needs. One block less
+    #      of drop, or an arc a metre shorter, and this is an ordinary
+    #      hop with the beat still reading as placed. ``spread=1`` is
+    #      not optional either -- at ``spread=0`` the bounce is refused
+    #      and the landing is quietly placed a block lower.
+    #
+    # The rise and the drop are inside *one* beat and that is not
+    # tidiness: machinery is inserted between beats and leaves the body
+    # back at lift 1, so a beat that opens by dropping off the height
+    # the beat before it climbed to drops nothing about half the time.
+    ("tank", [n("rock", arc=3.4, lift=3, spread=1, ceiling=3, orbs=1,
+                pedestal_style="dripstone"),
+              n("slime", arc=4.6, step_y=-2, spread=1, pedestal=False,
+                moat=True, orbs=2),
+              n("amethyst", arc=3.4, lift=3, kind="bounce", spread=1,
+                pedestal=False, orbs=3)]),
+    # The geode: the tank wall opened out into two metres of crystal
+    # chamber. Two metres and not fifteen seconds -- the real map is
+    # fully enclosed 6.1% of the way and its enclosed runs have a median
+    # length of two metres (RESEARCH 4). What it *is* almost always is a
+    # groove, and that is what the rest of this level is.
+    #
+    # The shell is a ``cave`` and it sits on the **walk**, for a reason
+    # that is geometry rather than taste: a shell's roof lands in the
+    # cell the head sweeps at a hop's apex, so ``write`` refuses it
+    # there and a tunnel over a jump is a roof with a hole in it. It
+    # only survives whole over a leg that never leaves the ground. Its
+    # walls come out ``theme.rock`` -- white calcite -- and its roof
+    # ``theme.sub``, which is the amethyst. That is the whole structure
+    # the level is named for, and it cost one keyword.
+    ("geode", [n("amethyst", arc=3.2, lift=2, spread=1, ceiling=3, orbs=1,
+                 pedestal_style="dripstone"),
+               n("amethyst", arc=3.0, lift=2, kind="walk", spread=0,
+                 shell="cave", deco="lamp"),
+               n("rock", arc=3.2, lift=3, spread=0, deco="lamp", orbs=2)]),
 ], filler=[
-    # The tank itself, repeating: a stone standing in the water, a lit shelf
-    # against the wall, and a low slab under the drip-stone.
-    ("tank", [n("calcite", arc=3.4, lift=1, spread=1, moat=True, orbs=1),
-              n("glow", arc=3.2, lift=2, hug=3.0, spread=1),
-              n("darkprismarine", arc=3.2, lift=1, spread=1, ceiling=3)]),
+    # The drip run, and this is where the level's character actually
+    # lives: the filler repeats and a script's tail does not. Four
+    # landings at lifts 2, 2, 3 and 1 -- it climbs and then *falls*,
+    # which is the thing every level in this tower lacked. The real map
+    # descends somewhere on 36 of its 43 legs and travels eleven blocks
+    # vertically to gain four; it does it by coming off edges, not by
+    # jumping down, and the two-block drop at the end of this loop is
+    # that.
+    #
+    # The four seams are all legal, including the one nobody looks for
+    # -- the loop's own last-to-first: 2 -> 2 walked, 2 -> 3 at reach
+    # 2.52, 3 -> 1 at reach 3.72, and 1 -> 2 back round at 2.52.
+    #
+    # The walk is at position two and is the level's third: it is the
+    # only non-hop verb reliable enough to put in a loop, and a loop is
+    # the only place a verb gets used more than once. No ``moat``
+    # anywhere in here, and that is a rule rather than a preference --
+    # the filler loops, and the second lap digs the ground out from
+    # under the pedestals the first lap stood up.
+    ("drip", [n("rock", arc=3.2, lift=2, spread=1, ceiling=3, orbs=1,
+                pedestal_style="dripstone"),
+              n("ground", arc=2.9, lift=2, kind="walk", spread=0,
+                ceiling=3, deco="lamp"),
+              n("amethyst", arc=3.2, lift=3, spread=0, pedestal=False,
+                orbs=1),
+              n("ground", arc=4.4, lift=1, spread=0, pedestal=False,
+                orbs=2, deco="lamp")]),
+], exit_beats=[
+    # The overflow well in the corner of the tank. Written out rather
+    # than left to the generated climb for the usual reason -- a climb
+    # wants solid rock within one cell of its column at the column's
+    # middle index and at its top, and a column hung mid-lane at
+    # ``hug`` 2.0 with no pedestal has nothing to grab (11,097 of 13,000
+    # candidates refused on a generated bubble). The recipe that fires
+    # is the landing's **own pedestal** under the column plus a rise of
+    # at least four, so the middle cell lands inside the stack rather
+    # than in the air below it: hence no ``hug`` at all on the column.
+    #
+    # ``step_y=6`` is the level's ``rise`` exactly. Short is not free
+    # here -- the crossing appended after the climb comes down one on to
+    # the next terrace, so a column that overshoots makes GLACIER SHELF
+    # open by jumping back down to its own floor, which is the owner's
+    # "it puts a ladder there and then jumps back down" in one number.
+    # Six blocks of *bubble* is half a second at 11.0 m/s; the same six
+    # on a ladder would be two and a half seconds of plate against the
+    # lens, which is why this theme exits by water.
+    #
+    # Nothing overhead on the well head. Both lids RULES 7 recommends
+    # for an exit launch were measured on the level below this one and
+    # both cost designed content, because a lid that will not fit
+    # refuses the launch landing outright and the fallback for a refused
+    # ascent node is the generated staircase.
+    n("rock", arc=3.0, lift=1, hug=2.4, spread=2, deco="lamp", orbs=1),
+    n("rock", arc=3.0, step_y=6, kind="bubble", climb_style="water",
+      spread=0, deco="lamp", orbs=2),
 ])
