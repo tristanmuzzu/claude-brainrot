@@ -121,7 +121,7 @@ from ._base import Level, n
 #   that -- and there is **no moat in the filler**, because the loop's
 #   second lap digs out the first lap's footings.
 LEVEL = Level("THE GROVE", "warped", rise=8, gap=3.0, exit="bubble",
-              band=12.0, shelf=6.0, breaks=2, landmark="cluster",
+              band=12.0, shelf=6.0, breaks=2, landmark="hoard",
               ground="warpednylium", sub="soulsand", rock="warped",
               accent="shroomlight", liquid="water", glow="sealantern",
               candy=("shroomlight", "warped"),

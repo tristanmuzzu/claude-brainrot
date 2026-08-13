@@ -15,8 +15,8 @@ world and invalidates whatever they are measuring.
 | batch | levels | state |
 |---|---|---|
 | 1 | 1–6 | **merged** — 630 tests, design 100% legal |
-| 2 | 7–12 | running |
-| 3 | 13–18 | not started |
+| 2 | 7–12 | **merged** — 630 tests, design 100% legal |
+| 3 | 13–18 | running |
 | 4 | 19–24 | not started |
 | 5 | 25–30 | not started |
 | 6 | 31–33 | not started |
@@ -83,12 +83,14 @@ its own A/B, never while agents run.
    position over eight runs: identical worlds on every figure. If general, a
    plank across water cannot be authored, which is a hole in the vocabulary.
    Check `Course._moat` against walk landings.
-10. **The no-jump walker is not deterministic across processes.** The same
-    unchanged design read 41.8 / 45.0 / 47.9 / 53.2% coverage in four runs —
-    set iteration order in the flood. That is ±6 points of noise on the one
-    number the owner's "exactly one way to the end" rule is judged by, and it
-    probably explains the 59%-mean / 1-of-16-fully reading at the batch-1
-    merge. Sort the frontier; re-measure the watch item afterwards.
+10. ~~**The no-jump walker is not deterministic across processes.**~~
+    **Checked and false.** Run three times in three processes on a stable
+    roster it reads identically to the digit. The ±6 spread the agent saw was
+    the *roster* changing under it — five other agents were rewriting levels
+    while it measured. Sets of int tuples do not get hash randomisation, so
+    there was never a mechanism. Worth keeping as a reminder that "noisy
+    metric" and "the thing being measured is moving" look identical from
+    inside one level.
 
 11. **The generated exit climb launches at `hug=2.2` and that is most of the
     wall-in-lens number.** Measured on one level: 69 jammed frames of 1,293 at
@@ -139,10 +141,10 @@ its own A/B, never while agents run.
 
 ## Watch list
 
-- **No-jump walk coverage rose to 59% mean with 1 of 16 levels fully
-  walkable** at the batch-1 merge (real map 46%, none fully). The owner's rule
-  is exactly one route to the end. If it is still there after batch 2, tighten
-  the brief rather than the levels.
+- ~~No-jump walk coverage at 59% mean, 1 of 16 fully walkable.~~ **Closed
+  after batch 2: 37% mean, median 40%, and 0 of 40 levels walkable end to
+  end**, against the real map's 46% and 0 of 43. Better than the reference on
+  both halves. The batch-1 reading was taken while agents were editing.
 - Unlit is 29% of the frame against vanilla Minecraft's 18%. Closing the rest
   means an ambient term in the shading, which touches all four scenes.
 - A single surface still owns about half the frame against the reference's

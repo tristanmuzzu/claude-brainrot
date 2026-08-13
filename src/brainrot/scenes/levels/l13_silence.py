@@ -48,7 +48,7 @@ from ._base import Level, n
 # emergency placements went from one in eight runs to fifteen.
 LEVEL = Level("THE SILENCE", "deepdark", rise=8, gap=3.0, exit="ladder",
               band=8.0, shelf=3.5, profile="ledge", breaks=5,
-              landmark="cluster",
+              landmark="cabin",
               ground="sculk", sub="deepslate", rock="blackstone",
               accent="sculkvein", glow="amethyst", liquid="water",
               step=("deepslate", "hop"),
