@@ -124,6 +124,17 @@ the rest and is worth reading in full.
   on a beat's **first two** nodes, not its last.
 - Anything past about the fifth authored beat is never built: a level lays
   9–12 landings and the exit climb takes some of those.
+- **A stale `__pycache__` will hand you a fabricated A/B.** Editing a level
+  module twice inside one second, where the two versions are the *same number
+  of bytes* (`shelf=4.5` → `shelf=3.6`), leaves Python's cache valid by
+  mtime-and-size and your second arm measures the first. One agent measured a
+  nine-point walk-coverage "win" that way before catching it. Run
+  `find src -name __pycache__ -delete` between arms of any A/B.
+- **A failed node abandons the whole rest of its beat**, silently, and the
+  recovery hop is committed under the beat's own name. So a beat reading 64%
+  is not "some landings missed" — it is usually *one* opener that wanted
+  ground it did not have, costing every node behind it. Suspect the first node
+  of a beat, not the last.
 - `frame empty` and `lens jammed` are seed-noisy. Average several seeds, and
   remember that changing your level re-rolls the levels above it, so a ±10
   point move on one seed is not evidence.
