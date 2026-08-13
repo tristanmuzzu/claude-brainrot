@@ -653,6 +653,72 @@ is the design feedback loop: every table row under 98% traced to a real
 authoring mistake, and half of them were at beat boundaries -- including the
 one class nobody looks for, the filler loop's last-landing-to-first seam.
 
+## Levels 1-20, rebuilt against measured research (2026-08-13)
+
+The design as data is now **one module per level** in
+`src/brainrot/scenes/levels/`; `handlevels.py` re-exports it. Two documents
+sit under `docs/TOWER.md` and are read first when the job is a level rather
+than the tower: **`docs/RULES.md`**, the constitution a level must satisfy,
+and **`docs/RESEARCH.md`**, what the real map and its footage measure as.
+`docs/reference/` holds the material -- 182 frames, the contact sheets, the
+checkpoint and palette data -- and `tools/mapdig/` the parsers that read the
+world save.
+
+**Three things `docs/TOWER.md` believed did not survive being measured**, and
+each had been load-bearing for a rebuild. The reference does *not* alternate
+interior and exposed (fully enclosed 6.1% of the way; what it always is, is a
+**groove** -- a wall within 4 m on one side 71% of the time and a rock lid a
+median 8 blocks overhead on 98% of samples). It does *not* put a landmark on
+each level (median biggest mass on a real terrace: 12 cells, 4 blocks tall);
+**identity comes from the floor**, a median 14 materials with the dominant one
+at 26%, against our two or three. And its levels are *not* monotonic climbs --
+36 of 43 descend somewhere and 22 dip below their own start, travelling 11
+blocks vertically to gain 4, by falling off edges rather than jumping down.
+Also: two of the three reference videos are **Parkour Volcano, not Parkour
+Spiral**, so TOWER.md's frame-level section has the wrong provenance.
+
+**And the exotic-physics premise was wrong in the other direction.** Across
+~2,900 s of footage there is no slime, honey, soul sand, bubble column or
+waded cobweb; cobweb appears **zero** times in the entire Spiral save. Lava
+and water are the mechanic (26 and 20 of 43 levels), slime is one 2x2 pad per
+level, and the one special block the reference leans on hard is the
+**ladder**. A hop-heavy tower is *matching* the reference, not falling short.
+
+`tools/level_review.py --level N --all` is the per-level tool: the game camera
+over the level and into the next, a **blueprint** (elevation and plan of the
+built world, the only view that shows ground running unbroken past your
+jumps), a Blender orthographic three-view, and that level's numbers.
+`tools/roster_sheet.py` tiles one frame per level, which is how "do the levels
+look like different places" gets answered. **One level per process** -- the
+phase pin is a class patch and the tool refuses a second.
+
+**The pin skewed three metrics before this was noticed**, and the pattern is
+worth knowing: a pinned run *opens* on the level a fifth of the way along it,
+so walkability read 0% where the walker simply had nowhere to seed, a
+structure was measured from beside it rather than from the run-up (0.6 s
+against a true 1.5), and fidelity read 88% where the tests read 100%. All
+three now run unpinned in their own process; the pin belongs to the camera.
+
+Measured after the rebuild: placed as authored **94.7%**, designed content
+42%, exit climb 37%, unchecked 0.35%, twice-claimed 0, cone-alone walkability
+0 m, **0 of 52 levels walkable end to end** (real map 0 of 43), non-hop share
+**6% -> 14.3%**, dead air 0.0%, seconds on one theme 10.7-13.0 (reference
+10-15), **frame empty 43-77% -> 44-56%**, and **2.65 ms/frame against the 3.5
+the criteria ask for** -- the one criterion the previous pass missed, met
+without optimising anything. 628 tests pass.
+
+**The biggest thing left is that the generated exit ladder essentially never
+fires.** `_ascent_climb` writes its column at `hug=2.0, pedestal=False`, and a
+climb anchors on solid rock within one cell of the column at its middle index
+and at its top -- which the core's lean never reaches. Measured: 1 anchored
+column in 1,559 candidates without a pedestal, 5 in 9 with one and
+`step_y >= 4`; on a generated bubble exit, 11,097 of 13,000 refused. So a
+level whose `exit` says ladder silently gets an eight-landing staircase, the
+exit climb is 37% of the course, and 8.5% of level visits overrun (worst: 210
+landings against a design of nine to twelve). The one-line fix is measured and
+**not applied** -- it touches the generated `spiral` scene too and wants its
+own A/B.
+
 ## Linux (added 2026-08-09, verified on the owner's Ubuntu box)
 
 Runs on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200% scaling) with the same

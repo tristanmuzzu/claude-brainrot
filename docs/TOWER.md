@@ -56,6 +56,17 @@ sheet of any run says why, and none of it is a number the probes watched:
 
 ## What the reference actually does
 
+> **Read this section against `docs/RESEARCH.md`, which measured it and found
+> three of these claims false.** The reference does *not* alternate interior
+> and exposed (fully enclosed 6.1% of the way, in pinches a couple of metres
+> long — what it always is, is a groove); it does *not* put one landmark on
+> each level (the median biggest thing standing on a real terrace is 12 cells
+> and 4 blocks tall, and identity comes from a 14-material floor); and its
+> levels are *not* monotonic climbs (36 of 43 descend somewhere). Two of the
+> three videos this was read off are also **Parkour Volcano, not Parkour
+> Spiral** — same author, same genre, wrong label. The text below is kept as
+> the record of what was believed when the tower was built.
+
 Read off Hielke's own maps at frame level (Parkour Spiral 1 walkthrough and
 speedrun, Parkour Spiral 3 walkthrough; 130-odd sampled frames, 2026-08-12):
 
