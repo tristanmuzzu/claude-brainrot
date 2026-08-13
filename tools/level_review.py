@@ -233,6 +233,19 @@ def _held_from_before(index: int, seed: int, seconds: float) -> dict:
     return {"hold25": 0.0, "hold40": 0.0}
 
 
+def reach(index: int, blocks: int) -> int:
+    """Blocks an *unpinned* sweep needs to reach this level and sample it.
+
+    The pinned measurements open on the level and need nothing; the unpinned
+    ones -- fidelity, the move mix, the walk -- have to climb to it, and a
+    level in the twenties is a truncated tail at the default. Measured on
+    level 25: 34 landings sampled over 8 runs at ``--blocks 260`` against 123
+    at 640, and the fidelity and hop-share figures differ by ten points
+    between them. So the floor scales with how far up the roster the level is.
+    """
+    return max(blocks, 140 + index * 26)
+
+
 def _stats_unpinned(index: int, runs: int, blocks: int) -> dict:
     """``measure`` in a fresh process, because this one is pinned.
 
@@ -247,7 +260,7 @@ def _stats_unpinned(index: int, runs: int, blocks: int) -> dict:
     r = subprocess.run(
         [sys.executable, str(ROOT / "tools/level_review.py"), "--level",
          str(index + 1), "--stats-json", "--runs", str(runs), "--blocks",
-         str(blocks)], capture_output=True, text=True, cwd=ROOT)
+         str(reach(index, blocks))], capture_output=True, text=True, cwd=ROOT)
     for line in r.stdout.splitlines():
         if line.startswith("{"):
             return json.loads(line)
@@ -260,7 +273,7 @@ def _walk_unpinned(index: int, runs: int, blocks: int) -> dict:
     r = subprocess.run(
         [sys.executable, str(ROOT / "tools/level_review.py"), "--level",
          str(index + 1), "--walk-json", "--runs", str(runs), "--blocks",
-         str(blocks)], capture_output=True, text=True, cwd=ROOT)
+         str(reach(index, blocks))], capture_output=True, text=True, cwd=ROOT)
     for line in r.stdout.splitlines():
         if line.startswith("{"):
             return json.loads(line)

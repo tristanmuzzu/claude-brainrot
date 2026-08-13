@@ -748,6 +748,35 @@ time; none is guessable from the source.
 - **A pedestal cannot stand in a `channel` cut**, and `hug` on a `ledge` is
   load-bearing — unhugged, `_targets` pulls the course to the *outer* edge of
   its own shelf.
+- **Only five material names emit light.** `spiral._GLOWING` is `lantern`,
+  `torch`, `glowstone`, `sealantern`, `magma` — and `magma` is the only warm
+  one. `shroomlight`, `pumpkin` and the rest are bright *textures* that emit
+  nothing. This decides a whole palette: a jack-o-lantern field is lit by
+  magma or it is not lit.
+- **A `ceiling=` lid is the cheapest overhead mass, and it darkens the level.**
+  The lid cells are real, so the lens probe counts them — but a lid within
+  eight blocks of the head also makes `_indoor_want` return 0.85, which takes
+  27% off every tint in the frame. **Lid half the landings, not all of them.**
+  And `pedestal_style` paints the lid as well as the plinth, so a floating
+  landing can carry a differently-coloured roof for free.
+- **A structure you run *between* beats one you run *under*, on the frame.**
+  Same seed: a bell's two five-tall posts either side of the passage read 54%
+  empty; a tree, whose trunk stands off the run and whose canopy hangs clear
+  above the lids, read 60%.
+- **The slime pad is unreliable even written exactly to the recipe above.**
+  Measured over 24 runs with `pedestal=False`, `spread=1` and a three-block
+  drop over a 6.0 arc so the 0.84 fallback is still three blocks: it **placed
+  on 6 runs of 24 and fired on 1**, and cost two beats of terrace. Two
+  reliable `walk` strides bought more non-hop share than the pad ever did.
+  Treat a bounce as a flourish you can afford to lose, never as the level's
+  signature verb.
+- **Measuring a level above about 20 needs a longer sweep.** `level_review`'s
+  fidelity, move mix and walk run **unpinned**, so they have to climb to the
+  level; at the old default a level in the twenties was a truncated tail. Level
+  25 sampled 17 designed landings at `--blocks 260` against 120 once the sweep
+  scaled, and its hop share read 82% against 76%. The tool now scales the floor
+  with the level index (`level_review.reach`), but any hand-rolled sweep needs
+  the same.
 - **A beat's first node belongs at `lift=1`, and this is a *fidelity* lever.**
   Machinery leaves the body at lift 1, so a beat opening at lift 2 is asking for
   a rise it may not have. Measured on four separate beats by two agents:
