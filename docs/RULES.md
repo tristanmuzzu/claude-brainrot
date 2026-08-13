@@ -593,6 +593,42 @@ time; none is guessable from the source.
 - **`ceiling=3` over a `kind="walk"` leg is a real head-hitter** that the arc
   clearance test never refuses, because a walk has no arc. This is the genre's
   `2bc` — the lid you sprint under — expressible today.
+- **A climb or bubble that cannot anchor silently becomes a staircase.**
+  `_climb_move` wants solid rock within one cell of its column at the column's
+  **middle index** and at its **top**, and a column standing mid-lane has
+  nothing to grab whatever it stands on. Instrumented: 674 of 819 candidates
+  refused for "no anchor" on a vine, and **11,097 of 13,000 on a generated
+  bubble exit, which became a six-step staircase — a third of that level —
+  with nothing reporting it.** The recipe: a pedestal under the column *and* a
+  rise of at least four blocks, so the middle index lands on the landing rather
+  than on the stack below. Always check the move mix for `climb`/`bubble` by
+  name; absence is silent.
+- **Machinery is inserted *between* script beats and leaves the body back at
+  lift 1.** So a beat whose first node drops off the height the previous beat
+  climbed to drops nothing about half the time — a `bounce` there silently
+  becomes a hop and the beat still reads as placed. **Put the rise and the drop
+  in the same beat.** Same class as the walk-first-in-a-beat trap above.
+- **The bounce needs an arrival speed, and the arithmetic is exact.** It fires
+  only at `impact >= 7.0` m/s. A level hop arrives at **5.4 and cannot bounce
+  at all**. A one-block drop across a 4.4 m arc arrives at 9.2 and is thrown
+  back **one** block; **two** blocks needs `impact >= 11.0`, i.e. a two-block
+  drop across 4.4 m or more. So a bounce pad must be at the bottom of a real
+  fall, and how high it throws you is decided by that fall.
+- **Half the landmark blueprints name materials literally** (`_lm_g_hoodoo` is
+  terracotta whatever your theme is) and half take `theme.rock`/`accent`/`glow`
+  (`_lm_g_arch`, `_lm_g_bell`). Pick one that takes roles or the level gets a
+  structure from another biome standing in it. And `_lm_g_tree` hangs its
+  canopy at dy 5–6, so any landing at lift 4 or above on a `tree` level puts
+  the camera inside the leaves.
+- **Reported, not reproduced: a level's usable shelf may be bounded by the
+  `core_r` of the level three below**, that being the cliff at your back, with
+  anything inboard of it painted as cone skin. One level at `band=11.5` had 65%
+  of the cell the body stands on come out as `conerib` — a jungle that rendered
+  as a grey plate — and dropping `band` to match the level three below fixed
+  it. A check of `cone.rock` across the roster reads under 1% everywhere and
+  the terrace floor is analytic rather than in `course.struct`, so this is
+  recorded as a **symptom to look for** rather than a rule: if the floor under
+  the body reads as grey cone stone in a contact sheet, try the band.
 - **`form="floor"` clamps `lift` to zero.** It places no block; the cell must
   already be solid ground. Writing `lift=1, form="floor"` used to pass the
   paper check and build a block lower, taking every jump after it in the beat
