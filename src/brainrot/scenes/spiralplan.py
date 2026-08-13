@@ -453,6 +453,8 @@ class Theme:
         "exits",
         "step",
         "features",
+        "floor",
+        "_floorpal",
         "glow",
         "ground",
         "liquid",
@@ -469,8 +471,13 @@ class Theme:
                  sky: tuple[int, int, int], dark: float = 0.0,
                  candy: tuple[str, ...] = (),
                  exits: tuple[str, ...] = ("stair",),
-                 step: tuple[str, str] | None = None) -> None:
+                 step: tuple[str, str] | None = None,
+                 floor: tuple[tuple[str, int], ...] = ()) -> None:
         self.name = name
+        #: The tail of this level's floor palette: everything the ground is
+        #: made of *besides* its four roles, weighted. See :data:`FLOOR_MIX`.
+        self.floor = floor
+        self._floorpal: tuple | None = None
         #: The top cell of the terrace floor: what you are standing on.
         self.ground = ground
         #: The two cells under it, seen in the cut face at the rim.
@@ -488,6 +495,8 @@ class Theme:
         self.sky = sky
         #: 0 for a section lit by the sky, 1 for one lit only by its own lamps.
         self.dark = dark
+        # ...continues below; ``floor_palette`` builds the weighted table on
+        # first use because a level's roles may be re-skinned after __init__.
         #: Materials this theme's *floating* jump blocks use, where it has any.
         self.candy = candy or (accent, rock)
         #: How a body may get out of this level. Every theme can be left by a
@@ -499,6 +508,66 @@ class Theme:
         #: and the same hop in all fifteen places is the single largest source
         #: of sameness in the format.
         self.step = step
+
+    def floor_palette(self) -> tuple[tuple[str, int], ...]:
+        """This level's ground as a weighted table, commonest first.
+
+        The four roles on top of :attr:`floor`, which is what keeps a re-skinned
+        level's own colours dominant while the family underneath supplies the
+        tail. Weights are summed for a material that appears twice -- a theme
+        whose ``rock`` is also in its mix should be commoner for it, not listed
+        twice.
+
+        Built once and cached, because a level's roles are settled by the time
+        anything paints and this is called per cell of terrace.
+        """
+        if self._floorpal is None:
+            weights: dict[str, int] = {}
+            for mat, w in ((self.ground, 4), (self.sub, 2), (self.rock, 2),
+                           (self.accent, 2)) + tuple(self.floor):
+                if mat:
+                    weights[mat] = weights.get(mat, 0) + w
+            self._floorpal = tuple(sorted(weights.items(),
+                                          key=lambda kv: (-kv[1], kv[0])))
+        return self._floorpal
+
+    def floor_style(self, x: int, z: int) -> str:
+        """One cell of terrace, picked from the palette and stable per cell.
+
+        Patchy rather than speckled, and both at once: the coarse term lays
+        three-cell patches, which is what a real floor of two or three stones
+        looks like, and a fifth of cells re-roll on their own so the patches
+        have grit in them. Salted with the level's own name so two levels
+        sharing a palette do not share a pattern.
+
+        No consistency requirement with :meth:`Cone.rock` -- what a floor cell
+        is *made of* changes nothing about whether it is solid -- but it is a
+        pure function of the cell so that re-emitting a layer draws the same
+        floor it drew before.
+        """
+        pal = self.floor_palette()
+        if not pal:
+            return self.ground
+        total = sum(w for _, w in pal)
+        fine = _hash3(x, z, self._salt)
+        h = _hash3(x // 3, z // 3, self._salt + 1) if fine > 0.2 else fine
+        pick = h * total
+        for mat, w in pal:
+            pick -= w
+            if pick < 0:
+                return mat
+        return pal[0][0]
+
+    @property
+    def _salt(self) -> int:
+        return sum(ord(c) * (i + 3) for i, c in enumerate(self.name))
+
+
+def _hash3(a: int, b: int, salt: int) -> float:
+    """A deterministic 0..1 from three integers. No state, no rng."""
+    h = (a * 374761393 + b * 668265263 + salt * 2147483647) & 0xFFFFFFFF
+    h = (h ^ (h >> 13)) * 1274126177 & 0xFFFFFFFF
+    return ((h ^ (h >> 16)) & 0xFFFFFF) / 0xFFFFFF
 
 
 THEMES = (
@@ -645,6 +714,99 @@ THEMES = (
           exits=("stair",),
           step=("diorite", "hop")),
 )
+#: What a level's ground is *made of*, beyond the one material it is named for.
+#:
+#: ``docs/RESEARCH.md`` §1 counted the real map's floors: a median of **14
+#: distinct materials on one level with the commonest holding 26%**, and seven
+#: kinds needed to cover four fifths of what you look at. This tower painted
+#: its terraces in ``theme.ground`` and nothing else, and measured over 54
+#: level-visits came out at **6 materials with the commonest at 55%**. That
+#: line of the research ends "palette is the identity lever, and it has never
+#: been used"; this is it being used.
+#:
+#: Weights, not fractions. The level's own four roles are added on top at high
+#: weight by :meth:`Theme.floor_palette`, so a level that re-skins its base
+#: theme keeps its own colours and this supplies the tail underneath. Every
+#: name here is checked against ``MATERIALS`` by ``tests/test_spiral.py``,
+#: because a misspelt material is not an error anywhere -- it is a hole.
+FLOOR_MIX: dict[str, tuple[tuple[str, int], ...]] = {
+    "plains": (("coarse", 2), ("podzol", 2), ("moss", 2), ("gravel", 2),
+               ("dirt", 2), ("stone", 1), ("cobble", 1), ("mossy", 1),
+               ("andesite", 1), ("farmland", 1)),
+    "farm": (("hay", 3), ("coarse", 2), ("dirt", 2), ("grass", 2),
+             ("podzol", 2), ("gravel", 1), ("oak", 1), ("stone", 1),
+             ("moss", 1), ("cobble", 1)),
+    "desert": (("sandstone", 3), ("redsand", 2), ("terracotta", 2),
+               ("gravel", 2), ("chiselled", 2), ("clay", 1), ("coarse", 1),
+               ("stone", 1), ("terra_orange", 1), ("andesite", 1)),
+    "mesa": (("terra_orange", 3), ("terra_red", 2), ("terra_white", 2),
+             ("terra_yellow", 2), ("clay", 2), ("coarse", 1), ("gravel", 1),
+             ("sand", 1), ("terracotta", 1), ("stone", 1)),
+    "jungle": (("podzol", 3), ("grass", 2), ("junglelog", 2),
+               ("jungleleaf", 2), ("coarse", 2), ("dirt", 1), ("mossy", 1),
+               ("stone", 1), ("gravel", 1), ("bamboo", 1)),
+    "mushroom": (("mushroomstem", 3), ("dirt", 2), ("podzol", 2),
+                 ("mushroomred", 2), ("coarse", 2), ("grass", 1), ("moss", 1),
+                 ("stone", 1), ("gravel", 1), ("mossy", 1)),
+    "village": (("coarse", 3), ("plaster", 2), ("brick", 2), ("cobble", 2),
+                ("oak", 2), ("stone", 1), ("mossy", 1), ("andesite", 1),
+                ("dirt", 1), ("grass", 1), ("roof", 1)),
+    "mine": (("deepslate", 3), ("cobble", 2), ("stone", 2), ("coalore", 2),
+             ("andesite", 2), ("goldore", 1), ("mossy", 1), ("oak", 1),
+             ("iron", 1), ("tuff", 1), ("coarse", 1)),
+    "deepdark": (("deepslate", 3), ("sculkvein", 2), ("blackstone", 2),
+                 ("stone", 2), ("tuff", 2), ("cobble", 1), ("mossy", 1),
+                 ("andesite", 1), ("gravel", 1), ("obsidian", 1)),
+    "dripstone": (("tuff", 3), ("calcite", 2), ("stone", 2), ("deepslate", 2),
+                  ("gravel", 2), ("cobble", 1), ("andesite", 1), ("mossy", 1),
+                  ("clay", 1), ("copper", 1)),
+    "ice": (("packedice", 3), ("blueice", 2), ("frost", 2), ("gravel", 2),
+            ("calcite", 2), ("stone", 1), ("diorite", 1), ("spruce", 1),
+            ("andesite", 1), ("cobble", 1)),
+    "nether": (("netherbrick", 3), ("magma", 2), ("blackstone", 2),
+               ("soulsand", 2), ("crimsonnylium", 1), ("wartblock", 1),
+               ("gravel", 1), ("obsidian", 1), ("glowstone", 1),
+               ("warpednylium", 1)),
+    "warped": (("warped", 3), ("shroomlight", 2), ("netherrack", 2),
+               ("blackstone", 2), ("soulsand", 2), ("wartblock", 1),
+               ("obsidian", 1), ("magma", 1), ("gravel", 1)),
+    "end": (("purpur", 3), ("obsidian", 2), ("chorus", 2), ("stone", 1),
+            ("calcite", 1), ("quartz", 1), ("blackstone", 1), ("amethyst", 1),
+            ("diorite", 1), ("sculk", 1)),
+    "rainbow": (("wool_pink", 2), ("wool_yellow", 2), ("wool_lime", 2),
+                ("wool_blue", 2), ("wool_purple", 2), ("wool_red", 2),
+                ("wool_orange", 2), ("quartz", 2), ("diorite", 1),
+                ("glass", 1)),
+    "honey": (("honeycomb", 3), ("oak", 2), ("coarse", 2), ("grass", 2),
+              ("podzol", 1), ("farmland", 1), ("gravel", 1), ("moss", 1),
+              ("stone", 1), ("dirt", 1)),
+    "coral": (("coral_pink", 2), ("coral_red", 2), ("coral_blue", 2),
+              ("prismarine", 2), ("darkprismarine", 2), ("gravel", 2),
+              ("clay", 1), ("sandstone", 1), ("moss", 1), ("stone", 1)),
+    "gold": (("deepslate", 3), ("rawgold", 2), ("gold", 2), ("blackstone", 2),
+             ("stone", 2), ("gravel", 1), ("andesite", 1), ("copper", 1),
+             ("cobble", 1), ("iron", 1)),
+    "library": (("oak", 3), ("bookshelf", 2), ("darkoak", 2), ("stone", 2),
+                ("cobble", 1), ("brick", 1), ("plaster", 1), ("mossy", 1),
+                ("andesite", 1), ("gravel", 1)),
+    "snow": (("packedice", 2), ("frost", 2), ("spruce", 2), ("stone", 2),
+             ("gravel", 2), ("calcite", 1), ("diorite", 1), ("coarse", 1),
+             ("cobble", 1), ("blueice", 1)),
+    "crimson": (("netherrack", 3), ("crimson", 2), ("wartblock", 2),
+                ("blackstone", 2), ("soulsand", 2), ("magma", 1),
+                ("shroomlight", 1), ("gravel", 1), ("obsidian", 1)),
+    "prismarine": (("darkprismarine", 3), ("sealantern", 1), ("stone", 2),
+                   ("gravel", 2), ("sand", 2), ("clay", 2), ("moss", 1),
+                   ("cobble", 1), ("mossy", 1), ("calcite", 1),
+                   ("coral_blue", 1)),
+    "quartz": (("diorite", 3), ("calcite", 2), ("gold", 2), ("chiselled", 2),
+               ("stone", 2), ("sandstone", 1), ("plaster", 1), ("andesite", 1),
+               ("gravel", 1), ("glass", 1)),
+}
+
+for _t in THEMES:
+    _t.floor = FLOOR_MIX.get(_t.name, ())
+
 THEME_BY_NAME = {t.name: t for t in THEMES}
 #: ``ladder`` and ``vine`` are here rather than in a theme's prop list because
 #: they belong to a *move*, not to a place: any level may be left by climbing.
@@ -1780,7 +1942,13 @@ class Cone:
         upband = self.band_at(up)
         if depth == 0:
             style, r0 = theme.ground, self.outer_at(up) - upband - SKIN
-        elif depth == 1:
+            # The top cell of the terrace is the one surface a run spends its
+            # whole life looking at, and it was a single material. See
+            # :data:`FLOOR_MIX`.
+            floor = theme
+        else:
+            floor = None
+        if depth == 1:
             # The cut face under the ground: a slice through the place, which
             # is what stops the rim reading as a painted line.
             style, r0 = theme.sub, self.outer_at(up) - upband - SKIN
@@ -1804,11 +1972,13 @@ class Cone:
                     return None
                 if ch and ch[0] <= r <= ch[1]:
                     return liquid if depth == 1 else None
-                return style
+                return floor.floor_style(cell[0], cell[2]) if floor else style
             self._ring(ct, st, r0, out + 0.6, y, style, seen, place,
                        styler=styler)
             return
-        self._ring(ct, st, r0, out, y, style, seen, place)
+        self._ring(ct, st, r0, out, y, style, seen, place,
+                   styler=(lambda c: floor.floor_style(c[0], c[2]))
+                   if floor else None)
 
     def _ring(self, ct: float, st: float, r0: float, r1: float, y: int,
               style: str, seen: set, place, rib: bool = False,

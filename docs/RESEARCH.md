@@ -59,6 +59,27 @@ This tower gives a level six material roles and most levels set two or three.
 That is the gap, and it is probably the largest single reason the reference's
 levels read as places and this tower's read as boxes.
 
+**Used, 2026-08-13.** `spiralplan.FLOOR_MIX` gives every theme a weighted tail
+of eight to eleven materials underneath its four roles, and `Theme.floor_style`
+picks one per cell — patchy at three cells with a fifth of cells re-rolling on
+their own, salted by the level's name, a pure function of the cell so
+re-emitting a layer draws the same floor. Measured over 29 level-visits on the
+terrace itself, palette off against palette on in one process:
+
+| a level's walking surface | before | after | real map |
+|---|---|---|---|
+| materials holding ≥1% | **3** | **10** | 14 |
+| share held by the commonest | **69%** | **45%** | 26% |
+
+Two notes for whoever reads this next. The commonest is still 45% because a
+good deal of the terrace is not painted by `_slab` at all — course pedestals,
+landings and dressing go through `write()` and each use a single role — so
+closing the rest of that gap is a change to those, not to the palette. And the
+first version of this measurement was wrong in a way worth remembering: it
+counted `Course.struct`, which is terrain the *course* wrote, and the cone's
+terrace is emitted through `_draw_only` and deliberately never enters it. The
+floor was not in the number that was supposed to be about the floor.
+
 ## 2. Lava and water are the mechanic; slime is rationed; cobweb does not exist
 
 A block is *on the walking line* if it is within one cell of the column a body

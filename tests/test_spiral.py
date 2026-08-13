@@ -598,3 +598,32 @@ def test_two_seeds_are_different_runs() -> None:
     _, a = grow(1, 60)
     _, b = grow(2, 60)
     assert [x["x"] for x in a] != [x["x"] for x in b]
+
+
+def test_every_floor_material_exists() -> None:
+    """A misspelt material is not an error anywhere -- it is a hole.
+
+    ``FLOOR_MIX`` is the level's ground beyond the one material it is named
+    for, and nothing between here and the mesher looks a name up in a way that
+    would complain.
+    """
+    bad = [(theme, mat) for theme, mix in sp.FLOOR_MIX.items()
+           for mat, _ in mix if mat not in sp.MATERIALS]
+    assert not bad, f"unknown floor materials: {bad}"
+    assert set(sp.FLOOR_MIX) == {t.name for t in sp.THEMES}, \
+        "a theme has no floor palette, or a palette has no theme"
+
+
+def test_a_level_floor_is_more_than_one_material() -> None:
+    """The identity lever. ``docs/RESEARCH.md`` §1 measured the real map at a
+    median 14 materials with the commonest at 26%; this tower painted its
+    terraces in one material until 2026-08-13."""
+    for theme in sp.THEMES:
+        pal = theme.floor_palette()
+        assert len(pal) >= 8, f"{theme.name}: only {len(pal)} floor materials"
+        total = sum(w for _, w in pal)
+        assert pal[0][1] / total < 0.35, \
+            f"{theme.name}: {pal[0][0]} holds {100 * pal[0][1] / total:.0f}%"
+        # Stable per cell, or re-emitting a layer redraws a different floor.
+        assert all(theme.floor_style(x, z) == theme.floor_style(x, z)
+                   for x in range(-8, 8) for z in range(-8, 8))

@@ -135,7 +135,7 @@ def _skin(design: Level) -> Theme:
         "accent": base.accent, "liquid": base.liquid, "glow": base.glow,
         "props": base.props, "features": base.features, "sky": base.sky,
         "dark": base.dark, "candy": base.candy, "exits": (design.exit,),
-        "step": base.step,
+        "step": base.step, "floor": base.floor,
     }
     kw.update(design.skin)
     return Theme(design.name, **kw)
