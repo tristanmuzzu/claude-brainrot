@@ -157,6 +157,37 @@ and a lid eight blocks overhead. Almost always half-enclosed, almost never
 fully enclosed, **almost never actually open above** — which is precisely what
 a contact sheet of this tower is, and why half its frames are sky.
 
+### The one-sided question was the wrong question (2026-08-13)
+
+*"A wall within 4 m on **at least one** side"* cannot tell a shelf cut into
+the outside of a tower from a groove with rock on both sides, and those are
+completely different places to stand. Our tower satisfied it at 73% against
+the real map's 71% and looked nothing like it. `tools/mapdig/enclosure.py`
+asks the two-sided question against the save — it reproduces the 71% row as
+72.4%, which is what says the two measurements are the same measurement:
+
+| along the route | real map | ours |
+|---|---|---|
+| rock within 4 m on **both** sides | **22.6%** | **3.9%** |
+| inward (the core) only | 39.0% | **71.3%** |
+| **outward only** | **11.0%** | 1.8% |
+| neither | 27.6% | 23.1% |
+| **rock outboard at all** | **33.6%** | **5.6%** |
+| a canyon: both sides *and* a lid within 12 | **22.2%** | **3.3%** |
+
+**A third of the real route has rock on its outboard shoulder. Ours has the
+drop there essentially always.** That is the measured form of "it feels like a
+thin layer wrapped around one big undifferentiated tower": our body always has
+the core on one side and nothing whatever on the other, so every frame is
+composed identically — cliff down one edge, sky down the other — and no amount
+of level design changes it, because it is the building.
+
+Note what it does *not* say. The real map is not a canyon most of the time
+either; 39% of it is the one-sided shelf we build everywhere. The difference
+is that it has a second wall a fifth of the time and an outboard-only wall a
+tenth, so the composition keeps changing. Variety of enclosure, not more of
+it.
+
 ## 5. The shelf is four blocks wide, and levels do not wander
 
 | | min | median | p90 | max |
@@ -374,3 +405,48 @@ corridor, shaft, hazard floor, ledge, threshold.
 | nothing says where a level begins | **an emissive block flush in the floor, on a rise, 2.3 s early, and the palette changes completely at it** | levels need a threshold |
 | the route is obvious | **it is painted** — a stripe of another floor material down the middle of any wide ground | free legibility we have never used |
 | light is decoration | **every lamp is at the far end of a room; there is no ambient decorative lighting anywhere** | light is a wayfinding device |
+
+## 10. What the footage measures as, once the control is right (2026-08-13)
+
+The frame comparisons this project has made were all against `ps1` and `ps3`,
+and both of those run a shader pack (see `reference/README.md`, where the
+provenance is now written down from the video titles rather than assumed).
+Comparing flat baked light against a shader pack tells you about the shader
+pack. `frames/vanilla_2hz/` is the fix: 125 frames of the vanilla speedrun at
+2.22 fps, which is the **same 0.45 s spacing** a `brainrot shoot --every 27`
+produces, so a frame-to-frame figure is finally comparable.
+
+`tools/frame_probe.py`, 100 frames of the hand-built tower against 125 vanilla
+and 125 shader:
+
+| | ours | vanilla | shaders |
+|---|---|---|---|
+| **frame-to-frame change** | **9.8%** | **20.3%** | 29.4% |
+| ...stillest tenth of frames | **5.3%** | 10.6% | 17.0% |
+| left/right lopsidedness | **41.3%** | **32.6%** | 41.2% |
+| unlit (under 18% luma) | **28.3%** | **17.3%** | 40.1% |
+| detail in the top third | **4.5%** | **6.9%** | 2.8% |
+| materials on screen | 8.4 | 10.1 | 10.2 |
+| biggest single surface | 33% | 33% | 33% |
+| empty ninths | 24% | 25% | 35% |
+
+Four rows separate and the rest do not:
+
+- **The picture changes at half the rate.** Ours 9.8% against vanilla's 20.3%,
+  and the shader walkthrough — a *slower* run than the speedrun — is higher
+  still at 29.4%, so this is not the speedrunner's pace. A real player whips
+  the camera constantly; ours is on rails with a smoothed tangent blend and
+  moves like a tram. This is the largest single difference the frames show and
+  it is a **camera** finding, not a level-design one.
+- **Ours is more lopsided** (41% against 33%), which is the enclosure table in
+  §4 arriving in the pixels.
+- **Ours is darker than vanilla** (28% against 17%). The old reading that ours
+  was *less* unlit came from comparing against a graded shader render.
+- **Less overhead** (4.5% against 6.9%), same story as the lid.
+
+And the rows that do not separate are worth as much: surface dominance,
+material count, empty ninths and edge detail are all within noise of the real
+map. **Palette count off a frame is not the floor-palette finding** in
+`docs/TOWER.md` — that one is measured off the *blocks* of a terrace, where we
+run 6 materials at 55% dominance against 14 at 26%, and it does not show up in
+a frame statistic because a frame is mostly sky, rock and lighting.

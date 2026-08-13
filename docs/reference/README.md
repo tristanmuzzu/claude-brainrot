@@ -7,8 +7,17 @@ the thing every design decision is justified by.
 ## What is here
 
 - `frames/ps1/` — 47 frames of the Parkour Spiral 1 walkthrough, one per 15 s.
-- `frames/ps3/` — 75 frames of the Parkour Spiral 3 walkthrough, one per 30 s.
+  **Shader-rendered** — see the provenance note below before comparing any
+  pixel of ours against one of these.
+- `frames/ps3/` — 75 frames of the Parkour Spiral **3** walkthrough, one per
+  30 s. A different map from the world save. Also shader-rendered.
 - `frames/speedrun/` — 49 frames of the speedrun.
+- `frames/vanilla_2hz/` — **125 frames of the speedrun at 2.22 fps**, which is
+  the same 0.45 s spacing a `brainrot shoot --every 27` produces. This is the
+  only reference set that is *vanilla-lit* and *matched in sampling rate*, and
+  it is therefore the only one against which a pixel statistic or a
+  frame-to-frame change figure means anything. Added 2026-08-13; everything
+  before that date compared our flat baked light against a shader pack.
 - `sheets/` — the four contact sheets those frames were read off.
 - `data/plates.json` — the 44 checkpoint pressure plates of the real map, in
   world coordinates. Consecutive plates bound one *level*, which is the unit
@@ -18,10 +27,27 @@ the thing every design decision is justified by.
 
 ## What is deliberately not here
 
-- **The videos** (711 MB). Reproduce with `yt-dlp`: `AXBlPPbZFjg` (Parkour
-  Spiral 1 walkthrough), `PZlCfIRy5b4` (Parkour Spiral 3), `aNwDMKzYfgo`
-  (speedrun). Frames were extracted with one linear `ffmpeg -vf fps=1/N` pass
-  and tiled with `magick montage` — seeking is far slower on long VP9.
+- **The videos** (711 MB). Reproduce with `yt-dlp`; frames were extracted with
+  one linear `ffmpeg -vf fps=1/N` pass and tiled with `magick montage` —
+  seeking is far slower on long VP9. **The provenance, read off the titles
+  with `yt-dlp --skip-download --print "%(title)s"` on 2026-08-13:**
+
+  | id | actual title | lighting |
+  |---|---|---|
+  | `AXBlPPbZFjg` | Minecraft Parkour Spiral [Shaders \| No Commentary \| Walkthrough], 11:43 | **shaders** |
+  | `PZlCfIRy5b4` | Minecraft Parkour Spiral **3** [Shaders \| No Commentary \| Walkthrough], 37:16 | **shaders** |
+  | `aNwDMKzYfgo` | Parkour Spiral - Fastest Time Possible (6:14) | vanilla |
+
+  Two corrections fall out of that table and both mattered. `docs/RESEARCH.md`
+  records that *"two of the three reference videos are Parkour Volcano, not
+  Parkour Spiral"* — **that is wrong**; none of them is Volcano, and the real
+  mismatch is that `ps3` is Parkour Spiral *3*, a different map from the save.
+  And **both walkthroughs run a shader pack**: soft shadows, volumetric light,
+  bloom and a colour grade. Any comparison of this project's flat baked light
+  against `ps1` or `ps3` pixels is measuring the shader pack. Use
+  `frames/vanilla_2hz/`. Re-derived: our frames read as *less* unlit than
+  `ps1`/`ps3` (28% against 38 and 49) and *more* unlit than vanilla (28%
+  against 17).
 - **The world save** (12 MB zipped, 49 MB unpacked). The owner's copy is
   `~/Downloads/parkour-spiral-2347-v3.0.3.zip`; the map is Hielke's *Parkour
   Spiral*, 1.2M downloads, saved at Minecraft `26.2` / DataVersion 4903. Only
