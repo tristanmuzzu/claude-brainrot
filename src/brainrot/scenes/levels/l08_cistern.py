@@ -101,19 +101,4 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     ("tank", [n("calcite", arc=3.4, lift=1, spread=1, moat=True, orbs=1),
               n("glow", arc=3.2, lift=2, hug=3.0, spread=1),
               n("darkprismarine", arc=3.2, lift=1, spread=1, ceiling=3)]),
-], exit_beats=[
-    # The way out is the bubble column the theme is named for, and it needs
-    # a pier under it rather than the cliff behind it. A climb anchors on
-    # solid rock within one cell of the column at its *middle* and its top;
-    # the generated exit hangs its column off the core wall at ``hug=2.0``,
-    # and at this band the wall's lean never reaches that far -- measured,
-    # 11,097 of 13,000 candidate columns refused for "no anchor", the bubble
-    # exit silently fell back to a six-step staircase, and the climb was a
-    # third of the level. Standing the column on its own pedestal fixes it,
-    # but only if the rise is four blocks or more: the anchor is tested at
-    # ``column[len//2]``, and on a shorter column that index lands *on* the
-    # landing itself rather than on the stack below it.
-    n("calcite", arc=2.8, lift=1, spread=1),
-    n("prismarine", arc=2.5, step_y=7, kind="bubble", climb_style="water",
-      spread=0, pedestal_style="tuff", orbs=2),
 ])
