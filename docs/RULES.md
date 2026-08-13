@@ -756,6 +756,28 @@ time; none is guessable from the source.
   cells across the corridor, so it fails "no support under base" on any narrow
   or `ledge` level: refused 20 of 20 on one level where a `hop` gate reserved
   4 of 4. The walk gates are `watchtower`, `windmill` and `cabin`.
+- **A non-hop verb belongs at position *two* of a beat, never at its tail.**
+  A beat lays about half its nodes, so a `walk` or a `bounce` written last is
+  written and never seen. Moving each walk to position two and changing nothing
+  else took one level from **100% plain hop to 83%**. This is the corollary of
+  the truncation note above and of "a walk is never a beat's first node".
+- **A gated landmark on a `channel` level costs the level's second half.** The
+  reservation fails there (above), and the bill is measurable: same eight runs,
+  landmark on against off, designed content **42% → 57%**, the exit climb 30 →
+  24 landings, and the last two script beats went from 2 and 1 landings to 6 and
+  9 — the crossing is inserted between beats and eats whatever is due next. It
+  bought 0.9 s of structure on screen.
+- **Splitting a long exit ladder into stairs plus a short climb does not move
+  the lens.** Measured at `step_y=8` against three steps plus `step_y=5`: **116
+  of 640 jammed frames both ways, to the frame**, and the split cost 6 points of
+  fidelity. The jammed frames are the *in-body* climb, not the exit. Recorded so
+  nobody spends another pass on it.
+- **`pedestal=False` also fixes the beat parked at 89-92%.** The note above
+  offers it for a beat at 0% with an empty trace; the commoner symptom is a beat
+  stuck just under target for several passes, because a pedestal on a `ledge`
+  must find ground under a shelf that wobbles about ±1.3 and has holes in it.
+  Floating the two ledge-dependent landings in three beats took one level from
+  90% exact with beats at 89/90/90 to **98% with every script beat at 100%**.
 - **Three things that were reported by agents and are *not* true**, both checked
   by the parent and recorded so they do not get rediscovered: `kind="walk"`
   **can** be authored (six levels use it with `--design-only` clean; the
