@@ -68,16 +68,21 @@ name each in one word after two seconds of looking at it, and you cannot name
 **The three failures this pass exists to end**, all of them the owner's words
 and all of them still true of the current roster:
 
-1. *You can just run past half the obstacles.* Sixteen of the first twenty
-   levels are 100% plain hop over ground that is continuous underneath.
-2. *It's the same jump every time.* Measured: the tower is 94% plain hop, and
-   what non-hop share exists is almost entirely the exit staircase. Note the
-   research qualifies this one — the reference is hop-heavy too, and its
-   variety is architectural rather than a vocabulary of special blocks (§2).
-3. *It doesn't read as a place.* Levels name two or three materials against
-   the reference's fourteen, half of every frame is empty sky where the
-   reference's is overhanging rock, and no level in the first twenty holds its
-   own structure at readable size for more than 0.8 s.
+1. *You can just run past half the obstacles.* Was: sixteen of the first
+   twenty levels 100% plain hop over continuous ground. **Now: 0 of 33 levels
+   walkable end to end, 41% mean coverage** against the real map's 46%.
+2. *It's the same jump every time.* Was 94% plain hop. **Now 82%, with walk 8,
+   slide 4, climb 3, bounce 2 and bubble 1** — an 18.5% non-hop share against
+   about 6%. Note the research qualifies this one: the reference is hop-heavy
+   too, and its variety is architectural rather than a vocabulary of special
+   blocks (§2).
+3. *It doesn't read as a place.* Was two or three materials a level against the
+   reference's fourteen, and half of every frame empty sky. **Now six to eleven
+   materials a level and 44–56% empty** — better, and still the weakest of the
+   three: it is why the rule below tightened to 48%.
+
+All three are measured over the whole rebuilt roster; the numbers a level is
+held to individually are in §8.
 
 ---
 
@@ -528,8 +533,19 @@ Three things follow, and they are the level designer's, not the renderer's:
    always small detail underfoot at the bottom of the frame. Props, fences,
    lamps, path materials, a liquid channel.
 
-**Design rule.** Empty frame **under 55%** on average, printed by
-`level_review --report`. Under 45% is where the reference sits.
+**Design rule.** Empty frame **under 48%** on average, printed by
+`level_review --report`. It was 55% and that was too lax: six of the back
+thirteen passed it at 45–55% and still read as two cubes low-left against a
+pale blue wash when the owner looked at a contact sheet. The reference sits
+near 45%.
+
+**And the number is not the rule — the intent is.** The probe cannot see a
+roof higher than 4.6 m over the eye (§7), so a level can sit at 47% and still
+frame as sky, or fill the top of every shot with a high soffit and read as
+"empty". What you are actually building is the reference's composition: **the
+dark brow filling the top of the frame** — it is more than half dark rock in
+73% of reference shots — **the level's own coloured ground filling the
+bottom, and the sky as a bright slot between them.** Judge that on the sheet.
 - **Design rule — palette. Fourteen materials, not three.** This is the rule
   that changed most on measuring the real map, and it is probably the single
   biggest reason its levels read as places and ours read as boxes. A real leg
