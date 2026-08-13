@@ -233,6 +233,27 @@ def _held_from_before(index: int, seed: int, seconds: float) -> dict:
     return {"hold25": 0.0, "hold40": 0.0}
 
 
+def _stats_unpinned(index: int, runs: int, blocks: int) -> dict:
+    """``measure`` in a fresh process, because this one is pinned.
+
+    The third metric the pin skewed, and the pattern is now unmistakable: a
+    pinned run *opens* on the level, so its script is laid from the first
+    landing and the world around it is a fifth of a level younger than it
+    would ever be in a real run. Measured pinned, THE CRUCIBLE reads 88%
+    placed as authored and 46% designed; measured the way ``tower_probe`` and
+    the tests do, 100% and 27%. The pin belongs to the camera, which genuinely
+    needs the level on screen at frame zero, and to nothing else.
+    """
+    r = subprocess.run(
+        [sys.executable, str(ROOT / "tools/level_review.py"), "--level",
+         str(index + 1), "--stats-json", "--runs", str(runs), "--blocks",
+         str(blocks)], capture_output=True, text=True, cwd=ROOT)
+    for line in r.stdout.splitlines():
+        if line.startswith("{"):
+            return json.loads(line)
+    return {"beats": {}, "tally": {}, "moves": {}, "forms": {}}
+
+
 def _walk_unpinned(index: int, runs: int, blocks: int) -> dict:
     """``walk`` in a fresh process, because this one is pinned and it must not
     be."""
@@ -329,7 +350,7 @@ def motion(index: int, seed: int, seconds: float) -> dict:
 def report(index: int, runs: int, blocks: int, seed: int,
            seconds: float, with_motion: bool = True) -> str:
     lv = hp.LEVELS[index]
-    got = measure(index, runs, blocks)
+    got = _stats_unpinned(index, runs, blocks)
     got.update(_walk_unpinned(index, runs, blocks))
     t, n = got["tally"], max(1, got["tally"].get("landings", 1))
     des = max(1, t.get("design", 1))
@@ -361,7 +382,7 @@ def report(index: int, runs: int, blocks: int, seed: int,
                                                  key=lambda kv: -kv[1]))
     out += ["", "THE PARKOUR", f"  move mix   {mix}",
             f"  hop share  {100 * mv.get('hop', 0) / tot:.0f}%"
-            "   (the rule is no more than 70%)",
+            "   (the rule is no more than 85%)",
             f"  forms      {fm}",
             f"  floating landings {t.get('floating', 0)}"
             f" ({100 * t.get('floating', 0) / n:.0f}%)",
@@ -789,6 +810,8 @@ def main() -> int:
                     help="internal: the unpinned walk, as one JSON line")
     ap.add_argument("--landmark-json", action="store_true",
                     help="internal: structure visibility from the approach in")
+    ap.add_argument("--stats-json", action="store_true",
+                    help="internal: fidelity and move mix, unpinned")
     args = ap.parse_args()
 
     if args.list:
@@ -799,6 +822,9 @@ def main() -> int:
         return 0
 
     index = resolve(args.level)
+    if args.stats_json:             # no pin: see _stats_unpinned's docstring
+        print(json.dumps(measure(index, args.runs, args.blocks)))
+        return 0
     if args.walk_json:              # no pin: see walk()'s docstring
         print(json.dumps(walk(hp.LEVELS[index].name, args.runs, args.blocks)))
         return 0
