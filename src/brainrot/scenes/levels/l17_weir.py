@@ -179,12 +179,14 @@ LEVEL = Level("THE WEIR", "plains", rise=7, gap=3.0, exit="bubble",
     # interiors measure as (fully enclosed 6.1% of the way, median
     # enclosed run two metres).
     #
-    # It carries its own lamp, which is not decoration. The one frame in
-    # this level's contact sheet that was *flat* -- a single grey wall,
-    # nothing else in it -- was taken from inside this arch, and an
-    # interior in the reference is always lit from inside. A jammed lens
-    # inside a shell you built on purpose is the level working; a jammed
-    # lens with nothing to look at is not.
+    # It carries its own lamp, because an interior in the reference is
+    # always lit from inside. It was put here to answer the one flat
+    # frame on this level's contact sheet -- a single grey wall, nothing
+    # else in it -- and it did not: switching the whole shell off leaves
+    # the jammed-lens count at 30 of 494 frames on that seed, to the
+    # frame, so the wall is the cliff at a corridor bend and not this
+    # arch. The lamp stayed anyway; the reasoning for it was sound even
+    # though the diagnosis was wrong.
     ("headgate", [n("glow", arc=3.2, lift=1, spread=1, hug=2.8,
                     deco="lamp", orbs=1),
                   n("stonebrick", arc=2.8, lift=1, kind="walk", spread=0,
