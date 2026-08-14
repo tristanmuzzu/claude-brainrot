@@ -325,6 +325,8 @@ def main() -> int:
           f"({100 * exits['crossing'] / max(1, ascent):.0f}%)")
     print(f"  ...a generated staircase        {exits['stair']} "
           f"({100 * exits['stair'] / max(1, ascent):.0f}%)")
+    print(f"  ...walking to the chasm lip     {exits['approach']} "
+          f"({100 * exits['approach'] / max(1, ascent):.0f}%)")
     print(f"  ...a generated climb            {exits['climb']}")
     print(f"  ...the reliability chain        "
           f"{exits['recover'] + exits['other']}")

@@ -2241,6 +2241,32 @@ LIFT_MAX = 6
 #: vocabulary exists precisely because it is not.
 BALLISTIC = frozenset(("hop", "slide", "walk"))
 
+#: How close to the near lip of the chasm the body has to be before the
+#: crossing is worth asking for, and how many landings it may spend getting
+#: there.
+#:
+#: ``_aim_crossing`` aims at the *far* side of the chasm, which is the honest
+#: target and is only a jump when the body is standing at the near side.
+#: Measured before this existed: 338 crossings asked over eight runs, 114
+#: placed, and at the moment the exit gave up the median arc being asked for
+#: was **9.9 m** against a level hop of 4.26 -- so the crossing was
+#: arithmetically impossible, and the generated staircase, which is what fires
+#: when it is refused, was doing the walking instead. One landing a block, in
+#: the wrong direction: a stair *climbs*, and a crossing that descends a block
+#: reaches nearly a metre further, so every step of that staircase made the
+#: jump it was preparing for harder.
+CROSS_LIP = 1.4
+CROSS_WALK_MAX = 6
+
+#: The arc past which a crossing is not a jump anybody could make, so a refusal
+#: is arithmetic rather than luck. A crossing descends, and dropping three
+#: blocks is the furthest this motion model reaches -- 6.05 m stand point to
+#: stand point -- plus the two edges a landing sets its feet back by. Under
+#: this the ordinary machinery is left to retry, because it often succeeds:
+#: gating on distance rather than on refusal is the difference between the walk
+#: costing nothing and it costing a landing every time the dice went badly.
+CROSS_MAX_ARC = 6.05 + 0.4 + 0.34
+
 #: How finely :meth:`Course._walk_bridge` walks a leg looking for ground. A
 #: cell is a metre across and a body 0.6 wide, so anything coarser than this
 #: can step over a one-cell hole without ever standing in it.
@@ -2361,6 +2387,9 @@ class Course:
         #: Measured: THE QUARRY's three authored exit nodes place on every
         #: visit and it was still charged twenty-two staircase landings.
         self.author = -1
+        #: Landings spent walking to the lip for one crossing. Bounded, and
+        #: the bound is the termination argument: each one advances ``u``.
+        self._cross_walks = 0
         self.laid = 0
         #: Landings that fell through to the one unchecked answer. Held near
         #: zero by the probe; it is the only hop in the module nothing verified.
@@ -2645,6 +2674,13 @@ class Course:
                     and self._pending[0].get("origin") == "design":
                 node = self._pending.pop(0)
                 got = self._try_node(prev, node)
+        if got is None and node.get("origin") == "crossing":
+            # Refused because it is too far away, not because it is too high:
+            # walk the last of the terrace and ask again. See
+            # :meth:`_cross_approach` for why this is not a stair step.
+            walked, got = self._cross_approach(prev, node)
+            if got is not None:
+                node = walked
         if got is None and node.get("label") == "ascent":
             # The exit climb is the one feature a run cannot do without, so a
             # failure here is answered by trying the other way out rather than
@@ -2802,6 +2838,59 @@ class Course:
         arc = reach + 1.2
         return dict(node, arc=arc,
                     arcs=(arc, arc + 0.9, arc + 1.9, max(2.4, arc - 0.7)))
+
+    def _cross_approach(self, prev: dict, node: dict):
+        """Walk the last of the terrace, then ask to jump the chasm again.
+
+        The crossing is aimed at the *far* side of the hole, which is the
+        honest target and is only a jump from the near side. When the body is
+        still out on the terrace the arc asked for is whatever the terrace has
+        left -- a median of 9.9 m at the moment the exit gave up, against a
+        level hop of 4.26 -- so it is refused, and what used to answer that was
+        a generated staircase. A staircase does get the body there, eventually
+        and at eight landings a go; it also *climbs*, and a crossing that
+        descends a block reaches nearly a metre further than a level one, so
+        every step of it made the jump it was preparing for harder.
+
+        So: one flat landing along the level's own ground, and ask again.
+        ``confine`` keeps it on that ground, ``step_y=0`` keeps it at the
+        height the climb already won, and the crossing node is put back at the
+        head of the queue rather than rebuilt, so nothing about the jump is
+        re-decided except where it is asked from.
+
+        **Termination**, because the obvious version of this loops and that was
+        measured: every landing this places advances ``u`` (``_targets``
+        refuses anything at or behind the body), so the distance to the lip is
+        strictly decreasing; the walk stops at ``CROSS_LIP`` and is capped at
+        ``CROSS_WALK_MAX`` besides. The version that ran away laid a *stair*
+        step instead and asked again regardless of distance, which climbed
+        without approaching and took the exit climb from 16% of the course
+        to 40%.
+
+        Returns ``(node, got)`` because the caller commits the pair.
+        """
+        u = self.u_of(prev)
+        lv = self.cone.level(self.cone.level_index(u))
+        radius = max(6.0, self.radius_of(prev))
+        left = (lv.u_edge - u) * radius
+        if left <= CROSS_LIP or self._cross_walks >= CROSS_WALK_MAX:
+            return None, None
+        # Only when the refusal is arithmetic. ``_aim_crossing`` aims at the
+        # far side of the hole, so this is the same number it asks for.
+        if (lv.u1 - u) * radius + 1.2 <= CROSS_MAX_ARC:
+            return None, None
+        theme = self.cone.section_at(self.u).theme
+        for arc in (min(3.2, max(2.7, left + 0.6)), 2.9, 3.5, 2.7):
+            trial = self._node(theme.rock, arc=arc, step_y=0, spread=0,
+                               confine=True, ramp=False, label="ascent",
+                               origin="approach")
+            for cell in self._targets(prev, trial):
+                got = self._attempt(prev, trial, cell, strict=True)
+                if got is not None:
+                    self._cross_walks += 1
+                    self._pending.insert(0, node)
+                    return trial, got
+        return None, None
 
     def _place(self, prev: dict, node: dict, cell, strict: bool = True):
         return self._attempt(prev, node, cell, strict=strict)
@@ -3935,6 +4024,7 @@ class Course:
         """
         lv, need, want, radius = self._level_budget()
         self.author = lv.index
+        self._cross_walks = 0
         # The climb out of a level takes priority over everything, and it has
         # to be started early enough that the last landing clears the chasm.
         # Nothing else in the vocabulary can cross a hole with no floor in it
