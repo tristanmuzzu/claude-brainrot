@@ -81,6 +81,16 @@ and the staircase still fires four to nine times in eight runs, about once a
 visit, and always *after* `_crossing` has been refused. **The generated
 staircase is the crossing failing.** The lever is `_aim_crossing`.
 
+**And it fails on distance, not height.** 338 crossings asked over eight runs,
+114 placed, the staircase fired 134 times. The body is at the intended height
+(+1 above the next floor) on 290 of the asks and on 102 of the give-ups, so the
+climb is doing its job. `_aim_crossing` sets the arc to *the distance to the end
+of the level* — at give-up the median is **9.9 m**, the worst 76.6, against a
+level hop of 4.26 m. The crossing is impossible until the body has walked to the
+lip, and the staircase is what walks it. First thing to try: do not ask while
+the arc is beyond the physics; travel along the trough instead. Read the third
+dead end below before writing that loop.
+
 The two wrong turns: attribution was suspected (the table buckets by
 `blk["theme"]`, and THE QUARRY's exit descends the outside of the tower past a
 revolution above THE VAULT) and blocks now carry `author`, the level whose plan

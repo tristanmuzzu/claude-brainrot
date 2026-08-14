@@ -807,6 +807,21 @@ touching any of it — the reasoning is there, this is the short list:
    generated staircase is the crossing's failure, once per level visit, and
    the lever is `_aim_crossing`.
 
+   **And the crossing fails on distance, not on height.** Instrumented over
+   eight runs: 338 crossings asked, 114 placed, the staircase fired 134 times.
+   The body is at exactly the intended height on 290 of the 338 asks (+1 above
+   the next floor, which is where `_drop_climbed_treads` leaves it) and on 102
+   of the 134 give-ups. What it is asked to jump is the problem --
+   `_aim_crossing` sets `arc = (lv.u1 - u) * radius + 1.2`, which is *the
+   distance to the end of the level*, not a distance a body can cover: at
+   give-up the median arc asked for is **9.9 m** and the worst is 76.6, against
+   a level hop of 4.26 and 4.98 dropping one. So the crossing is arithmetically
+   impossible until the body has walked most of the way to the lip, and the
+   generated staircase is what walks it there. The cheap answer to try first is
+   to not ask at all while the arc is beyond the physics, and to travel along
+   the trough instead -- but see the dead end immediately below before writing
+   the loop.
+
    Do **not** answer it by shortening the recovery. A body already level with
    the terrace it is jumping to gains nothing from climbing, so one
    repositioning step instead of eight looks obviously right; measured, it
