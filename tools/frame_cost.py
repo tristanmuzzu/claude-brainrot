@@ -33,12 +33,12 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from brainrot.config import Config                       # noqa: E402
-from brainrot.engine import rl                           # noqa: E402
-from brainrot.engine import scene as scene_api           # noqa: E402
-from brainrot.engine.window import HeadlessWindow        # noqa: E402
-from brainrot.palette import generate as generate_palette  # noqa: E402
-from brainrot.rng import Seed                            # noqa: E402
+from brainrot.config import Config
+from brainrot.engine import rl
+from brainrot.engine import scene as scene_api
+from brainrot.engine.window import HeadlessWindow
+from brainrot.palette import generate as generate_palette
+from brainrot.rng import Seed
 
 W, H = 420, 760
 DT = 1.0 / 60.0
@@ -82,7 +82,7 @@ def main() -> None:
     ap.add_argument("--settle", type=int, default=2400,
                     help="frames simulated before timing starts")
     ap.add_argument("--scenes", nargs="*",
-                    default=["runner", "parkour", "spiral"])
+                    default=["parkour", "runner", "spiral", "tower"])
     args = ap.parse_args()
 
     cfg = Config()
@@ -104,13 +104,19 @@ def main() -> None:
         spread = max(got[name]) - min(got[name])
         print(f"{name:<8} {ms:6.2f} ms/frame   (spread {spread:.2f} ms "
               f"over {args.rounds} rounds)")
-    if "runner" in med and med["runner"]:
-        for other in ("parkour", "spiral"):
-            if other in med:
-                print(f"{other} / runner = {med[other] / med['runner']:.3f}")
-    if "runner" in med and "parkour" in med and med["runner"]:
-        print(f"\nparkour / runner = {med['parkour'] / med['runner']:.3f}"
-              "   <- the number that means something")
+    # Every scene against the first one measured, not against ``runner`` by
+    # name. The tower and the rebuilt spiral were both invisible here for
+    # want of two lines: the ratio table listed the scenes it knew about, and
+    # the two scenes actually worth watching were not among them.
+    base = next(iter(med))
+    if med[base]:
+        print()
+        for other, ms in med.items():
+            if other == base:
+                continue
+            print(f"{other} / {base} = {ms / med[base]:.3f}")
+        print("\nAbsolute milliseconds off a busy machine are worthless; "
+              "the ratios are not.")
 
 
 if __name__ == "__main__":

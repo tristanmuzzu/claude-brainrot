@@ -44,16 +44,19 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from brainrot.config import Config                       # noqa: E402
-from brainrot.engine import fx, rl, textures             # noqa: E402
-from brainrot.engine import scene as scene_api           # noqa: E402
-from brainrot.engine.window import HeadlessWindow        # noqa: E402
-from brainrot.palette import generate as generate_palette  # noqa: E402
-from brainrot.rng import Seed                            # noqa: E402
-from brainrot.scenes import parkour as pk                # noqa: E402
+from brainrot.config import Config
+from brainrot.engine import fx, rl, textures
+from brainrot.engine import scene as scene_api
+from brainrot.engine.window import HeadlessWindow
+from brainrot.palette import generate as generate_palette
+from brainrot.rng import Seed
+from brainrot.scenes import parkour as pk
+from brainrot.scenes import spiral as sr
 
 W, H = 420, 760
 DT = 1.0 / 60.0
+#: Which scene is under the knife. Rebound by ``--scene``.
+SCENE = "parkour"
 #: A pixel has to change by this much light before it counts. Below it the two
 #: renders differ by rasteriser dither on a gradient rather than by occlusion.
 THRESHOLD = 6
@@ -102,7 +105,7 @@ def without_depth(obj, name: str):
 
 #: name -> (instrument, how to perturb the draw). One entry, one suspect, and
 #: the perturbation touches that draw and nothing else.
-SUSPECTS = {
+PARKOUR_SUSPECTS = {
     # Lanterns, gate lamps, orbs, and whatever is in your hand. Stubbing the
     # per-glow call rather than the pass covers --legacy too, where there is no
     # pass and each glow is drawn where it stands.
@@ -123,6 +126,44 @@ SUSPECTS = {
     # -- what is being asked here is whether the faded ones hide each other.
     "arrival": ("reveal", lambda: stubbed(pk.ParkourScene, "_arrival",
                                           lambda self, born: (0.0, 255))),
+}
+
+#: The same question asked of the spiral tower, which this tool could not see
+#: at all until now: it patched the flat scene's draw methods *by name*, so
+#: the two scenes with a whole cone of geometry in front of the lens were the
+#: two it had never measured. Every translucent draw in this scene does go
+#: through ``fx.no_depth_write`` and ``tests/test_rendering.py`` proves that
+#: guard is load-bearing at the ``fx`` level -- what was never measured is how
+#: many pixels each individual draw would hide if it were not guarded, which
+#: is the only form of the question that names a culprit.
+SPIRAL_SUSPECTS = {
+    # Orbs, lanterns, landing lights, the tops of water and lava columns.
+    # Patched on ``sr`` and not on ``fx``: the scene does
+    # ``from ..engine.fx import glow_pass, no_depth_write``, so its module
+    # global is a *reference* and rebinding the one in ``fx`` reaches nothing.
+    # Both of these read a flat clean zero while patched the other way, which
+    # is exactly what a probe that is not connected to anything reads.
+    "glows": ("depth", lambda: without_depth(sr, "glow_pass")),
+    "burst": ("depth", lambda: without_depth(fx.Burst, "draw")),
+    # Every guarded draw in the scene at once -- water, lava, cobweb, glass,
+    # the emissives -- by turning the guard itself into a no-op. This is the
+    # spiral's answer to ``--legacy``: what the frame would look like if
+    # ``fx.no_depth_write`` were not there, measured rather than argued.
+    #
+    # It is a whole-scene switch and not a per-draw one on purpose. Wrapping
+    # ``_draw_furniture`` was tried and measures the wrong thing: that method
+    # draws the *opaque* ladders and vines as well, those must write depth,
+    # and taking it away lets the tower behind them reappear -- 28,000 px of
+    # "the course is hidden" that is the instrument breaking the scene rather
+    # than the scene hiding anything.
+    "guards": ("depth", lambda: stubbed(sr, "no_depth_write",
+                                        contextlib.nullcontext)),
+    "clouds": ("depth", lambda: without_depth(sr.SpiralScene, "_draw_clouds")),
+    "haze": ("depth", lambda: without_depth(sr.SpiralScene, "_draw_haze")),
+    # The tower itself is opaque and must write depth; the question asked of it
+    # is only whether the props hung on it can reach the course.
+    "props": ("reveal", lambda: stubbed(sr.SpiralScene, "_draw_props",
+                                        nothing)),
 }
 
 
@@ -170,7 +211,7 @@ def legacy():
 def build(run: int, frames: int):
     seed = Seed.for_run(run)
     ctx = scene_api.SceneContext(W, H, generate_palette(seed), seed)
-    scene = scene_api.build("parkour", ctx)
+    scene = scene_api.build(SCENE, ctx)
     for _ in range(frames):
         scene.update(DT)
         scene.elapsed += DT
@@ -200,13 +241,33 @@ def worst_of(base: bytes, other: bytes, where: set[int]) -> int:
 
 #: Everything in the frame that is not the course itself. Stubbing the lot
 #: leaves a silhouette of solid course geometry on the cleared background.
-_NOT_THE_COURSE = (
+PARKOUR_NOT_THE_COURSE = (
     (pk.ParkourScene, "_draw_ocean"), (pk.ParkourScene, "_draw_reefs"),
     (pk.ParkourScene, "_draw_islands"), (pk.ParkourScene, "_draw_shelves"),
     (pk.ParkourScene, "_draw_haze"), (pk.ParkourScene, "_draw_glows"),
     (pk.ParkourScene, "_draw_held"), (pk.ParkourScene, "_draw_crosshair"),
     (pk.ParkourScene, "_draw_hud"), (fx.Burst, "draw"), (fx.Weather, "draw"),
 )
+
+#: The spiral's version. ``_draw_tower`` stays: in this scene the building is
+#: not scenery a long way below, it is the thing the course is cut into, and a
+#: silhouette taken without it is a handful of floating cubes that no draw
+#: could plausibly hide. What comes out is everything hung on it or drawn past
+#: it.
+SPIRAL_NOT_THE_COURSE = (
+    (sr.SpiralScene, "_draw_haze"), (sr.SpiralScene, "_draw_clouds"),
+    (sr.SpiralScene, "_draw_props"), (sr.SpiralScene, "_draw_orbs"),
+    (sr.SpiralScene, "_draw_held"), (sr.SpiralScene, "_draw_crosshair"),
+    (sr.SpiralScene, "_draw_hud"), (fx.Burst, "draw"), (fx.Weather, "draw"),
+)
+
+#: scene -> (suspects, the stubs that leave a course silhouette).
+SCENES = {
+    "parkour": (PARKOUR_SUSPECTS, PARKOUR_NOT_THE_COURSE),
+    "spiral": (SPIRAL_SUSPECTS, SPIRAL_NOT_THE_COURSE),
+    "tower": (SPIRAL_SUSPECTS, SPIRAL_NOT_THE_COURSE),
+}
+SUSPECTS, _NOT_THE_COURSE = SCENES["parkour"]
 
 
 def course_pixels(window, scene) -> set[int]:
@@ -250,7 +311,13 @@ def main() -> None:
                     help="directory to write the compared frames into")
     ap.add_argument("--legacy", action="store_true",
                     help="measure the pre-fix draw order instead")
+    ap.add_argument("--scene", choices=tuple(SCENES), default="parkour")
     args = ap.parse_args()
+    if args.legacy and args.scene != "parkour":
+        ap.error("--legacy reconstructs the flat scene's old draw order only")
+    global SCENE, SUSPECTS, _NOT_THE_COURSE
+    SCENE = args.scene
+    SUSPECTS, _NOT_THE_COURSE = SCENES[args.scene]
 
     names = [args.only] if args.only else list(SUSPECTS)
     window = ensure_window()
