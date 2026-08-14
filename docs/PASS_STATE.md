@@ -1,5 +1,24 @@
 # The level pass: live state
 
+> **The pass is complete.** All 33 levels rebuilt, merged, verified and live
+> (2026-08-14). What is below is kept as the record of how, and the backlog is
+> what is genuinely left. Fold the findings into `docs/TOWER.md` and delete
+> this file.
+>
+> | | before | after |
+> |---|---|---|
+> | designed content | 42% | **54%** |
+> | placed as authored | 95.3% | **97.6%** |
+> | the exit climb | 38% | **31%** |
+> | unchecked placements | 0.35% | **0.16%** |
+> | non-hop share | 6% | **19.6%** |
+> | levels authoring their own exit | **0 of 33** | **33 of 33** |
+> | walkable end to end | 1 of 16 | **0 of 54** (real map 0 of 43) |
+> | no-jump coverage | 59% | **40% mean, 46% median** (real map 46%) |
+> | twice-claimed cells / cone walkability | 0 / 0 m | **0 / 0 m** |
+> | frame cost | 2.65 ms | 3.13 ms (budget 3.5) |
+> | tests | 628 | **630 passed, 34 skipped** |
+
 Working file for the 33-level rebuild started 2026-08-13. Delete it when the
 pass is finished and its findings have moved into `docs/TOWER.md`.
 
@@ -19,7 +38,7 @@ world and invalidates whatever they are measuring.
 | 3 | 13–18 | **merged** |
 | 4 | 19–24 | running |
 | 5 | 25–30 | **merged** |
-| 6 | 31–33 | running |
+| 6 | 31–33 | **merged** |
 
 After batch 6: full suite, `tower_probe`, `spiral_probe --plan tower`,
 `bypass_probe`, `landmark_probe`, `frame_cost`, a roster sheet judged by eye,

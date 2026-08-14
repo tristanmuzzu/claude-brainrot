@@ -13,7 +13,7 @@ from ._base import Level, n
 # sill, through the gate arch **on foot**, out over the drawbridge deck and
 # onto a pier standing in the water, up the far bank and down into the mire
 # at the bottom of the ditch, bounced out of it onto the curtain wall, and
-# away up the vine on the wall's own face.
+# away up the mural stair in the wall's own thickness to the wall-walk.
 #
 # **The level is built around the lodge, and that decided the profile.**
 # ``cabin`` is a *walk* gate -- an interior three cells high, crossed at a
@@ -231,49 +231,76 @@ LEVEL = Level("THE GATEHOUSE", "plains", rise=4, gap=2.8, exit="stair",
                n("cobble", arc=3.2, lift=2, spread=0, moat=True,
                  orbs=1)]),
 ], exit_beats=[
-    # The way out is the vine on the wall's own face, and it is deliberately
-    # not a staircase. The owner's complaint about this tower names one:
-    # "a couple of ground-level hops, then a couple higher, *then stairs*,
-    # then you drop back down". Measured over the same 24 runs, a four-tread
-    # stair of dressed cobble -- lit, roofed, hugged to the wall, everything
-    # a stair can be given -- was worse on both counts than the climb: **96
-    # landings of exit against 92, and 87% plain hop against 73%.** It does
-    # not even buy the level room; the climb out is a third of it either
-    # way. Three treads was tried as well and is worse again (98), because a
-    # stair that arrives short hands the crossing a jump no physics has and
-    # the recovery chain pays for it.
+    # The way out is the **mural stair**: the flight of steps built into the
+    # thickness of the curtain wall, off the foot of it and up to the
+    # wall-walk. It is the thing a real gatehouse has where this file used to
+    # put a vine, and the reason it changed is a measurement rather than a
+    # taste.
     #
-    # A vine rather than a ladder for two reasons: WINDMILL REACH above
-    # leaves by a ladder and two in a row at the bottom of the tower is one
-    # too many, and this wall is mossy. Same two nodes, same numbers to the
-    # landing, a different thing to look at.
+    # **A climb ride is the wall in your lens and it is not tunable.**
+    # Bucketing every jammed frame of this level by segment *and* move over
+    # six seeds, with the vine anchoring in all of them: ``ascent/climb`` read
+    # **14.4% of its 814 frames jammed and every other move on the level read
+    # 0.0%** -- 117 of the level's 139 jammed frames were the ride itself. A
+    # climbing body has its face against the thing it is climbing, and ``hug``
+    # on a climb node is inert (the wall it hangs on *is* the wall), so there
+    # is no version of a vine here that does not do this. THE WHITE STAIR
+    # measured the same thing from the other side: 20.9% for the ride against
+    # 1.0% for a five-tread stair carrying identical designed content.
     #
-    # ``exit="stair"`` in the header is not a contradiction: ``exit_beats``
-    # is what gets built and ``exit`` names what happens when it *cannot*
-    # be, and the honest fallback is a stair on this level's own cobble
-    # (``step``). A generated climb is the wrong fallback -- it hangs its
-    # column at ``hug`` 2.0 with no pedestal, finds nothing to anchor on,
-    # and falls through to a longer staircase than the one it replaced.
+    # **What it costs is almost nothing, and the old note here had that
+    # wrong.** Five authored nodes where the vine was two, and measured over
+    # the same fourteen level visits either way: exit landings **89 -> 95**,
+    # designed landings **193 -> 193** -- the level grew by six landings
+    # rather than the design losing any, because ``exit="stair"`` in the
+    # header had already reserved stair-sized terrace and the vine was simply
+    # not spending it. What does move is the move mix, which loses ``climb``
+    # and reads 81% plain hop against the vine's 76%; that is the
+    # whole bill. The
+    # owner's "then stairs" complaint is about a *generated* staircase
+    # arriving as the leftover, and a stair that is the curtain wall's own is
+    # a different object -- it is also the only exit in the vocabulary that
+    # does not point the camera at rock.
     #
-    # The recipe is the part of a climb that is not negotiable. A column
-    # anchors only where there is solid rock within one cell of it at its
-    # **middle index and at its top**, which out in the lane there never is
-    # -- so it needs a pedestal under it and a rise of at least four, and
-    # ``step_y=4`` on a level that rises four is exactly that and no more.
-    # A climb that cannot anchor silently becomes a staircase and the beat
-    # still reads as placed, so the only proof is the move mix showing
-    # ``climb`` by name: it is 10% of every move in this level.
+    # **The arithmetic, which is the whole of why it is four treads.** The
+    # terrace walks at 1.0 and the foot sits an ordinary hop above it at 2.0;
+    # four ``step_y=1`` treads finish at **6.0** against the next terrace's
+    # 5.0, which is this level's ``rise`` of 4 plus the one block
+    # ``hop_span(-1)`` brings the crossing down. Written on ``step_y`` and
+    # never on ``lift``: ``lift`` is clamped to ``LIFT_MAX = 6`` in silence,
+    # with nothing in the fidelity table to say it happened, and a stair that
+    # overshoots hands the crossing a jump no physics has. A tread is
+    # ``arc`` 2.9-3.0, which is a reach of 2.22-2.32 against the 2.00-3.10 a
+    # one-block rise allows, and the first fallback (``arc * 1.14``) is still
+    # inside it.
     #
-    # No ``shell="shaft"`` round it. It is the obvious way to stop a climb
-    # framing as sky and it is the wrong one -- measured elsewhere in this
-    # roster it puts the body inside the tube wall, and taking one off took
-    # a jammed lens from 18.2% to 10.4%. The lid goes on the launch landing
-    # instead: the exit climb is the emptiest part of every level in this
-    # tower, because a body climbing against the cliff is looking at the
-    # chasm, the next terrace and the sky over it.
+    # **``exit="stair"`` in the header now says what actually happens.** It is
+    # a reserve declaration -- ``Course._level_budget`` sizes the terrace it
+    # holds back by that word, and a non-stair kind hands two treads of it
+    # away -- so a level that builds a stair must not claim otherwise. It also
+    # names the fallback, which is a generated stair on this level's own
+    # cobble (``step``).
+    #
+    # The foot stands at ``hug=2.8`` and not 2.4, and only the foot's ``hug``
+    # matters: measured elsewhere at 69 wall-jammed frames of 1,293 tucked in
+    # against **0 of 1,280** moved out. The head is thrown further out again
+    # to 3.2 for the mirror-image reason -- the camera locks onto the landing
+    # through take-off and flight, so a lip hugged to the core aims the last
+    # second of the level at a cliff face. The lid stays on the foot: the exit
+    # is the emptiest part of every level in this tower.
+    #
+    # The middle treads stay tucked in, and that was measured rather than
+    # assumed: pushing them out to 2.8/3.0/3.0 -- the obvious answer to the
+    # 2.2% of ascent frames still jammed -- reads **4.5%** on the same six
+    # seeds, because out there the lane meets the outer wall this stretch of
+    # the tower has. Only the two ends of a stair want room.
     n("cobble", arc=2.8, lift=1, hug=2.8, spread=1, confine=True,
       ceiling=5, deco="lamp"),
-    n("vine", arc=2.4, step_y=4, kind="climb", climb_style="vine",
-      hug=2.6, pedestal_style="cobble", spread=0, confine=True,
-      deco="lamp", orbs=2),
+    n("rock", arc=2.9, step_y=1, hug=2.6, spread=0, confine=True,
+      radial=0.9),
+    n("accent", arc=3.0, step_y=1, hug=2.6, spread=0, confine=True,
+      ceiling=3, radial=-0.9, orbs=1),
+    n("rock", arc=2.9, step_y=1, hug=2.8, spread=0, confine=True,
+      radial=0.9),
+    n("cobble", arc=3.0, step_y=1, hug=3.2, spread=0, deco="lamp", orbs=2),
 ])
