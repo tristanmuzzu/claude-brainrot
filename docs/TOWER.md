@@ -299,7 +299,7 @@ landmark, breaks, exit and skin — was rewritten, most of them from scratch.
 | moves per minute / median idle | 100.6 / 0.53 s | — | 101.4 / 0.53 s |
 | dead air / frozen frames | 0.6% / 0.00% | — | **0.0% / 0.00%** |
 | frames mostly filled by a wall | 1.8% | 1.8% | 3.6% |
-| **per frame** (vs parkour, same process) | 3.74 ms (×1.53) | — | **2.65 ms (×1.32)** |
+| **per frame** (vs parkour, same process) | 3.74 ms (×1.53) | — | **2.65 ms (×1.32)**  (2.79 ms ×1.46 on 2026-08-14) |
 | tests | — | 628 pass | **628 pass, 34 skip** |
 
 Four honest notes.
@@ -685,3 +685,38 @@ was not wrong to measure; it was wrong to conclude from green numbers that the
 thing was good. A probe can only ever say *this particular difference is not
 the one* -- which is worth knowing, and is why all four are written down here
 including the three that found nothing.
+
+## Where the open list actually stands (2026-08-14)
+
+The list above is kept as written because how it read at the time is part of
+the record. Re-measured at the end of the walk-verb session, most of it has
+moved, and one item was never the thing it looked like.
+
+| item above | now |
+|---|---|
+| 1. an authored exit that cannot complete loops | still true in principle; a refused authored landing now falls through to the *next* authored landing before the generated staircase takes over, which is what fixed the cases that were losing twenty-four landings a sweep |
+| 2. the generated exit ladder never fires | **fixed and superseded.** `pedestal=True` is applied. More to the point, **all thirty-three levels write `exit_beats`**, so `_ascent_climb` is dead code here and lives on only in the generated `spiral` |
+| 3. 8.5% of level visits overrun | largely closed by (2) and by `_drop_climbed_treads`, which stops an authored climb one block above the next floor instead of letting it climb a fixed height past it |
+| 4. a block records the theme of where it is | unchanged, and still the right warning to read every per-level number with |
+| 5. wall-filled frames are the ladder rides | **confirmed exactly, and fixed at the camera.** Bucketed by move: climb 42.0%, bubble 30.3%, hop 1.0%. A ride is the one move whose body is pinned against the core, so the camera now looks outward for its length: 3.23% → 1.83% of frames, climb → 16.3% |
+| 6. levels 21–33 have not been through the pass | unchanged |
+
+**And the frame budget is met.** All four scenes in one process: parkour 1.91,
+tower **2.79**, spiral 2.07, runner 1.83 ms/frame; tower/parkour 1.46 against
+the 3.5 ms the criteria ask for. Every figure in the tables above that says
+3.74 or 3.40 predates the level rebuild.
+
+**What the exit climb is made of**, measured for the first time — the number
+this document has been arguing about without ever having: 29% of the course, of
+which **60% is the level's own design at 98.5% placed as authored**, 23% the
+crossing, 17% a generated staircase, and 0% the reliability chain. It could not
+be measured before because every landing of the climb is labelled `ascent`
+whichever wrote it; nodes carry `origin` now and `tower_probe` prints it.
+
+**Two acceptance criteria that were being met by two different descriptions of
+the same surface.** `emit_layer` drew the core's flutes a cell proud of
+`core_r` and `rock` had never heard of them, so half the ribs were geometry the
+body walked through — 3.3% of body samples inside a drawn cell, up to 0.80 m.
+"Body inside the world" could not see it, because it asks `blocked`, which is
+`rock`. Paint is a subset of the solid by construction now and the figure is
+0.00%.

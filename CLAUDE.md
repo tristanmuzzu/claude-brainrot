@@ -23,7 +23,7 @@ resurrections.)
 
 **Now verified on real Windows hardware with a GPU**, which turned up several
 things the software-rasteriser cloud sessions could not have seen — see
-"Landmines" below. 628 passed, 34 skipped, including a Win32 suite that
+"Landmines" below. 634 passed, 34 skipped, including a Win32 suite that
 exercises the real window API.
 
 The runner has a real collision model. Obstacles carry hitboxes derived from
@@ -569,7 +569,7 @@ fidelity numbers because they are aimed rather than authored):
 
 Measured (full table in `docs/TOWER.md`): design 100% legal on paper,
 **93.5% placed as authored** over the design alone, unchecked **0.31%**,
-twice-claimed 0, walkability 0 m, body inside the world 0.00%, 628 tests +
+twice-claimed 0, walkability 0 m, body inside the world 0.00%, 634 tests +
 34 skips green, **frames mostly filled by a wall 1.8%** (down from 2.8%).
 The one criterion missed is the frame budget: **3.74 ms** against parkour's
 2.44 in the same process (ratio 1.53, against 1.30 with the gates switched
@@ -705,19 +705,54 @@ Measured after the rebuild: placed as authored **94.7%**, designed content
 **6% -> 14.3%**, dead air 0.0%, seconds on one theme 10.7-13.0 (reference
 10-15), **frame empty 43-77% -> 44-56%**, and **2.65 ms/frame against the 3.5
 the criteria ask for** -- the one criterion the previous pass missed, met
-without optimising anything. 628 tests pass.
+without optimising anything. 634 tests pass.
 
-**The biggest thing left is that the generated exit ladder essentially never
-fires.** `_ascent_climb` writes its column at `hug=2.0, pedestal=False`, and a
-climb anchors on solid rock within one cell of the column at its middle index
-and at its top -- which the core's lean never reaches. Measured: 1 anchored
-column in 1,559 candidates without a pedestal, 5 in 9 with one and
-`step_y >= 4`; on a generated bubble exit, 11,097 of 13,000 refused. So a
-level whose `exit` says ladder silently gets an eight-landing staircase, the
-exit climb is 37% of the course, and 8.5% of level visits overrun (worst: 210
-landings against a design of nine to twelve). The one-line fix is measured and
-**not applied** -- it touches the generated `spiral` scene too and wants its
-own A/B.
+**The generated exit ladder used to essentially never fire**, because
+`_ascent_climb` wrote its column at `pedestal=False` and a climb anchors on
+solid rock within one cell of the column at its middle index and at its top,
+which the core's lean never reaches. That is fixed (`pedestal=True`, and the
+note beside it records the measurement: 1 anchored column in 1,559 without a
+pedestal). Two things about it were still recorded here long after they stopped
+being true, and both mattered:
+
+- **All thirty-three levels write `exit_beats`.** The exit is designed, not
+  generated. `_ascent_climb` is now dead code in the tower and lives on only in
+  the generated `spiral`.
+- **Nobody could tell, because the label cannot say.** Every landing of the
+  climb is labelled `ascent` whether a level wrote it or the engine improvised
+  it, and that label is load-bearing in eight other places -- so a third of the
+  course sat outside every fidelity number the project had. Nodes carry
+  `origin` now, blocks keep it, and `tower_probe` prints **THE WAY OUT**.
+
+## What the exit climb is made of (first measured 2026-08-14)
+
+It is 29% of the course, and:
+
+| | |
+|---|---|
+| the level wrote it | **60%**, of which **98.5%** placed as authored |
+| the crossing | 23% |
+| a generated staircase finishing a climb the design did not top out | 17% |
+| the reliability chain (`_climb_on`, `_grab_the_wall`) | **0** -- it never fires |
+
+Two engine faults were hiding under the label and both put a staircase where a
+level had written an exit. **One refused landing threw the whole authored exit
+away** -- the recovery went straight to `_ascent_stair` from the first refusal,
+which alone was ECHO SHAFT and WINDMILL REACH losing twenty-four landings a
+sweep each; the rest of the design is tried first now. And **an authored exit
+climbs a fixed height while `need` is not fixed** -- it is the next level's
+floor minus wherever the level's own beats left the body, so six treads against
+a need of three climb three blocks past the thing being climbed to, and the
+crossing, offered from too high, is refused and re-plans as a staircase.
+`_drop_climbed_treads` stops an authored climb one block above the next floor,
+which is where the crossing wants to launch from because it descends by design.
+
+Together: exit landings 894 -> 867 a sweep, generated staircase 177 -> 141,
+authored exits placed as authored 98.1% -> 98.6%. What is left is per-level
+authoring, and the reject table names a different cause for each: WINDMILL
+REACH `no move: hop`, WART FIELDS `landing occupied`, THE WHITE STAIR
+`pedestal will not stand`, THE QUARRY `no move: bubble`, MARKET STREET
+`no move: climb`.
 
 ## Linux (added 2026-08-09, verified on the owner's Ubuntu box)
 
@@ -745,37 +780,46 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
-0. **The exit climb is still a third of the hand-built tower**, and the way
-   in now exists: `Level.exit_beats` is live and tested (an authored exit
-   that fails falls to the generated climb, whose reliability chain --
-   `_climb_on`, `_grab_the_wall` -- is untouched), but no level writes one
-   yet. Replacing the machinery third with design is now a per-level
-   authoring job in `handlevels.py`, not an engine change.
-0b. **Half the gate-capable levels still do not get entered.** Over 12 runs:
-   141 levels wanted a gate, 104 got the reservation (the rest lost the
-   anchor to rock, to the drop, or to having no legal crossing), the offer
-   was made on 94 and 10 were retired -- and about half of the offers put a
-   landing in the passage. The single biggest lever left is the leg **onto
-   the first stored cell**: it is an ordinary jump from wherever the approach
-   hops finished, and `no move: hop` is the whole of its rejection table. The
-   fix is to stop leaving that distance to chance -- store the approach
-   landings too, laid out along the lane at reserve time -- and *not* to
-   retry, which was measured and is worse.
-0c. **The gated structures cost 0.74 ms a frame** (3.00 -> 3.74 in one
-   process, ratio to parkour 1.30 -> 1.53), which is over the 3.5 ms the
-   tower's own criteria ask for. They are three to four times the cells of
-   the blueprints they replace and much of that is solid fill nobody sees:
-   hollow interiors and ring eaves are the cheap way back, not fewer gates.
-1. **A wall fills the lens on 1.8% of frames in the rebuilt tower** -- down
-   from 2.8% when the gates landed (a doorway frames sky), still up from
-   0.4% before interiors existed, and partly on purpose: a tunnel *is* walls
-   near the lens. The real residue clusters in one- to two-second stretches
-   at corridor bends where the cliff swings across the aim (watched on a
-   dusk run, seed 9, THE BALCONIES). Same shape as the last camera residue,
-   same method to find it: walk a run, call `spiral_probe._lens_jammed`
-   every few frames, bucket by `blk["segment"]` -- and now also by whether a
-   shell or a gate encloses the body, because enclosed wall-frames are the
-   level working as designed and open ones are not.
+0. **The generated staircase is 17% of the exit climb**, and what is left of
+   it is per-level authoring rather than an engine change -- see "What the
+   exit climb is made of" above for the decomposition and the per-level
+   reject table. Worst offenders per 8 x 300 sweep: WINDMILL REACH 24
+   landings, THE WHITE STAIR 16, THE QUARRY 16, THE WEIR 15, WART FIELDS 13.
+0b. **Half the gate-capable levels still do not get entered**, and the fix
+   this file used to recommend has been tried and is **worse**. Over 8 runs:
+   173 levels wanted a gate, 135 got the reservation, the offer was made on
+   107, and 62 put a landing in the passage. Aiming the last approach landing
+   at a cell one level hop back from the doorway halves the hop refusals
+   (157 -> 77) and *reduces* passages entered, 56 -> 48, because an `at` node
+   is strict, the crossing is offered once, and a launch cell that will not
+   take a landing spends the offer. Pre-checking the cell for occupancy
+   changes nothing -- the cells are free; what fails is the hop into them.
+   Doing it properly means the reservation holding the approach cells too,
+   which is a real change to `_reserve_landmark`. What *did* work is letting
+   a refused stored landing fall through to the next one (56 -> 62), which is
+   the same shape as the authored-exit recovery.
+0c. ~~The gated structures cost 0.74 ms a frame~~ **Met.** Measured
+   2026-08-14 with all four scenes in one process: parkour 1.91, tower 2.79,
+   spiral 2.07, runner 1.83 ms/frame, tower/parkour 1.46. The 3.74 ms on
+   record predates the level rebuild. The tower's criteria ask for 3.5.
+1. **A wall fills the lens on 1.8-2.9% of frames**, and the biggest cause is
+   now known and fixed: bucketing every jammed frame by what the body was
+   *doing* said **climb 42.0% and bubble 30.3% against hop 1.0%** -- three
+   quarters of every jammed frame was a ladder or a bubble ride, because a
+   climbable column has to anchor on the core and the ride is therefore the
+   one move whose body is pinned against the surface it cannot see past. The
+   camera now looks outward for the length of a ride (`RIDE_OUT`): jammed
+   frames 3.23% -> 1.83%, climb -> 16.3%, bubble -> 15.2%. It is *not*
+   enclosure -- frames with rock overhead jam at 0.9% against 4.1% for open
+   ones, so a tunnel is the level working as designed. Next by rate, both
+   level-specific: `basin` 16.7% of 54 frames, `sill` 8.2% of 748.
+1c. **Level openings are not the problem they were recorded as.** Measured
+   over 4 runs x 35 s, a level's first ninety frames are 46.2% sky against
+   41.9% everywhere else -- four points, not "one or two frames of sky with a
+   cube in them". What is actually empty is the exit climb (48.6% of 3,716
+   frames) and three beats: `stacks` 60.2%, `gate` 55.7%, `stalls` 55.3%.
+   Whole-frame emptiness is 14.9% against vanilla's 24.4%, so this axis has
+   headroom rather than a deficit.
 1b. **The roster still wants assets**: per-theme pours (falling lava/water
    columns past the course), the windmill's blades, a bell, coral fans, a
    scarecrow -- all `assets/src/` work, none load-bearing.
@@ -803,14 +847,16 @@ touching any of it — the reasoning is there, this is the short list:
      which is a deliberate, load-bearing feature of the flat scene too.
    - **Two-leg steered jumps** (the neo family) and **ice accumulation** are
      both real and both still untried.
-3. **`tools/depth_probe.py` does not know about the spiral or the tower.** It patches
-   `parkour`'s own draw methods by name. The spiral's translucent draws --
-   water, cobweb, lava glow, every emissive -- do all go through
-   `fx.no_depth_write` / `fx.glow_pass`, and `tests/test_rendering.py` proves
-   that guard is load-bearing at the `fx` level. What is *not* measured is how
-   many pixels each individual draw in *this* scene would hide, which is what
-   the probe would tell you. The tower's version of that coverage went with
-   `tests/test_tower.py` and has not been replaced.
+3. ~~`tools/depth_probe.py` does not know about the spiral or the tower.~~
+   **Done.** `--scene spiral|tower` and a suspect table for that family.
+   Answer: the depth guards are load-bearing and now have a number -- without
+   them, up to 3,370 px (1.06%) of the course is deleted on the tower and
+   7,428 px on the generated spiral. Glows, bursts, cloud shelves and the haze
+   band all measure zero; props reach at most 99 px of the course. Two
+   instrumentation traps are written into the tool and both read as a clean
+   pass: wrapping `_draw_furniture` measures the *opaque* ladders it also
+   draws, and patching `fx.no_depth_write` reaches nothing because `spiral.py`
+   imports it by name.
 4. **DPI**: measured 2026-08-07 on the owner's 1920x1080 at 125%. The daemon
    *is* per-monitor DPI aware — GLFW sets that at `InitWindow` — so every
    `GetWindowRect`/`SetWindowPos`/work-area number inside it is in **physical
@@ -838,13 +884,18 @@ touching any of it — the reasoning is there, this is the short list:
    weighted out, so their geometry is about half a millisecond. The ramp
    itself is free.
 
-   The rebuilt `spiral` has **not** been through `frame_cost.py` yet, and the
-   ring tower's 1.28 ms went with the scene -- do not quote it. It defaults to
-   the three live scenes (`--scenes runner parkour spiral`), so the measurement
-   is one command. What is known from the shape of the thing: a whole cone of
-   face-culled geometry is one draw call per chunk against one call per cube,
-   and the view-cone cull in `engine/chunk.py` was worth a third of a frame on
-   the platform version of this scene.
+   Measured 2026-08-14 with **all four** scenes in one process, which is what
+   it defaults to now, and every scene is reported against the first one asked
+   for rather than against `runner` by name: parkour **1.91**, tower **2.79**,
+   spiral **2.07**, runner **1.83** ms/frame; tower/parkour **1.46**. The
+   rebuilt spiral and the hand-built tower had never been through this harness
+   at all, because the ratio table listed scenes by name and neither was in it.
+   The ring tower's 1.28 ms went with that scene -- do not quote it.
+
+   Scene *construction* is a separate cost and worth watching: the tower takes
+   **1.80 s**, up from 1.53 s since `emit_layer` began gating every cell of
+   skin on `rock`. That is paid once when the strip appears, and it buys the
+   guarantee that nothing drawn is walk-through.
 
    The runner's own set-piece rewrite was measured the same way, back to back
    on a busier machine: **1.025 before, 1.005 after**, against a round-to-round
@@ -1029,15 +1080,20 @@ long jumps you need a different motion model, not a bigger number.
   emergency hops, the hop distribution and its ramp, and whether the body ever
   ends up inside a block. Currently: **0 overlapping pairs, 0 emergency hops,
   100% on the grid, 0% frozen frames, body worst case 0.042 m.**
+- `python tools/depth_probe.py --scene tower` says what each translucent draw
+  is hiding in the spiral family. The one that is not zero is `guards`, which
+  switches `no_depth_write` off scene-wide and is this scene's answer to
+  `--legacy`. Read the two instrumentation notes in the suspect table before
+  adding a suspect: both of the traps they describe read as a clean pass.
 - `python tools/depth_probe.py` says what each translucent draw is hiding, by
   re-rendering the frame with that one draw's depth writing turned off and
   counting the pixels that change -- and again against a silhouette of the
   course alone, which is the number that matters. Everything reads 0 now.
   `--legacy` reconstructs the pre-fix draw order in the same process, which is
   where the before numbers come from.
-- `python tools/frame_cost.py` times each scene in one process with vsync off
-  and reports the ratio between them. Absolute milliseconds off a busy machine
-  are worthless; that ratio is not.
+- `python tools/frame_cost.py` times **all four** scenes in one process with
+  vsync off and reports every one against the first asked for. Absolute
+  milliseconds off a busy machine are worthless; those ratios are not.
 - `python tools/atlas_sheet.py out.png` shows every block pattern at texel
   scale *and* at block scale. Judging a texture at 8x is how the first set
   ended up as four enormous bricks and a chequerboard.
@@ -1049,6 +1105,41 @@ long jumps you need a different motion model, not a bigger number.
   software rasteriser (CI uses this; colours/output match the GPU build).
 
 ## Landmines that cost hours — do not relearn these
+
+- **Two descriptions of one surface will disagree, and the disagreement is
+  invisible in both directions.** `emit_layer` drew the core's flutes a cell
+  proud of `core_r` and `rock` had never heard of them, so twenty-eight of the
+  fifty-six ribs -- the tower's signature forest of columns -- were drawn, lit,
+  fogged and walked straight through. Measured: **3.3% of body samples along a
+  course were inside a cell the tower draws**, up to 0.80 m deep. The "body
+  inside the world" figure cannot see this, because it asks `blocked`, which is
+  `rock`, which is exactly the half that is wrong. Every cell of skin now goes
+  through `Course._paint` and is placed only if `rock` agrees, and
+  `tests/test_spiral.py` holds it at zero. A margin that skipped the gate well
+  inside the wall leaks: `unwrap` puts a cell near a level seam in the *other*
+  level, whose band is a different width, so "comfortably inside" is not a
+  local question.
+- **A probe that exempts what it is measuring reads zero forever.** The walk
+  probe accepted a cell belonging to either landing as ground, which exempted
+  precisely the cells a walk's own bridge meant to lay -- including the ones
+  `write` refused. It read 0% while `tests/test_tower.py` failed. Ask the world
+  the same question the body would.
+- **Check a move at the moment the body reaches it, not one step later.**
+  `advance` releases the ground behind the body, so a probe that walks the
+  course with `<` where `<=` was meant measures every move against a world that
+  has already had its floor taken away. It reads as a catastrophic air-walk and
+  it is the probe's own doing. This was made twice in one session.
+- **A refusal in the middle of a written sequence is not the sequence
+  failing.** Both the authored exit and the gated crossing threw away
+  everything after the first landing that would not go, and in both cases the
+  next landing is aimed further along the same lane and usually goes. Worth
+  twenty-four landings a sweep on two levels and six passages entered.
+- **Vanilla's constants are not vanilla's *result*.** The face-shade table
+  (top 1.0, bottom 0.5, sides 0.6/0.8) multiplies a light level skylight has
+  already filled in. Copied on its own it is 60% of nothing, and this
+  renderer's frames were half again as dark as the real game's -- with three
+  materials hand-brightened to compensate locally before anybody checked the
+  general case.
 
 - **A cell's `y` is its floor, its `x` and `z` are its centre.** Everything
   that reasons about standing on a block (`surface = y + 1`) depends on it, and
@@ -1247,10 +1338,13 @@ long jumps you need a different motion model, not a bigger number.
   nothing can walk up the tower without touching the parkour).
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~150s). **628
+- Run `python -m pytest tests/` before committing; it is fast (~220s). **634
   passed, 34 skipped.** The Win32 suite skips off Windows and the X11 suite
   skips without a display, so a green run means less on the other platform's
   machine -- check the count.
+  `tests/test_overlay_x11.py::test_the_states_survive_being_hidden_and_shown_again`
+  has been seen to fail once in a full run and pass alone and on the next full
+  run; if it fails, re-run before believing it.
 - `brainrot doctor` is the per-machine check and knows about both platforms;
   `brainrot extension status` reports on the gnome-shell half alone.
 - Art direction is done by looking at `brainrot shoot` output. That only works
