@@ -2142,7 +2142,14 @@ ASCENTS = {"stair": 2.4, "ladder": 1.0, "vine": 1.0, "bubble": 0.8}
 ASCENT_STYLE = {"ladder": ("oak", "climb"), "vine": ("junglelog", "climb"),
                 "bubble": ("prismarine", "bubble")}
 #: ...and what is drawn in the column itself.
-ASCENT_SOFT = {"ladder": "ladder", "vine": "vine", "bubble": "water"}
+#: ``None`` for a bubble, not ``"water"``: the column is made of whatever the
+#: theme's liquid is, and ``Course._climb_move`` is the one place that knows
+#: which theme a column stands in.
+ASCENT_SOFT = {"ladder": "ladder", "vine": "vine", "bubble": None}
+
+#: Liquids a rideable column may be made of. Anything else a theme calls its
+#: liquid falls back to water rather than drawing a column of it.
+COLUMN_LIQUIDS = frozenset(("water", "lava"))
 
 #: Blocks of arc allowed for each landing of a level's exit climb.
 #:
@@ -3427,7 +3434,18 @@ class Course:
                 line_leg((lx, top, lz), to, WALK_SPEED)]
         if not (VY_MIN <= legs[0]["vy0"] <= VY_MAX):
             return None
-        style = "water" if node["kind"] == "bubble" else node["climb_style"]
+        style = node["climb_style"]
+        if style is None:
+            # A bubble column is made of the theme's own liquid. It was always
+            # water, so the one exit in the vocabulary that is both fast and
+            # tidy read as a swimming pool in the nether and no level in that
+            # family could use it; the alternative they were left with is the
+            # eight-landing staircase.
+            if node["kind"] == "bubble":
+                liquid = self.cone.theme_at(cy + 1, cx, cz).liquid
+                style = liquid if liquid in COLUMN_LIQUIDS else "water"
+            else:
+                style = "ladder"
         # Which side the wall is on, kept from here rather than worked out
         # again at draw time. A ladder is a plate on a *face*; without knowing
         # which face, the only honest thing to draw is a cube, which is what
@@ -3625,7 +3643,8 @@ class Course:
     def _node(self, style: str, arc: float = 3.0, lift: int = 1,
               radial: float = 0.0, kind: str = "hop", form: str = "full",
               deco: str | None = None, orbs: int = 0, pedestal: bool = True,
-              pedestal_style: str | None = None, climb_style: str = "ladder",
+              pedestal_style: str | None = None,
+              climb_style: str | None = None,
               spread: int = 2, moat: bool = False, step_y: int | None = None,
               hug: float = 0.0, confine: bool = False, ceiling: int = 0,
               cross: bool = False, ramp: bool = True,
@@ -3716,6 +3735,13 @@ class Course:
                 "at": at,
                 "radial": radial, "kind": kind, "form": form, "deco": deco,
                 "orbs": orbs, "pedestal": pedestal,
+                #: What the column a ``climb`` or a ``bubble`` rides is made
+                #: of, or ``None`` for the default -- which ``_climb_move``
+                #: resolves against the *theme*, because a bubble column drew
+                #: as water whatever the node asked for. That is why the
+                #: fastest and cleanest exit in the engine was a blue column
+                #: standing in a lava field, and unavailable to all four of
+                #: the nether, warped, crimson and gold themes.
                 "pedestal_style": pedestal_style, "climb_style": climb_style,
                 #: Dig the ground away round this landing and fill it with the
                 #: theme's liquid. A pond you cross on stepping stones is the

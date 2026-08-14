@@ -944,15 +944,16 @@ class SpiralScene(Scene):
                                        at[2], self._fog(dist, 150),
                                        1.15, 1.0, 0.10, yaw=yaw)
                     continue
-                narrow = 0.66 if s["style"] == "water" else 0.94
+                narrow = 0.66 if s["style"] in _COLUMN_GLOW else 0.94
                 voxel.draw_box(self._model(s["style"]), at[0], at[1], at[2],
                                self._fog(dist, 120), narrow, 1.0, narrow)
-        if clear[0]["style"] == "water":
+        glow = _COLUMN_GLOW.get(clear[0]["style"])
+        if glow is not None:
             top = max(s["dy"] for s in clear)
             self._glows.append((blk["x"] + clear[0]["dx"],
                                 blk["y"] + top + 0.6,
                                 blk["z"] + clear[0]["dz"], 3.0,
-                                (150, 210, 255), 110))
+                                glow, 110))
 
     def _draw_orbs(self) -> None:
         model = self._model("glowstone")
@@ -1115,7 +1116,12 @@ class SpiralScene(Scene):
 #: generator does not know or care which of its blocks glow.
 _GLOWING = frozenset(("lantern", "torch", "glowstone", "sealantern", "magma"))
 #: Soft cells drawn see-through, which therefore must not write depth.
-_TRANSLUCENT = frozenset(("water", "web", "glass"))
+_TRANSLUCENT = frozenset(("water", "lava", "web", "glass"))
+#: Columns a body rides up, and the light that spills off the top of one. A
+#: bubble column used to be water whatever the node asked for, so this table
+#: had no reason to exist; it does now, and the nether family's exit is a
+#: column of lava rather than a blue one standing in an orange field.
+_COLUMN_GLOW = {"water": (150, 210, 255), "lava": (255, 168, 72)}
 
 
 def _wrap(a: float) -> float:
