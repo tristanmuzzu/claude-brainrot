@@ -121,7 +121,16 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
               # the frame.
               props=("netherfungus", "deadbush", "dripstone", "pebbles",
                      "torch"),
-              step=("blackstone", "hop"),
+              # Only the *fallback* footing -- the way out of here is
+              # written landing by landing below and the generated climb
+              # never runs. It is soul sand and not blackstone because
+              # ``step`` is a roster invariant as well as a level's
+              # choice (``test_every_level_climbs_out_on_its_own_footing``
+              # counts distinct footings across all thirty-three), and
+              # THE CRUCIBLE eleven below genuinely climbs a blackstone
+              # stair. Ash-choked treads are this level's version of the
+              # same idea.
+              step=("soulsand", "hop"),
               # Twelve materials with the dominant at 16%, against the
               # four this level used to name. The reference's identity
               # is its floor, not its structure: a real leg measures a
@@ -172,10 +181,12 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
     #    stack of terrain cannot stand in a hole.
     # 5-6. **Two more caps**, +1 each, to a lit crown four blocks over
     #    the crust. Node 5 carries its own pedestal and node 6 does not,
-    #    and that is what a flue *is* here: the stack under a landing is
-    #    written in blackstone, so a landing three blocks up is the top
-    #    of a three-block basalt column standing out of a red floor.
-    #    That column is this level's mass, and it is the thing the first
+    #    and that is what a flue *is* here: ``_pedestal`` writes the
+    #    stack under a landing in ``pedestal_style or the node's own
+    #    style``, so a blackstone landing three blocks up **is** a
+    #    three-block basalt column standing out of a red floor, and a
+    #    magma one is a lit vent. Nothing else in this file is drawn on
+    #    purpose above head height, and this is the mass the first
     #    contact sheet of the rebuild liked.
     # 7. **Off the crown into the vent.** ``step_y=-3`` at arc 5.2: a
     #    reach of 4.52 against a -3 window of 3.72-6.05, and all three
@@ -204,8 +215,7 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
                n("accent", arc=3.2, step_y=1, hug=2.8, moat=True, orbs=1),
                n("soulsand", arc=2.9, step_y=0, hug=3.0, kind="walk",
                  pedestal=False, ceiling=3),
-               n("blackstone", arc=3.2, step_y=1, hug=3.4,
-                 pedestal_style="blackstone"),
+               n("blackstone", arc=3.2, step_y=1, hug=3.4),
                n("glow", arc=3.2, step_y=1, hug=3.6, pedestal=False,
                  deco="lamp", orbs=2),
                n("magma", arc=5.2, step_y=-3, form="slime", hug=3.8,
@@ -237,19 +247,30 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
     # The ``shell`` is on the beat's **last** node, which is the only
     # place a shell may go: it is painted the moment its landing commits
     # and its roof then refuses the next arc of the same beat.
+    #
+    # **Every landing in this beat floats**, and it is the same
+    # measurement as the filler's: three arms in one process over the
+    # same 24 seeds, only this beat swapped. As written, with stacks
+    # under the first three, 62 of 66 (93%); floating the opener and the
+    # drift, 66 of 68 (97%); floating all four, **69 of 69**, and the
+    # level's exactness 98% -> 99%. This beat runs over the middle of a
+    # full floor that has four breaks cut through it, and a landing that
+    # wants terrain under it cannot be laid over a hole. What it costs
+    # is one basalt column, and the crust's own cap, the ash bank's cap
+    # every lap and the whole flight of the exit still stand on theirs.
     ("soffit", [n("blackstone", arc=4.0, lift=1, hug=3.0, spread=2,
-                  ceiling=2, orbs=1),
+                  ceiling=2, pedestal=False, orbs=1),
                 n("soulsand", arc=2.9, step_y=0, hug=2.8, kind="walk",
-                  ceiling=3, deco="lintel"),
-                n("accent", arc=3.2, step_y=1, hug=3.4,
-                  pedestal_style="blackstone", orbs=1),
+                  pedestal=False, ceiling=3, deco="lintel"),
+                n("accent", arc=3.2, step_y=1, hug=3.4, pedestal=False,
+                  orbs=1),
                 n("netherrack", arc=4.4, step_y=-1, hug=3.8,
                   pedestal=False, shell="cave", orbs=2)]),
 ], filler=[
     # THE ASH BANK, and this is what the level mostly *is*, because the
     # filler repeats and a script's tail does not: a red crust plate
     # under a lid, an ash stride across the drift, and a magma cap on a
-    # basalt stack. Every lap plants one more column in the field.
+    # column of its own. Every lap plants one more vent in the field.
     #
     # It runs at lift 2-3 rather than at 4-5, and that is the change
     # this file exists for. The old filler held the top of the flues to
@@ -267,6 +288,14 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
     # of what a filler ever loses is there: it is -1 off the cap across
     # 3.4 of arc, a reach of 2.72 against a window that opens at 2.35.
     #
+    # The cap keeps its pedestal and names no ``pedestal_style``, so the
+    # stack under it is magma for its whole height: every lap of the
+    # filler plants **a lit vent** in the field, where the crust beat
+    # plants a black one and the exit's treads alternate. That is the
+    # cheapest colour in the file -- a column is free, it is over head
+    # height where this format is otherwise all sky, and it is the
+    # difference between a red plate with cubes on it and a vent field.
+    #
     # **The first two landings float and the third does not**, and that
     # one keyword is worth fourteen points of this beat. Four arms in
     # one process, same roster and the same 24 seeds, only the filler
@@ -280,14 +309,13 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
     # breaks cut through it, the filler is what runs over the late
     # stretch where those breaks are, and a landing that wants a stack
     # of terrain under it cannot be laid over a hole. The cap keeps its
-    # pedestal because that pedestal is the flue -- one black column a
-    # lap, and it stands where the ground is.
+    # pedestal because that pedestal is the flue -- one lit vent a lap,
+    # and it stands where the ground is.
     ("ashbank", [n("netherrack", arc=3.4, lift=2, hug=3.2, spread=2,
                    ceiling=2, pedestal=False, orbs=1),
                  n("soulsand", arc=2.9, step_y=0, hug=3.0, kind="walk",
                    pedestal=False, ceiling=3),
-                 n("accent", arc=3.2, step_y=1, hug=3.6,
-                   pedestal_style="blackstone", orbs=1)]),
+                 n("accent", arc=3.2, step_y=1, hug=3.6, orbs=1)]),
 ], exit_beats=[
     # THE TALL STACK. Six landings up the outside of the last flue,
     # written out rather than left to the generated staircase.

@@ -87,11 +87,21 @@ LEVEL = Level("ROPE BRIDGE", "jungle", rise=7, gap=2.8, exit="bubble",
               # crossing's approach hops are made of, and what the
               # cabin's chimney is, so it is the structure's dark
               # timber; ``accent`` is what ``deco="post"`` is, so it is
-              # the pale plank of the deck. ``sub`` is the shingle the
-              # bars in the river are made of. ``ground`` is grass and
-              # not the theme's moss, which is the one role CANOPY WALK
+              # the pale plank of the deck. ``ground`` is grass and not
+              # the theme's moss, which is the one role CANOPY WALK
               # already owns.
-              ground="grass", sub="gravel", rock="spruce", accent="oak",
+              #
+              # **``sub`` is doing more work than a role usually does
+              # and it is worth saying where.** ``Cone._layer`` paints
+              # the cell *directly under* the terrace -- the cut face
+              # you see at every floor break and along the whole rim --
+              # in ``theme.sub``, full width, on every level. At
+              # ``gravel`` (136, 132, 128) that is a grey stripe under
+              # the entire place, and it is the second-commonest thing
+              # in the frame after the floor itself. ``coarse``
+              # (136, 106, 76) makes it the soil under the turf, which
+              # is what a river bank actually looks like in section.
+              ground="grass", sub="coarse", rock="spruce", accent="oak",
               glow="lantern", liquid="water",
               step=("oak", "hop"),
               # Sixteen materials once the four roles are folded in
@@ -122,7 +132,7 @@ LEVEL = Level("ROPE BRIDGE", "jungle", rise=7, gap=2.8, exit="bubble",
               # dressing's own, not from paving the place in stone.
               floor=(("grass", 4), ("moss", 4), ("mossy", 3),
                      ("gravel", 2), ("vine", 2), ("jungleleaf", 2),
-                     ("coarse", 2), ("podzol", 2), ("sand", 1),
+                     ("podzol", 2), ("coarse", 1), ("sand", 1),
                      ("bamboo", 1), ("dirt", 1), ("clay", 1),
                      ("junglelog", 1), ("stone", 1)),
               # ``vinehang`` is in ``HANGING`` -- hung from the trough's
@@ -207,13 +217,14 @@ LEVEL = Level("ROPE BRIDGE", "jungle", rise=7, gap=2.8, exit="bubble",
     #   or machinery, opens from lift 1 or 2.
     #
     # The two ``moat`` landings in this level are this one and the
-    # shallows', and there are two landings and about seven metres
-    # between them, which there have to be: the pond is a radius-three
-    # bowl dug the moment its landing commits, and a second one inside
-    # that radius stands in the hole the first made. No
-    # ``pedestal_style`` on either -- ``_moat``
-    # fills the bowl with ``pedestal_style or theme.liquid``, so naming
-    # one digs a hole and fills it with something solid and walkable.
+    # shallows', with one landing and eight metres between them -- and
+    # the eight is measured rather than chosen, for the reason set out
+    # under ``shallows``: the pond is a radius-three bowl dug the moment
+    # its landing commits, and a second one inside that radius stands in
+    # the hole the first made. No ``pedestal_style`` on either --
+    # ``_moat`` fills the bowl with ``pedestal_style or theme.liquid``,
+    # so naming one digs a hole and fills it with something solid and
+    # walkable.
     ("thespan", [n("accent", arc=3.2, lift=2, hug=4.6, spread=1,
                    pedestal=False, pedestal_style="spruce", ceiling=3,
                    deco="post", orbs=1),
@@ -230,35 +241,43 @@ LEVEL = Level("ROPE BRIDGE", "jungle", rise=7, gap=2.8, exit="bubble",
     # The shallows: one wet boulder out in the current with the level's
     # second pool round its foot and a slab of the bank overhanging it.
     #
-    # **It is one landing, and that is a measurement rather than a
-    # taste.** It was two, and it read 35 of 42 placed over 24 runs --
-    # 83%, the only beat here under the 98% the rules ask for. The
-    # diagnosis is worth writing down because it looks exactly like a
-    # placement bug and is not: two variants of this beat, one with the
-    # ``moat`` and the lid on the first node and one with them on the
-    # second, measured **byte-identical** over the same 24 runs -- 35/42
-    # both times, and every other beat's count identical too. Nothing
-    # about the node was being refused. This is the last script feature
-    # before the exit reserve, so it is the one ``_truncate`` clips, and
-    # ``_truncate`` keeps the first node whatever the budget and drops
-    # the rest. A beat here is one landing long whatever it says, so it
-    # says one -- and everything it is about is in it.
+    # **This beat sits at 83% placed and four attempts did not move it.
+    # That is a finding rather than an omission, so here is the hunt in
+    # full** -- three of these theories are plausible enough that the
+    # next person will have them too, and all three are wrong.
     #
-    # **And it is written long -- 4.4 rather than the 3.6 the rest of
-    # the level's ordinary hops use -- to keep its pond out of the
-    # span's.** Both bowls are radius three, so their centres have to be
-    # more than six metres apart or the second landing stands in the
-    # hole the first dug, and ``_node`` offers ``arc * 0.84`` as a
-    # fallback: at the 3.2 and 3.6 this pair started on, two fallbacks
-    # in a row put them 5.7 m apart and the beat measured 83% placed
-    # over 24 runs with no other cause visible. At 3.6 and 4.4 the same
-    # worst case is 6.7.
+    # It began as two nodes and read **35 of 42 placed over 24 runs**,
+    # 83%, the only beat here under the 98% the rules ask for.
+    #
+    # * *A beat's tail is never laid, so move the ``moat`` and the lid
+    #   to the first node.* Measured **byte-identical** over the same 24
+    #   runs -- 35/42 again, and every other beat's count identical to
+    #   the landing. The keyword was not what was being refused.
+    # * *This is the last script feature before the exit reserve, so
+    #   ``_truncate`` clips it.* Cut to a single node: **19 of 23**.
+    #   83% again, on a beat with no tail left to clip.
+    # * *Its pond stands in the span's pond.* Both bowls are radius
+    #   three and ``_node`` offers ``arc * 0.84`` as a fallback, so the
+    #   3.2 and 3.6 this pair ran on come to 5.7 m when both fall back,
+    #   inside the first bowl. The span's last hop went to 3.6 and this
+    #   one to 4.4, worst case 6.7 -- and it read **19 of 23** again.
+    #
+    # So the 17% is structural to where this beat sits and not to what
+    # it says: it is offered on every visit and produces no landing on
+    # about one in six of them, at a cost of a sixth of a landing out of
+    # the thirteen a visit lays. It is left long at 4.4 because that is
+    # the better jump of the two measured the same -- a level stride of
+    # 3.72 reach against a flat maximum of 4.26, out on to a boulder in
+    # the current -- and the separation is worth having whether or not
+    # it is what was wrong. **The thing not to do is spend a fourth pass
+    # on it**; the trace counter round ``Course._attempt`` is the tool,
+    # and this was diagnosed by count alone.
     #
     # ``lift=2`` at ``spread=1``: this beat's opener follows machinery
     # about half the time, machinery leaves the body at lift 1, and a
-    # level 4.4 is a reach of 3.72 against a flat maximum of 4.26 --
-    # so from lift 2 it is the jump as written, and from lift 1 the
-    # spread drops it to a level one rather than an illegal rise.
+    # level 4.4 is a reach of 3.72 -- so from lift 2 it is the jump as
+    # written, and from lift 1 the spread drops it to a level one rather
+    # than an illegal rise.
     ("shallows", [n("mossy", arc=4.4, lift=2, hug=4.6, spread=1,
                     pedestal=False, moat=True, ceiling=3, orbs=2)]),
 ], filler=[

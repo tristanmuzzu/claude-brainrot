@@ -27,8 +27,18 @@ then restart the daemon and confirm `brainrot doctor` is 14/14 with 1 daemon.
 
 ## Fixed centrally before the pass, do not let an agent move these
 
-- `rise` — 4–8, nine values, every three consecutive summing 13–20 checked
-  cyclically. Cycle climbs 187 blocks over 11 revolutions.
+- `rise` — 4-8, every three consecutive summing to a legal head-room, checked
+  cyclically by `tower_probe --design-only`. The cycle climbs 190 blocks over
+  11 revolutions.
+  **The level modules are the authority, not any table.** My batch-4 prompts
+  gave levels 19, 20 and 21 rises of 8/7/6 where the assignment table said
+  6/5/8, and the agents rightly followed the brief they were given. One of
+  them caught the mismatch, checked it against `--design-only` rather than
+  guessing, and reported it. The files are kept because the designs are built
+  around them -- level 21 sizes its exit to exactly `rise=6`, five gains to
+  8.0 against the next terrace's 7.0 -- and forcing the table back would break
+  three levels' exit arithmetic to fix a bookkeeping mismatch. The check is
+  what matters and it passes; the table does not.
 - `landmark` — spread so no blueprint repeats inside four levels; `arch` down
   from 8 of 33 to 4.
 

@@ -31,7 +31,7 @@ from ._base import Level, n
 # level 16 made the floor lethal and bolted the route to the wall over
 # it. Here the floor is *not there*. A plaza is a full floor and this
 # one is a full floor with its middle removed: three floor breaks, and
-# four ponds cut through what is left, each one a radius-three bowl a
+# three ponds cut through what is left, each one a radius-three bowl a
 # walker drops into and cannot step back out of. That mechanism -- the
 # hole, not the liquid -- is the one that actually moves the number
 # (`docs/RULES.md` §7: 65.8% -> 25.8% on identical worlds), and it is
@@ -45,13 +45,16 @@ from ._base import Level, n
 # frames are more than half dark rock across the top. So everything
 # built here is `bookshelf`, which is the darkest thing in the level and
 # stands four blocks over a pale plaster floor; nearly every landing
-# carries a `ceiling` beam (the shelf overhang you run under); one
-# `hall` shell roofs the gallery; and the **gated watchtower is a five
-# by five gatehouse of bookshelves with a tower of them on top of it**,
-# which is the biggest single mass on the level and is walked *through*
-# rather than admired. On a `plaza` it has ground to stand on -- a
-# `walk` gate is refused on a ledge every time (§7) -- so the profile
-# and the frozen landmark want each other.
+# carries a `ceiling` beam (the shelf overhang you run under); three
+# shells roof it -- a `hall` over the catalogue, a `tunnel` over the
+# highest landing in the level and a `cave` over the wellhead, which is
+# `docs/RULES.md`'s "roof the exit's launch" and measured here at two
+# points of empty frame for a fifth of a point of jam; and the **gated
+# watchtower is a five-by-five gatehouse of bookshelves with a tower of
+# them on top of it**, which is the biggest single mass on the level and
+# is walked *through* rather than admired. On a `plaza` it has ground to
+# stand on -- a `walk` gate is refused on a ledge every time (§7) -- so
+# the profile and the frozen landmark want each other.
 #
 # ---------------------------------------------------------------------
 # What was here before was brown on brown with a generated staircase for
@@ -69,8 +72,10 @@ from ._base import Level, n
 # * the floor palette is written out. The library theme's own mix is oak
 #   on oak on darkoak, and the last contact sheet of this level was
 #   brown boxes on a grey plate;
-# * the ponds went from three to four and the level stopped pretending
-#   its water was weather.
+# * the water stopped being weather. Every pond is now under a jump --
+#   the fall lands in one, the catalogue climbs out of one, the gallery
+#   hangs over one -- and it is the *hole* a pond digs and not the
+#   liquid in it that a walker cannot get out of.
 LEVEL = Level("THE ARCHIVE", "library", rise=5, gap=2.8, exit="bubble",
               band=8.5, profile="plaza", breaks=3, landmark="watchtower",
               # Value contrast, which is how every reference frame is
@@ -140,9 +145,34 @@ LEVEL = Level("THE ARCHIVE", "library", rise=5, gap=2.8, exit="bubble",
     #    under it. 2.9 of arc is 2.22 m of ground against a walk's 2.4 m
     #    limit.
     # 4. +1 again onto the tall stack, and out from the wall: `hug` goes
-    #    2.6, 2.6, 3.0, so the rows step *out* over the room as they get
+    #    3.2, 3.2, 3.6, so the rows step *out* over the room as they get
     #    taller and the top of the stack stands clear with the water
     #    under it.
+    #
+    #    **Those three numbers were 2.6, 2.6, 3.0 and that was nearly all
+    #    of this level's jammed lens.** Bucketed by segment and move over
+    #    four seeds -- the method `docs/TOWER.md` asks for and the only
+    #    one that finds this -- the beat read `stacks/walk` **41% jammed**
+    #    and `stacks/hop` 6.8% against 0.0% for every other move in the
+    #    level, and the level as a whole 5.7% against THE VAULT's 1.4%
+    #    measured the same way in the same session. Moved out by six
+    #    tenths of a block: **1.5%**, `stacks/hop` 0.2%, `stacks/walk`
+    #    12.7%, for two points of empty frame (44% -> 46%). On a `plaza`
+    #    the core face is a wall like any other and a body hugging it at
+    #    2.6 has it inside the lens' three-metre threshold for half the
+    #    fan; the launch-block measurement in the brief (`hug` 2.2 -> 2.8,
+    #    69 jammed frames -> 0) is the same lever on a different node.
+    #
+    #    Recorded because it cost an hour and generalises: **`deco` is
+    #    not a voxel.** The same beat carried `deco="lintel"` and the
+    #    obvious suspect was that beam hanging at head height over a walk
+    #    (`_decorate` puts it at the arc's apex + 0.35, and a walk's apex
+    #    is the walk, so 1.35 above the feet). Removing it changed the
+    #    jam table by **not one frame in any bucket** -- decoration is
+    #    drawn and never written to a cell, so it cannot move any probe
+    #    that raycasts the world. It is gone anyway: a block at eye
+    #    height 1.5 cells in front of the camera is not a thing to leave
+    #    in on the strength of a metric that cannot see it.
     # 5. **Off the end and down into the flood.** `step_y=-2` at
     #    `arc` 4.9: a reach of 4.22 against a -2 window of 3.12-5.56,
     #    and the level's long jump, because a descent is the only long
@@ -205,6 +235,19 @@ LEVEL = Level("THE ARCHIVE", "library", rise=5, gap=2.8, exit="bubble",
     # Short, and its point first: a beat is truncated in the *middle*
     # once the terrace budget runs out, so whatever a third beat is
     # about has to be in its first node or it is not about anything.
+    #
+    # The `shell="tunnel"` is on the level's **highest** landing, which
+    # is where `docs/RULES.md` §7 says a shell is worth five points of
+    # empty frame rather than half of one: at lift 4 a `_shell` finds no
+    # footing for its wall columns and skips them, and its roof builds
+    # anyway, which is the dark brow over the top of the frame with none
+    # of the corridor. It shares the node with a `moat`, which is legal
+    # and deliberate -- `_moat` runs first and takes the footing out
+    # from under the walls, so what is left is exactly the roof. Adding
+    # it took this beat to 100% placed and the level's designed content
+    # to 74%; it is on the last node because a shell is painted the
+    # moment its landing commits and its roof then refuses the next arc
+    # of the same beat.
     ("gallery", [n("darkoak", arc=3.4, lift=3, hug=3.8, spread=1,
                    pedestal=False, deco="lamp", orbs=1),
                  n("oak", arc=2.9, step_y=0, hug=3.8, kind="walk",
@@ -216,9 +259,11 @@ LEVEL = Level("THE ARCHIVE", "library", rise=5, gap=2.8, exit="bubble",
     # the level's character lives here: the end of a case, the top of it
     # walked under the shelf above, and then off the end and down one
     # into the next aisle. It is the level's shape in three landings,
-    # and it stays at lift 1-2 rather than climbing, because the exit
-    # column is sized by what the body still has to climb when it
-    # starts.
+    # and it neither climbs nor sinks across a lap: case end, case top,
+    # down one into the aisle, and back up onto the next case end. The
+    # exit column is sized by what the body still has to climb when it
+    # starts, so a filler that drifted downhill would buy the level a
+    # longer climb every lap.
     #
     # **No `moat` anywhere in here.** The filler loops, and the second
     # lap digs away the ground the first lap's pedestals are standing
