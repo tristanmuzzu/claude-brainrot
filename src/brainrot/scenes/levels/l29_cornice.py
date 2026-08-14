@@ -7,232 +7,374 @@ and ``docs/TOWER.md``.
 
 from ._base import Level, n
 
-# An avalanche gallery under a snow cornice.
+# THE CORNICE. The crest of the tower's snowfield, where the wind has
+# built a wave of slab out over the drop -- and it has broken.
 #
-# The old version was white cubes on a pale blue sky: 60% of the frame
-# empty, 73% of the design placed, and its cabin never stood up once.
-# Three things were wrong with it and all three are geometry rather than
-# taste.
+# What is left is three things, and the level is the three of them in
+# order. The **crown wall**: the clean torn face where the slab pulled
+# away, standing three or four blocks proud of the field and running the
+# whole length of the level. The **crown crack** behind it, full of
+# standing melt, with the pieces that settled back rather than falling
+# sitting in it as islands. And out past the crown, the **lip** itself,
+# what is left of the cornice, hanging on nothing over four hundred
+# metres of air.
 #
-# * **It ran out at the rim.** Every landing hugged 5.6-8.8 on a band of
-#   8.5 with a shelf of 4.0, so the body spent the level out over the
-#   drop with nothing but sky in front of it -- and the two beats that
-#   asked for it, ``ridge`` (hug 5.8, pedestal on) and ``cornice`` (hug
-#   8.8, past the band entirely), were the tower's two worst-placed
-#   beats through every pass. A pedestal cannot stand past the shelf and
-#   a landing cannot stand past the rim. Everything here hugs 2.8-4.0:
-#   the cliff is a few metres off the shoulder, the drop is outboard,
-#   and something is overhead. That is the groove the real map measures
-#   as (a wall within 4 m on 71% of samples, a lid on 98%).
-# * **The cabin is a walk gate**, and a walk gate reserves 0-2 times in 8
-#   on a ledge where a hop gate reserves 8 of 8 (``docs/RULES.md`` §7).
-#   So the level's one structure was never built and the frame never
-#   held one. The crane is a hop gate, it is made of spruce, and its
-#   **jib passes over the run six blocks up** -- a timber cable-crane
-#   above an alpine shelf is both the thing you would name the place
-#   after and a lid in the top of the frame.
-# * **It was one value.** White snow, pale ice and a pale sky read as a
-#   single wash, which is the mistake GLACIER SHELF fixed by keeping the
-#   terrace light and building everything on it dark. Here the floor is
-#   snow -- the lightest thing low in the frame -- and everything built
-#   is dark spruce and dark oak decking, with the cliff dark above and
-#   one warm lantern doing the only job light does on this level.
+# One sentence: *you come in under the brow, climb the torn face, drop
+# three blocks into the crack onto a slab that has come loose, get back
+# out of it, take the long glaze slide along the crest, and then go out
+# onto the hanging lip and fall off the end of it into the crack again.*
 #
-# The place: a snowfield pinned under an overhanging lip and broken into
-# islands, decked in timber, with meltwater cut through the deck, a lit
-# gallery roofed against the cornice, and the crane standing at the turn.
-# It falls into the notch a third of the way along and climbs from there
-# to the gallery's own ledges, which are the highest thing in it.
+# The one thing a viewer would remember is the avalanche bell -- a dark
+# frame standing on the crest exactly where the snow tore, run between
+# its two posts with the drop underneath -- and after it, the two-block
+# fall off the lip with nothing under either end of it.
 #
-# **It is a broken plaza now, and that is the answer to the empty frame.**
-# The rebuild above fixed the palette, the structure and the fidelity and
-# left one thing wrong: the owner picked this level out of a contact sheet
-# as white cubes against a pale wash, and the rule tightened to *under 48%
-# of the view empty*. As a ``ledge`` of 4.5 on a band of 8.5 it measured
-# **55.4% over eight seeds**, and the reason is where the ray fan goes: the
-# probe fires 25 rays inside an 8 m horizon, and on a 4.5-block shelf the
-# whole outboard half of them clears the rim and reaches the sea. Roofs
-# barely touch that -- three shells added to the exit stair moved it under
-# a point. Ground does: **``plaza`` on ``band`` 10.5, with ``breaks=3``,
-# and a checked lid over every arc in the level, reads 47.5%.**
+# ---------------------------------------------------------------------
+# **How the plaza earns itself, and it is a fifth answer.** Level 3 put
+# its route on the roofs *above* a street you could still walk. Level 10
+# stood you on the hives standing in a meadow you could still walk.
+# Level 16 made the floor lethal and bolted the route to the wall over
+# it. Level 24 took the floor away altogether and ran the route over the
+# flood on the tops of the bookcases. All four get off the ground and
+# stay off it.
 #
-# A wide *ledge* was tried instead of the plaza and is worse on the same
-# worlds (shelf 6.5 on band 10.5: 49.2% against 47.8% on the diagnostic
-# that compared them), so the profile is doing real work and not standing
-# in for the band. **Quote the two endpoints and nothing between them**:
-# the intermediate steps were measured with a per-segment diagnostic that
-# calls the ray fan on a slightly different frame from ``level_review``'s
-# own camera pass and reads two to three points high, which is fine for
-# ranking two candidates and useless as a number to record.
+# **This one lands on the ground twice, on purpose, and the ground is an
+# island both times.** ``form="floor"`` with ``moat=True`` is the whole
+# device: ``Course._moat`` digs a radius-three disc of the terrace out
+# from under the landing and fills it with the melt, and the only thing
+# it may not touch is the landing's own reserved ``ground`` -- so what is
+# left standing in the pond is exactly the slab the body came down on. A
+# no-jump walker that reaches one drops into the bowl and cannot step
+# back out (``docs/RULES.md`` §7: the *hole* is the barrier, not the
+# liquid; 65.8% -> 25.8% on identical worlds). So this level is on the
+# terrace's own snow more often than any other plaza level in the tower,
+# and the terrace never once takes it anywhere. Three breaks and seven
+# floating landings do the rest.
 #
-# **A plaza is only legitimate broken and dressed** -- an undressed one is
-# what killed the first tower -- so ``breaks=3`` and both meltwater moats
-# stay, and they hold it: a no-jump walker covers 38% of it against a
-# limit of 55 and the reference's own 46%, and none of thirty-seven walks
-# crossed a level end to end. The break count is also a *frame* lever in
-# its own right: the lock builds an approach stack and an island out over
-# its hole, and those blocks stand in the corridor ahead of the body where
-# an open shelf has nothing (lock frames read 47.6% empty against the
-# level's 47.5% and the exit climb's 55.1%).
+# That device is also the reference's own, which the other four are not:
+# read frame by frame the real map does not break its wide ground into
+# five-block chasms, it makes *the whole width hazard with isolated
+# single blocks standing in it* (``docs/RULES.md`` §3).
 #
-# **Everything overhead is a ``ceiling`` beam, not a shell, and the reason
-# is worth knowing.** ``_ceiling_cells`` spreads its ``n`` cells along the
-# *direction of travel*, so ``ceiling=5`` roofs nearly the whole arc in
-# the one column of the fan that looks where you are going. A ``shell``
-# roof is five cells wide but sits three above the walking surface --
-# exactly the cell the body's head sweeps at the apex of a hop -- so
-# ``write`` refuses it there and a tunnel over a jump is a roof with a
-# hole in the middle of it. It survives whole over a ``walk``. The exit
-# climb is a third of every run and was the emptiest part of the level at
-# 64%; beams on all seven treads took it to 55%.
+# ---------------------------------------------------------------------
+# What was here before stated a good premise and measured badly on the
+# only thing that decides. It was an avalanche gallery: a timber deck,
+# spruce for every role that builds anything, and a ``ceiling`` beam on
+# **every single landing** of the level. Four things came out of the
+# contact sheet, and three of them are one mistake:
+#
+# * **A lid within eight blocks of the head makes the whole frame an
+#   interior.** ``spiral._indoor_want`` returns ``max(theme.dark, 0.85)``
+#   the moment any cell three to eight above the body is solid, and that
+#   takes 27% off every tint in the shot. Lidding all eighteen landings
+#   *plus* nine ``shell="tunnel"`` bays meant the level was lit as a cave
+#   from end to end -- so a white level came out grey-brown. It is a
+#   third of the landings now, and two shells, which is the reference's
+#   own figure (a roof within six blocks on 25% of samples) rather than
+#   an attempt to win the empty-frame number outright.
+# * **Everything built was ``rock``, and ``rock`` was ``spruce``.** The
+#   pedestal stacks, the lids, the shell walls and the bell frame all
+#   take ``theme.rock``, so a level that builds a lot in spruce is a
+#   level of dark brown columns whatever its floor is made of -- and the
+#   old sheet is a lumber yard with some pale blue in the gaps. ``rock``
+#   is ``deepslate`` now: the ridge's own dark banded stone, blown clear
+#   of snow. Cold, and the darkest thing in the level, which is what the
+#   composition rule wants above the eye and under the foot.
+# * **The sky was the theme's own 222/230/242**, which against snow is
+#   one value from the top of the frame to the bottom -- the owner's
+#   "white cubes on a pale wash" is as much the sky as the ground. A
+#   ridge crest at altitude has a deep sky and it is free contrast:
+#   146/176/214.
+# * **The way out was seven treads and 38% of the level.** Six now, and
+#   ``exit="ladder"`` is a *reserve declaration* rather than a
+#   description of the list below -- see the exit.
 #
 # Against THE SEA GATE below (prismarine, a six-block ledge on band 12,
-# arch, cool blue-green) and WART FIELDS above (crimson nylium, lava,
-# a fungus canopy) this is white timber-decked ground in the snow: a
-# different enclosure, a different verb, and a hue that shares nothing
-# with either.
-LEVEL = Level("THE CORNICE", "snow", rise=6, gap=3.0, exit="stair",
-              band=10.5, profile="plaza", shelf=4.5, breaks=3,
+# drowned causeway, blue-green) and WART FIELDS above (crimson nylium,
+# lava, a fungus canopy) this is white ground under a deep blue sky with
+# black rock through it: a different hue from either, a wider floor than
+# either, and the only one of the three you fall three blocks in.
+#
+# And against the tower's other two cold levels: GLACIER SHELF (9) is the
+# natural one, a crevasse you fall into with seracs and a moulin, and
+# BLUE RUN (18) is the worked one, a flume sawn in blue ice and staged
+# over with timber. Neither is white -- 9 is glacier blue and 18 is blue
+# ice on dark grit. This is the one that is actually **snow**: a wind
+# crest, dry and bright, with no ice run in it and nothing built on it
+# but a bell frame.
+LEVEL = Level("THE CORNICE", "snow", rise=6, gap=3.0, exit="ladder",
+              band=10.5, profile="plaza", breaks=3,
               landmark="bell",
-              ground="snow", sub="packedice", rock="spruce",
+              # Six roles set. The floor is the palest thing in the level
+              # and everything standing on it is the darkest, which is
+              # how every reference frame is built; ``accent`` is the
+              # rimed slab of the torn face, ``glow`` the marker lanterns
+              # and ``liquid`` the melt standing in the crack.
+              ground="snow", sub="packedice", rock="deepslate",
               accent="frost", glow="lantern", liquid="water",
               props=("chain", "mcfence", "lanternpost", "pebbles"),
-              step=("spruce", "hop"), beats=[
-    # The threshold: one lantern set flush in the snow on a rise with the
-    # meltwater dug out round it, then a stride onto the deck under the
-    # first beam. The material changes completely at that block --
-    # prismarine and sea light below, snow and timber here.
+              # A crest sky, not the theme's own pale wash. And a little
+              # darkness so the two lanterns and the underside of the
+              # brow read at all -- but only a little: this is the one
+              # level in the tower whose subject is brightness.
+              sky=(146, 176, 214), dark=0.15,
+              step=("frost", "hop"),
+              # Twelve materials with the dominant one at 22%, which is
+              # the shape a real terrace measures as (median 14 kinds,
+              # dominant 26%). Snow over a wind-scoured tail: rimed slab,
+              # packed ice where it has been walked, and the ridge's own
+              # black rock showing through wherever the wind has stripped
+              # it. The snow theme's own mix has *no snow in it at all*
+              # -- packedice, frost, spruce, stone, gravel -- which is
+              # most of why this level has never looked like snow.
+              floor=(("snow", 5), ("frost", 3), ("packedice", 2),
+                     ("calcite", 2), ("deepslate", 2), ("stone", 2),
+                     ("gravel", 2), ("diorite", 1), ("andesite", 1),
+                     ("cobble", 1), ("coarse", 1), ("blueice", 1)),
+              beats=[
+    # THE CROWN -- the threshold, the torn face, and the first slab in
+    # the crack. Six nodes in one beat, and the reason is
+    # ``docs/RULES.md`` §7: machinery is inserted *between* script beats
+    # and hands the body back at lift 1, so a rise written in one beat
+    # and spent in the next is a rise that mostly does not happen. This
+    # level's whole idea is a three-block fall, and the only way to be
+    # sure of having three blocks under the feet is to have climbed them
+    # three nodes earlier in the same list. It is also the one beat that
+    # is never truncated: it opens the level, so it never competes with
+    # anything for terrace.
     #
-    # ``ceiling`` goes on **every** node, and the earlier note here that a
-    # lid three cells up is refused over any arc that climbs is wrong: the
-    # check is on the *feet*, and one jump impulse lifts them 1.25 against
-    # a lid at 3, so a +1 tread takes a beam as happily as a walk does.
-    # What a walk buys is the *shell*, whose five-wide roof sits in the
-    # cell the head sweeps at a hop's apex and is refused there.
+    # 1. A lantern set flush in the snow on the ridge marker, with the
+    #    cliff brow three cells over it. The reference's own way of
+    #    saying a level begins -- an emissive block on a rise with the
+    #    palette changing completely at that block and no blend. Below is
+    #    THE SEA GATE, which is prismarine and sea light; from here it is
+    #    snow and black rock. ``lift=1`` and not 2: the identical beat
+    #    measures 67% at lift 2 and 100% at lift 1, because an opener is
+    #    placed from wherever the machinery before it left the body.
+    # 2. In under the overhang on foot. A walk is the genre's ``2bc`` --
+    #    the lid you sprint under -- and the only honest form of it this
+    #    kernel has, because one impulse rises 1.25 m and the head then
+    #    sweeps the two cells above every take-off, so a lintel low
+    #    enough to read as one refuses any arc beneath it. 2.9 of arc is
+    #    2.22 m of ground against a walk's 2.4 limit. Position **two**,
+    #    which is where a non-hop verb has to go: a beat lays about half
+    #    its nodes and a verb written at the tail is written and never
+    #    seen.
+    # 3. Up onto the crown wall -- the torn face of the slab, standing
+    #    proud of the field. +1 at ``arc`` 3.2 is a reach of 2.52 against
+    #    a +1 window of 2.00-3.10, centred rather than at the top of it,
+    #    because a +1 written at 3.6 is a reach of 2.92 and is the arc
+    #    that has to fall back.
+    # 4. And up again, on the glaze along the top of it. A ``slide``
+    #    gaining a block reaches 2.67-4.36 where a hop reaches 3.10, so
+    #    this is a longer, faster step for the same block of rise -- the
+    #    difference between two identical hops in a row, which is one
+    #    idea, and two different questions.
+    # 5. **Off the crown and three blocks down into the crack.** The
+    #    level's descent, in its first third, which is where the
+    #    reference puts one -- and it is a *fall off an edge* rather than
+    #    a jump down, which is how the real map spends eleven blocks of
+    #    travel to gain four. 5.0 of arc from an ice take-off onto the
+    #    terrace's own ground is a reach of 4.26 against a -3 window of
+    #    3.72-6.05, and it stays legal at -2 (3.12-5.56) and at -4
+    #    (4.22-6.48), so it does not care which height the two treads
+    #    before it actually reached.
     #
-    # Three nodes and not two because the first two beats are the only
-    # ones a level of this length reliably lays -- measured, ``sill`` and
-    # ``notch`` were attempted on 8 runs of 8 and the fourth beat on one
-    # -- so a landing written here is a landing the viewer sees and one
-    # written at the tail of the script is not.
-    ("sill", [n("glow", arc=3.4, lift=1, hug=3.0, spread=1,
-                deco="lamp", moat=True, ceiling=5, shell="tunnel",
-                orbs=1),
-              n("spruce", arc=2.9, lift=1, hug=3.0, kind="walk",
-                spread=0, ceiling=5, shell="tunnel", orbs=1),
-              n("darkoak", arc=3.2, lift=2, hug=2.8, spread=0,
-                ceiling=5, shell="tunnel")]),
-    # The gallery: the timber snow-shed, and the second beat because a
-    # second beat is still laid whole.
+    #    **This is the level's device.** ``form="floor"`` puts the body
+    #    on the terrace itself and ``moat=True`` digs the terrace out
+    #    from round it: what is left standing in the melt is the slab
+    #    that came loose, and a walker that reaches it is in a bowl it
+    #    cannot climb.
+    # 6. Back out of the crack onto the far lip. It floats, and it has
+    #    to: the moat one node back has just dug a bowl of radius three
+    #    and a pedestal cannot stand in a hole -- that one keyword is
+    #    27,859 "pedestal will not stand" refusals elsewhere in this
+    #    roster.
+    ("crown", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1, deco="lamp",
+                 ceiling=5, orbs=1),
+               n("deepslate", arc=2.9, step_y=0, hug=3.0, kind="walk",
+                 ceiling=5),
+               n("frost", arc=3.2, step_y=1, hug=3.0, orbs=1),
+               n("packedice", arc=4.0, step_y=1, kind="slide", form="ice",
+                 hug=3.2, orbs=1),
+               n("ground", arc=5.0, lift=0, form="floor", hug=3.4,
+                 spread=0, moat=True, orbs=2),
+               n("frost", arc=3.2, step_y=1, hug=3.2, pedestal=False,
+                 orbs=1)]),
+    # THE GLAZE AND THE LIP -- the wind-polished crest, the level's long
+    # jump, and the fall off the end of the cornice.
     #
-    # It sits at **lift 1** and that is the whole of it. A shell grows
-    # walls only where there is ground under them, so a shelled landing
-    # a block up gets a roof on stilts and one on the deck gets a room;
-    # and a beat's first node is placed from wherever the machinery
-    # between beats left the body, which is lift 1 -- written at lift 2
-    # this beat measured 86% placed as authored over sixteen runs and at
-    # lift 1 it measures 100%.
+    # **The lip used to be a beat of its own and that was measured and
+    # wrong.** Beats are laid whole or not at all, in order, and what
+    # decides how many play is the terrace budget: over eight runs this
+    # level asked ``crown`` 5.7 times, ``glaze`` 4.3, a third beat
+    # **2.0** and the filler 1.0. So a showpiece written into the third
+    # beat is a showpiece the viewer sees on fewer than a third of
+    # visits, which is the brief's own landmine restated in this level's
+    # numbers. The fall off the lip is in here now, as the tail of the
+    # beat that plays second, and what is left in the third beat is the
+    # quieter half.
     #
-    # The shell goes on the landing whose *arrival* is roofed and the way
-    # out of it is walked rather than jumped: a shell wraps the arc that
-    # arrived and its roof then refuses the next one, and a doorway is
-    # walked through in any case.
-    ("gallery", [n("spruce", arc=3.2, lift=1, hug=3.0, spread=0,
-                   ceiling=5),
-                 n("darkoak", arc=2.9, lift=1, hug=3.0, kind="walk",
-                   spread=0, shell="tunnel", ceiling=5, orbs=1)]),
-    # The notch, and the level's descent -- in its first half, which is
-    # where the reference puts one, and by falling off an edge rather
-    # than jumping down, which is how the real map spends eleven blocks
-    # of travel to gain four. Off the end of the deck onto the terrace
-    # itself under a beam, and back up out of the meltwater on the wind-
-    # polished ice.
+    # It opens at ``lift=2`` with ``spread=1``. Following the beat above
+    # that is free; following machinery it costs a fallback, which the
+    # spread covers -- and everything after the opener is on ``step_y``,
+    # so a beat that started a block low still has the shape it was
+    # written with.
     #
-    # 4.4 m of arc is a reach of 3.72: a -1 fall against a window of
-    # 2.35-4.98 and a -2 against 3.12-5.56, so it is legal whichever
-    # height the beat before it left the body at. The two hops after it
-    # are written at 3.2 and 4.2 rather than 3.6 and 3.6 because a +1
-    # hop reaches 2.00-3.10 and a +1 *slide* 2.67-4.36 -- the first was
-    # sitting at 2.92, hard against the top of its own window, and the
-    # arc that has to fall back is the arc that is not exact.
-    ("notch", [n("ground", arc=4.4, lift=0, form="floor", hug=3.0,
-                 spread=0, ceiling=5, orbs=1),
-               n("frost", arc=3.2, lift=1, hug=3.0, spread=1,
-                 moat=True, ceiling=5, orbs=1),
-               n("packedice", arc=4.2, lift=2, kind="slide", form="ice",
-                 hug=3.2, spread=0, shell="cave", ceiling=5, orbs=1)]),
-    # The showpiece, a little past halfway: the cornice itself. One frost
-    # ledge under the lip and then the wind-polished ice on its very
-    # edge, hung over the drop with nothing under it and a beam over the
-    # jump. A slide reaches 6.00 m level where a hop reaches 4.26, so
-    # this is the jump in the level that reads as long.
-    ("cornice", [n("frost", arc=3.2, lift=2, hug=3.8, spread=0,
-                   ceiling=5),
-                 n("packedice", arc=4.0, lift=2, kind="slide",
-                   form="ice", hug=4.0, spread=0, pedestal=False,
-                   ceiling=5, shell="tunnel", orbs=1)]),
+    # 1. Up onto the crest itself.
+    # 2. **The long slide**, and it is the second node for the same
+    #    reason the walk was above: it is the thing this beat is about
+    #    and a beat's tail is almost never laid. 5.2 of arc between two
+    #    ice blocks is a reach of **4.52 m level, where a hop tops out at
+    #    4.26** -- so it is not a long jump, it is a distance no jump in
+    #    this engine has, and it is the only gap in the level a body
+    #    could not have crossed on foot and hop alone. Ice is a
+    #    speciality and not a staple (three levels of forty-three on the
+    #    real map); this level gets three ice blocks in its body and two
+    #    treads in its exit, which is a wind crest rather than an ice
+    #    level.
+    # 3. Out onto the hanging lip on foot, under the brow, and the second
+    #    of the level's two walks. ``hug`` steps out to 3.4 here and 3.6
+    #    and 3.8 after it, so the last three landings of the beat are the
+    #    furthest out over the drop the level ever goes.
+    # 4. Up onto the last block of the lip still standing, with the melt
+    #    cut out from under the jump.
+    # 5. **Off the end of it, two blocks down.** A reach of 4.12 against
+    #    a -2 window of 3.12-5.56, and the jump the level exists for: a
+    #    descent is the only long jump this motion model has, because
+    #    falling takes time and the body does not slow down while it
+    #    does. Both ends float, so it is a fall from nothing to nothing.
+    #    Written on ``step_y`` rather than on ``lift`` so it is two
+    #    blocks below *the lip the body actually reached*.
+    #
+    # The ``shell="cave"`` is on the beat's **last** node, which is the
+    # only place a shell may go -- it is painted the moment its landing
+    # commits and its roof then refuses the next arc of the same beat.
+    # Off a floating landing it grows a roof and open sides (``_shell``
+    # skips a wall column with nothing under it), which is exactly what
+    # is wanted: what this tower's sheets are short of is not walls but
+    # the dark brow across the top of the frame that the reference has in
+    # 73% of its shots.
+    ("glaze", [n("frost", arc=3.4, lift=2, hug=3.2, spread=1, ceiling=5,
+                 orbs=1),
+               n("blueice", arc=5.2, step_y=0, kind="slide", form="ice",
+                 hug=3.2, pedestal=False, orbs=2),
+               n("deepslate", arc=2.9, step_y=0, hug=3.4, kind="walk",
+                 ceiling=5),
+               n("frost", arc=3.2, step_y=1, hug=3.6, pedestal=False,
+                 moat=True, orbs=1),
+               n("snow", arc=4.8, step_y=-2, hug=3.8, pedestal=False,
+                 shell="cave", orbs=2)]),
+    # THE SECOND CRACK -- the quiet beat, and the level's device said a
+    # second time in three landings rather than six.
+    #
+    # Three nodes and not four, because this is the beat that plays about
+    # twice in eight runs: whatever it is about has to be at its head,
+    # and a short beat is a beat that fits. Up onto a canted slab, down
+    # two blocks onto the second loose block in the crack with the melt
+    # dug out round it, and out of the hole on the ice that has formed at
+    # its edge -- which is a ``slide`` rather than a hop because the exit
+    # staircase and this level's two crack landings are the only places
+    # a non-hop verb can live at all, and the hop share is a rule.
+    ("crack", [n("frost", arc=3.4, lift=2, hug=3.4, spread=1, ceiling=5,
+                 orbs=1),
+               n("ground", arc=4.4, lift=0, form="floor", hug=3.6,
+                 spread=0, moat=True, orbs=2),
+               n("packedice", arc=4.0, step_y=1, kind="slide", form="ice",
+                 hug=3.4, pedestal=False, orbs=1)]),
 ], filler=[
-    # The level's voice, repeated for as long as the terrace lasts: the
-    # covered deck, taken on foot under the beams and left on the ice.
+    # THE SLAB FIELD. The filler repeats and a script's tail does not, so
+    # the level's character lives here, and this level's character is the
+    # broken crest: a canted slab, a stride across it under the brow, and
+    # off the far end of it onto the glaze a block below.
     #
-    # Every landing in it is level with the one before, and that is
-    # deliberate rather than dull: a flat run is the one a ``shell`` can
-    # roof the whole way, because a hop's apex puts the head in the cell
-    # the roof wants and ``write`` refuses it there. The beams go on
-    # everything regardless -- they are checked against the *feet* and a
-    # climbing tread clears them. Half of every frame in this tower is sky
-    # and this is the cheapest thing a level author can do about it.
+    # It neither climbs nor sinks across a lap -- +1, level, -1 -- and
+    # that matters for a reason that is not obvious: the exit column is
+    # sized by what the body still has to climb when it starts, so a
+    # filler that drifted downhill would buy the level a longer staircase
+    # every time it played.
     #
-    # No moat in here -- a filler loops, and the second lap digs away the
-    # ground the first lap's pedestals are standing on.
-    ("deck", [n("spruce", arc=3.2, lift=1, hug=2.8, spread=1,
-                ceiling=5, orbs=1),
-              n("darkoak", arc=2.9, lift=1, hug=2.8, kind="walk",
-                spread=0, ceiling=5, shell="tunnel"),
-              n("frost", arc=3.6, lift=1, hug=3.2, spread=1, ceiling=5),
-              n("packedice", arc=4.2, lift=1, kind="slide", form="ice",
-                hug=3.2, spread=0, ceiling=5, orbs=1)]),
+    # The seam where the loop closes is a jump like any other and half of
+    # what a filler ever loses is there: it is +1 off the ice back onto a
+    # slab end, a reach of 2.55 against a window opening at 2.00.
+    #
+    # **No ``moat`` anywhere in here.** The filler loops, and the second
+    # lap digs away the ground the first lap's pedestals are standing on.
+    # This level's three ponds are all in beats that play once.
+    ("slabs", [n("frost", arc=3.2, lift=2, hug=3.0, spread=1, ceiling=5,
+                 orbs=1),
+               n("deepslate", arc=2.9, step_y=0, hug=3.0, kind="walk",
+                 ceiling=5),
+               n("packedice", arc=4.4, step_y=-1, kind="slide", form="ice",
+                 hug=3.4, pedestal=False, orbs=1)]),
 ], exit_beats=[
-    # The gallery's own ledges, cut into the cliff and lit at the foot
-    # and the head. Authored rather than generated because the climb out
-    # is the single biggest consumer of a level -- twenty-seven of this
-    # one's eighty-eight landings before this pass -- and a generated
-    # staircase of the cone's own stone says nothing about the place.
+    # THE FRACTURE STAIR. The crown wall steps as it tears, and the way
+    # off this level is up those steps to the ridge -- a chimney cut into
+    # the torn face, lit at the foot and the head, with a beam over every
+    # tread and one roofed pinch in the middle of it.
     #
-    # A stair and deliberately not a ladder: the tower already leaves
-    # seventeen of twenty rebuilt levels by a climb against the real
-    # map's seven of forty-three, and this level's idea is the shelf,
-    # not the shaft.
+    # **A stair and deliberately not a climb.** The brief's measurement
+    # is unambiguous -- an ``ascent/climb`` ride measured 20.9% jammed
+    # against 0.0% for every other move in that level, because the wall a
+    # ladder hangs on *is* the wall in the lens and ``hug`` on a climb
+    # node is inert -- and ``docs/RULES.md`` §3 puts a climb exit on
+    # about one level in five, for a level whose *idea* is the climb.
+    # Seventeen of the twenty rebuilt levels leave by one against the
+    # real map's seven of forty-three. This level's idea is the crest.
     #
-    # **Seven treads, every one roofed and beamed.** The climb is a third
-    # of every run and was the emptiest part of this level by a wide
-    # margin -- 64% of the view against the level's own 54% -- because a
-    # body walking up a staircase against the cliff is looking at the
-    # chasm, the next terrace and the sky over it, and the slab that roofs
-    # this corridor is seven to thirteen blocks up, past anything the ray
-    # fan can reach. Beams took it to 55%. The seventh tread is there
-    # because six left the body a block short about half the time and the
-    # fallback staircase that answered that was three unroofed landings.
-    n("spruce", arc=2.9, step_y=1, hug=2.4, spread=0, confine=True,
-      shell="tunnel", ceiling=5, deco="lamp"),
-    n("darkoak", arc=3.0, step_y=1, hug=2.4, spread=0, radial=0.9,
-      shell="tunnel", ceiling=5),
-    # Two of the six treads are wind-polished ice, taken as slides, and
-    # they are the reason this level is not 91% plain hop: the climb out
-    # is a third of every run and can otherwise only ever be hops. A
-    # slide gaining a block reaches 2.67-4.36 m against a hop's
-    # 2.00-3.10, so an icy tread is written a little longer than a
-    # timber one.
-    n("packedice", arc=3.6, step_y=1, kind="slide", form="ice",
-      hug=2.4, spread=0, radial=-0.9, shell="tunnel", ceiling=5,
-      orbs=1),
-    n("darkoak", arc=3.0, step_y=1, hug=2.4, spread=0, radial=0.9,
-      shell="tunnel", ceiling=5),
-    n("packedice", arc=3.6, step_y=1, kind="slide", form="ice",
-      hug=2.4, spread=0, radial=-0.9, shell="tunnel", ceiling=5,
-      orbs=1),
-    n("darkoak", arc=3.0, step_y=1, hug=2.6, spread=0, deco="lamp",
-      shell="tunnel", ceiling=5),
-    n("spruce", arc=3.0, step_y=1, hug=2.6, spread=0, shell="tunnel",
-      ceiling=5),
+    # **``exit="ladder"`` in the header is a reserve declaration and not
+    # a description of this list.** ``handplan._feat_ascent`` takes the
+    # ``exit_beats`` branch before it ever looks at the kind, so no
+    # ladder is built anywhere; what the kind does is
+    # ``_level_budget``, which gives any non-stair exit back
+    # ``(need - 2) * 3.2`` metres of terrace -- sixteen metres on a
+    # six-block level, which on a level whose design was 36% of its own
+    # landings is the single biggest lever there is. The exit is
+    # therefore under-reserved by about two treads, deliberately. If a
+    # neighbour's rewrite ever pushes it into the chasm -- the symptoms
+    # are unchecked placements above zero, or ``ascent`` landings
+    # climbing past seven -- set ``exit="stair"`` and take the loss.
+    #
+    # **Six treads and not seven**, and the difference is one line: the
+    # foot is an absolute ``lift=2`` rather than a ``step_y``, so it
+    # re-bases off whatever height the machinery before it left the body
+    # at instead of adding to it. Five ``step_y`` treads then finish at
+    # lift 7 -- a walking surface of 8 against the next terrace's 7,
+    # which is this level's ``rise`` of 6 plus the one block the crossing
+    # comes down. The old seven-tread version started on ``step_y`` too
+    # and finished a block higher than that; a stair that overshoots is a
+    # level above that opens by dropping back onto its own terrace, which
+    # is the owner's "it puts a ladder there and then jumps back down to
+    # a lower part".
+    #
+    # Two of the treads are glaze and taken as slides. The exit is a
+    # third of every run and can otherwise only ever be hops, and a slide
+    # gaining a block reaches 2.67-4.36 against a hop's 2.00-3.10, so an
+    # icy tread is written a little longer than a stone one.
+    #
+    # Every tread carries a lid, which is the opposite of the rule in the
+    # body of the level and is right for the same reason: the exit is the
+    # emptiest third of any level in this tower -- a staircase with sky
+    # on five sides of it -- and here being read as an interior is the
+    # point. ``shell="cave"`` on the **launch** landing is
+    # ``docs/RULES.md`` §7's largest single frame win, worth about four
+    # points on its own, and it takes its chimney out of the climb's
+    # already-reserved cells for free.
+    #
+    # The last tread is a lit lip thrown **out** at ``hug=3.2`` rather
+    # than tucked in at 2.4, because the camera locks onto the landing
+    # through take-off and flight: a lip against the core aims the last
+    # second of the level at the cliff.
+    n("glow", arc=3.0, lift=2, hug=2.8, spread=1, deco="lamp", ceiling=3,
+      shell="cave", orbs=1),
+    n("frost", arc=3.0, step_y=1, hug=2.6, spread=0, confine=True,
+      ceiling=3),
+    n("packedice", arc=3.6, step_y=1, kind="slide", form="ice", hug=2.6,
+      spread=0, confine=True, ceiling=3, orbs=1),
+    n("deepslate", arc=3.0, step_y=1, hug=2.6, spread=0, confine=True,
+      ceiling=3, shell="tunnel"),
+    n("packedice", arc=3.6, step_y=1, kind="slide", form="ice", hug=2.8,
+      spread=0, confine=True, ceiling=3, orbs=1),
+    n("glow", arc=3.0, step_y=1, hug=3.2, spread=0, pedestal=False,
+      ceiling=3, deco="lamp", orbs=2),
 ])

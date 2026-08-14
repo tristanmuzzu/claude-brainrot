@@ -758,6 +758,15 @@ time; none is guessable from the source.
   across the top of it: a lava moat buys atmosphere and nothing at all for
   walkability. If your theme's liquid is lava and you need the walk number
   down, you need holes.
+- **`moat=True` and `pedestal_style=` on the same node fill the pond with that
+  solid material.** `Course._moat` digs its bowl and fills it with
+  `pedestal_style or theme.liquid`, so a landing written with both cuts a hole
+  and packs it with walkable stone — no error, no rejection, nothing in the
+  fidelity table, and the unwalkability the moat existed for silently gone.
+  Two levels shipped it in a first draft. It is a natural pair to write when
+  the plinth under a landing wants a colour; it is recorded here as well as in
+  `docs/LEVEL_BRIEF.md` because this is the file open when the node is being
+  written.
 - **Never repeat a `moat` in a `filler`.** The filler loops, and the second lap
   digs away the ground the first lap's pedestals stand on: 27,859 "pedestal
   will not stand" refusals from one keyword.

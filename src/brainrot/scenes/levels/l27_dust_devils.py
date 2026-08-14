@@ -7,244 +7,335 @@ and ``docs/TOWER.md``.
 
 from ._base import Level, n
 
-# A slot canyon in the badlands.
+# A hoodoo field standing out of a dry wash, and the route goes over the
+# **tops** of it.
 #
-# The idea in one line: you drop off the sunlit rim into a dry wash cut
-# between banded terracotta walls, wade the last pool left in it, and
-# climb the strata back out past the hoodoos.
+# The place in one line: the wind has eaten the rim away into a stand of
+# thin banded spires with white capstones, the wash they stand in still
+# holds one green pool, and the only water left in the badlands is coming
+# back *up* a chimney at the head of the slot.
 #
-# What was wrong with the old one, measured rather than guessed: **62%
-# empty frame -- the worst level in the back thirteen** -- 22% designed
-# content, 98% plain hop, one unchecked emergency placement, and a walker
-# that could not even find ground to seed on. Four causes, all geometry:
+# The route: a lantern set flush in the red sand, a stride under the slab
+# leaning across the mouth of the slot, up the shoulder of the first
+# hoodoo and onto its cap -- and then **off the undercut side of it, two
+# blocks down and four and a half metres out**, into the pool at the
+# bottom of the wash. You wade it, squeeze under the boulder wedged
+# across the slot, climb the strata back out on an eroded half-step into
+# a wind-hollowed bay, and cross the hoodoo field itself: three spires
+# weaving across the lane, the middle one hanging over the wash on
+# nothing. The way out is the seep -- a block to launch from with the
+# rock closing over it, the spring pushing water up the chimney, and a
+# lit shelf on the rim to leap from.
 #
-# * **``band=12.5`` was the widest corridor in the tower.** The core wall
-#   was eight metres off the shoulder, so the frame was sky on one side
-#   and nothing on the other. The reference's corridor has a wall within
-#   4 m on 71% of samples.
-# * **It hugged 7.0 and 8.6 on a 3.5-block shelf.** That is twice as far
-#   out as its own ledge reaches, over the drop, which is a frame of sea
-#   and sky by construction. Everything here hugs 3.0-3.8.
-# * **Its script was five beats long and only two of them were ever
-#   laid.** A level lays nine to twelve landings and the exit climb takes
-#   a third of them; beats three, four and five were writing for a strip
-#   nobody sees. Three beats and a filler that carries the character.
-# * **The exit climb was 40% of the level and every frame of it was
-#   sky.** ``rise=6`` is the tallest in the tower and the staircase is one
-#   landing per block, so the way out was eight landings of one terracotta
-#   column against a blue sky.
+# The thing to remember is the fall off the capstone: it is the longest
+# jump in the level, it is the level's descent, and it is written into
+# the one beat that is laid on every single run.
 #
-# **That pass took the empty frame from 62% to 60% and no further**, and
-# a second one (2026-08-13) against a rule that is now *under 48%* had to
-# find out why. The answer was measured with a ray fan bucketed by the
-# feature the body was standing on, and it is two things, neither of them
-# the corridor:
+# ---------------------------------------------------------------------
+# **The way out is now three landings, and that is the biggest single
+# change in the file.** What was here was an eight-tread authored
+# staircase -- itself a rebuild, and a real improvement on the generated
+# one -- but measured over eight runs it was **76 of 225 landings, 34% of
+# everything the viewer sees**, and the blueprint's elevation was the
+# owner's complaint drawn as a picture: forty metres of design lying flat
+# on the terrace, then forty metres of evenly spaced orange staircase
+# climbing away from it. The contact sheet agrees. The level opens hot
+# orange and ends grey, because the cliff a staircase rides is
+# ``CLIFF_MIX`` and only five parts in twenty-six of that are the level's
+# own colour.
 #
-# * **The ground beside the lane was empty, not the corridor.**
-#   ``shelf=4.0`` inside ``band=9.5`` is a four-block ribbon with five
-#   and a half blocks of drop beside it, and the fan's two lower rows
-#   spend that drop on the sea. ``shelf=6.0`` inside ``band=10.5`` is
-#   the same corridor with a terrace carrying it: the bottom row of the
-#   frame goes **32% -> 19% empty** and the one under the horizon
-#   **44% -> 33%**, for *better* fidelity (90% -> 92% exact,
-#   ``rimlight`` 93% -> 96%, ``strata`` back to 100%) and still no
-#   unchecked placement. This is the opposite of the rule of thumb in
-#   ``docs/RULES.md`` that a wide shelf costs the exit climb its lane --
-#   which was measured at ``band=9.0``, where widening the shelf leaves
-#   the climb nothing, and does not hold with a block of band to spare.
-# * **The exit climb is asked for from lift 1, not from lift 4.** The
-#   note this file used to carry -- that the level climbs to lift 4 in
-#   its own filler and hands the machinery a shorter job -- is false, and
-#   the segment table says so: machinery is inserted *between* beats and
-#   leaves the body back at lift 1, so ``need`` is six or seven every
-#   time and the climb is 40% of every frame however the design ends. It
-#   cannot be shortened from here; it can only be roofed, which is what
-#   ``exit_beats`` below does.
+# Two mechanisms, and the second is the one that is easy to miss:
 #
-# And it named three materials on a level whose subject is *strata*. A
-# real badlands is banded: red sand underfoot, orange, red, white and
-# yellow terracotta in the walls, with the pool the one cold colour in it.
-# All six roles are set, four literals on top, five props.
+# * **A climb spends three landings whatever the height; a stair spends
+#   one a block.** ``rise=7`` is near the tallest in the tower, so the
+#   stair was always going to be seven or eight of them.
+# * **``Cone._level_budget`` reserves the terrace for the *kind* of exit
+#   the level declares, before a single beat is laid** -- and for
+#   anything but ``"stair"`` it gives back ``(need - 2) * ASCENT_ARC``,
+#   which here is **sixteen metres of an eighty-one metre corridor**.
+#   That is why this level could only ever lay its first two beats: the
+#   third and the filler were writing for terrace the exit had already
+#   booked.
 #
-# Against THE GROVE below (teal nylium, band 11.0, a bubble lift, damp)
-# and THE SEA GATE above (dark teal prismarine, band 12.0, water on the
-# floor, gold) this is hot orange, the tightest corridor of the three,
-# dry, and lit by the sky rather than by its own lamps.
+# So ``exit="bubble"``: the spring at the head of the wash. It is the one
+# thing in a dry level that is wet, the pool in the wash below is the
+# same water, and it is the level's *idea* rather than a way of getting
+# out -- which is the test ``docs/RULES.md`` §3 sets for spending a climb
+# on a level at all. A bubble is ridden at 11.0 m/s against a ladder's
+# 2.35, so the ride is a fifth of a second rather than three, and the
+# brief's measurement on the ladder -- the ride 20.9% jammed against
+# 0.0% for every other move in the level -- cannot arise.
 #
-# Three things here that only the per-beat table or the physics table
-# would tell you:
+# THE GROVE below also leaves by a bubble and that is the one real cost
+# here; it is taken deliberately. Its column is a bare six-block ride out
+# of a teal nylium floor. This one is five blocks with the rock shelled
+# over the launch and **two lit terracotta shelves above it**, so the
+# last thing before the leap is a floor rather than the top of a shaft,
+# and ten seconds of orange badlands stand between the two rides.
 #
-# * **The descent is beat two, not the tail.** A level's drop belongs in
-#   its first two thirds and the exit must be the highest thing in it, so
-#   the wash is the low point and everything after it climbs.
-# * **The wades are what hold the hop share down.** The exit climb can
-#   only ever be hops, and a ``walk`` is the only non-hop a dry mesa
-#   honestly owns -- no ice, no slime, no water deep enough to swim, and
-#   deliberately no ladder, the tower having far too many already. A walk
-#   is never the *first* node of a beat: it needs its predecessor within
-#   half a block and a beat boundary does not promise that.
-# * **The water is in the *first* beat, not the best one.** Over 24 runs
-#   this level lays about eighteen landings a visit and only five or six
-#   of them are the design: the opening beat is laid every time, the
-#   second gets clipped against the exit climb's arc reserve, and the
-#   third and the filler are usually never reached at all. Anything the
-#   level is *about* has to be in beat one. That is also why the moat sits
-#   on the opening beat's last node -- a moat digs a radius-three disc the
-#   moment its landing commits, so nothing may follow it inside three
-#   metres, and nothing does.
-# * **``frame empty`` is a ray cast, not a sky-colour test.** It counts
-#   the sampled directions that reach eight metres without hitting a
-#   *voxel*, so the only things that move it are geometry within 8 m:
-#   the cliff, the terrace under your feet, pedestals, ``ceiling`` lids
-#   and shells. The slab of the turn above is twelve blocks up here and a
-#   ray at the probe's steepest up-angle reaches that height fourteen
-#   metres away, so this level's ceiling can never register. Props are
-#   models and do not register either.
-# * **And on a ledge, a ``shell`` is a roof and nothing else.** Its walls
-#   only stand where the cell under them is solid, and the two columns a
-#   five-wide shell wants sit one cell *inside* the cliff and one cell
-#   *past* the shelf edge -- so a ``cave`` or a ``hall`` on this level
-#   wrote about thirteen cells, all of them roof, and moved the number by
-#   nothing measurable. A single lid or shell anywhere in a script beat
-#   is noise here: the design is a third of the level and a beat is four
-#   landings of it. Only the things that touch every frame -- the ground
-#   under the lane, and the climb -- are worth spending a pass on.
-LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="stair",
-              band=10.5, shelf=6.0, breaks=3, landmark="hoodoo",
+# ---------------------------------------------------------------------
+# Three other things that are measurements rather than taste.
+#
+# * **Beat one carries the whole level.** Over eight runs the old
+#   ``rimlight`` laid 30 of 30 and ``wash`` 37 of 40, while ``hoodoos``
+#   managed 13 of 16 and the filler 6 of 7 -- the level gets about three
+#   visits and the script is truncated in the middle of whichever beat is
+#   in progress. So the threshold, both rises, the fall and the water are
+#   all in the first beat, in that order, and beats two and three are
+#   what the level does with the room the exit gave back.
+# * **Only the opening beat is written at ``lift=1``.** It is placed from
+#   wherever the ``start`` machinery left the body, and the identical
+#   beat measures 67% at lift 2 against 100% at lift 1. Every *other*
+#   beat opens at ``lift=2, spread=1`` and then works in ``step_y``, so
+#   the shape it was written with survives an opener that settled a block
+#   off -- and the level stops spending its first four landings on the
+#   floor, which is the owner's complaint measured (55% of the roster's
+#   authored landings sit at lift 0-1; nine of this level's thirteen used
+#   to).
+# * **``shelf=6.0`` inside ``band=10.5`` is kept from the pass before
+#   this one**, where it was measured against 4.0 inside 9.5: the fan's
+#   bottom row went 32% -> 19% empty and the row under the horizon 44% ->
+#   33%, *and* fidelity improved, because a pedestal on a ledge then has
+#   ground to find. It contradicts the "a wide shelf costs the exit climb
+#   its lane" note in ``docs/RULES.md`` §7, which was measured at
+#   ``band=9.0``; with a block of band to spare it does not hold.
+#
+# And the floor is written out. ``docs/RESEARCH.md`` says identity comes
+# from the ground -- a real terrace runs a median fourteen materials with
+# the commonest at 26% -- and the mesa family mix underneath this one is
+# a fifth grey (``clay`` is (166,170,180), ``stone`` is (146,146,150)).
+# What is here is fifteen kinds and none of them cold: burnt orange, red
+# and yellow bands, terracotta, fired brick, oxidised copper, coarse
+# dirt, two sands, with gravel and a little clay for grit.
+#
+# Against THE BALCONIES, the other mesa level, this is a deliberate
+# opposite. That one is *bolted to the cliff* -- oak-and-clay decks hung
+# off a banded face, a lava seep, everything hugging the wall. This one
+# stands *free of it*: spires with air all round them, the drop on one
+# shoulder and the wash on the other, water instead of lava, and no
+# timber anywhere in it.
+LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
+              band=10.5, profile="ledge", shelf=6.0, breaks=3,
+              landmark="hoodoo",
               ground="redsand", sub="terra_orange", rock="terra_red",
               accent="terra_white", glow="lantern", liquid="water",
               candy=("terra_yellow", "terra_white"),
-              props=("deadbush", "pebbles", "mcfence", "grasstuft",
-                     "cactus"),
+              props=("deadbush", "pebbles", "cactus", "mcfence",
+                     "grasstuft"),
               sky=(238, 178, 116),
-              step=("terra_yellow", "hop"), beats=[
-    # The threshold: one lantern set flush in the red sand on a rise, and
-    # then a stride onto the yellow band under a slab of rock. The palette
-    # changes completely at that lantern -- teal nylium to red sand in one
-    # frame -- which is what the reference does at every seam it has.
+              step=("terra_yellow", "hop"),
+              # Fifteen materials with the commonest at 17%, against the
+              # roster's usual six at 55%. The four roles are added on
+              # top of this at high weight by ``Theme.floor_palette``,
+              # so the list below is the tail -- and it is the mesa
+              # family's own tail with the two grey entries taken out
+              # and warm ones put in: fired brick and oxidised copper
+              # for the baked crust, sandstone and sand for the wash
+              # bed, coarse dirt and podzol for the scree.
+              floor=(("terra_orange", 3), ("terra_red", 3),
+                     ("terra_yellow", 3), ("redsand", 2),
+                     ("terracotta", 2), ("coarse", 2), ("sandstone", 2),
+                     ("brick", 2), ("copper", 1), ("sand", 1),
+                     ("chiselled", 1), ("dirt", 1), ("podzol", 1),
+                     ("gravel", 1), ("clay", 1)),
+              beats=[
+    # THE CAPSTONE -- the threshold, both rises and the fall, in the one
+    # beat that is never truncated. Every other beat here is what the
+    # level does with whatever terrace is left; this is what it *is*.
     #
-    # **The threshold is written at lift 1 and that is the whole of why
-    # it places.** Machinery is inserted between beats and leaves the body
-    # back at lift 1, so a first node asking for lift 2 is asking for a
-    # rise it only sometimes gets -- and the ``walk`` after it then needs
-    # its predecessor within half a block and does not have it. Measured
-    # on this beat alone: lift 2 with a walk second, 67%; the same beat at
-    # lift 1, below. ``spread=1`` on the opening node and ``spread=0`` on
-    # the one the walk steps off is the other half -- let the landing
-    # before a stride settle a block out and the stride is a one-block
-    # step, which a walk refuses outright.
-    #
-    # And **one** walk, not two. Two consecutive strides took this beat to
-    # 71% and the sea gate's threshold to 50%.
-    ("rimlight", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1,
+    # 1. A lantern set flush in the red sand on a rise, with the rock
+    #    closing seven cells over it. The palette changes completely at
+    #    that block -- THE GROVE below is teal warped nylium and
+    #    shroomlight, and from here it is burnt orange -- which is what
+    #    the reference does at every one of its nine seams, in one or two
+    #    frames with no blend. `lift=1` and not 2, because a beat's
+    #    opener is placed from wherever machinery left the body: the
+    #    identical beat reads 67% at lift 2 and 100% at lift 1.
+    # 2. The stride under the slab leaning across the mouth of the slot.
+    #    A body cannot jump through a gap this low -- one impulse rises
+    #    1.25 m and the head then sweeps the two cells above every
+    #    take-off -- so the lintel is a `ceiling=3` and the leg under it
+    #    is a `walk`. This is the genre's `2bc`, the lid you sprint
+    #    under, and it is the only form of it this kernel has. It asks
+    #    for the *same* `lift` as the opener, which is the whole reason
+    #    it survives an opener that settled a block off: +1, level and -1
+    #    are all legal, and `lift + 1` after a spread opener is a rise of
+    #    two about a fifth of the time, which nothing makes.
+    # 3. Up the weathered shoulder of the first hoodoo. +1 at `arc` 3.2
+    #    is a reach of 2.52 against a +1 window of 2.00-3.10 -- centred,
+    #    not at the top of it, because 3.6 is the arc that has to fall
+    #    back and a fallback is not `exact`.
+    # 4. **Onto the capstone**, +1 again, and this is the second landing
+    #    of the level that is off the floor. `pedestal_style` paints the
+    #    plinth under it: an orange banded column with a white cap on top
+    #    of it *is* a hoodoo, and it costs nothing.
+    # 5. **Off the undercut side of it.** `step_y=-2` at `arc` 5.2 is a
+    #    reach of 4.52 against a -2 window of 3.12-5.56, and it is the
+    #    longest jump in the level by a metre and a half -- a descent is
+    #    the only long jump this motion model has, because falling takes
+    #    time and the body does not slow down while it does. It lands at
+    #    lift 1 and not lift 0 on purpose: lift 0 is the terrace's own
+    #    top cell, which is solid, so the landing would be refused and
+    #    the rest of the beat abandoned behind it under the beat's own
+    #    name. The `moat` is on this node because the pool has to be
+    #    *under* the jump rather than beside it, and because a bowl dug
+    #    here is a hole a no-jump walker can get into and not out of --
+    #    which is the mechanism that moves the walk number, not the
+    #    water.
+    # 6. The wade across the last of it onto the sand bar. It floats: the
+    #    moat one node back has just dug a radius-three bowl and a
+    #    pedestal cannot stand in a hole.
+    ("capstone", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1,
                     deco="lamp", ceiling=7, orbs=1),
-                  n("terra_yellow", arc=2.9, lift=1, hug=3.2, kind="walk",
-                    spread=0, ceiling=7),
-                  n("terra_orange", arc=3.4, lift=1, hug=3.4, spread=0,
-                    moat=True, ceiling=3, orbs=1)]),
-    # The wash, and the whole of the level's one idea in one beat --
-    # because machinery is inserted *between* beats and leaves the body
-    # back at lift 1, so a rise and the drop off it have to be written
-    # together. Down off the rim onto the canyon floor, two stones
-    # standing in the last of the water with a wade to each, and the
-    # climb out into a wind-hollowed bay in the cliff.
+                  n("terra_white", arc=3.0, lift=1, hug=3.2, kind="walk",
+                    spread=0, ceiling=3),
+                  n("terra_orange", arc=3.2, step_y=1, hug=3.4,
+                    pedestal_style="terra_red", ceiling=7, orbs=1),
+                  n("terra_white", arc=3.2, step_y=1, hug=3.0,
+                    pedestal_style="terra_orange", orbs=1),
+                  n("terra_red", arc=5.2, step_y=-2, hug=3.8, moat=True,
+                    orbs=2),
+                  n("redsand", arc=3.0, step_y=0, hug=3.4, kind="walk",
+                    spread=0, pedestal=False)]),
+    # THE SLOT -- the bottom of the wash, and the only enclosed stretch
+    # in the level. The reference is a *groove* rather than a tunnel:
+    # rock within four metres on one side on 71% of its samples, a lid
+    # overhead on 98%, and fully enclosed only 6% of the way. So this is
+    # a two-metre pinch and not a room -- a lid to sprint under, a
+    # half-step up the strata, and one bay carved into the bank.
     #
-    # The rim above ends at lift 1, not lift 2, and that is a *frame*
-    # decision as much as a fidelity one: the drop is a block shallower
-    # and the beat below it is reached twice as often (its landings went
-    # 61 to 120 over four seeds), which is worth two points of empty
-    # frame on its own -- the wash is the fullest thing in the level at
-    # 42% against ``rimlight``'s 59%, so screen time spent down here is
-    # screen time not spent looking off the rim.
-    ("wash", [n("ground", arc=4.8, lift=0, hug=3.4, form="floor",
-                spread=0, ceiling=5, orbs=2),
-              n("terra_orange", arc=3.6, lift=1, hug=3.0, spread=0,
-                moat=True, ceiling=4, orbs=1),
-              n("redsand", arc=2.9, lift=1, hug=3.0, kind="walk",
-                spread=0),
-              n("terra_white", arc=3.4, lift=1, hug=3.4, spread=0,
+    # It opens at `lift=2` with `spread=1`, which is the one real lever a
+    # level has against "half the jumps are at ground level": following
+    # another script beat that measures 100% exact, and following
+    # machinery the spread covers the fallback. Everything after the
+    # opener is on `step_y`, so a beat that started a block low still has
+    # the shape it was written with.
+    #
+    # The `slab` is the fourth node: the commonest non-cube form in the
+    # whole reference map, and a form this tower has barely used. Note
+    # what it does *not* buy here -- `form="slab"` is a half-height step
+    # only when the rise is written as `lift + 1`; written as `step_y=1`
+    # the rise between walking surfaces is a full block whatever the
+    # form, and `--design-only` says so. So it is an eroded ledge to look
+    # at and an ordinary +1 to jump, and its `arc` is centred at 3.2 like
+    # every other +1 in the file.
+    #
+    # The beat then **drops into the bay** rather than climbing into it.
+    # A grotto is a hollow the wind has cut into the bank, and you get
+    # into one by stepping down off the ledge above it; -1 at `arc` 4.0
+    # is a reach of 3.32 against a -1 window of 2.35-4.98, which is
+    # further than any rising jump in the level can go. It also leaves
+    # the beat at lift 3 rather than 5, so THE FIELD's opener at lift 2
+    # is a one-block descent instead of the three-block one nothing
+    # makes.
+    #
+    # The `grotto` is on the beat's **last** node, which is the only
+    # place a shell may go: it is painted the moment its landing commits
+    # and its walls would then be in the way of the next landing of the
+    # same beat.
+    ("slot", [n("terra_yellow", arc=3.2, lift=2, hug=3.0, spread=1,
                 ceiling=7, orbs=1),
-              n("redsand", arc=2.9, lift=1, hug=3.4, kind="walk",
-                spread=0, ceiling=7),
-              n("terra_red", arc=3.5, lift=2, hug=3.2, spread=0,
-                shell="grotto")]),
-    # The hoodoos themselves: thin spires with white capstones, weaving
-    # across the lane, the middle one hung out over the wash with nothing
-    # under it and a beam across the jump onto it. This ends at lift 4,
-    # which is the level's high ground -- but see the head of the file:
-    # it does *not* shorten the way out, because machinery is inserted
-    # after it and puts the body back on the floor first.
-    ("hoodoos", [n("terra_white", arc=3.4, lift=2, hug=3.2, spread=0,
-                   radial=1.2, ceiling=4, orbs=1),
-                 n("terra_red", arc=3.3, lift=3, hug=3.8, spread=0,
-                   radial=-1.3, pedestal=False, deco="lintel"),
-                 n("terra_yellow", arc=3.6, lift=4, hug=3.0, spread=0,
-                   deco="post", ceiling=3, orbs=1),
-                 n("terra_white", arc=2.9, lift=4, hug=3.2, kind="walk",
-                   spread=0, ceiling=5, shell="tunnel")]),
+              n("terra_white", arc=3.0, step_y=0, hug=3.0, kind="walk",
+                spread=0, ceiling=3),
+              n("terra_orange", arc=3.2, step_y=1, hug=3.4,
+                pedestal_style="terra_red", orbs=1),
+              n("terra_yellow", arc=3.2, step_y=1, form="slab", hug=3.2),
+              n("terra_red", arc=4.0, step_y=-1, hug=3.0, shell="grotto",
+                orbs=1)]),
+    # THE FIELD -- the hoodoos themselves, and the level's high ground.
+    # Three spires weaving across the lane: one out toward the rim, the
+    # middle one hung over the wash on nothing at all with a beam drawn
+    # across the jump onto it, the last and tallest back inboard. Then a
+    # stride across the wind-cut bridge between the last two caps, with
+    # the rock closed over it.
+    #
+    # `radial` is what makes this read as a *field* rather than as a line
+    # of blocks: +1.2 then -1.3 puts two and a half metres of side-step
+    # between consecutive caps, so the lane visibly weaves and the spires
+    # stand off each other. The middle one is `pedestal=False` because a
+    # column of rock under it would make it a buttress; a hoodoo that has
+    # lost its own footing is the thing worth looking at.
+    #
+    # This ends at lift 4 and nothing after it goes down more than two,
+    # which is `docs/RULES.md` §3: a level's descent belongs in its first
+    # two thirds and the exit is the highest thing in it.
+    ("field", [n("terra_white", arc=3.4, lift=2, hug=3.2, spread=1,
+                 radial=1.2, pedestal_style="terra_orange", orbs=1),
+               n("terra_red", arc=3.2, step_y=1, hug=3.6, radial=-1.3,
+                 pedestal=False, deco="lintel"),
+               n("terra_yellow", arc=3.2, step_y=1, hug=3.0,
+                 pedestal_style="terra_red", ceiling=7, orbs=1),
+               n("terra_white", arc=3.0, step_y=0, hug=3.2, kind="walk",
+                 spread=0, shell="tunnel")]),
 ], filler=[
-    # The character, repeated, and on a terrace this long the filler is
-    # most of what is actually seen: a long drop back into the wash, a
-    # stride along it, and two banded steps up onto the rim again. It
-    # ends at lift 4 every lap and never falls more than two, which is
-    # the rule about a run not undoing itself. It does **not** shorten
-    # the climb out -- that was the belief this file was written on and
-    # the segment table refuted it; see the head of the file.
-    ("strata", [n("terra_white", arc=4.6, lift=2, hug=3.0, spread=2,
-                  orbs=1),
-                n("terra_orange", arc=2.9, lift=2, hug=3.0, kind="walk",
-                  spread=0, ceiling=5),
-                n("terra_yellow", arc=3.5, lift=3, hug=3.4, spread=0),
-                n("terra_red", arc=3.4, lift=4, hug=3.0, spread=0,
-                  ceiling=7, orbs=1)]),
+    # THE WINDGAP, repeated. A script's tail does not repeat and the
+    # filler does, so the level's *character* lives here rather than its
+    # surprise: along a bench under the overhang, off the end of it and
+    # down one out over the wash -- the longest flat-ish jump the level
+    # owns after the capstone fall -- and back up a stratum onto the next
+    # bench.
+    #
+    # It neither climbs nor sinks across a lap. lift 3, 3, 2, 3, and the
+    # seam back onto the opener is a level hop at `arc` 3.4. Half of what
+    # a filler ever loses is at that seam, and a filler that drifted
+    # downhill would also buy the level a longer exit every lap, since
+    # the exit is sized from wherever the body is when it triggers.
+    #
+    # **No `moat` anywhere in here.** The filler loops, and a second lap
+    # digs away the ground the first lap's pedestals are standing on --
+    # one keyword, 27,859 refusals.
+    ("windgap", [n("terra_orange", arc=3.4, lift=3, hug=3.0, spread=2,
+                   ceiling=7, orbs=1),
+                 n("terra_white", arc=3.0, step_y=0, hug=3.0, kind="walk",
+                   spread=0, ceiling=3),
+                 n("terra_yellow", arc=4.6, step_y=-1, hug=3.6, orbs=1),
+                 n("terra_red", arc=3.2, step_y=1, hug=3.0,
+                   pedestal_style="terra_orange")]),
 ], exit_beats=[
-    # Out up the strata, written down tread by tread instead of left to the
-    # generated staircase -- and this is the single biggest thing in the
-    # file. The exit climb is **40% of every frame spent on this level**
-    # and it was the emptiest thing in the tower at 68% sky; the design
-    # beats put together are a third of that. Two numbers do the work and
-    # neither is guessable:
+    # THE SEEP -- the spring at the head of the slot, and the only water
+    # in the badlands that is going anywhere.
     #
-    # * **Eight treads, not four.** ``need`` is measured from wherever the
-    #   body is when the climb triggers, and machinery is inserted between
-    #   beats and leaves it back at lift 1 -- so the note above about this
-    #   level "climbing to lift 4 and handing the machinery a shorter job"
-    #   is not what happens: it asks for six or seven. An authored list
-    #   shorter than that runs out, the crossing is refused, and
-    #   ``_pending`` is replaced wholesale by the generated stair, which
-    #   carries no lid at all. Measured over four seeds: four treads took
-    #   the climb 68% -> 59% empty, eight took it to **49%**.
-    # * **``hug=1.8``, against the generated stair's 2.4.** Hard against
-    #   the cliff the treads read as ledges cut into the tower and the
-    #   weathered face fills the inboard half of every frame of the climb;
-    #   0.6 of a block was worth a point and a half of the level's total.
+    # Three landings against the eight-tread staircase this replaces, and
+    # the arithmetic of the height is the part to check if anything here
+    # is ever touched: the launch is lift 2, the column gains five, the
+    # shelf one -- lift 8, against the next terrace's floor at `rise` 7
+    # plus the one block the crossing comes down. An exit that overshoots
+    # is a level above that opens by dropping onto its own terrace, which
+    # is the owner's "it puts a ladder there and then jumps back down to
+    # a lower part". The old stair reached lift 9 and the seam showed it:
+    # the first landing of THE SEA GATE was built two cells *below* the
+    # last landing of this level.
     #
-    # And it is **free**: measured over 24 runs against the generated
-    # stair on the same ground, exact 91% either way, unchecked 0 either
-    # way, the same move mix to a landing. A tread that cannot be placed
-    # simply hands ``_pending`` back to ``_ascent_stair``, so the whole
-    # reliability chain is still underneath this.
+    # `pedestal=True` and `step_y=5` are the recipe and both are
+    # load-bearing. `_climb_move` wants solid rock within one cell of the
+    # column at its **middle index** and at its **top**, and out in the
+    # lane the only candidate is the landing's own stack; floated, the
+    # column is refused silently -- 11,097 of 13,000 candidates on a
+    # generated bubble exit -- and the level gets a staircase without
+    # being told. **Check the move mix for the word `bubble` by name
+    # after touching anything here**; its absence reads as 100% placed.
+    # `arc=2.4` for the same reason: 3.0 often does not fire.
     #
-    # Each tread carries the two things a level author has against the
-    # sky -- a ``ceiling`` beam along its own arc and a ``tunnel`` roof
-    # over the jump that arrived -- and a pedestal, so the flight reads as
-    # built terrain rather than as eight cubes hung one above the other.
-    # The first is unhugged because it is placed from wherever the body
-    # happens to be standing; the rest are pinned.
-    n("terra_yellow", arc=3.0, step_y=1, spread=0, confine=True,
-      pedestal_style="terra_orange", ceiling=7, shell="tunnel", orbs=1),
-    n("terra_white", arc=2.9, step_y=1, hug=1.8, spread=0, confine=True,
-      pedestal_style="terra_red", ceiling=7, shell="tunnel"),
-    n("terra_orange", arc=3.0, step_y=1, hug=1.8, spread=0, confine=True,
-      pedestal_style="terra_yellow", ceiling=7, shell="tunnel", orbs=1),
-    n("terra_red", arc=2.9, step_y=1, hug=1.8, spread=0, confine=True,
-      pedestal_style="terra_white", ceiling=7, shell="tunnel"),
-    n("terra_yellow", arc=3.0, step_y=1, hug=1.8, spread=0, confine=True,
-      pedestal_style="terra_orange", ceiling=7, shell="tunnel", orbs=1),
-    n("terra_white", arc=2.9, step_y=1, hug=1.8, spread=0, confine=True,
-      pedestal_style="terra_red", ceiling=7, shell="tunnel"),
-    n("terra_orange", arc=3.0, step_y=1, hug=1.8, spread=0, confine=True,
-      pedestal_style="terra_yellow", ceiling=7, shell="tunnel", orbs=1),
-    n("terra_red", arc=2.9, step_y=1, hug=1.8, spread=0, confine=True,
-      pedestal_style="terra_white", ceiling=7, shell="tunnel"),
+    # The launch block stands at `hug=2.8` and not 2.2, and that one
+    # number is most of a level's jammed lens -- measured elsewhere, 69
+    # wall-jammed frames of 1,293 at 2.2 against 0 of 1,280 at 2.8. Its
+    # `shell="cave"` takes the chimney out of the climb's own reserved
+    # cells for free, which is the single biggest thing a level can do
+    # about the exit being the emptiest third of it. And both ends carry
+    # a `ceiling` beam, because a beam is spread along the direction of
+    # travel and fills the one column of the ray fan that looks where you
+    # are going.
+    # `arc=3.4` on the launch is chosen to be legal at *every* height the
+    # thing before it can leave the body at: a reach of 2.72 sits inside
+    # the +1 window (2.00-3.10), the level one and the -1 one (2.35-4.98)
+    # at once, which 2.8 does not -- 2.12 of reach is under a descent's
+    # minimum, because a descending arc covers that much ground before it
+    # arrives.
+    n("terra_orange", arc=3.4, lift=2, hug=2.8, spread=1, confine=True,
+      ceiling=3, shell="cave"),
+    n("terra_white", arc=2.4, step_y=5, kind="bubble", hug=2.0,
+      pedestal=True, pedestal_style="terra_orange", spread=0, deco="lamp",
+      orbs=2),
+    n("terra_yellow", arc=3.0, step_y=1, hug=3.2, spread=0,
+      pedestal=False, ceiling=3, deco="lamp", orbs=1),
 ])
