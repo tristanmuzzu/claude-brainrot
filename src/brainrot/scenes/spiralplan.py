@@ -3073,17 +3073,7 @@ class Course:
         if built is None:
             return self._no("no move: " + node["kind"])
         move, soft = built
-        if move.kind == "walk":
-            # A walk is the one verb the body crosses on its feet, and until
-            # this existed nothing asked whether there was anything under
-            # them: ``_move_for`` validates a walk by its two endpoints alone,
-            # so a landing two cells away was reached by strolling across the
-            # hole in between. Measured before it: 98% of walk legs crossed
-            # air, a mean of 0.76 m of it and 1.68 m at worst.
-            bridge = self._walk_bridge(prev, move, cells, pedestal)
-            if bridge is None:
-                return self._no("walk: no ground to lay")
-            pedestal = tuple(pedestal) + bridge
+        bridge = ()
         lid = self._ceiling_cells(prev, node, move)
         if lid is None:
             return self._no("head-hitter will not fit")
@@ -3095,9 +3085,31 @@ class Course:
                 footprint(prev["x"], prev["y"], prev["z"], prev["form"]),
                 tuple(pedestal) + lid):
             return self._no("path blocked")
+        if move.kind == "walk":
+            # A walk is the one verb the body crosses on its feet, and until
+            # this existed nothing asked whether there was anything under
+            # them: ``_move_for`` validates a walk by its two endpoints alone,
+            # so a landing two cells away was reached by strolling across the
+            # hole in between. Measured before it: 98% of walk legs crossed
+            # air, a mean of 0.76 m of it and 1.68 m at worst.
+            #
+            # **After** the path check, and that ordering is the whole of a
+            # bug that cost five beats a third of their fidelity. The bridge
+            # rides in with the pedestal, and the pedestal is what
+            # ``_path_clear`` is handed as the terrain this landing is about
+            # to build -- so the ground being laid *under* the feet was
+            # checked as an obstruction *to* them. It only bites on a slab,
+            # whose walking surface is halfway up its own cell: at a surface
+            # of 1.5 the body's lowest cell and the cell holding it up are
+            # the same one. A cell laid because the feet needed it there
+            # cannot also be in their way.
+            bridge = self._walk_bridge(prev, move, cells, pedestal)
+            if bridge is None:
+                return self._no("walk: no ground to lay")
+            pedestal = tuple(pedestal) + bridge
         return {"cell": (cx, cy, cz), "step": step, "form": form,
                 "move": move, "soft": soft, "pedestal": pedestal,
-                "footing": footing, "ceiling": lid}
+                "bridge": bridge, "footing": footing, "ceiling": lid}
 
     def _pedestal(self, node: dict, cx: int, cy: int, cz: int, form: str):
         """The stack of terrain under a landing, down to the trough's ground.
@@ -3358,6 +3370,15 @@ class Course:
             dist = math.dist((frm[0], frm[2]), (to[0], to[2]))
             if dist > 2.4 or abs(to[1] - frm[1]) > 0.55:
                 return None
+            # You cannot walk off the top of a fence post. A form that stands
+            # proud of its own cell -- a fence or a wall, both 1.5 -- puts the
+            # feet half a block above the block holding them up, so there is
+            # no cell under them for ``_walk_bridge`` to continue, and the only
+            # honest shelf between two posts is more posts. The rise limit
+            # above does not catch it: a post at one lift and a block at the
+            # next differ by exactly half a block, which is inside it.
+            if FORMS[prev["form"]] > 1.0 or FORMS[form] > 1.0:
+                return None
             return Move("walk", [line_leg(frm, to, RUN_SPEED)]), ()
         return None
 
@@ -3470,9 +3491,16 @@ class Course:
         run = self.land_point(prev), self.takeoff_point(prev)
         walk = [tuple(run[0][i] + (run[1][i] - run[0][i]) * f
                       for i in range(3)) for f in (0.0, 0.25, 0.5, 0.75, 1.0)]
+        # ...minus the shelf a walk laid for itself, and the exclusion is
+        # load-bearing rather than tidy. ``write`` refuses a cell in
+        # ``pathcells``, so a bridge cell that is also a path cell is a block
+        # that never gets built and a walk that crosses air after all. They
+        # coincide whenever the walk is between two surfaces at different
+        # fractions of a cell -- a slab to a full block -- because the body's
+        # lowest cell partway up that transition *is* the cell holding it up.
         prev["path"] = tuple({
             c for x, y, z in list(got["move"].points(ARC_SAMPLES)) + walk
-            for c in body_cells(x, y, z)})
+            for c in body_cells(x, y, z)} - set(got.get("bridge") or ()))
         self.pathcells.update(prev["path"])
         last = got["move"].legs[-1]
         blk["impact"] = (abs(last["vy0"] - GRAVITY * last["dur"])

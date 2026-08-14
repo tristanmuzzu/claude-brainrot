@@ -54,20 +54,33 @@ After: **0% of walk legs cross air**, and the move mix does not move (walk stays
 at 12%). `tests/test_tower.py::test_a_walk_never_crosses_air` is the lock, and
 it fails on the old code.
 
-**What it cost, stated plainly.** Fidelity over the design alone went **97.7% →
-95.8%** on the same 12 × 340 sweep. The mechanism is not the refusals (55 in six
-runs of 280, and removing them entirely moved fidelity not at all) — it is that
-the bridge cells *occupy cells*, and `landing occupied` rejections rose 11%. The
-loss concentrates in five beats, and every one of them is a walk beat whose
-authored intent was only ever satisfiable by air-walking: `THE TIMBERWORKS/
-sawbench` and `REEF GARDEN/tideline` walk across a dug pond, `THE GATEHOUSE/
-gate` walks through a tunnel that is not built until commit, `MARKET STREET/
-stalls` and `WOOLWORKS/dyehouse` the same shape. **Those five are now level
-authoring jobs** — make the node a hop, or drop the moat — and not engine ones.
-Everything else improved or held: unchecked 0.35% → 0.27%, landings on built
-terrain 90.5% → 91.4%, lens under 0.8 m 1.89% → 1.52%, walls filling the frame
-3.6% → 3.5%, cone-alone walkability 0 m, no-jump runnable unchanged at 68% mean
-and 2 of 24 fully.
+**And it costs nothing.** Fidelity over the design alone is **97.6%** against
+97.7% before, on the same 12 × 340 sweep; unchecked 0.33% against 0.35%, landings
+on built terrain 91.6% against 90.5%, walls filling the frame 3.6% either way,
+cone-alone walkability 0 m, no-jump runnable unchanged. The first cut of this
+read 95.8% and that number was reported as the price of the fix. **It was not a
+price, it was two more bugs**, and both are the same shape — a cell laid because
+the feet needed it there being treated as a cell in their way:
+
+- The bridge rode in with the pedestal, and the pedestal is what `_path_clear`
+  is handed as the terrain a landing is about to build. So the ground under the
+  feet was checked as an obstruction to them. It only bites on a **slab**, whose
+  walking surface is halfway up its own cell: at a surface of 1.5 the body's
+  lowest cell and the cell holding it up are the same one. Five beats lost a
+  third of their fidelity to it and every one of them opened on a slab.
+- `write` refuses a cell in `pathcells`, so a bridge cell that was also a path
+  cell was a block that never got built — an air-walk that survived the fix.
+  Same coincidence, on a walk between two surfaces at different fractions of a
+  cell. `_commit` now subtracts the bridge from the path it records.
+
+One real design fault turned up under them and it is fixed in the roster:
+`MARKET STREET/stalls` walked **off the top of a fence post**. A form that
+stands proud of its own cell — `fence` and `wall`, both 1.5 — puts the feet half
+a block above the block holding them up, so there is no cell under them to
+continue and the only honest shelf between two posts is more posts. The rise
+limit does not catch it, because a post at one lift and a block at the next
+differ by exactly half a block. `_move_for` refuses it now, and that beat is a
+hop (reach 2.31 off a post's dead-centre plant).
 
 ### Symptom 2: real, tiny, and *not* the walk
 

@@ -137,8 +137,12 @@ def _check_move(course, blk: dict, nxt: dict, out: dict) -> None:
             if not grounded:
                 continue
             out["ground_samples"] += 1
-            if any(course.blocked(c) or c in own
-                   for c in _cells_under(x, y, z)):
+            # Solid, and nothing else counts. An earlier draft also accepted a
+            # cell belonging to either landing, which quietly exempted every
+            # cell a walk's own bridge *meant* to lay -- including the ones
+            # ``write`` refused, which are exactly the ones that leave a hole.
+            # The probe read zero while `tests/test_tower.py` failed.
+            if any(course.blocked(c) for c in _cells_under(x, y, z)):
                 was_hole = False
                 run = 0.0
                 continue
@@ -188,8 +192,14 @@ def sweep(runs: int, blocks: int) -> dict:
             laid.append(course.spawn())
             if len(course.blocks) > sp.AHEAD:
                 course.advance(len(course.blocks) - sp.AHEAD + sp.TRAIL)
+            # ``<=``, not ``<``. Indices below ``first_live`` are the ones
+            # ``advance`` has just released, so the strictly-less form checks
+            # every move exactly one step after its own ground has been taken
+            # away -- which reads as an air-walk that is the probe's doing.
+            # It hid behind an exemption for the two landings' cells for a
+            # while, and surfaced the moment that exemption was removed.
             first_live = len(laid) - len(course.blocks)
-            while nxt < first_live and nxt + 1 < len(laid):
+            while nxt <= first_live and nxt + 1 < len(laid):
                 a, b = laid[nxt], laid[nxt + 1]
                 nxt += 1
                 out["moves"] += 1

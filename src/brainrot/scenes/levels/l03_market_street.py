@@ -104,7 +104,12 @@ LEVEL = Level("MARKET STREET", "village", rise=7, gap=3.0, exit="ladder",
     # * **counter** -- off the rail onto the stall top is only +0.5,
     #   because the fence already stands half a block proud. The short
     #   step is deliberate: it is the one beat in the climb that is easy,
-    #   and it is where the eye finds the awning.
+    #   and it is where the eye finds the awning. It is a *hop* and was
+    #   written as a walk, which is the one thing a fence top cannot do:
+    #   the feet stand half a block above the block holding them up, so
+    #   there is no cell under them and a walk across the gap is a walk
+    #   across air. ``_move_for`` refuses it now; at arc 2.7 off a post's
+    #   dead-centre plant it is a reach of 2.31, comfortably a hop.
     # * **awning** and **tiles** -- two ordinary +1 hops at arc 3.2,
     #   which is a reach of 2.52 against 3.10. Centred, not at the top of
     #   the envelope: a +1 written at 3.6 is a reach of 2.92 and is the
@@ -119,7 +124,7 @@ LEVEL = Level("MARKET STREET", "village", rise=7, gap=3.0, exit="ladder",
     #   the pond then swallows the next landing of the same beat.
     ("stalls", [n("oak", arc=3.0, lift=1, form="fence", spread=0,
                   deco="post", orbs=1),
-                n("rock", arc=2.7, lift=2, kind="walk", spread=0),
+                n("rock", arc=2.7, lift=2, spread=0),
                 n("accent", arc=3.2, lift=3, spread=0, deco="lintel",
                   orbs=1),
                 n("accent", arc=3.2, lift=4, spread=0,
