@@ -155,11 +155,11 @@ LEVEL = Level("WINDMILL REACH", "farm", rise=6, gap=3.0, exit="stair",
     # carries no ``hug``**, exactly as the generated stair's does not: it
     # is placed from wherever the body happens to be standing, and
     # pinning it to a lane it cannot reach throws the whole list away.
-    # And there are **six**, which is one more than ``need`` usually asks
-    # for from the pit -- at four and at five the crossing was offered
-    # more often and refused more often (20 and 16 crossing attempts over
-    # 24 runs against 14 at six), and each refusal re-plans the climb as
-    # a generated staircase.
+    # There were **six**, chosen when a refused crossing re-planned the
+    # whole climb as a generated staircase (20 and 16 crossing attempts
+    # over 24 runs at four and five treads, against 14 at six). That is no
+    # longer how a refused crossing behaves -- see the note further down --
+    # and at six the fifth tread was failing four visits in six.
     #
     # ``hug=2.2`` against the generated stair's 2.4: harder against the
     # cliff the treads read as ledges cut into the tower rather than as
@@ -167,13 +167,23 @@ LEVEL = Level("WINDMILL REACH", "farm", rise=6, gap=3.0, exit="stair",
     # the one column of the lens an exit climb otherwise spends looking
     # at sky.
     #
-    # Honest note for whoever measures this next: about a third of the
-    # exit climb ends up being these treads and the rest is the engine's
-    # own recovery. The climb re-plans from ``_ascent_stair`` every time
-    # a crossing is refused, and it is refused several times a visit
-    # because the trigger reserves far more arc than six treads spend.
-    # That is ``CLAUDE.md``'s outstanding item 0 and not something a
-    # level module can reach.
+    # The note that used to sit here said about a third of the exit climb
+    # is these treads and the rest is the engine's own recovery, and that
+    # it was out of reach of a level module. It was right, it was found
+    # and fixed on 2026-08-14, and the two engine faults are written up in
+    # ``CLAUDE.md`` -- a refused tread threw the whole authored exit away,
+    # and an authored climb of fixed height overshoots a ``need`` that is
+    # not fixed.
+    #
+    # **Five treads, not six.** Measured per tread over ten runs, the
+    # first four place on every visit and the fifth places on two of six:
+    # 24 refusals of ``no move: hop`` and 12 of ``body does not fit on
+    # landing``. That is the terrace running out under a staircase that
+    # walks along it, and it is not something a shorter arc can fix -- an
+    # arc of 2.6 is a *jump* of 1.92, under ``MIN_HOP``. Dropping the
+    # sixth took this level's mean exit climb from 11.0 landings to 5.5
+    # and the tower's generated staircase from 134 landings a sweep to
+    # 126. The lamp and the last orb moved onto the new top tread.
     n("ground", arc=3.0, step_y=1, spread=0, confine=True, ceiling=6,
       pedestal_style="coarse", orbs=1),
     n("log", arc=2.9, step_y=1, hug=2.2, spread=0, confine=True,
@@ -183,7 +193,5 @@ LEVEL = Level("WINDMILL REACH", "farm", rise=6, gap=3.0, exit="stair",
     n("log", arc=2.9, step_y=1, hug=2.2, spread=0, confine=True,
       ceiling=6, pedestal_style="hay", radial=0.9),
     n("ground", arc=3.0, step_y=1, hug=2.2, spread=0, confine=True,
-      ceiling=6, pedestal_style="coarse", radial=-0.9, orbs=1),
-    n("log", arc=2.9, step_y=1, hug=2.2, spread=0, confine=True,
-      ceiling=6, pedestal_style="hay", radial=0.9, deco="lamp", orbs=1),
+      ceiling=6, pedestal_style="coarse", radial=-0.9, deco="lamp", orbs=1),
 ])
