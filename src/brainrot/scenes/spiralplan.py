@@ -2353,6 +2353,14 @@ class Course:
         self.blocks: list[dict] = []
         self._pending: list[dict] = []
         self.segment = ""
+        #: The level whose plan the pending nodes came from. Not the same
+        #: question as which level's *air* a landing ends up in, which is what
+        #: ``blk["theme"]`` answers -- and on a course that leaves its own band
+        #: (THE QUARRY descends the outside of the tower, a revolution above
+        #: THE VAULT) the two differ by enough to make a per-level table lie.
+        #: Measured: THE QUARRY's three authored exit nodes place on every
+        #: visit and it was still charged twenty-two staircase landings.
+        self.author = -1
         self.laid = 0
         #: Landings that fell through to the one unchecked answer. Held near
         #: zero by the probe; it is the only hop in the module nothing verified.
@@ -2644,6 +2652,23 @@ class Course:
             cone = self.cone
             lv = cone.level(cone.level_index(self.u_of(prev)))
             need = cone.level(lv.index + 1).y - int(self.surface(prev))
+            self.author = lv.index
+            # **The whole staircase, even when the height is already won.**
+            # The crossing is where the entire generated staircase comes from:
+            # on THE QUARRY, WINDMILL REACH, WART FIELDS and THE WEIR the
+            # authored treads place on nearly every visit and the staircase
+            # still fires four to nine times in eight runs -- about once a
+            # visit -- and always *after* the crossing has been refused.
+            #
+            # It is tempting to answer that with one repositioning step rather
+            # than eight, since a body already level with the terrace it is
+            # jumping to gains nothing from climbing. Measured, that is much
+            # worse and the reason is obvious in hindsight: one step, crossing
+            # refused again, one more step, and the exit climb goes from 16%
+            # of the course to 40% (staircase 126 -> 357 landings a sweep,
+            # crossings 180 -> 71). The full staircase at least terminates.
+            # The real fix is to make the crossing succeed, in ``_aim_crossing``,
+            # not to change what happens when it does not.
             self._pending = self._ascent_stair(self.rng, lv, need)
             if self._pending:
                 node = self._pending.pop(0)
@@ -3630,6 +3655,7 @@ class Course:
         blk["ceiling"] = got["ceiling"]
         blk["exact"] = got.get("exact", False)
         blk["origin"] = node.get("origin")
+        blk["author"] = self.author
         for cell in got["ceiling"]:
             self.write(cell, node["pedestal_style"] or theme.rock)
         for cell in got["pedestal"]:
@@ -3908,6 +3934,7 @@ class Course:
         off a page. See :mod:`brainrot.scenes.handplan`.
         """
         lv, need, want, radius = self._level_budget()
+        self.author = lv.index
         # The climb out of a level takes priority over everything, and it has
         # to be started early enough that the last landing clears the chasm.
         # Nothing else in the vocabulary can cross a hole with no floor in it

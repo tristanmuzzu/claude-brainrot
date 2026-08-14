@@ -66,7 +66,7 @@ jumps), but the case for it is what it buys, not the state of the contract.
 
 ## Open, in the order I would take them
 
-### 1. The generated staircase is 17% of the exit climb
+### 1. The generated staircase is 16% of the exit climb, and it is the crossing
 
 The exit climb is 29% of the course and, measured for the first time this
 session, **60% of it is the level's own design** at 98.5% placed as authored.
@@ -74,11 +74,26 @@ The rest is the crossing (23%, and it is the hero jump — it is meant to be
 there) and a generated staircase finishing a climb the design did not top out
 (17%).
 
-That last 17% is per-level authoring and the reject table names a different
-cause for each: WINDMILL REACH `no move: hop`, WART FIELDS `landing occupied`,
-THE WHITE STAIR `pedestal will not stand`, THE QUARRY `no move: bubble`,
-MARKET STREET `no move: climb`. `tower_probe` prints THE WAY OUT and a
-per-level staircase count; that is the loop.
+That last 16% is **one thing, not thirty-three**, and finding that out cost
+two wrong turns worth recording. On THE QUARRY, WINDMILL REACH, WART FIELDS and
+THE WEIR -- the four worst -- the authored treads place on nearly every visit,
+and the staircase still fires four to nine times in eight runs, about once a
+visit, and always *after* `_crossing` has been refused. **The generated
+staircase is the crossing failing.** The lever is `_aim_crossing`.
+
+The two wrong turns: attribution was suspected (the table buckets by
+`blk["theme"]`, and THE QUARRY's exit descends the outside of the tower past a
+revolution above THE VAULT) and blocks now carry `author`, the level whose plan
+emitted them -- the two agree exactly, 143 either way. And shortening the
+recovery to one repositioning step instead of a whole staircase, which looks
+obviously right for a body already level with its target, **loops**: step,
+crossing refused, step, and the exit climb goes from 16% of the course to 40%.
+
+There is still per-level work under this -- WINDMILL REACH's sixth tread was
+not landing and is gone, taking its mean exit climb from 11.0 landings to 5.5 --
+and the loop for it is per-tread instrumentation of one level at a time: tag
+each authored exit node with its index and count `_attempt` calls and successes
+per index.
 
 ### 2. Two beats own most of the remaining wall-in-the-lens
 
@@ -129,7 +144,7 @@ Per-theme pours, the windmill's blades, a bell, coral fans, a scarecrow. All
 
 ---
 
-## Two measured dead ends, so nobody pays for them twice
+## Three measured dead ends, so nobody pays for them twice
 
 - **Aiming the gate approach.** Placing the last approach landing a level hop
   back from the doorway halves the hop refusals and *reduces* passages entered
@@ -137,6 +152,9 @@ Per-theme pours, the windmill's blades, a bell, coral fans, a scarecrow. All
   a launch cell that will not take a landing spends the offer. Pre-checking the
   cell changes nothing: the cells are free, and what fails is the hop into
   them.
+- **Answering a refused crossing with one step instead of a staircase.** It
+  loops -- step, crossing refused, step -- and takes the exit climb from 16% of
+  the course to 40%. See item 1.
 - **Skipping the `rock` gate inside `emit_layer`.** A margin that skips the
   gate "comfortably inside" the wall leaks five cells a sweep, because `unwrap`
   puts a cell near a level seam in the *other* level, whose band is a different

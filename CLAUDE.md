@@ -790,14 +790,29 @@ touching any of it — the reasoning is there, this is the short list:
    and the fifth on two of six, which is a terrace running out and is fixed
    by writing one fewer tread (mean exit climb 11.0 -> 5.5 landings).
 
-   **Do not trust the per-level staircase counts without fixing the
-   attribution first.** They bucket by `blk["theme"]`, which is the theme of
-   wherever the landing physically *is* -- so THE QUARRY, whose exit descends
-   the outside of the tower and passes a revolution above THE VAULT, both
-   donates and receives. Measured directly, THE QUARRY's three authored exit
-   nodes place on every visit, and it is still charged 22 staircase landings.
-   The next move here is attributing a landing to the level whose *script*
-   emitted it rather than to the air it lands in.
+   **But the staircase is not a tread problem at all: it is the crossing.**
+   That was worth two wrong turns to find, and both are worth knowing.
+   Attribution was suspected first -- the table buckets by `blk["theme"]`,
+   which is the theme of wherever a landing physically *is*, and THE QUARRY's
+   exit descends the outside of the tower past a revolution above THE VAULT.
+   Blocks now also carry `author`, the level whose plan emitted them, and the
+   two attributions **agree**: 143 staircase landings a sweep either way, and
+   THE QUARRY is charged 24 by both. `author` is kept because it is the right
+   thing to bucket by, not because it changed an answer.
+
+   What the measurement actually says is that on THE QUARRY, WINDMILL REACH,
+   WART FIELDS and THE WEIR the authored treads place on nearly every visit
+   and the staircase still fires four to nine times in eight runs -- about
+   once a visit -- and always *after* `_crossing` has been refused. So the
+   generated staircase is the crossing's failure, once per level visit, and
+   the lever is `_aim_crossing`.
+
+   Do **not** answer it by shortening the recovery. A body already level with
+   the terrace it is jumping to gains nothing from climbing, so one
+   repositioning step instead of eight looks obviously right; measured, it
+   loops -- step, crossing refused, step -- and takes the exit climb from 16%
+   of the course to 40% (staircase 126 -> 357 a sweep, crossings 180 -> 71).
+   The full staircase at least terminates.
 0b. **Half the gate-capable levels still do not get entered**, and the fix
    this file used to recommend has been tried and is **worse**. Over 8 runs:
    173 levels wanted a gate, 135 got the reservation, the offer was made on
