@@ -7,192 +7,355 @@ and ``docs/TOWER.md``.
 
 from ._base import Level, n
 
-# A vent field: a red netherrack plain nine blocks across with basalt
-# chimneys standing out of it, lava welling up in the pits between them,
-# and a lid of rock over most of the running line. You come in through a
-# soot tunnel, walk out of it on to the crust, go up the flues into the
-# overhang, fall two blocks into the vent between two lava pools, wade
-# it, and climb back out to the top of the stack -- which is the highest
-# thing in the level and where the way out starts.
+# BASALT FLUES. A vent field on a cooling crust: red netherrack plates
+# with molten cracks between them, and standing out of them the flues --
+# black basalt stacks, each one capped with magma, each one venting. The
+# crust is the whole width of the terrace and it is the hazard; the
+# stacks are the route.
 #
-# Five things here are deliberate and four of them are numbers this
-# level was failing.
+# You come in over a glowstone eye set flush in the red rock, duck under
+# a fallen basalt lintel, and go up the caps -- magma, then black stone,
+# then a lit crown four blocks over the crust, which is the highest
+# ground in the body of the level. Then **off that crown, three blocks
+# down and 5.2 of arc out, onto the mouth of a live vent** standing in
+# the lava -- the longest jump here, and the only kind of long jump this
+# motion model has -- and **the vent throws you two blocks straight back
+# up** onto a basalt shelf, which is a rise no jump in this engine makes.
+# After that it is the soffit: a low run under the rock brow, through
+# the obsidian gate where the crust has chilled over an old flue mouth,
+# and then the ash bank for as long as the terrace lasts. The way out is
+# the tallest stack, climbed on its own weathered treads.
 #
-# **The ground is red and the rock is black.** Both roles used to be
-# blackstone, which is 70,64,74 against the cone's own 88,84,82 -- the
-# level was the same value as the cliff it stood on, so the frame was
-# one grey mass with two orange cubes in it and nothing said what place
-# this was. Netherrack under foot, blackstone and netherbrick standing
-# up, crimson and soul sand in the ash, magma and shroomlight for the
-# light: one hot colour and dark rock, which is how every frame of the
-# reference is built.
+# The one thing a viewer would remember is the vent: falling off a lit
+# black crown into a hole full of light and being spat out of it.
 #
-# **The floor is a plaza and the hazard is its whole width.** The plaza
-# is the profile that killed the first tower and it is the right one
-# here, for the reason the research gives: where the reference's ground
-# is wide, its whole width is lava with one lit block standing in it. So
-# this one is a full floor, cut by four breaks and three lava pools, and
-# it measures 34% covered by a no-jump walker against a 55% limit and
-# the real map's own 46% -- *better* than the ledge version, which
-# measured 41%. What the full floor buys is the frame: empty frame is
-# rays that reach eight metres without hitting anything, and a body four
-# blocks up on a four-cell shelf has nothing under two thirds of its
-# view. Ledge 60%, plaza 50%.
+# ---------------------------------------------------------------------
+# **What was already working here, and it is the reason this is a
+# rewrite and not a replacement.** On the first contact sheet of the
+# whole rebuild this was the one level that read as a real place, and
+# the frames that did it are all the same frame: a bright orange magma
+# floor filling the bottom, black basalt columns standing out of it, red
+# rock behind, and a slot of sky between. That is the reference's own
+# composition -- dark brow at the top, the level's own colour at the
+# bottom, sky as a slot -- and it arrived by accident, because a
+# pedestal is a stack of terrain down to the ground and a pedestalled
+# landing on a plaza *is* a basalt stack.
 #
-# **The rest of the frame is lids.** Five shells and a ``ceiling`` on
-# nearly every jump. A shell's roof is five to seven cells wide and
-# builds even where its walls find no footing, which is the only thing
-# in the vocabulary that puts real mass over a course at lift 4; a
-# ``ceiling`` beam is one cell wide and only ever answers the middle
-# column of the ray fan. Two shells were worth nothing measurable and
-# five were worth five points.
+# **And the reason the rest of the sheet was grey is that the level
+# climbed away from it.** Every beat ended at lift 4 or 5 and the filler
+# held there, on purpose, to shorten the exit climb -- and lift 4 on a
+# nine-block band is a body above its own coloured floor with nothing
+# under two thirds of its view but cone stone and sky. Frames 1-5 of the
+# old sheet are the level; frames 10-40 are grey slabs against blue.
+# So the pedestals are now written down as the level's *material* -- the
+# flues are pedestals, ``pedestal_style`` is blackstone, and the route
+# spends its length at lift 1-4 where its own crust is still in frame --
+# and the height the exit needs is taken back out of the exit itself
+# rather than out of the body of the level.
 #
-# **The level climbs early, and that is what buys it back from the
-# staircase.** This is the tallest rise in the tower (seven), the exit
-# is a stair, and the climb out reserves ``(need + 1)`` landings of
-# terrace *measured from wherever the body is when the trigger is
-# checked* -- so a level that spends its whole length at lift 1 reserves
-# forty per cent of itself for the way out and then spends it: measured,
-# 85% of this level's landings were machinery and 62% of them were that
-# one staircase. Every beat here ends at lift 4 or 5 and the filler
-# holds there, which halves what the climb still has to find.
+# **The lights were not lights.** ``glow`` was ``shroomlight``, which is
+# a bright *texture* that emits nothing: only ``lantern``, ``torch``,
+# ``glowstone``, ``sealantern`` and ``magma`` are in ``spiral._GLOWING``.
+# Every "lit" landing and every ``deco="lamp"`` in the old file was an
+# orange block in the dark. It is glowstone now, and magma keeps the
+# accent, which is the pair the reference lights a nether frame with.
 #
-# **And there is no landmark, which is a trade and not an oversight.**
-# A gated arch is worth about two seconds of screen -- and on this level
-# it also cost five landings and twenty metres of an eighty-one metre
-# terrace that already owed thirty-four to the climb. Measured with the
-# arch in: 16% of the level designed, against 32-44% without it. The
-# shells, the lids, the pools and the flue stacks carry the frame here
-# instead.
+# **The floor is written out.** A real leg of the reference uses a
+# median fourteen floor materials with the dominant one at about a
+# quarter; this level named four. Twelve now, at 16% dominant: red
+# crust, black basalt, magma veins, ash, soot and the obsidian where it
+# has chilled -- so the ground says nether before a single block of the
+# course does.
 #
-# **The drop is inside a beat, never across one.** Machinery is
-# inserted between beats and leaves the body back at lift 1, so a beat
-# that opens by falling off the height the last beat climbed to falls
-# off nothing about half the time. The climb and the fall are both in
-# ``crust``.
+# **How it differs from THE CRUCIBLE, which is the other nether level
+# and eleven below.** That one is *built*: a smelting gallery on a
+# ledge, a tap-hole, a casting pit, a furnace with a charging stair, and
+# a ladder up a brick flue. This one is *geological*: an open crust on a
+# full floor, no masonry anywhere in it, a natural vent for its gadget,
+# and a stair up the outside of a stack for its exit. Same theme, same
+# gated totem blueprint, and the two frames have nothing in common but
+# the colour of the rock: THE CRUCIBLE reads its obsidian gate as a
+# portal frame standing over a tapped floor, and here the same five-high
+# obsidian frame is a flue that went out -- the crust chilled around a
+# vent mouth, and you run through the hole it left.
 #
-# **The one rule this level misses is the hop share, and the reason is
-# arithmetic rather than laziness.** Measured over 20 runs: 186
-# landings, of which the exit staircase is 103 and every one of those
-# is a hop. So even if every single authored landing in the level were
-# a walk, the hop share would still be 56%; at a realistic conversion
-# it lands at 89% against a rule of 85%. Two things were tried and both
-# made it *worse*, measured on the same 20 runs: adding a second walk
-# to ``flues`` and to ``vents`` lengthened those beats, so fewer of
-# them were laid whole, so the staircase grew -- designed content 40%
-# -> 37% and hop share 89% -> 90%. The lever that would actually work
-# is not in this file: it is ``rise=8`` (frozen, and cyclic across all
-# thirty-three levels) with a stair exit (mandated -- this tower has
-# seventeen climb exits of twenty and must not gain another).
-LEVEL = Level("BASALT FLUES", "nether", rise=7, gap=2.8, exit="stair", landmark="totem",
-              band=9.0, profile="plaza", breaks=4,
+# ---------------------------------------------------------------------
+# Three constraints this level is built around, all of them arithmetic.
+#
+# **``rise=6`` is above the tower's median and the exit is not
+# allowed to be a ladder** (measured elsewhere: a ladder ride is 20.9%
+# jammed lens against 0.0% for every other move in the same level, and
+# no ``hug`` moves it, because the wall a ladder hangs on *is* the wall
+# in the lens). Nothing rises two blocks in one ballistic move, so
+# leaving a six-block level on foot is six landings whatever else is
+# true. They are written out here rather than left to the generated
+# staircase, which is the same six landings unlit, unlidded and hung
+# in the corridor -- and the exit is the emptiest third of any level in
+# this tower.
+#
+# **A bubble was considered for it and rejected on one line of the
+# renderer.** ``_climb_move`` draws a bubble column as ``water``
+# whatever ``climb_style`` says, so a flue that blows would be a blue
+# column standing in a lava field -- and the level's whole argument is
+# that its palette is red, black and hot.
+#
+# **Machinery is inserted between beats and leaves the body back at lift
+# 1.** So the rise and the fall are in the same beat: a drop written
+# across a beat boundary falls off nothing about half the time, and a
+# bounce fed by a level hop is silently an ordinary hop with the beat
+# still reading as placed.
+LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
+              band=9.0, profile="plaza", breaks=4, landmark="totem",
+              # Red crust, black stacks, hot cracks, and glowstone for
+              # anything that has to be aimed at. ``magma`` is the only
+              # warm material in the engine that emits, and it is far
+              # too dim to find a landing by, so the *accent* is magma
+              # and the *glow* is glowstone -- one is the heat and the
+              # other is the light.
               ground="netherrack", sub="crimsonnylium", rock="blackstone",
-              accent="magma", glow="shroomlight", liquid="lava",
-              props=("netherfungus", "deadbush", "torch"),
-              step=("blackstone", "hop"), beats=[
-    # The threshold: a shroomlight set flush in the netherrack with lava
-    # dug out round it, then two walked steps in under the lintel and
-    # through the soot tunnel, and up on to the first flue. Green moss
-    # and a rope bridge behind, red rock and black basalt ahead, and the
-    # palette changes completely at the light.
+              accent="magma", glow="glowstone", liquid="lava",
+              # Ash clinker, dead scrub, fungus, and basalt spikes under
+              # the brow -- ``dripstone`` is in ``HANGING`` so it is
+              # given a ceiling cell and hangs from it, which is the
+              # only prop in the set that puts detail in the *top* of
+              # the frame.
+              props=("netherfungus", "deadbush", "dripstone", "pebbles",
+                     "torch"),
+              step=("blackstone", "hop"),
+              # Twelve materials with the dominant at 16%, against the
+              # four this level used to name. The reference's identity
+              # is its floor, not its structure: a real leg measures a
+              # median fourteen kinds with no single one over about a
+              # quarter. Crust, basalt, hot veins, ash drift, soot and
+              # chilled obsidian.
+              floor=(("netherrack", 3), ("blackstone", 3), ("magma", 2),
+                     ("gravel", 2), ("soulsand", 2), ("crimsonnylium", 1),
+                     ("obsidian", 1), ("wartblock", 1), ("netherbrick", 1),
+                     ("glowstone", 1), ("tuff", 1), ("coalore", 1)),
+              beats=[
+    # THE CRUST. The threshold, the flues, the vent and the blast, all
+    # in one beat -- and *why* it is one beat is the only structural
+    # thing worth knowing about this file. A beat is laid whole or not
+    # at all and is truncated from the end, and machinery is inserted
+    # *between* beats: the lock across the level's first floor break and
+    # the crossing through the gate both hand the body back at lift 1.
+    # So a rise written in one beat and spent in the next is a rise that
+    # mostly does not happen, and the fall that feeds the vent would
+    # then be a fall off nothing. This beat opens the level, so it never
+    # competes with anything for terrace and is never truncated.
     #
-    # The walks are not decoration. The exit staircase is half this
-    # level's landings and every one of them is a hop, so the only place
-    # a non-hop verb can come from is the design -- and the reference's
-    # own vocabulary here is architectural, not a zoo of gadgets: a
-    # doorway you run through, a lintel you duck. Two walks a beat takes
-    # the hop share from 98% to 84%.
-    ("mouth", [n("glow", arc=3.4, lift=1, hug=3.0, spread=0, deco="lamp",
-                 moat=True, orbs=1),
-               n("rock", arc=2.8, lift=1, hug=3.0, kind="walk", spread=0,
-                 deco="lintel", shell="tunnel"),
-               n("netherbrick", arc=3.6, lift=2, hug=3.0, spread=0,
-                 ceiling=4, shell="tunnel")]),
-    # The flues themselves: up on to a magma cap, along the ridge of the
-    # column, and across to the next one under the overhang, weaving so
-    # the flue just left is beside the lens on the next.
+    # 1. **A glowstone eye flush in the red crust**, lit, with a plate
+    #    of basalt two cells over it. The reference signposts where a
+    #    level *begins* with an emissive block set into the floor, on
+    #    screen two seconds before it is reached, and the palette
+    #    changing completely at that block with no blend. Below is ROPE
+    #    BRIDGE -- jungle leaves, planks and lantern poles; from here it
+    #    is red rock, black basalt and one hot colour.
+    # 2. **Under the fallen lintel, on foot.** A beam three cells over
+    #    the take-off. A body cannot *jump* under a lid that low -- one
+    #    impulse always rises 1.25 m and the head then sweeps the two
+    #    cells above every take-off -- so this is the genre's 2bc, the
+    #    lid you sprint under, and the only honest form of it this
+    #    kernel has. Second in the beat and not first: a walk needs its
+    #    predecessor within half a metre and a beat boundary does not
+    #    promise that, and a verb written at a beat's tail is written
+    #    and never seen.
+    # 3. **Up onto the first cap**, +1 at arc 3.2 -- a reach of 2.52
+    #    against a window of 2.00-3.10, centred rather than at the top
+    #    of it, because a +1 written at 3.6 is a reach of 2.92 and is
+    #    the arc that has to fall back. The crack under the jump is
+    #    tapped: one ``moat`` to a beat, because the bowl has a radius
+    #    of three and a second one inside it digs away the ground the
+    #    first one's pedestal is standing on.
+    # 4. **The ash drift**, walked. Floating, because the moat on node 3
+    #    has just dug a bowl about three metres upstream of it and a
+    #    stack of terrain cannot stand in a hole.
+    # 5-6. **Two more caps**, +1 each, to a lit crown four blocks over
+    #    the crust. Node 5 carries its own pedestal and node 6 does not,
+    #    and that is what a flue *is* here: the stack under a landing is
+    #    written in blackstone, so a landing three blocks up is the top
+    #    of a three-block basalt column standing out of a red floor.
+    #    That column is this level's mass, and it is the thing the first
+    #    contact sheet of the rebuild liked.
+    # 7. **Off the crown into the vent.** ``step_y=-3`` at arc 5.2: a
+    #    reach of 4.52 against a -3 window of 3.72-6.05, and all three
+    #    arcs placement may try (5.2, 5.93, 6.66) are inside it. The
+    #    longest jump in the level, and a descent is the only long jump
+    #    this model has -- falling takes time and the body does not slow
+    #    down while it does. Written on ``step_y`` rather than on
+    #    ``lift`` so that it is three blocks below *the crown the body
+    #    actually reached*, which is what makes node 8 possible.
+    # 8. **The vent throws you out.** A pad is fed by the fall onto it
+    #    and by nothing else: off three blocks the arrival is about 15
+    #    m/s against the 11.0 that clearing two blocks needs, so
+    #    ``step_y=2`` -- the only rise in this engine that is not a hop.
+    #    ``spread >= 1`` or the bounce is refused silently and placed a
+    #    block lower as an ordinary hop; ``pedestal=False`` on both,
+    #    because a pad offered only cells with ground under them finds
+    #    none at the foot of a fall. The pad's *material* is free --
+    #    ``SPRINGY`` is imported by ``spiralplan`` and never read, and
+    #    the physics is entirely ``kind="bounce"`` against the previous
+    #    landing's impact -- so it is magma, and a green cube in a vent
+    #    field is not a place.
+    ("crust", [n("glow", arc=3.2, lift=1, hug=3.2, spread=1, deco="lamp",
+                 ceiling=2, orbs=1),
+               n("blackstone", arc=2.9, step_y=0, hug=3.0, kind="walk",
+                 ceiling=3, deco="lintel"),
+               n("accent", arc=3.2, step_y=1, hug=2.8, moat=True, orbs=1),
+               n("soulsand", arc=2.9, step_y=0, hug=3.0, kind="walk",
+                 pedestal=False, ceiling=3),
+               n("blackstone", arc=3.2, step_y=1, hug=3.4,
+                 pedestal_style="blackstone"),
+               n("glow", arc=3.2, step_y=1, hug=3.6, pedestal=False,
+                 deco="lamp", orbs=2),
+               n("magma", arc=5.2, step_y=-3, form="slime", hug=3.8,
+                 pedestal=False, moat=True, orbs=2),
+               n("accent", arc=3.6, step_y=2, kind="bounce", hug=3.2,
+                 spread=1, pedestal=False, orbs=3)]),
+    # THE SOFFIT. The quiet beat and the level's only enclosure -- a
+    # two-metre pinch and not a room, which is what the reference
+    # actually does: fully enclosed 6.1% of the way, an enclosed run
+    # lasting a median two metres, but a wall within four metres on one
+    # side 71% of the time and a lid overhead on 98%.
     #
-    # The jump out of the tunnel is written long (3.6 against the 3.4
-    # the rest of the beat uses): a landing tight against a shell's
-    # mouth is one the shell's own far wall keeps refusing. Its radial
-    # is 0.8 and not 1.2 because the checker measures the hypotenuse --
-    # 3.6 across 1.2 is a reach of 3.11 and a rising hop stops at 3.10.
-    ("flues", [n("accent", arc=3.6, lift=3, hug=3.0, radial=0.8, spread=0,
-                 ceiling=4, orbs=1),
-               n("blackstone", arc=2.8, lift=3, hug=3.0, kind="walk",
-                 spread=0),
-               n("rock", arc=3.4, lift=4, hug=3.0, radial=-1.2, spread=0,
-                 shell="cave")]),
-    # The blast: off the top of the third flue, two blocks down on to the
-    # mouth of a live vent, which throws the body straight back up it.
+    # It opens at lift 1 with ``spread=2`` because it follows machinery
+    # -- the lock, or the crossing through the gate -- and a beat whose
+    # opener asks for lift 2 is asking for a two-block rise a third of
+    # the time, which nothing in this motion model makes. And it is
+    # written **long**, at arc 4.0, for the other half of the same
+    # problem: when no machinery intervenes it follows the bounce and
+    # drops two. A reach of 3.32 is inside the window at level, at -1
+    # *and* at -2, so the opener exists whichever of the three heights
+    # the body is handed over at; at 3.4 it existed at only two of them
+    # and ``--design-only`` refused it.
     #
-    # This is the level's one gadget and the reference rations it to
-    # exactly this -- one 2x2 pad, in 26 of its 43 levels, and nothing
-    # else in the whole map. The pad is ``form="slime"`` and the *style*
-    # is magma, because the form is geometrically identical to a full
-    # block and ``SPRINGY`` is never read: the physics comes from
-    # ``kind="bounce"`` on the landing after it, so what the pad is made
-    # of is free, and a green cube in a nether vent field is not what
-    # this place is.
-    #
-    # Four numbers hold it up, all of them in RULES section 7. The pad
-    # must be ``pedestal=False`` -- with a pedestal it is only offered
-    # cells that have ground under them and at the foot of a fall there
-    # are none. The bounce needs ``spread >= 1`` or it is refused
-    # silently and placed a block lower as an ordinary hop. It fires
-    # only at an arrival speed of 7 m/s and needs 11 to be thrown two
-    # blocks, so the feed is a *two*-block drop written near the top of
-    # its envelope at 4.9 -- and written that long so that the 0.84
-    # fallback arc ``_node`` also offers is still 4.1 and still arrives
-    # hard enough. And the rise and the drop are in the same beat,
-    # because machinery between beats leaves the body back at lift 1 and
-    # a fall written across a beat boundary falls off nothing.
-    #
-    # It is worth two blocks of the climb out as well as a verb: a
-    # bounce is the only move in this engine that gains two.
-    ("crust", [n("accent", arc=4.9, lift=2, hug=3.0, form="slime",
-                 pedestal=False, spread=0, orbs=2),
-               n("rock", arc=4.0, lift=4, hug=3.0, kind="bounce", spread=1,
-                 orbs=1),
-               n("soulsand", arc=2.8, lift=4, hug=3.0, kind="walk",
-                 spread=0),
-               n("crimson", arc=3.4, lift=5, hug=3.0, spread=0, moat=True,
-                 ceiling=4, shell="cave")]),
-    # Out of the vent and up on to the top of the stack, in under the
-    # last two lids. The last landing of the script is the highest thing
-    # before the way out, which is the whole of the "the run must not
-    # undo itself" rule: everything that goes down in this level has
-    # already gone down by here.
-    #
-    # The two shells on this beat are the most expensive geometry in the
-    # level and they earn it. A shell's roof is five to seven cells wide
-    # and builds even where its walls find no footing, and these two sit
-    # over the highest landings -- which is exactly where a body has
-    # nothing under two thirds of its view. Measured by taking them out
-    # again: empty frame 50% with them, 57% without.
-    ("stack", [n("rock", arc=3.6, lift=5, hug=3.0, spread=1, ceiling=4,
-                 shell="cave"),
-               n("crimson", arc=3.4, lift=5, hug=3.0, spread=0,
-                 shell="hall", orbs=1)]),
+    # Four landings: in under the brow, the ash drag on foot beneath the
+    # rock lid, up onto a hot ledge, and then **down one and 4.4 out**
+    # onto a floating plate with a cave roof over it -- a reach of 3.72
+    # against a -1 window of 2.35-4.98, the level's second-longest jump,
+    # and the one that hands the filler a body already off the floor.
+    # The ``shell`` is on the beat's **last** node, which is the only
+    # place a shell may go: it is painted the moment its landing commits
+    # and its roof then refuses the next arc of the same beat.
+    ("soffit", [n("blackstone", arc=4.0, lift=1, hug=3.0, spread=2,
+                  ceiling=2, orbs=1),
+                n("soulsand", arc=2.9, step_y=0, hug=2.8, kind="walk",
+                  ceiling=3, deco="lintel"),
+                n("accent", arc=3.2, step_y=1, hug=3.4,
+                  pedestal_style="blackstone", orbs=1),
+                n("netherrack", arc=4.4, step_y=-1, hug=3.8,
+                  pedestal=False, shell="cave", orbs=2)]),
 ], filler=[
-    # The tops of the flues, and this is where the level lives: a beam
-    # to duck, two strides along the ridge of one column and the step up
-    # on to the next, looping for as long as the terrace lasts.
+    # THE ASH BANK, and this is what the level mostly *is*, because the
+    # filler repeats and a script's tail does not: a red crust plate
+    # under a lid, an ash stride across the drift, and a magma cap on a
+    # basalt stack. Every lap plants one more column in the field.
     #
-    # It stays at lift 4 and 5 on purpose. The filler is the last thing
-    # that runs before the climb out is triggered, so it is the filler
-    # that decides how many of the seven blocks that climb still has to
-    # find.
+    # It runs at lift 2-3 rather than at 4-5, and that is the change
+    # this file exists for. The old filler held the top of the flues to
+    # shorten the exit climb and spent the level's whole second half
+    # above its own crust, looking at cone stone; the ash bank keeps the
+    # glow in the bottom of the frame and the brow across the top of it,
+    # and the height the exit wants is now written into the exit.
     #
-    # No moat in here: the filler loops, and the second lap digs away
-    # the ground the first lap's pedestals are standing on. And every
-    # node carries some ``spread``, because the first lap is entered
-    # from whatever height the lock left the body at -- usually lift 1
-    # -- and a beat that can only be run from lift 4 is a beat that is
-    # refused every time machinery goes first.
-    ("vents", [n("rock", arc=3.6, lift=4, hug=3.0, spread=2, ceiling=4,
-                 orbs=1),
-               n("sub", arc=2.8, lift=4, hug=3.0, kind="walk", spread=1),
-               n("accent", arc=3.4, lift=5, hug=3.0, spread=1, shell="cave",
-                 orbs=1)]),
+    # No ``moat`` anywhere in here, and that is not taste: the filler
+    # loops, and the second lap digs away the ground the first lap's
+    # pedestals are standing on. This level's liquid is in the two beats
+    # that play once, plus whatever the crust's own breaks expose.
+    #
+    # The seam where the loop closes is a jump like any other and half
+    # of what a filler ever loses is there: it is -1 off the cap across
+    # 3.4 of arc, a reach of 2.72 against a window that opens at 2.35.
+    #
+    # **The first two landings float and the third does not**, and that
+    # one keyword is worth fourteen points of this beat. Four arms in
+    # one process, same roster and the same 24 seeds, only the filler
+    # swapped on the live ``Level``: as written with pedestals under the
+    # plate and the drift it laid 44 of 51 (86%); floating the *cap*
+    # instead changed nothing at all, to the landing; opening at lift 1
+    # rather than 2 made it 90% and cost the level a point of designed
+    # content; **floating the plate and the drift laid 56 of 56**, took
+    # the level's exactness from 96% to 98% and its hop share from 81%
+    # to 80%. The reason is the profile: this is a full floor with four
+    # breaks cut through it, the filler is what runs over the late
+    # stretch where those breaks are, and a landing that wants a stack
+    # of terrain under it cannot be laid over a hole. The cap keeps its
+    # pedestal because that pedestal is the flue -- one black column a
+    # lap, and it stands where the ground is.
+    ("ashbank", [n("netherrack", arc=3.4, lift=2, hug=3.2, spread=2,
+                   ceiling=2, pedestal=False, orbs=1),
+                 n("soulsand", arc=2.9, step_y=0, hug=3.0, kind="walk",
+                   pedestal=False, ceiling=3),
+                 n("accent", arc=3.2, step_y=1, hug=3.6,
+                   pedestal_style="blackstone", orbs=1)]),
+], exit_beats=[
+    # THE TALL STACK. Six landings up the outside of the last flue,
+    # written out rather than left to the generated staircase.
+    #
+    # It is a stair and not a climb, and that is not a preference. A
+    # ladder ride was measured on another level by bucketing every
+    # jammed frame by segment *and* move over four seeds: the ride was
+    # 20.9% jammed and every other move in that level was 0.0%, with the
+    # rays hitting the ladder's own pedestal. It is not tunable -- the
+    # wall a ladder hangs on *is* the wall in the lens, and ``hug`` on a
+    # climb node is inert. A bubble is the other good answer and this
+    # level cannot have one: ``_climb_move`` draws a bubble column as
+    # ``water`` whatever its ``climb_style`` says, and a blue column in
+    # a lava field is a rendering fault with a story attached.
+    #
+    # It begins with a threshold of its own: the foot of the stack is a
+    # lit landing, and then **a stride on foot under the brow** before
+    # the first tread. That is a landing spent on a verb rather than on
+    # height, and it is bought back twice -- the exit is the emptiest
+    # third of every level in this tower and a lidded walk fills the one
+    # column of the ray fan that looks where you are going, and the
+    # level's whole non-hop share is otherwise four legs against a
+    # staircase that can only ever be hops.
+    #
+    # The arithmetic of the height. The foot is at lift 2, so its
+    # walking surface is 3.0; the walk holds it there; five landings
+    # gain five; the top is 8.0
+    # against the next terrace's 7.0, and the crossing descends one --
+    # which is exactly this level's ``rise`` of 6. A stair that
+    # overshoots is a level above that opens by dropping back down onto
+    # its own terrace, which is the owner's "it puts a ladder there and
+    # then jumps back down to a lower part". The chasm here is 2.8
+    # blocks, so the crossing is 4.2 of arc, a reach of 3.52 -- inside
+    # the window at level, at -1 *and* at -2, which is what makes the
+    # foot's ``spread`` safe: if it comes down at lift 1 the whole stair
+    # is a block low and the crossing is simply flat.
+    #
+    # Every tread is a block up and about three along, written at arc
+    # 2.9 -- a reach of 2.22, and its 1.14 fallback is 2.74, both inside
+    # the 2.00-3.10 a one-block rise allows. The ``hug`` weaves 2.6 to
+    # 3.8 and back, so the flight winds round the outside of the stack
+    # instead of being a straight column of identical hops, which is the
+    # single most monotonous thing this format can produce and is a
+    # third of what a viewer sees. ``confine=True`` keeps the treads on
+    # the level's own ground; only the last lip hangs.
+    #
+    # Every tread carries a lid, and the last one carries none. A
+    # ``ceiling`` beam is the cheapest overhead mass a level author has,
+    # it is legal over a +1 hop (apex 1.25 against a lid at three), and
+    # the exit is the emptiest third of every level in this tower --
+    # measured on another level, lidding the treads took empty frame
+    # 46.7% to 45.9% at no cost to anything. The lip is bare and lit and
+    # thrown **out** at hug 4.2, because the camera locks onto the
+    # landing through take-off and flight: a lip tucked against the core
+    # aims the last second of the level at the cliff, and a lip over the
+    # drop aims it at sky with the next level standing in it.
+    n("glow", arc=3.2, lift=2, hug=3.0, spread=2, deco="lamp", ceiling=3,
+      orbs=1),
+    n("blackstone", arc=2.9, step_y=0, hug=2.8, kind="walk", spread=0,
+      confine=True, ceiling=3, deco="lintel"),
+    n("accent", arc=2.9, step_y=1, hug=2.6, spread=0, confine=True,
+      ceiling=3),
+    n("blackstone", arc=2.9, step_y=1, hug=3.2, spread=0, confine=True,
+      ceiling=3, orbs=1),
+    n("accent", arc=2.9, step_y=1, hug=3.8, spread=0, confine=True,
+      ceiling=3),
+    n("blackstone", arc=2.9, step_y=1, hug=3.0, spread=0, confine=True,
+      ceiling=3, orbs=1),
+    n("glow", arc=3.0, step_y=1, hug=4.2, spread=0, pedestal=False,
+      deco="lamp", orbs=2),
 ])

@@ -16,8 +16,8 @@ world and invalidates whatever they are measuring.
 |---|---|---|
 | 1 | 1–6 | **merged** — 630 tests, design 100% legal |
 | 2 | 7–12 | **merged** — 630 tests, design 100% legal |
-| 3 | 13–18 | running |
-| 4 | 19–24 | not started |
+| 3 | 13–18 | **merged** |
+| 4 | 19–24 | running |
 | 5 | 25–30 | not started |
 | 6 | 31–33 | not started |
 
@@ -149,6 +149,14 @@ its own A/B, never while agents run.
     global, so a deep-dark or nether level is lit by a bright blue daytime sky
     whatever its theme says. That is most of why the deep dark reads as a
     flooded quarry in daylight.
+
+20. **`test_every_level_climbs_out_on_its_own_footing` is at 23 distinct
+    (material, move) footings against a floor of 23.1** — it went under while
+    batch 4 was in flight, because a level rewriting its skin converged its
+    `step` with another's. Not an engine fault and not worth chasing while
+    the roster moves; give one level a distinct `step=` at the batch-4 merge.
+    Worth knowing that this test is a *roster* invariant, so it can only ever
+    be settled between batches.
 
 ## Watch list
 
