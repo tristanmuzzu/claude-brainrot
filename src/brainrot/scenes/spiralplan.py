@@ -1779,6 +1779,20 @@ class Cone:
         theta = math.atan2(z, x)
         return float(int((theta / (2 * math.pi) + 0.5) * RIBS) % 2) * RIB_D
 
+    def face_r(self, x: float, z: float, u: float, y: int) -> float:
+        """The core wall where it actually *is*, flute and all.
+
+        :meth:`core_r` is the smooth wall; ``emit_layer`` draws the ribs a cell
+        proud of it, and for the life of this format nothing else knew. Half of
+        the fifty-six ribs therefore stood in the corridor as geometry that was
+        drawn, lit and fogged and that a body walked straight through --
+        measured at 3.3% of body samples along the course, up to 0.80 m deep,
+        and every one of them a cell of ``conerib``. That is the owner's "the
+        body sometimes passes straight through a block", and it is the tower's
+        signature forest of columns doing it.
+        """
+        return self.core_r(u, y) + self.rib_out(x, z)
+
     # -- the solid test ----------------------------------------------------
 
     def rock(self, cell) -> bool:
@@ -1814,15 +1828,25 @@ class Cone:
             # overhang is the reference's stepped underside and the trough's
             # ceiling at the same time -- and it is also the *ground* of that
             # level, so its chasm is a hole in both at once.
+            #
+            # **Not in the slab is not the same as not rock.** These heights
+            # are the top of the corridor a body is running along three levels
+            # below, and its back wall is there whatever the level above does
+            # with its own floor: a chasm is a gap in a terrace, not a hole
+            # bored through the middle of the tower. Every one of these
+            # branches used to answer ``False`` outright, so at a chasm the
+            # collision model said air for the whole disc while
+            # ``emit_layer`` painted the core skin anyway -- about ten and a
+            # half thousand cells a run of wall that was drawn and could be
+            # walked through. They fall through to the core test now, which is
+            # the same answer the paint gives.
             up = u + 2 * math.pi
-            if not self.has_floor(up):
-                return False
-            if r > self.floor_range(up)[1]:
-                return False            # outboard of a ledge level's shelf
-            ch = self.channel_range(up)
-            if ch and ch[0] <= r <= ch[1] and y >= above.y - 2:
-                return False            # the cut the channel's liquid sits in
-            return True
+            if self.has_floor(up):
+                if r <= self.floor_range(up)[1]:
+                    ch = self.channel_range(up)
+                    if not (ch and ch[0] <= r <= ch[1]
+                            and y >= above.y - 2):
+                        return True
         if y == above.y - FLOOR_T - 1 and self.tooth(u):
             # A tooth hanging off the soffit, out near the slab's edge.
             up = u + 2 * math.pi
@@ -1836,7 +1860,7 @@ class Cone:
         if r > self.rim_at(y) - BUTTRESS_MAX - 2.0 \
                 and r >= self.buttress_r(u, y):
             return True
-        return r <= self.core_r(u, y)           # the core, behind your back
+        return r <= self.face_r(x, z, u, y)     # the core, behind your back
 
     def surface_y(self, x: float, z: float, y_hint: float) -> int:
         """The ``y`` a body standing at this bearing has its feet at."""
@@ -2072,19 +2096,36 @@ class Cone:
             return
         r = r0
         while r <= r1 + 1e-9:
-            cell = (iround(ct * r), y, iround(st * r))
-            if cell not in seen:
-                seen.add(cell)
-                got = styler(cell) if styler else style
-                if got:
-                    place(cell, got)
+            self._paint(ct, st, r, y, style, seen, place, styler)
             r += 0.5
-        cell = (iround(ct * r1), y, iround(st * r1))
-        if cell not in seen:
-            seen.add(cell)
-            got = styler(cell) if styler else style
-            if got:
-                place(cell, got)
+        self._paint(ct, st, r1, y, style, seen, place, styler)
+
+    def _paint(self, ct: float, st: float, r: float, y: int, style: str,
+               seen: set, place, styler) -> None:
+        """One cell of skin, if it is a cell the tower is actually made of.
+
+        The ``rock`` gate is the whole point. This march walks a *float* radius
+        along a bearing and rounds each step to a cell, and a cell rounded
+        outward from the last step of the march sits beyond the surface the
+        march was walking to -- so the skin stood proud of the solid by up to a
+        cell in places, drawn and lit and walked straight through. Paint is a
+        subset of ``rock`` now, by construction, which is the only way the two
+        can be kept honest: the alternative is two independent descriptions of
+        the same surface, which is what this was.
+        """
+        cell = (iround(ct * r), y, iround(st * r))
+        if cell in seen:
+            return
+        seen.add(cell)
+        # Costs two thirds of the time this method spends, and a margin that
+        # skipped the gate well inside the wall was tried and leaked: ``unwrap``
+        # puts a cell near a level seam in the *other* level, whose band is a
+        # different width, so "comfortably inside" is not a local question.
+        if not self.rock(cell):
+            return
+        got = styler(cell) if styler else style
+        if got:
+            place(cell, got)
 
 
 # ---------------------------------------------------------------------------
@@ -3357,7 +3398,7 @@ class Course:
                 # Near the wall (cheap flare arithmetic; no unwrap): now the
                 # real question, with the real face.
                 u = self.cone.unwrap(x, z, y + 0.9)
-                if r < self.cone.core_r(u, ifloor(y + 0.9)) - 1e-6:
+                if r < self.cone.face_r(x, z, u, ifloor(y + 0.9)) - 1e-6:
                     return False
         return True
 

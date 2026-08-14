@@ -671,3 +671,29 @@ def test_the_terrace_is_painted_in_its_own_levels_floor() -> None:
     assert unpainted <= surfaces // 100, \
         f"{unpainted} of {surfaces} cells a body stands on are painted by " \
         f"nothing and show the row beneath them"
+
+
+def test_what_the_tower_draws_is_what_the_tower_is() -> None:
+    """Every cell of skin is a cell ``rock`` calls solid, and nothing else.
+
+    Two independent descriptions of one surface is how this format grew
+    geometry you could see and walk through. ``emit_layer`` marched a float
+    radius and rounded each step to a cell, and it drew the flutes a cell
+    proud of ``core_r`` while ``rock`` knew nothing about them -- so half of
+    the fifty-six ribs, which are the tower's signature forest of columns,
+    stood in the corridor as blocks the body passed straight through.
+    Measured before the fix: 24,000 drawn cells that were air, 3.3% of body
+    samples along a course inside one of them, up to 0.80 m deep.
+    """
+    for run in range(2):
+        c = cone(run)
+        lo, hi = c.level(4).y, c.level(10).y
+        painted: dict = {}
+        for y in range(lo, hi):
+            c.emit_layer(y, lambda cell, style: painted.__setitem__(cell,
+                                                                    style))
+        assert len(painted) > 10_000, "nothing was painted; the test is blind"
+        phantom = [(cell, style) for cell, style in painted.items()
+                   if not c.rock(cell)]
+        assert not phantom, \
+            f"{len(phantom)} drawn cells are air, e.g. {phantom[:3]}"
