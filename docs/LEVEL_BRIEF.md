@@ -127,6 +127,12 @@ the rest and is worth reading in full.
   lock, a recovery — because those hand the body over at whatever height they
   happened to finish at. That distinction is the one real lever a level has
   against "half the jumps are at ground level".
+- **A bubble column beats a ladder for an exit, and it is not close.** A body
+  rides a ladder at 2.35 m/s and a bubble at 11.0, so the same eight blocks
+  are on screen for a quarter of the time — and a climbing body has its face
+  against whatever it is climbing, so the ride *is* the wall in your lens. One
+  level swapped ladder for bubble and took its jammed-lens number from 14.9%
+  to 6.6% **at no other cost**. If your theme can justify water, use it.
 - **Your exit climb's *launch* block is most of your jammed-lens number.**
   One level measured 69 wall-jammed frames of 1,293 with the launch landing at
   `hug=2.2`, and **0 of 1,280** at `hug=2.8`. Only the launch landing matters:

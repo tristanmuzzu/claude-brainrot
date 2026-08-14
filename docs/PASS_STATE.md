@@ -139,12 +139,28 @@ its own A/B, never while agents run.
     that could anchor on the cliff at `hug` 1.6-2.0 without building a column
     would remove it. Same defect family as backlog 11.
 
+18. **`deepdark`'s `glow` role is `amethyst`, which emits nothing.** Only
+    `lantern`, `torch`, `glowstone`, `sealantern` and `magma` are in
+    `spiral._GLOWING`, so the darkest theme in the tower cannot light itself
+    and every `deco="lamp"` written on it is a violet cube lighting nothing.
+    A one-word fix in the theme table, or add amethyst to `_GLOWING`. Check
+    every other theme's `glow` against that set at the same time.
+19. **`sky=` does not set the sky.** It tints the ring light; the sky dome is
+    global, so a deep-dark or nether level is lit by a bright blue daytime sky
+    whatever its theme says. That is most of why the deep dark reads as a
+    flooded quarry in daylight.
+
 ## Watch list
 
 - ~~No-jump walk coverage at 59% mean, 1 of 16 fully walkable.~~ **Closed
   after batch 2: 37% mean, median 40%, and 0 of 40 levels walkable end to
   end**, against the real map's 46% and 0 of 43. Better than the reference on
   both halves. The batch-1 reading was taken while agents were editing.
+- **Prefer a bubble exit to a ladder wherever the theme allows** — 4.7x the
+  ride speed for the same rise, and the ride is the wall in the lens. One
+  level measured 14.9% -> 6.6% jammed on that swap alone. Audit exit kinds
+  across the roster at the final merge; two adjacent levels already both leave
+  by ladder, which no agent inside a level can see.
 - Unlit is 29% of the frame against vanilla Minecraft's 18%. Closing the rest
   means an ambient term in the shading, which touches all four scenes.
 - A single surface still owns about half the frame against the reference's
