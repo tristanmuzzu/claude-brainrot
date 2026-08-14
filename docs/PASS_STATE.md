@@ -18,8 +18,8 @@ world and invalidates whatever they are measuring.
 | 2 | 7–12 | **merged** — 630 tests, design 100% legal |
 | 3 | 13–18 | **merged** |
 | 4 | 19–24 | running |
-| 5 | 25–30 | not started |
-| 6 | 31–33 | not started |
+| 5 | 25–30 | **merged** |
+| 6 | 31–33 | running |
 
 After batch 6: full suite, `tower_probe`, `spiral_probe --plan tower`,
 `bypass_probe`, `landmark_probe`, `frame_cost`, a roster sheet judged by eye,
@@ -167,6 +167,20 @@ its own A/B, never while agents run.
     the roster moves; give one level a distinct `step=` at the batch-4 merge.
     Worth knowing that this test is a *roster* invariant, so it can only ever
     be settled between batches.
+
+21. **`level_review`'s camera stops on `scene.tier`, which does not tick at the
+    roster wrap.** So level 33's camera numbers -- jam, empty frame, seconds
+    on level -- silently include level 1. Level 33 is the only level where
+    this can happen, and it was caught only because the agent bucketed its
+    jammed frames by segment and move and found 117 of 133 sitting on
+    `ascent/climb` when its own exit has no climb in it. One-line fix in the
+    tool.
+22. **Level 1 still exits by ladder**, which is the one thing the roster was
+    later told not to do -- it was written in batch 1, before the measurement
+    existed. It is 117 of 133 jammed frames in the level-33 camera pass. A
+    ladder measured 20.9% jammed on its ride against 0.0% for every other
+    move, and a five-tread stair measured 1.0% for *identical* designed
+    content. Worth one agent at the final sweep.
 
 ## Watch list
 
