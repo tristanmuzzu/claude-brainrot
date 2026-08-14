@@ -2565,9 +2565,23 @@ class Course:
         if not self._pending:
             self._plan_feature()
         prev = self.blocks[-1]
+        self._drop_climbed_treads()
         node = self._pending.pop(0)
         self.laid += 1
         got = self._try_node(prev, node)
+        if got is None and node.get("label") == "ascent":
+            # **The rest of the design first.** A level's exit is a written
+            # sequence, and one landing of it refusing is not the sequence
+            # failing -- the next is aimed further along the same lane and
+            # usually goes. Throwing the whole thing away at the first refusal
+            # is what put a generated staircase in place of the authored exit
+            # on ten levels, and it is a quarter of every landing in the exit
+            # climb: measured, ECHO SHAFT and WINDMILL REACH each lost
+            # twenty-four landings a sweep to it.
+            while got is None and self._pending \
+                    and self._pending[0].get("origin") == "design":
+                node = self._pending.pop(0)
+                got = self._try_node(prev, node)
         if got is None and node.get("label") == "ascent":
             # The exit climb is the one feature a run cannot do without, so a
             # failure here is answered by trying the other way out rather than
@@ -2589,6 +2603,35 @@ class Course:
         self.u = self.u_of(blk)
         self._paint_behind()
         return blk
+
+    def _drop_climbed_treads(self) -> None:
+        """Stop an authored exit once it has climbed high enough.
+
+        A level writes a fixed number of treads and the height it has to gain
+        is not fixed: ``need`` is the next level's floor minus wherever the
+        level's own beats actually left the body, which varies by several
+        blocks between visits. Six treads against a need of three is three
+        treads of climbing past the thing being climbed to -- and then the
+        crossing is offered from too high, refused, and the whole climb
+        re-plans as a generated staircase. WINDMILL REACH's own module says so
+        in a note and calls it out of reach of a level module; it is, and this
+        is where it was.
+
+        One above the next floor and not level with it, because the crossing
+        *descends* a block by design -- ``hop_span(-1)`` reaches 4.98 m where a
+        flat jump reaches 4.26, and that extra reach is what gets it over the
+        chasm.
+        """
+        if not self._pending or self._pending[0].get("origin") != "design":
+            return
+        prev = self.blocks[-1]
+        lv = self.cone.level(self.cone.level_index(self.u_of(prev)))
+        want = self.cone.level(lv.index + 1).y + 1
+        if self.surface(prev) < want:
+            return
+        while self._pending and self._pending[0].get("origin") == "design" \
+                and (self._pending[0].get("step_y") or 0) > 0:
+            self._pending.pop(0)
 
     def _try_node(self, prev: dict, node: dict):
         """The node as asked for, then its runners-up, then its fallbacks.
@@ -2790,7 +2833,8 @@ class Course:
                                           pedestal=on_ground,
                                           pedestal_style=theme.sub,
                                           spread=0, confine=on_ground,
-                                          label="ascent")
+                                          label="ascent",
+                                          origin="recover")
                         for cell in self._targets(prev, node):
                             got = self._attempt(prev, node, cell, strict=False)
                             if got is not None:
@@ -2827,7 +2871,8 @@ class Course:
                 node = self._node(style, arc=2.4, step_y=step, kind=climb,
                                   climb_style=ASCENT_SOFT[kind], hug=hug,
                                   pedestal=False, spread=0, cross=True,
-                                  label="ascent", orbs=2)
+                                  label="ascent", orbs=2,
+                                  origin="recover")
                 for cell in self._targets(prev, node):
                     got = self._attempt(prev, node, cell, strict=False)
                     if got is not None:
@@ -3529,6 +3574,7 @@ class Course:
         blk["footing"] = got["footing"]
         blk["ceiling"] = got["ceiling"]
         blk["exact"] = got.get("exact", False)
+        blk["origin"] = node.get("origin")
         for cell in got["ceiling"]:
             self.write(cell, node["pedestal_style"] or theme.rock)
         for cell in got["pedestal"]:
@@ -3649,7 +3695,7 @@ class Course:
               hug: float = 0.0, confine: bool = False, ceiling: int = 0,
               cross: bool = False, ramp: bool = True,
               shell: str | None = None, at=None,
-              label: str | None = None) -> dict:
+              label: str | None = None, origin: str | None = None) -> dict:
         """One entry in a feature's expansion.
 
         ``lift`` is the height of the landing's walking surface above the
@@ -3776,7 +3822,14 @@ class Course:
                 #: under it or the landing is refused. The genre's most-used
                 #: obstacle, and the reason is that it costs no exotic block and
                 #: makes an ordinary gap into a jump you have to keep flat.
-                "ceiling": ceiling, "label": label}
+                "ceiling": ceiling, "label": label,
+                #: Who wrote this landing, when ``label`` cannot say. The exit
+                #: climb is labelled ``ascent`` whether a level authored it
+                #: landing by landing or the generator improvised it, and the
+                #: label is load-bearing in eight other places -- so the two
+                #: were indistinguishable and a third of the course was
+                #: outside every fidelity number the project has.
+                "origin": origin}
 
     def _gap(self, easy, hard) -> float:
         """A feature's gap, ramped between two of its own tables.
@@ -4593,7 +4646,8 @@ class Course:
         # it is heading for and the last jump comes down onto it -- which also
         # means you can see where you are going, from above, before you commit.
         return self._node(nxt.theme.ground, arc=gap + 1.4, lift=0,
-                          form="floor", orbs=3, cross=True, label="ascent")
+                          form="floor", orbs=3, cross=True, label="ascent",
+                          origin="crossing")
 
     def _ascent_climb(self, rng, lv, need: int, kind: str) -> list[dict]:
         """Out of the level in one vertical move: a ladder, a vine, a water
@@ -4631,7 +4685,8 @@ class Course:
             # hangs on.
             self._node(style, arc=2.4, step_y=need + 1, kind=climb,
                        climb_style=ASCENT_SOFT[kind], hug=2.0,
-                       pedestal=True, spread=0, label="ascent", orbs=2),
+                       pedestal=True, spread=0, label="ascent", orbs=2,
+                       origin="climb"),
             self._crossing(rng, lv),
         ]
 
@@ -4688,6 +4743,7 @@ class Course:
                 arc=rng.uniform(2.7, 3.1) if on_ground else 2.7,
                 step_y=1, pedestal=on_ground, pedestal_style=theme.sub,
                 spread=0, confine=on_ground, label="ascent",
+                origin="stair",
                 # Weaves, but does not change *form*: a slab step stands half
                 # a block up, so the step after it is asked for one and a half
                 # and there is no such jump. The climb's arithmetic is exactly

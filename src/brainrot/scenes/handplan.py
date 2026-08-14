@@ -554,7 +554,8 @@ class Course(sp.Course):
         design = self.cone.design(lv.index)
         if design.exit_beats:
             theme = THEME_BY_NAME[design.name]
-            out = [self._node(**{**_resolve(spec, theme), "label": "ascent"})
+            out = [self._node(**{**_resolve(spec, theme), "label": "ascent",
+                                 "origin": "design"})
                    for spec in design.exit_beats]
             out.append(self._crossing(rng, lv))
             return out

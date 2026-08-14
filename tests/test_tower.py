@@ -405,3 +405,31 @@ def test_a_walk_never_crosses_air() -> None:
                     assert any(course.blocked(c) for c in under), \
                         f"walk at ({x:.2f}, {y:.2f}, {z:.2f}) is over nothing"
     assert walks >= 20, f"only {walks} walks seen -- the test proves nothing"
+
+
+def test_the_way_out_is_mostly_the_level_writing_it() -> None:
+    """The exit climb is nearly a third of the course, and until ``origin``
+    existed nobody could say what it was made of.
+
+    Every landing of it is labelled ``ascent`` whether the level wrote it or
+    the engine improvised it, and that label is load-bearing in eight other
+    places -- so the project's own notes recorded the exit as machinery and as
+    an authoring job still to be done, when in fact all thirty-three levels
+    write one. Measured here rather than assumed: over half the exit climb is
+    the level's own design, and what is left is the crossing plus the
+    generated staircase that finishes a climb the design did not reach the top
+    of.
+    """
+    kinds: Counter = Counter()
+    for run in range(3):
+        _, _, seen = grow(run, 260)
+        for blk in seen:
+            if blk["segment"] == "ascent":
+                kinds[blk.get("origin") or "other"] += 1
+    total = sum(kinds.values())
+    assert total > 150, f"only {total} exit landings -- nothing was measured"
+    assert kinds["design"] > total * 0.5, \
+        f"the levels wrote {kinds['design']} of {total} exit landings"
+    # The reliability chain is the last thing before the unchecked hop. It
+    # firing at all means an exit could not be built any other way.
+    assert kinds["recover"] + kinds["other"] <= total * 0.02, dict(kinds)

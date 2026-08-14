@@ -231,6 +231,7 @@ def main() -> int:
         return 1 if bad else 0
 
     exact = fallback = stuck = 0
+    exits: Counter = Counter()
     machinery = machined = 0
     by_level: dict[str, Counter] = defaultdict(Counter)
     beats: Counter = Counter()
@@ -250,6 +251,21 @@ def main() -> int:
             if blk["segment"] == "ascent":
                 ascent += 1
                 by_level[name]["ascent"] += 1
+                # What actually wrote this landing. The exit climb is labelled
+                # ``ascent`` whether the level authored it landing by landing
+                # or the engine improvised it, and the label is load-bearing
+                # in eight other places -- so until ``origin`` existed, a
+                # third of the course sat outside every fidelity number the
+                # project had, and "the exit climb is machinery" was an
+                # assumption nobody had ever been able to check.
+                exits[blk.get("origin") or "other"] += 1
+                if blk.get("origin") == "design":
+                    exits["exact" if blk["exact"] else "fallback"] += 1
+                    by_level[name]["exit_design"] += 1
+                    by_level[name]["exit_exact"] += bool(blk["exact"])
+                else:
+                    by_level[name]["exit_" + (blk.get("origin") or "other")] \
+                        += 1
                 continue
             if blk["segment"] == "stuck":
                 stuck += 1
@@ -298,6 +314,25 @@ def main() -> int:
               f"{sum(reach) / len(reach):.2f} / {reach[-1]:.2f} m")
         print(f"  jumps over 4 m                  "
               f"{100 * sum(1 for r in reach if r >= 4.0) / len(reach):.0f}%")
+
+    designed_exit = exits["design"]
+    print("\nTHE WAY OUT  (what the exit climb is actually made of)")
+    print(f"  exit-climb landings             {ascent}")
+    print(f"  ...the level wrote them         {designed_exit} "
+          f"({100 * designed_exit / max(1, ascent):.0f}%), "
+          f"{100 * exits['exact'] / max(1, designed_exit):.1f}% as authored")
+    print(f"  ...the crossing                 {exits['crossing']} "
+          f"({100 * exits['crossing'] / max(1, ascent):.0f}%)")
+    print(f"  ...a generated staircase        {exits['stair']} "
+          f"({100 * exits['stair'] / max(1, ascent):.0f}%)")
+    print(f"  ...a generated climb            {exits['climb']}")
+    print(f"  ...the reliability chain        "
+          f"{exits['recover'] + exits['other']}")
+    worst = sorted(((by_level[k]["exit_stair"], k) for k in by_level),
+                   reverse=True)[:5]
+    if worst and worst[0][0]:
+        print("  most staircase, by level        "
+              + ", ".join(f"{k} {v}" for v, k in worst if v))
 
     print(f"\nCOVERAGE  ({len(levels_seen)} of {len(hp.LEVELS)} levels seen, "
           f"{len(beats)} distinct beats)")
