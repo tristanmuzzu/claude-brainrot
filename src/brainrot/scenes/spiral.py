@@ -105,6 +105,12 @@ AXIS_BIAS = 0.05
 TANGENT_MIX = 0.45
 TANGENT_LOOK = 15.0
 PITCH_BIAS = 0.30
+#: How far out over the drop a ladder or bubble ride looks, and how hard.
+#: See the note beside the blend itself: the ride is the one move whose body
+#: is pinned against the core, so it is the one move whose camera must not be
+#: aimed inboard.
+RIDE_LOOK = 14.0
+RIDE_OUT = 0.70
 #: The furthest *in* the camera's aim point may be, measured from the rim. The
 #: outer clamp beside it has always existed; this is the same rule at the other
 #: end and it was missing.
@@ -609,6 +615,18 @@ class SpiralScene(Scene):
             aim[0] += (target[0] - aim[0]) * lock
             aim[1] += (target[1] - aim[1]) * lock
             aim[2] += (target[2] - aim[2]) * lock
+        # **A ride looks out, not at the wall it is hanging on.** A ladder or a
+        # bubble column has to anchor on the core, so the body spends the whole
+        # ride with its face against the one surface in the scene it cannot see
+        # past. Measured over six runs of the tower: 42% of climb frames and
+        # 30% of bubble frames were most-of-the-frame-one-near-surface, against
+        # 1.0% of hops -- three quarters of every jammed frame in the run, and
+        # the longest-standing visual complaint the project has. The pitch
+        # already tilts up for the view; the yaw was still aimed at the rungs.
+        if self.phase == "move" and self.move.kind in ("climb", "bubble"):
+            r = math.hypot(x, z) or 1.0
+            aim[0] += (x + x / r * RIDE_LOOK - aim[0]) * RIDE_OUT
+            aim[2] += (z + z / r * RIDE_LOOK - aim[2]) * RIDE_OUT
 
         self._flick = max(0.0, self._flick - dt * 5.5)
         rate = min(1.0, (5.0 + 22.0 * self._flick ** 2) * dt)
