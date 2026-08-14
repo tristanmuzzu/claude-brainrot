@@ -127,6 +127,13 @@ the rest and is worth reading in full.
   lock, a recovery — because those hand the body over at whatever height they
   happened to finish at. That distinction is the one real lever a level has
   against "half the jumps are at ground level".
+- **`ceiling=` on a climb node silently deletes the climb.** The lid stands in
+  the column, `_climb_move` finds nothing to hang on, and the climb becomes
+  ordinary hops — with the per-beat table still reading 100%, because the
+  landings are all placed. One level nearly shipped it: the tells were `climb`
+  leaving the move mix *by name*, hop share going 82% -> 87% through the rule,
+  and the level getting 16% **shorter** in frames. Check the move mix by name
+  after any change near your exit.
 - **A bubble column beats a ladder for an exit, and it is not close.** A body
   rides a ladder at 2.35 m/s and a bubble at 11.0, so the same eight blocks
   are on screen for a quarter of the time — and a climbing body has its face
