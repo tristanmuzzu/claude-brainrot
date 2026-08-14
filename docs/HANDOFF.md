@@ -20,42 +20,66 @@ Two symptoms, reported from watching the live strip:
    run speed and never leaves the ground.
 2. **Sometimes the body passes straight through a block**, entirely.
 
-### The hypothesis to test first
+### Symptom 1: measured, and fixed (2026-08-14)
 
-`Course._walk_move` in `src/brainrot/scenes/spiralplan.py` reads, in essence:
+The hypothesis in the previous draft of this file was right about the cause and
+wrong about only one thing: `_move_for`'s `walk` branch validates the two
+endpoints and nothing between them, but the *move* it returns does still go
+through `_path_clear` like every other kind, so nothing solid is ever **in** a
+walk. What is never asked is whether there is anything **under** it.
 
-```python
-if kind == "walk":
-    dist = math.dist((frm[0], frm[2]), (to[0], to[2]))
-    if dist > 2.4 or abs(to[1] - frm[1]) > 0.55:
-        return None
-    return Move("walk", [line_leg(frm, to, RUN_SPEED)]), ()
-```
+`tools/walk_probe.py` is the measurement, and it is new. It walks every
+committed move against the world as it stands *when the body would reach it* —
+`AHEAD` landings after the move was solved, which is the one detail that has to
+be right: check a move any later and `advance` has already released the ground
+it stands on, which reads as a catastrophic air-walk that is the probe's own
+doing. It asks two questions of every sample: is anything solid inside the
+body, and, on a leg the body is on its feet for, is there ground under them.
 
-It validates **only the two endpoints** — how far apart they are and how much
-they differ in height. It never asks whether there is floor along the line
-between them, and it never asks whether anything solid is *in* that line. A
-`walk` is then a straight `line_leg` from A to B.
+Measured on the tower before the fix: **98% of walk legs crossed air, a mean of
+0.76 m of it and 1.68 m at worst.** That is the owner's first symptom exactly.
 
-If that is the whole story, both symptoms are the same bug: a walk leg whose
-path crosses a hole walks on air, and a walk leg whose path crosses a block
-walks through it. Every *ballistic* move goes through the arc clearance test
-(`_path_clear`, `body_cells`) and is checked properly; the walk is the one verb
-that skips it.
+The fix is `Course._walk_bridge`, and it is the other answer rather than the one
+this file suggested. Refusing a walk with no continuous ground would have fallen
+back to a hop — which is the beat the author deliberately did not write, and a
+third of the roster writes `kind="walk"` by name. So a walk **lays the shelf it
+crosses**: the cells the feet pass over that nothing already stands on go in
+with the landing's pedestal, in the landing's own stone, reserved as ground
+against the dressing pass and released with the landing. Either of the two cells
+the boots straddle will hold them up, so a cell an earlier arc has claimed is
+not a refusal while its neighbour is free — that alone was two thirds of the
+walks the first draft refused.
 
-**Do not take this on trust.** It is read off the code by someone who did not
-then instrument it. Verify by finding a real occurrence first: drive the scene,
-sample the body along every `walk` leg, and count legs where a sample has no
-solid cell beneath the feet, or has a solid cell inside the body. Then decide
-whether the fix is to give `walk` the same clearance test the hops get, or to
-refuse a walk whose path is not continuous ground and let the feature fall back
-to a hop.
+After: **0% of walk legs cross air**, and the move mix does not move (walk stays
+at 12%). `tests/test_tower.py::test_a_walk_never_crosses_air` is the lock, and
+it fails on the old code.
 
-Watch for a second-order effect: `walk` is 12% of the move mix and several
-levels lean on it deliberately (it is the only non-hop verb a hot theme can
-spend, and it is how a doorway is crossed). A fix that silently converts walks
-to hops will move the hop share, the non-hop share and several levels' beat
-fidelity. A/B it.
+**What it cost, stated plainly.** Fidelity over the design alone went **97.7% →
+95.8%** on the same 12 × 340 sweep. The mechanism is not the refusals (55 in six
+runs of 280, and removing them entirely moved fidelity not at all) — it is that
+the bridge cells *occupy cells*, and `landing occupied` rejections rose 11%. The
+loss concentrates in five beats, and every one of them is a walk beat whose
+authored intent was only ever satisfiable by air-walking: `THE TIMBERWORKS/
+sawbench` and `REEF GARDEN/tideline` walk across a dug pond, `THE GATEHOUSE/
+gate` walks through a tunnel that is not built until commit, `MARKET STREET/
+stalls` and `WOOLWORKS/dyehouse` the same shape. **Those five are now level
+authoring jobs** — make the node a hop, or drop the moat — and not engine ones.
+Everything else improved or held: unchecked 0.35% → 0.27%, landings on built
+terrain 90.5% → 91.4%, lens under 0.8 m 1.89% → 1.52%, walls filling the frame
+3.6% → 3.5%, cone-alone walkability 0 m, no-jump runnable unchanged at 68% mean
+and 2 of 24 fully.
+
+### Symptom 2: real, tiny, and *not* the walk
+
+The same probe counts it: **3 moves in 2,880 (0.10%) have solid inside the body
+at some point along the path, worst 0.55 m — and 4 in 2,880 before the fix**, so
+it is pre-existing and untouched. All of them are hops, and what they clip is
+the cone or a piece of dressing. This is the same residue `spiral_probe` reports
+as "body inside the world" at 0.02–0.06% of frames; it is a graze, not a body
+passing through a block, and it is the dressing-built-after-an-arc-was-solved
+class. Worth knowing before chasing it: at 100 moves a minute, 0.10% is one
+graze every ten minutes of strip, which is about the rate at which somebody
+watching would notice one and reasonably describe it as passing through a block.
 
 ### The question the owner wants thought about deeply
 
@@ -99,6 +123,19 @@ simulation-time truth.** Both are defensible and they cost different things:
   the door to the kernel changes `docs/TOWER.md` lists as blocked — jump-cancel,
   momentum, steered jumps — because those need a body that interacts with the
   world rather than a body that replays a solution.
+
+**That measurement has now been taken, and it says close the holes.**
+`tools/walk_probe.py` is the thing that asks it: how often is a solved move
+actually wrong at play time, sampled along the whole path rather than on the
+frames a run happens to land on. Answer, on the tower after the walk fix, over
+2,880 moves: **0% over nothing on a ground leg, 0.10% of moves with solid inside
+the body and never deeper than 0.55 m.** One verb was wrong on 98% of its legs
+and the rest of the vocabulary is essentially honest, so the construction
+guarantee is not fiction — it had one hole in it, and the hole is closed. A real
+collision model is still the thing that would let a level be *proved* completable
+and would unblock the kernel changes, but it is now a feature to want rather than
+a defect to fix, and the case for it should be made on what it buys and not on
+the state of the current contract. The rest of the original argument stands:
 
 **A specific thing worth measuring before choosing:** how often is a solved
 move actually wrong at play time? Sample the body every frame across many runs

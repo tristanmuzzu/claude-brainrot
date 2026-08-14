@@ -981,6 +981,14 @@ long jumps you need a different motion model, not a bigger number.
   the physics on paper (`--design-only` needs nothing built and is instant),
   then how much of the design survived being placed, per level and per beat.
   Run it after touching a level. A beat under 98% is a design to look at.
+- `python tools/walk_probe.py --plan tower --runs 12 --blocks 240` asks whether
+  a *solved* move is still legal when it is played: it walks every committed
+  move against the world as it stands `AHEAD` landings later, which is where
+  the body is, and asks whether anything solid is inside the body and -- on a
+  leg the body is on its feet for -- whether there is ground under them.
+  Nothing had ever asked the second question, and the answer was that **98% of
+  walk legs crossed air** (see `Course._walk_bridge`). Check it after touching
+  any verb in `_move_for`. Needs no window.
 - `python tools/spiral_probe.py --plan tower ...` is the same probe's *safety*
   half pointed at the hand-built tower. The two towers are the same building
   and the same physics, so every number means the same thing for both and the

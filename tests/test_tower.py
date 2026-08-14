@@ -355,3 +355,53 @@ def test_a_seed_replays_exactly() -> None:
     a = [(b["x"], b["y"], b["z"], b["segment"]) for b in grow(3, 90)[2]]
     b = [(b["x"], b["y"], b["z"], b["segment"]) for b in grow(3, 90)[2]]
     assert a == b
+
+
+def test_a_walk_never_crosses_air() -> None:
+    """The one verb the body crosses on its feet has ground under them.
+
+    ``Course._move_for`` validates a walk by its two endpoints and by nothing
+    in between, and for the life of this format that was the whole check: a
+    landing two cells away was reached by strolling over the hole. Measured at
+    the time, 98% of walk legs crossed air -- a mean of 0.76 m of it and 1.68 m
+    at worst -- and it is what the owner saw and reported as the body sliding
+    across a gap without jumping. ``_walk_bridge`` lays the shelf a walk needs;
+    this is the assertion that it is still being laid.
+
+    Grown without ``advance`` on purpose. Releasing the cells behind the body
+    is what a real run does, and a probe that checks a walk after its own
+    ground has been released reads a catastrophic air-walk that is its own
+    doing -- which is exactly the mistake this test exists to make impossible
+    to repeat.
+    """
+    walks = 0
+    for run in range(4):
+        cone = hp.Cone(random.Random(run * 977 + 13), 0)
+        course = hp.Course(random.Random(run * 6151 + 29), cone)
+        seen = list(course.blocks)
+        for _ in range(70):
+            seen.append(course.spawn())
+        for blk in seen:
+            move = blk["move"]
+            if move is None or move.kind != "walk" or blk["unchecked"]:
+                continue
+            walks += 1
+            for leg in move.legs:
+                frm, to = leg["frm"], leg["to"]
+                span = math.dist(frm, to)
+                for i in range(int(span / 0.1) + 2):
+                    f = min(1.0, i * 0.1 / span) if span > 1e-9 else 1.0
+                    x = frm[0] + (to[0] - frm[0]) * f
+                    y = frm[1] + (to[1] - frm[1]) * f
+                    z = frm[2] + (to[2] - frm[2]) * f
+                    cy = pk.ifloor(y - 0.05)
+                    under = [
+                        (ux, cy, uz)
+                        for ux in {pk.ifloor(x - pk.BODY_HALF_W + 0.5),
+                                   pk.ifloor(x + pk.BODY_HALF_W + 0.5)}
+                        for uz in {pk.ifloor(z - pk.BODY_HALF_W + 0.5),
+                                   pk.ifloor(z + pk.BODY_HALF_W + 0.5)}
+                    ]
+                    assert any(course.blocked(c) for c in under), \
+                        f"walk at ({x:.2f}, {y:.2f}, {z:.2f}) is over nothing"
+    assert walks >= 20, f"only {walks} walks seen -- the test proves nothing"
