@@ -303,7 +303,17 @@ LEVEL = Level("THE BELFRY", "village", rise=4, gap=3.0, exit="ladder",
     # above it, and the crossing comes down onto it. What it must not do
     # is finish *below* four, which is why the footing is an absolute
     # ``lift`` rather than a ``step_y`` and why it is 2 rather than 1.
-    n("glow", arc=3.4, lift=2, hug=3.2, spread=1, confine=True,
+    # ``lift=1`` and not 2, applied by the coordinator after a tower-wide
+    # check. The launch height plus the ride's ``step_y`` is where the climb
+    # tops out, and at lift 2 + 4 this ended **6** over the terrace against a
+    # ``rise`` of 4. A crossing cannot find the far ground from more than one
+    # block over the next floor: it is refused, the body comes back down onto
+    # this terrace, and the reliability chain climbs out all over again --
+    # five ascent landings a visit, reading 100% on every per-beat check
+    # because every landing was placed. Another level instrumented exactly
+    # that; ``tower_probe --design-only`` now asks the question for the whole
+    # roster and this was the only level that failed it.
+    n("glow", arc=3.4, lift=1, hug=3.2, spread=1, confine=True,
       pedestal_style="cobble", ceiling=3, deco="lamp", orbs=1),
     n("rock", arc=2.4, step_y=4, kind="climb", climb_style="ladder",
       hug=2.4, pedestal_style="cobble", spread=0, confine=True, orbs=2),

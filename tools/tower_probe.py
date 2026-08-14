@@ -107,6 +107,29 @@ def check_design() -> list[str]:
             if isinstance(val, str) and key in hp.ROLES \
                     and val not in pk.MATERIALS:
                 bad.append(f"{lv.name}: skin {key}={val!r} is no material")
+        # **Where an authored exit tops out**, which is a whole class of bug and
+        # was invisible until a level instrumented it. A climb that ends higher
+        # than one block over the next level's floor cannot find the far ground
+        # from up there: the crossing is refused, the body comes back down onto
+        # *this* terrace, and the reliability chain climbs out all over again --
+        # five ascent landings a visit, reading 100% on every per-beat check
+        # because every landing was placed. It is the owner's "it climbs and
+        # then drops back to where it started" in level data rather than in the
+        # engine, and it is pure arithmetic, so it belongs here where it costs
+        # nothing to ask.
+        if lv.exit_beats:
+            surface = None
+            for spec in lv.exit_beats:
+                if spec.get("step_y") is not None:
+                    surface = (0 if surface is None else surface) \
+                        + spec["step_y"]
+                elif spec.get("lift") is not None:
+                    surface = spec["lift"]
+            if surface is not None and surface > lv.rise + 1:
+                bad.append(f"{lv.name}: the authored exit tops out {surface} "
+                           f"over the terrace against a rise of {lv.rise} -- "
+                           f"the crossing cannot reach the far ground from "
+                           f"more than {lv.rise + 1} and the body falls back")
         # Across beat boundaries as well as within them, because beats play in
         # the order they are written and the jump from the last landing of one
         # to the first of the next is a jump like any other. Checking only
