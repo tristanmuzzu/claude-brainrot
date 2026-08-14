@@ -780,11 +780,24 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
-0. **The generated staircase is 17% of the exit climb**, and what is left of
+0. **The generated staircase is 16% of the exit climb**, and what is left of
    it is per-level authoring rather than an engine change -- see "What the
    exit climb is made of" above for the decomposition and the per-level
-   reject table. Worst offenders per 8 x 300 sweep: WINDMILL REACH 24
-   landings, THE WHITE STAIR 16, THE QUARRY 16, THE WEIR 15, WART FIELDS 13.
+   reject table. The loop that works is `scratchpad`-style per-tread
+   instrumentation: tag each authored exit node with its index, count
+   `_attempt` calls and successes per index, and read which tread stops
+   landing. On WINDMILL REACH it said the first four place on every visit
+   and the fifth on two of six, which is a terrace running out and is fixed
+   by writing one fewer tread (mean exit climb 11.0 -> 5.5 landings).
+
+   **Do not trust the per-level staircase counts without fixing the
+   attribution first.** They bucket by `blk["theme"]`, which is the theme of
+   wherever the landing physically *is* -- so THE QUARRY, whose exit descends
+   the outside of the tower and passes a revolution above THE VAULT, both
+   donates and receives. Measured directly, THE QUARRY's three authored exit
+   nodes place on every visit, and it is still charged 22 staircase landings.
+   The next move here is attributing a landing to the level whose *script*
+   emitted it rather than to the air it lands in.
 0b. **Half the gate-capable levels still do not get entered**, and the fix
    this file used to recommend has been tried and is **worse**. Over 8 runs:
    173 levels wanted a gate, 135 got the reservation, the offer was made on
