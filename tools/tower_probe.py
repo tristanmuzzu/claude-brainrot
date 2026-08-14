@@ -90,31 +90,6 @@ def _beats(lv) -> list:
     return out
 
 
-def check_bands() -> list[str]:
-    """Levels whose band exceeds the band of the section three below them.
-
-    See the note in ``check_design``'s neighbours: the cone paints level i-3's
-    core wall before level i's terrace slab and ``_ring`` skips a claimed cell,
-    so everything inboard of ``outer - band(i-3)`` comes out painted as *that*
-    level's banded cliff -- in exactly the lane the course hugs. One level
-    proved it by forcing its ``floor`` to solid gold and watching the ground
-    under the body not change colour, which is the "reported, not reproduced"
-    grey-plate symptom in ``docs/RULES.md`` section 7 with a mechanism at last.
-
-    Reported and **not** failed: 13 of the 33 levels are over it and several
-    chose their band on a measured A/B, so the fix is per level and wants its
-    own frames rather than a sweep.
-    """
-    out = []
-    for i, lv in enumerate(hp.LEVELS):
-        below = hp.LEVELS[(i - sp.LEVELS_PER_TURN) % len(hp.LEVELS)]
-        if lv.band > below.band + 1e-9:
-            out.append(f"{lv.name}: band {lv.band} against {below.band} three "
-                       f"below -- a {lv.band - below.band:.1f} block strip of "
-                       f"that level's cliff over this one's lane")
-    return out
-
-
 def check_design() -> list[str]:
     """Every authored jump against the physics. Returns the complaints."""
     bad: list[str] = []
@@ -125,19 +100,14 @@ def check_design() -> list[str]:
         if not 6 <= head <= 16:
             bad.append(f"{lv.name}: three rises from here sum to {window}, "
                        f"leaving {head} blocks of open air (want 6..16)")
-        # **A level's band may not exceed the band of the section three below
-        # it.** The cone paints the core wall of level i-3 before it paints the
-        # slab that is level i's terrace, and `_ring` skips a cell already
-        # claimed -- so everything inboard of `outer - band(i-3)` comes out
-        # painted as *that* level's banded cliff. At band 13.0 against 10.5
-        # three below that is a two-and-a-half block strip of the wrong level's
-        # rock in exactly the lane the course hugs, and no floor palette can
-        # touch it: one level proved it by forcing `floor` to solid gold and
-        # watching the ground under the body not change colour. This is the
-        # "reported, not reproduced" grey-plate symptom in RULES section 7,
-        # with a mechanism at last. Reported rather than failed, because 13 of
-        # the 33 levels are over it and several chose their band on a measured
-        # A/B -- the fix is per level and wants its own frames.
+        # A level's band used to be checked against the band of the section
+        # three below it, because a wider one had a strip of *that* level's
+        # cliff painted over its own lane. That was never a design rule: the
+        # cone painted the core wall before the terrace slab and ``_ring``
+        # skips a claimed cell. Fixed in ``Cone.emit_layer`` on 2026-08-13 --
+        # the slab is laid first and the wall under it is capped at the slab's
+        # own inner edge -- and a band is free again. See
+        # ``test_the_terrace_is_painted_in_its_own_levels_floor``.
         if lv.exit not in sp.ASCENTS:
             bad.append(f"{lv.name}: exit {lv.exit!r} is not one of "
                        f"{sorted(sp.ASCENTS)}")
@@ -255,12 +225,6 @@ def main() -> int:
             print(f"  BAD  {line}")
     else:
         print("  every authored jump is one a body can make")
-    notes = check_bands()
-    if notes:
-        print(f"  {len(notes)} levels wider than the section three below "
-              f"(a strip of that level's cliff paints over this one's lane):")
-        for line in notes:
-            print(f"    {line}")
     print(f"  cycle climbs {sum(lv.rise for lv in hp.LEVELS)} blocks over "
           f"{len(hp.LEVELS) / sp.LEVELS_PER_TURN:.0f} revolutions")
     if args.design_only:

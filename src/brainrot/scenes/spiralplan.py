@@ -1938,14 +1938,34 @@ class Cone:
             above = self.level(lv.index + LEVELS_PER_TURN)
             h = y - lv.y
             inner = self.outer_at(u) - lv.band
+            # **The slab goes down first, and that order is the same order
+            # ``rock`` decides in.** Where the layer is inside the floor slab
+            # of the turn above, ``rock`` answers off the slab alone and never
+            # reaches its core branch at all -- so the paint may not either.
+            # It used to run last, and ``_ring`` skips a cell already claimed:
+            # a level whose band is wider than the band of the level three
+            # below (twelve of the thirty-three, worst 11.0 against 7.5) had
+            # everything inboard of ``outer - band(i-3)`` painted as *that*
+            # level's banded cliff, in exactly the lane the course hugs, with
+            # no floor palette able to touch it. Two cells of it leak even
+            # where the bands match, because the cone flares over a turn and
+            # the core leans out under the soffit.
+            cap = _INF
+            if y >= above.y - FLOOR_T and self.has_floor(u + 2 * math.pi):
+                cap = self._slab(ct, st, u + 2 * math.pi, y,
+                                 above.y - 1 - y, seen, place)
             # The core, at every height: the wall at the back of the trough,
             # fluted, browed and knuckled -- ``core_r`` is the collision
             # radius, so the mesh follows it and the two cannot disagree.
             # Its lowest two cells carry the theme's own subsoil, so the wall
             # reads as a cut bank through the level rather than as bare
-            # masonry meeting grass.
+            # masonry meeting grass. Under a slab it stops at the slab's own
+            # inner edge: ``seen`` alone is not enough, because the two rings
+            # march outward from different radii and so round to different
+            # cells, which would leave the strip behind as a speckle instead
+            # of as a band.
             self._ring(ct, st, inner - SKIN, self.core_r(u, y), y,
-                       lv.theme.sub, seen, place, rib=True,
+                       lv.theme.sub, seen, place, rib=True, cap=cap,
                        styler=lambda c, t=lv.theme, hh=h:
                        self.cliff_style(t, c[0], c[1], c[2], hh))
             # The outer wall of the groove, where this stretch has one. Styled
@@ -1969,12 +1989,9 @@ class Cone:
                 r1f = self.floor_range(u + 2 * math.pi)[1]
                 self._ring(ct, st, r1f - 1.6, r1f, y, "conesoffit",
                            seen, place)
-            if y >= above.y - FLOOR_T and self.has_floor(u + 2 * math.pi):
-                self._slab(ct, st, u + 2 * math.pi, y, above.y - 1 - y,
-                           seen, place)
 
     def _slab(self, ct: float, st: float, up: float, y: int, depth: int,
-              seen: set, place) -> None:
+              seen: set, place) -> float:
         """The floor slab of the turn above: this trough's ceiling, and the
         next one's ground.
 
@@ -1984,24 +2001,38 @@ class Cone:
         everything between them is emitted as a rim only. That is what lets the
         slab be nine cells thick, which is what makes the tower a mass rather
         than a stack of plates, for the price of two.
+
+        Returns the radius it starts painting at, which is what the core wall
+        under it is capped to. On the two faced rows and the soffit that is a
+        skin's width inside the terrace's own inner edge, so the wall is
+        tucked under the ground it holds up; on the rows between, it is the
+        rim, and the wall is free to fill the mass behind it as before.
         """
         theme = self.section_at(up).theme
         out = self.floor_range(up)[1]
         upband = self.band_at(up)
+        wide = self.outer_at(up) - upband - SKIN
+        floor = theme if depth == 0 else None
         if depth == 0:
-            style, r0 = theme.ground, self.outer_at(up) - upband - SKIN
             # The top cell of the terrace is the one surface a run spends its
             # whole life looking at, and it was a single material. See
             # :data:`FLOOR_MIX`.
-            floor = theme
-        else:
-            floor = None
-        if depth == 1:
+            #
+            # **One chain, and this branch has to be in it.** It used to set
+            # its style and its radius in a chain of its own and then fall
+            # into the ``else`` below, which threw both away: the ground under
+            # the body was painted two metres wide at the rim and left as a
+            # hole across the rest of the terrace, showing the ``sub`` row a
+            # block beneath it. Measured over the roster, 45% of every cell a
+            # body can stand on was never painted at all, and no floor palette
+            # could touch the part that was.
+            style, r0 = theme.ground, wide
+        elif depth == 1:
             # The cut face under the ground: a slice through the place, which
             # is what stops the rim reading as a painted line.
-            style, r0 = theme.sub, self.outer_at(up) - upband - SKIN
+            style, r0 = theme.sub, wide
         elif depth == FLOOR_T - 1:
-            style, r0 = "conesoffit", self.outer_at(up) - upband - SKIN
+            style, r0 = "conesoffit", wide
         else:
             style, r0 = "conestone", out - 2.0
         ch = self.channel_range(up) if depth <= 1 else None
@@ -2023,17 +2054,21 @@ class Cone:
                 return floor.floor_style(cell[0], cell[2]) if floor else style
             self._ring(ct, st, r0, out + 0.6, y, style, seen, place,
                        styler=styler)
-            return
+            return r0
         self._ring(ct, st, r0, out, y, style, seen, place,
                    styler=(lambda c: floor.floor_style(c[0], c[2]))
                    if floor else None)
+        return r0
 
     def _ring(self, ct: float, st: float, r0: float, r1: float, y: int,
               style: str, seen: set, place, rib: bool = False,
-              styler=None) -> None:
+              styler=None, cap: float = _INF) -> None:
         if rib:
             r1 += self.rib_out(ct, st)
+        r1 = min(r1, cap)
         r0 = max(0.0, r0)
+        if r1 < r0:
+            return
         r = r0
         while r <= r1 + 1e-9:
             cell = (iround(ct * r), y, iround(st * r))

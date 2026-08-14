@@ -627,3 +627,47 @@ def test_a_level_floor_is_more_than_one_material() -> None:
         # Stable per cell, or re-emitting a layer redraws a different floor.
         assert all(theme.floor_style(x, z) == theme.floor_style(x, z)
                    for x in range(-8, 8) for z in range(-8, 8))
+
+
+def test_the_terrace_is_painted_in_its_own_levels_floor() -> None:
+    """The ground under the body is that level's floor, all the way across.
+
+    Two bugs met on this row and neither was visible from the code. The paint
+    laid the core wall of the level three below *before* the terrace slab and
+    ``_ring`` skips a claimed cell, so a level with a wider band than that one
+    wore a strip of its cliff -- and ``_slab``'s depth chain let depth 0 fall
+    into the rim branch, which threw the full-width radius away and left 45%
+    of every cell a body can stand on painted by nothing at all. Both read as
+    a grey plate through the lens and neither moves a single number in the
+    course probes, because ``Cone.rock`` is analytic and none of this is
+    collision. Enumerated from ``rock`` rather than from the emitter's own
+    marching, so the test cannot inherit the emitter's mistakes.
+    """
+    c = cone(3)
+    bad_style: list[tuple] = []
+    unpainted = surfaces = 0
+    for lv in [c.level(i) for i in range(4, 12)]:
+        y = lv.y - 1                      # the cell whose top face you stand on
+        painted: dict = {}
+        c.emit_layer(y, painted.__setitem__)
+        pal = {m for m, _ in lv.theme.floor_palette()}
+        lim = int(c.rim_at(y)) + 3
+        for x in range(-lim, lim + 1):
+            for z in range(-lim, lim + 1):
+                if not c.rock((x, y, z)) or c.rock((x, y + 1, z)):
+                    continue          # not ground, or buried under the wall
+                if c.level_index(c.unwrap(x, z, y + 1)) != lv.index:
+                    continue          # somebody else's terrace at this height
+                surfaces += 1
+                got = painted.get((x, y, z))
+                if got is None:
+                    unpainted += 1
+                elif got not in pal:
+                    bad_style.append((lv.theme.name, (x, y, z), got))
+    assert surfaces > 2000, f"only {surfaces} cells of terrace measured"
+    assert len(bad_style) <= surfaces // 200, \
+        f"{len(bad_style)} of {surfaces} terrace cells are not the level's " \
+        f"own floor: {bad_style[:6]}"
+    assert unpainted <= surfaces // 100, \
+        f"{unpainted} of {surfaces} cells a body stands on are painted by " \
+        f"nothing and show the row beneath them"

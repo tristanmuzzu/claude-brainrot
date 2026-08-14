@@ -724,15 +724,21 @@ time; none is guessable from the source.
   structure from another biome standing in it. And `_lm_g_tree` hangs its
   canopy at dy 5–6, so any landing at lift 4 or above on a `tree` level puts
   the camera inside the leaves.
-- **Reported, not reproduced: a level's usable shelf may be bounded by the
-  `core_r` of the level three below**, that being the cliff at your back, with
-  anything inboard of it painted as cone skin. One level at `band=11.5` had 65%
-  of the cell the body stands on come out as `conerib` — a jungle that rendered
-  as a grey plate — and dropping `band` to match the level three below fixed
-  it. A check of `cone.rock` across the roster reads under 1% everywhere and
-  the terrace floor is analytic rather than in `course.struct`, so this is
-  recorded as a **symptom to look for** rather than a rule: if the floor under
-  the body reads as grey cone stone in a contact sheet, try the band.
+- **The grey plate is fixed, and `band` was never the cause** (2026-08-13).
+  The symptom recorded here for two days — the cell the body stands on coming
+  out as `conerib`, a jungle rendering as a grey plate, a level's `floor`
+  palette forced to solid gold and the ground not changing colour — was two
+  bugs in `Cone`'s paint, neither of them anything to do with the level. The
+  terrace slab was laid *after* the core wall of the level three below and
+  `_ring` skips a claimed cell, so a wider band wore that level's cliff; and
+  `_slab`'s depth chain let depth 0 fall through into the rim branch, which
+  threw away its full-width radius and left **45% of every cell a body can
+  stand on painted by nothing at all**, showing the `sub` row beneath it.
+  Measured over the roster: 14% of terrace cells the wrong material and 45%
+  unpainted, now 0.1% and 0.3%. **Do not narrow a band to chase a colour** —
+  the old advice cost width that was chosen on measured A/Bs, and
+  `tower_probe`'s band check is gone. `test_the_terrace_is_painted_in_its_own_
+  levels_floor` holds it.
 - **A `shell=` or `moat=` is painted the moment its landing commits, and blocks
   the *next* landing of the same beat.** Put `shell=` on a beat's **last** node,
   and keep two `moat=True` landings more than the pond's radius (3 cells) apart
