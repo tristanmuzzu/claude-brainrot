@@ -27,6 +27,42 @@ FACES = ("top", "bottom", "north", "south", "east", "west")
 SHADE = {"top": 1.00, "bottom": 0.50, "north": 0.80, "south": 0.80,
          "east": 0.60, "west": 0.60}
 
+#: How much of a face's brightness arrives regardless of which way it points.
+#:
+#: The constants above are vanilla's, and copying them without copying what
+#: the game does *around* them is why this renderer's frames were half again
+#: as dark as the real thing: Minecraft's face shading multiplies a light
+#: level that skylight has already filled in, so an east-facing block outdoors
+#: is 60% of a lit face and not 60% of nothing. Here it was 60% of nothing. A
+#: grey-104 stone on an east face landed at 62 and read as black, and three
+#: separate materials had already been hand-brightened to compensate --
+#: ``conesoffit`` at 206 and ``conebutt`` at 152 are that patch, applied
+#: locally three times because the general fix had not been made.
+#:
+#: Measured against ``docs/reference/frames/vanilla_2hz`` -- the only
+#: reference set that is vanilla-lit rather than shader-rendered, which
+#: matters more than it sounds and cost this project a whole false conclusion
+#: once: unlit pixels 24.1% against vanilla's 17.4% before, and the value
+#: below is the one that lands on it without flattening the faces into each
+#: other -- 24.1% -> 17.9% against vanilla's 17.4%, with 0.40 overshooting to
+#: 17.1%. The trade is face-to-face contrast, which is the only thing making
+#: an unlit cube read as three-dimensional: top against east goes from 1.00
+#: vs 0.60 to 1.00 vs 0.74, which contact sheets of all three live scenes say
+#: is still plainly a cube. Judged by eye, because the luma number cannot see
+#: the thing being traded away.
+#:
+#: Worth knowing for whoever tunes the tower's palette next: the three
+#: hand-brightened cone materials are now compensating twice. They were left
+#: alone deliberately -- changing a material changes the building, and this
+#: change was already touching every scene at once.
+AMBIENT = 0.35
+
+
+def face_shade(face: str) -> float:
+    """A face's brightness, with the sky's share of it put back."""
+    return AMBIENT + (1.0 - AMBIENT) * SHADE[face]
+
+
 _MESH_KEEP: list = []
 _CUBE_MESH = None
 _MODELS: dict[str, object] = {}
@@ -262,7 +298,7 @@ def _atlas(base: rl.RGB, noise: float, seed: int,
         colour = base
         if top is not None and face == "top":
             colour = top
-        shade = SHADE[face]
+        shade = face_shade(face)
         for y in range(16):
             for x in range(16):
                 c = colour
