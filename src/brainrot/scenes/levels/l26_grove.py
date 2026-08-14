@@ -23,8 +23,9 @@ from ._base import Level, n
 # slow stride through the soul sand spilled among them, up over a lava
 # pool on a floating ingot, and up under a rough roof. The grove loops
 # for as long as the terrace lasts, and the way out is **the treasure
-# stair** -- eight blackstone-and-gold treads climbing the pile against
-# the cliff, lit at the foot and at the head.
+# stair** -- a lit block of paving at the foot and seven treads climbing
+# the pile against the cliff on black plinths, gold and warped stem
+# alternating, with a glowstone curb at the head.
 #
 # The one thing a viewer would remember is the fall off the stem out
 # over the sea with the gold under it.
@@ -81,13 +82,28 @@ from ._base import Level, n
 # climb, it is a quieter one. RULES 3 asks for a climb exit on about one
 # level in five and this level's idea is the hoard, not a shaft.
 #
-# The bill for that is honest and it is in the numbers: eight treads plus
-# the launch is nine landings of the twenty-odd this terrace lays, and
+# The bill for that is honest and it is in the numbers: seven treads plus
+# the launch is eight landings of the twenty-five this terrace lays, and
 # ``exit_beats`` are counted as machinery by ``handplan.MACHINERY``
-# however carefully they are written. What it buys back is that they are
-# *lidded and pedestalled* -- the exit is the emptiest third of any level
-# in this tower, and a roofed tread standing on its own black plinth is
-# the difference between a staircase and a row of cubes in the sky.
+# however carefully they are written -- so the way out of a level whose
+# ``rise`` is 8 is half of it whatever anybody does, and the level's
+# designed share reads 36-45% depending on the sweep. What it buys back
+# is that they are *lidded and pedestalled* -- the exit is the emptiest
+# third of any level in this tower, and a roofed tread standing on its
+# own black plinth is the difference between a staircase and a row of
+# cubes in the sky.
+#
+# **``band`` is 10.0 and not 12.0, and that was worth more than any
+# keyword in the file.** Same seeds, only the band changed: designed
+# content 42% -> 45%, exact 93% -> 95%, jammed lens 2.6% and 0.2% on two
+# seeds -> **0.0% on both**, frame empty 49/51 -> 48/50, walker 49% ->
+# 48%. A wider corridor on a level whose course spends most of its
+# length at lift 2-9 simply pushes the cliff out of the lens and puts
+# sea in it. ``shelf`` was swept with it: 6.5 is worse on every count
+# (jam 3.9%, empty 50/52) and 5.0 costs four points of designed content,
+# because the notes' "widening the shelf fills the bottom of the frame"
+# is a *low* level's lever and the down-rays here fly over the shelf
+# whatever it is.
 #
 # ---------------------------------------------------------------------
 # The things that are not free choices:
@@ -97,10 +113,13 @@ from ._base import Level, n
 #   ``glowstone``, ``sealantern``, ``magma`` -- and ``shroomlight`` is a
 #   bright orange *texture* that emits nothing at all. Glowstone
 #   (250,214,130) is the warm pale one and it is the same family as the
-#   gold, so the four lamps in this level read as the hoard's own light
-#   rather than as furniture: they are at the threshold, at the pool, at
-#   the foot of the stair and at the head of it. Every light in the
-#   reference is at an end of something and doing a job.
+#   gold, so the five lamps in this level read as the hoard's own light
+#   rather than as furniture: at the threshold, inside each of the two
+#   ``cave`` bays, at the foot of the stair and at the head of it. Every
+#   light in the reference is at an end of something and doing a job,
+#   and an interior carries its own or it is a black frame -- three of
+#   this level's frames came back near-black before the two bays had
+#   theirs.
 # * **The liquid is lava, and it is here for the picture rather than for
 #   the walker.** Water is in ``SEE_THROUGH``, so a water moat digs a pit
 #   a no-jump walker falls into and cannot climb out of; lava is *solid*
@@ -118,7 +137,7 @@ from ._base import Level, n
 #   last is written and never seen, and one written first follows
 #   machinery at an arbitrary height where a walk needs its predecessor
 #   within half a block.
-# * **Fourteen floor materials with the dominant one at 20%.** A real leg
+# * **Fourteen floor materials with the dominant one at 26%.** A real leg
 #   of the reference measures a median fourteen kinds with the commonest
 #   at about a quarter, and that -- not the one big structure -- is why
 #   its levels read as places. The tail here is the hoard weathering into
@@ -135,11 +154,11 @@ from ._base import Level, n
 #   is pulled to the middle of the *band*, which on a five-and-a-half
 #   cell shelf inside an eleven-block band is out over the drop.
 LEVEL = Level("THE GROVE", "warped", rise=8, gap=3.0, exit="stair",
-              band=11.0, shelf=5.5, breaks=3, landmark="hoard",
+              band=10.0, shelf=5.5, breaks=3, landmark="hoard",
               # Teal floor, black everything that stands up or hangs
               # overhead, gold for the hoard, warm pale light, lava in
               # the crack the treasury fell through.
-              ground="warpednylium", sub="blackstone", rock="blackstone",
+              ground="warpednylium", sub="warped", rock="blackstone",
               accent="gold", glow="glowstone", liquid="lava",
               candy=("gold", "warped"),
               props=("netherfungus", "vinehang", "grasstuft", "pebbles",
@@ -231,8 +250,9 @@ LEVEL = Level("THE GROVE", "warped", rise=8, gap=3.0, exit="stair",
                  pedestal_style="warped", ceiling=3, orbs=1),
                n("gold", arc=4.9, step_y=-2, hug=4.4, spread=0,
                  pedestal=False, orbs=2),
-               n("blackstone", arc=3.0, step_y=1, hug=3.4, spread=0,
-                 pedestal=False, shell="cave", deco="lamp", orbs=1)]),
+               n("warped", arc=3.0, step_y=1, hug=3.4, spread=0,
+                 pedestal_style="warped", shell="cave", deco="lamp",
+                 orbs=1)]),
     # THE SPILL. The second beat and the quiet one: the heaps themselves,
     # crossed at the pace the spill sets. It opens at ``lift=2`` with
     # ``spread=1`` -- following the beat above that is free, following
@@ -323,16 +343,18 @@ LEVEL = Level("THE GROVE", "warped", rise=8, gap=3.0, exit="stair",
                    pedestal_style="rawgold", orbs=2)]),
 ], exit_beats=[
     # THE TREASURE STAIR. The hoard is piled against the cliff at the end
-    # of the terrace and the way out is up it: a lit block of paving at
-    # the foot, eight treads of gold on black plinths, and a glowstone
-    # curb at the head to stand on before the leap across the chasm.
+    # of the terrace and warped stems have grown up through it; the way
+    # out is up the pile, and the stair is gold and stem alternating on
+    # black plinths -- a lit block of paving at the foot, seven treads,
+    # and a glowstone curb at the head to stand on before the leap across
+    # the chasm.
     #
     # **The arithmetic, which is the thing that was wrong here before.**
     # The terrace above stands ``rise`` = 8 blocks over this one, so its
     # walking surface is 9.0 against this level's 1.0; the crossing is a
     # ``hop_span(-1)`` jump and wants a block to spend coming down, so
     # the head of the stair has to stand at **lift 9**, a walking surface
-    # of 10.0. From the launch at lift 1 that is eight treads of +1 and
+    # of 10.0. From the launch at lift 2 that is seven treads of +1 and
     # there is no way to buy any of them back -- nothing in this motion
     # model rises two in one ballistic move, and a slab landing at +0.5
     # buys reach rather than height. A stair that stops short is not a
@@ -351,7 +373,7 @@ LEVEL = Level("THE GROVE", "warped", rise=8, gap=3.0, exit="stair",
     # between walking surfaces and is not clamped, which is why every
     # climb in the generator is written with it.
     #
-    # The launch *is* on ``lift``, at 2 with ``spread=2``, because it is
+    # The launch *is* on ``lift``, at 2 with ``spread=1``, because it is
     # the anchor the seven relative treads are counted from: the filler
     # hands the chasm a body at lift 1 by design (see THE THICKET), the
     # launch is one step up off it, and seven treads then land the head
@@ -363,49 +385,61 @@ LEVEL = Level("THE GROVE", "warped", rise=8, gap=3.0, exit="stair",
     # highest it may be: the trigger can also fire on a body at lift 1,
     # and nothing rises two in one ballistic move.
     #
-    # **The treads carry their pedestals for the first half and float for
-    # the second.** A pedestal writes the stack under a landing all the
-    # way down to the terrace, which on a staircase up a treasure heap
-    # *is* the heap -- the plinths are named ``blackstone`` so the stack
-    # and the lid over it are the dark mass and only the tread itself is
-    # gold. But a stack has to *find* ground, and on a ``ledge`` the
-    # shelf wobbles about a block and a half either way and has floor
-    # breaks in it, so the four treads that stand seven and eight blocks
-    # up are floated: past halfway the stair is ledges cut into the cliff
-    # rather than piers standing on the terrace.
+    # **Every tread keeps its pedestal**, and the keyword is the picture
+    # rather than a nicety: a pedestal writes the stack under a landing
+    # all the way down to the terrace, which on a staircase up a treasure
+    # heap *is* the heap. Floating the top half instead measured 59% of
+    # this level's landings hanging in air against 33% with the stacks
+    # in, and the contact sheet's last third was cubes over the sea. The
+    # plinths are named ``blackstone`` so the stack and the lid over it
+    # are the dark mass and only the tread itself is gold or stem.
     #
-    # The lids are on alternate treads. The exit is the emptiest third of
-    # any level in this tower and a ``ceiling`` beam chained landing to
-    # landing fills the one column of the ray fan that looks where you
-    # are going -- beams on an exit climb alone took one level from 64%
-    # to 55% empty -- but a lid within eight blocks of the head also
-    # makes ``_indoor_want`` return 0.85 and takes 27% off every tint in
-    # the frame, so lidding all nine makes a dark level whatever ``dark``
-    # says.
+    # The lids are on the **top four** treads and not on alternate ones.
+    # The bottom of the stair stands against the cliff and has the brow
+    # of the level above over it already; it is the head, eight and nine
+    # blocks up, that frames as sky. A lid within eight blocks of the
+    # head also makes ``_indoor_want`` return 0.85 and takes 27% off
+    # every tint in the frame, so lidding all eight would make a dark
+    # level whatever ``dark`` says. (Honest note: swapping the lids from
+    # alternate to top-weighted moved ``frame empty`` by under a point on
+    # two seeds. It is kept because the *sheet* is better, and because
+    # the probe's ray fan reaches only 4.6 m above the eye and cannot see
+    # most of what a lid is for.)
     #
     # **The launch stands at ``hug=2.9``.** One level measured 69
     # wall-jammed frames of 1,293 with its launch at 2.2 and **0 of
     # 1,280** at 2.8: the camera locks on to the landing through take-off
     # and flight, so a launch tucked against the core aims the whole
-    # climb at the cliff. The stair then *zigzags* out from 2.6 to 3.4 as
-    # it rises -- a hugging node's ``radial`` is never read, so the only
-    # weave available to it is in ``hug``, and a straight column of
-    # identical hops is the single most monotonous thing this format
-    # produces. The head stands furthest out, with sky behind it, because
-    # the last thing before the leap into DUST DEVILS should be a lit
-    # stone against the slot and not against rock.
-    n("glow", arc=3.6, lift=2, hug=2.9, spread=2, confine=True,
+    # climb at the cliff. The stair then *zigzags* -- 2.6, 3.1, 2.6, 2.9,
+    # 2.4, 2.9, 3.2 -- because a hugging node's ``radial`` is never read,
+    # so the only weave available to it is in ``hug``, and a straight
+    # column of identical hops is the single most monotonous thing this
+    # format produces. The head stands furthest out, with sky behind it,
+    # because the last thing before the leap into DUST DEVILS should be a
+    # lit stone against the slot and not against rock.
+    #
+    # **Do not flatten that zigzag.** Softening the top three from
+    # 2.9/2.4/2.9 to 3.0/2.6/3.0 -- a change of two tenths of a block --
+    # took seed 7 from 486 frames on the level with **0.2%** of them
+    # jammed by a wall to **703 frames and 14.8%**, with seed 3 unmoved.
+    # Same seeds, one edit, nothing else touched. The stair is threading
+    # a corridor between the cliff and the drop and there is less slack
+    # in it than the numbers suggest; re-measure both seeds after any
+    # change here.
+    n("glow", arc=3.6, lift=2, hug=2.9, spread=1, confine=True,
       deco="lamp", ceiling=3, shell="cave", orbs=1),
     n("gold", arc=2.9, step_y=1, hug=2.6, spread=0,
-      pedestal_style="blackstone", ceiling=3, orbs=1),
-    n("gold", arc=2.9, step_y=1, hug=3.1, spread=0,
+      pedestal_style="blackstone", orbs=1),
+    n("warped", arc=2.9, step_y=1, hug=3.1, spread=0,
       pedestal_style="blackstone"),
     n("gold", arc=2.9, step_y=1, hug=2.6, spread=0,
+      pedestal_style="blackstone", orbs=1),
+    n("warped", arc=2.9, step_y=1, hug=2.9, spread=0,
+      pedestal_style="blackstone", ceiling=3),
+    n("gold", arc=2.9, step_y=1, hug=2.4, spread=0,
       pedestal_style="blackstone", ceiling=3, orbs=1),
-    n("gold", arc=2.9, step_y=1, hug=3.1, spread=0, pedestal=False),
-    n("gold", arc=2.9, step_y=1, hug=2.7, spread=0, pedestal=False,
-      ceiling=3, orbs=1),
-    n("gold", arc=2.9, step_y=1, hug=3.2, spread=0, pedestal=False),
-    n("glow", arc=2.9, step_y=1, hug=3.4, spread=0, pedestal=False,
-      deco="lamp", ceiling=3, orbs=2),
+    n("warped", arc=2.9, step_y=1, hug=2.9, spread=0,
+      pedestal_style="blackstone", ceiling=3),
+    n("glow", arc=2.9, step_y=1, hug=3.2, spread=0,
+      pedestal_style="blackstone", deco="lamp", ceiling=3, orbs=2),
 ])

@@ -146,6 +146,11 @@ the rest and is worth reading in full.
   so it cannot jam a lens, block an arc or be the cause of anything the ray
   fan sees. One agent spent a pass suspecting a lintel; removing it changed
   the jam table by not one frame in any bucket.
+- **Write your exit on `step_y`, never on absolute `lift`.** `lift` is clamped
+  to `LIFT_MAX = 6` **silently** — no error, no rejection, nothing in the
+  fidelity table. One level's authored exit wrote lifts 2..9, was clamped to 6,
+  ground against the chasm for twelve landings a visit and laid 755 landings
+  over eight runs before the cause was found.
 - **Do not exit by ladder.** Measured properly on one level, bucketing every
   jammed frame by segment *and* move over four seeds: the `ascent/climb` ride
   was **20.9% jammed** and every other move in that level was **0.0%** — 114 of

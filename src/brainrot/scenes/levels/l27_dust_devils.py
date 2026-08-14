@@ -66,12 +66,24 @@ from ._base import Level, n
 # brief's measurement on the ladder -- the ride 20.9% jammed against
 # 0.0% for every other move in the level -- cannot arise.
 #
-# THE GROVE below also leaves by a bubble and that is the one real cost
-# here; it is taken deliberately. Its column is a bare six-block ride out
-# of a teal nylium floor. This one is five blocks with the rock shelled
-# over the launch and **two lit terracotta shelves above it**, so the
-# last thing before the leap is a floor rather than the top of a shaft,
-# and ten seconds of orange badlands stand between the two rides.
+# **The A/B, because absolutes here are worthless.** Thirty-two other
+# levels are being rewritten in parallel and THE GROVE below was mid-edit
+# through this pass -- its own exit climb overshoots its rise by seven
+# and the spare treads land in *this* level's bearing, where they are
+# counted against this level's machinery. So the only evidence is the two
+# designs swapped on the live ``Level`` object inside one process, same
+# sixteen seeds, same neighbours, nineteen visits each:
+#
+# | | old | new |
+# |---|---|---|
+# | designed landings a visit | 7.8 | **10.4** |
+# | designed share of the level | 35% | **48%** |
+# | exit-climb landings a visit | 10.1 | **7.2** |
+# | plain hop | 91% | **85%** |
+# | non-hop | walk 9% | walk 11%, bubble 5% |
+#
+# (Both arms' exit-climb figure carries THE GROVE's spill, which is why
+# neither is the four landings this exit actually spends.)
 #
 # ---------------------------------------------------------------------
 # Three other things that are measurements rather than taste.
@@ -107,6 +119,38 @@ from ._base import Level, n
 # What is here is fifteen kinds and none of them cold: burnt orange, red
 # and yellow bands, terracotta, fired brick, oxidised copper, coarse
 # dirt, two sands, with gravel and a little clay for grit.
+#
+# **What the frame cost, and what did not buy it back.** Running the
+# design on the spire tops instead of along the terrace costs empty
+# frame, exactly as ``docs/RULES.md`` §7 says it must -- the ray fan is
+# +/-36 degrees inside 8 m, so at lift 1 the ground a metre below is hit
+# by two whole rows of it and at lift 4 the shallow down-rays fly over
+# the shelf into the void. Measured over seeds 3, 5 and 7: the old flat
+# level read 42% and this one reads **50-52%**, against a ceiling of 55%.
+# Two attempts to buy it back, both measured on the same three seeds:
+#
+# * **Lids are worth about a point and a quarter.** Beams were added or
+#   lengthened on nine landings: 52% -> 50.7% mean, and it cost two
+#   points of exactness. Worth having and no more than that. Note what
+#   ``ceiling=n`` actually is -- ``n`` is the beam's *length along the
+#   direction of travel*, and the lid always sits three cells over the
+#   take-off -- so ``ceiling=7`` is a slab you run under and ``ceiling=3``
+#   is a stick. The 3s in this file are the ones over a jump whose
+#   neighbours the beam might collide with; everywhere else is 5 or 7.
+# * **A ``shell`` on the filler bought nothing.** ``tunnel`` on
+#   ``windgap``'s last node -- the most-seen landing in the level, since
+#   the filler is what repeats -- moved the three seeds to 50/52/52,
+#   which is inside the noise, and put the loop's own seam under a roof.
+#   Reverted. §7 predicted it: on a narrow ledge a shell's two wall
+#   columns land one cell inside the cliff and one cell past the shelf
+#   edge, so it writes about thirteen cells and all of them are roof.
+#
+# The honest reading is that the remaining emptiness is not this level's
+# to fix. The cliff filling the other half of those frames is
+# ``CLIFF_MIX``, and only five parts in twenty-six of it are the level's
+# own ``rock`` and ``sub`` -- so a badlands level on a tall ``rise``
+# frames as orange ground, blue sky and *grey* rock however it is
+# written. That is an engine number, not a design one.
 #
 # Against THE BALCONIES, the other mesa level, this is a deliberate
 # opposite. That one is *bolted to the cliff* -- oak-and-clay decks hung
@@ -188,15 +232,15 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
     ("capstone", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1,
                     deco="lamp", ceiling=7, orbs=1),
                   n("terra_white", arc=3.0, lift=1, hug=3.2, kind="walk",
-                    spread=0, ceiling=3),
+                    spread=0, ceiling=7),
                   n("terra_orange", arc=3.2, step_y=1, hug=3.4,
                     pedestal_style="terra_red", ceiling=7, orbs=1),
                   n("terra_white", arc=3.2, step_y=1, hug=3.0,
-                    pedestal_style="terra_orange", orbs=1),
+                    pedestal_style="terra_orange", ceiling=5, orbs=1),
                   n("terra_red", arc=5.2, step_y=-2, hug=3.8, moat=True,
                     orbs=2),
                   n("redsand", arc=3.0, step_y=0, hug=3.4, kind="walk",
-                    spread=0, pedestal=False)]),
+                    spread=0, pedestal=False, ceiling=7)]),
     # THE SLOT -- the bottom of the wash, and the only enclosed stretch
     # in the level. The reference is a *groove* rather than a tunnel:
     # rock within four metres on one side on 71% of its samples, a lid
@@ -236,10 +280,11 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
     ("slot", [n("terra_yellow", arc=3.2, lift=2, hug=3.0, spread=1,
                 ceiling=7, orbs=1),
               n("terra_white", arc=3.0, step_y=0, hug=3.0, kind="walk",
-                spread=0, ceiling=3),
+                spread=0, ceiling=7),
               n("terra_orange", arc=3.2, step_y=1, hug=3.4,
-                pedestal_style="terra_red", orbs=1),
-              n("terra_yellow", arc=3.2, step_y=1, form="slab", hug=3.2),
+                pedestal_style="terra_red", ceiling=5, orbs=1),
+              n("terra_yellow", arc=3.2, step_y=1, form="slab", hug=3.2,
+                ceiling=5),
               n("terra_red", arc=4.0, step_y=-1, hug=3.0, shell="grotto",
                 orbs=1)]),
     # THE FIELD -- the hoodoos themselves, and the level's high ground.
@@ -260,13 +305,14 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
     # which is `docs/RULES.md` §3: a level's descent belongs in its first
     # two thirds and the exit is the highest thing in it.
     ("field", [n("terra_white", arc=3.4, lift=2, hug=3.2, spread=1,
-                 radial=1.2, pedestal_style="terra_orange", orbs=1),
+                 radial=1.2, pedestal_style="terra_orange", ceiling=5,
+                 orbs=1),
                n("terra_red", arc=3.2, step_y=1, hug=3.6, radial=-1.3,
                  pedestal=False, deco="lintel"),
                n("terra_yellow", arc=3.2, step_y=1, hug=3.0,
                  pedestal_style="terra_red", ceiling=7, orbs=1),
                n("terra_white", arc=3.0, step_y=0, hug=3.2, kind="walk",
-                 spread=0, shell="tunnel")]),
+                 spread=0, ceiling=7, shell="tunnel")]),
 ], filler=[
     # THE WINDGAP, repeated. A script's tail does not repeat and the
     # filler does, so the level's *character* lives here rather than its
@@ -287,10 +333,11 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
     ("windgap", [n("terra_orange", arc=3.4, lift=3, hug=3.0, spread=2,
                    ceiling=7, orbs=1),
                  n("terra_white", arc=3.0, step_y=0, hug=3.0, kind="walk",
-                   spread=0, ceiling=3),
-                 n("terra_yellow", arc=4.6, step_y=-1, hug=3.6, orbs=1),
+                   spread=0, ceiling=7),
+                 n("terra_yellow", arc=4.6, step_y=-1, hug=3.6, ceiling=5,
+                   orbs=1),
                  n("terra_red", arc=3.2, step_y=1, hug=3.0,
-                   pedestal_style="terra_orange")]),
+                   pedestal_style="terra_orange", ceiling=5)]),
 ], exit_beats=[
     # THE SEEP -- the spring at the head of the slot, and the only water
     # in the badlands that is going anywhere.
@@ -325,6 +372,16 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
     # a `ceiling` beam, because a beam is spread along the direction of
     # travel and fills the one column of the ray fan that looks where you
     # are going.
+    #
+    # **No `deco="lamp"` on the column's own landing**, which the level
+    # this recipe was copied from carries. The renderer hangs a
+    # near-four-metre glow billboard on a lamp cell, so a lamp on a
+    # landing you are standing on is a bloom filling the lens from a
+    # metre away -- and the ride out already blows one frame of the
+    # contact sheet white on its own, the column being emissive water.
+    # The lamp is on the shelf above instead, where the reference puts
+    # every light it has: at the far end, marking the way out.
+    #
     # `arc=3.4` on the launch is chosen to be legal at *every* height the
     # thing before it can leave the body at: a reach of 2.72 sits inside
     # the +1 window (2.00-3.10), the level one and the -1 one (2.35-4.98)
@@ -332,10 +389,9 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
     # minimum, because a descending arc covers that much ground before it
     # arrives.
     n("terra_orange", arc=3.4, lift=2, hug=2.8, spread=1, confine=True,
-      ceiling=3, shell="cave"),
+      ceiling=5, shell="cave"),
     n("terra_white", arc=2.4, step_y=5, kind="bubble", hug=2.0,
-      pedestal=True, pedestal_style="terra_orange", spread=0, deco="lamp",
-      orbs=2),
+      pedestal=True, pedestal_style="terra_orange", spread=0, orbs=2),
     n("terra_yellow", arc=3.0, step_y=1, hug=3.2, spread=0,
-      pedestal=False, ceiling=3, deco="lamp", orbs=1),
+      pedestal=False, ceiling=7, deco="lamp", orbs=1),
 ])
