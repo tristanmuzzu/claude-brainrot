@@ -2610,6 +2610,20 @@ class Course:
         node = self._pending.pop(0)
         self.laid += 1
         got = self._try_node(prev, node)
+        if got is None and node.get("label") == "landmark":
+            # A refused landing in a gated structure lets the *next* one be
+            # tried from the same place, exactly as an authored exit does.
+            # The three stored landings are short of the doorway, inside it
+            # and out the far side, so the one that matters is the middle one
+            # -- and the leg onto the first is an ordinary jump from wherever
+            # the approach finished, which is the whole of its rejection
+            # table. Skipping to the landing inside the passage is a better
+            # answer than abandoning the crossing, and the offer is spent
+            # either way.
+            while got is None and self._pending \
+                    and self._pending[0].get("label") == "landmark":
+                node = self._pending.pop(0)
+                got = self._try_node(prev, node)
         if got is None and node.get("label") == "ascent":
             # **The rest of the design first.** A level's exit is a written
             # sequence, and one landing of it refusing is not the sequence
