@@ -134,6 +134,18 @@ the rest and is worth reading in full.
   leaving the move mix *by name*, hop share going 82% -> 87% through the rule,
   and the level getting 16% **shorter** in frames. Check the move mix by name
   after any change near your exit.
+- **`hug` is your jammed-lens number, on *ordinary* landings too — not just
+  the exit.** One level bucketed every jammed frame by segment *and* move and
+  found one beat's `walk` at **41% jammed** with every other move at 0.0%;
+  moving that beat out from the core by six tenths of a block (2.6 -> 3.2) took
+  the whole level from 5.7% to 1.5% for two points of empty frame. On a plaza
+  the core face is a wall like any other, and a body hugging it at 2.6 has it
+  inside the probe's three-metre threshold across half the ray fan. Bucket by
+  move before you theorise.
+- **`deco` is not a voxel.** Decoration is drawn and never written to a cell,
+  so it cannot jam a lens, block an arc or be the cause of anything the ray
+  fan sees. One agent spent a pass suspecting a lintel; removing it changed
+  the jam table by not one frame in any bucket.
 - **Do not exit by ladder.** Measured properly on one level, bucketing every
   jammed frame by segment *and* move over four seeds: the `ascent/climb` ride
   was **20.9% jammed** and every other move in that level was **0.0%** — 114 of
