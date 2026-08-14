@@ -8,214 +8,259 @@ and ``docs/TOWER.md``.
 from ._base import Level, n
 
 # THE VAULT. A strongroom cut into the cliff, and its floor is the melt:
-# lava tapped in under the paving so nothing can be carried out across
-# it. The bullion was never on that floor. It stands clear of it on the
-# strongroom's own **racking** -- an iron shelf, a course of bars, a lit
-# top tier -- cantilevered further out over the lava the higher it goes,
-# and that racking is the route.
+# lava tapped in under the paving so that nothing can be carried out
+# across it. The bullion was never on that floor. It stands clear of it
+# on the strongroom's own **racking** -- an iron shelf, a course of
+# bars, a lit top tier -- cantilevered further out over the lava the
+# higher it goes, and that racking is the route.
 #
-# **How the plaza earns itself, and it is not level 3's answer or level
-# 10's.** Level 3 put its route on the roofs *above* its street; level 10
-# made everything you stand on a hive. Here the floor is not something
-# you decline to use -- it is the hazard, and the level is the shelving
-# bolted to the wall over it. You come in through the vault door on foot
-# under its lintel, climb three tiers of racking to four blocks up, and
-# then **fall three blocks out into the middle of the room onto a magma
-# pad standing in the melt** -- the level's showpiece and its one long
-# jump, because a descent is the only long jump this motion model has --
-# and the pad throws you two blocks straight back up onto a stack of
-# bullion. From there it is piers over the lava for as long as the
-# terrace lasts, and out up the strongroom ladder in the corner.
+# You come in over a glowstone sill and through the vault door on foot
+# under its lintel; climb the rack four blocks up, walking one shelf and
+# jumping the next; and then **fall three blocks off the top of it, out
+# into the middle of the room, onto a magma pad standing in the melt** --
+# the level's showpiece and its long jump, because a descent is the only
+# long jump this motion model has. **The pad throws you two blocks
+# straight back up** onto a stack of bullion, which is a thing no jump
+# in this engine can do. After that it is the ledger room and then piers
+# over the lava for as long as the terrace lasts, and out up a flight of
+# gold treads in the corner.
 #
 # The one thing a viewer would remember is that fall: off the top of the
-# racking, down past the lit gold gate, into a room whose floor is
-# glowing.
+# racking, past the lit gold gate, down into a room whose whole floor is
+# glowing, and straight back up off it.
 #
-# What was here before was the same premise stated and not delivered.
+# ---------------------------------------------------------------------
+# **How the plaza earns itself, and it is neither level 3's answer nor
+# level 10's.** Level 3 put its route on the roofs *above* its street;
+# level 10 made everything you stand on a hive. Here the floor is not
+# something the route declines to use -- it *is* the hazard, and the
+# level is the shelving bolted to the wall over it. Half the landings
+# have nothing under them at all, four floor breaks are cut through the
+# paving, and both moats are wide enough to see across: a no-jump walker
+# gets 50% of the way and 0 runs of 8 reach the end.
+#
+# One honest note against that premise, because it is the kind of thing
+# that reads as design and is not: **the lava does nothing for the walk
+# number.** Lava is solid, so a walker strolls across the top of a moat;
+# what actually stops one is the pit a moat digs, and only a see-through
+# liquid leaves a pit. The moats here are atmosphere, and the breaks and
+# the floating landings are the barrier.
+#
+# ---------------------------------------------------------------------
+# What was here before was this same premise stated and not delivered.
 # Its elevation in the blueprint was a **flat line at lift 1** from the
 # threshold to the exit -- the owner's "half the jumps are at ground
-# level" drawn as a picture -- with three beats of nearly identical
-# 2.85-3.2 m hops on it. Six things changed and each is a measurement:
+# level" drawn as a picture -- with three beats of near-identical
+# 2.85-3.2 m hops laid along it, and a generated exit staircase that was
+# thirty of its eighty-four machinery landings. Four things changed, and
+# each is a measurement rather than a preference; they are written out
+# at the beats they belong to. The shape of it:
 #
-# * **The level now climbs inside its first beat.** The threshold, the
-#   door and the whole rack are one beat, because machinery -- the lock
-#   across the first floor break, the crossing through the hoard gate --
-#   is inserted *between* script beats and puts the body back at lift 1.
-#   A rise written in one beat and spent in the next is a rise that
-#   happens once in three visits.
-# * **Three beats became two and a filler.** A level lays nine to twelve
-#   landings; the old third beat measured 92% and was competing with the
-#   filler for a terrace that had already spent thirty landings on a
-#   generated exit staircase.
-# * **The way out is written down.** ``exit_beats`` was empty, so the
-#   exit was the generated climb -- thirty of the level's eighty-four
-#   machinery landings, and six consecutive frames of flat wall at
-#   arm's length on the contact sheet (85 jammed frames of 619, 13.7%,
-#   against the tower's 1.8%). The launch block is what does that, not
-#   the ladder: it is now at ``hug=2.8`` with the lip out at 3.8, so the
-#   last thing before the leap is a lit floor with sky behind it.
-# * **The lava was doing nothing for the walker.** Lava is solid, so a
-#   no-jump walker simply walks across the top of a lava moat -- the
-#   moats here are atmosphere and always were. What holds the number
-#   down is that from the door onward almost every landing is
-#   ``pedestal=False``: there is nothing under the route to walk to.
-# * **The floor is written out.** The gold theme's own mix is deepslate,
-#   stone, gravel, andesite, cobble and iron -- five kinds of pale grey
-#   -- and half the old sheet was a grey plate with gold cubes standing
-#   on it. Twelve materials now, all of them warm-dark or metal.
-# * **``ceiling=`` is a checked lid and against this cliff it is often
-#   refused** for a reason nothing reports: the cells it wants are
-#   inside the rock. It is spent here on the two nodes that are moves
-#   under something -- the vault door and the ledger plank -- where it
-#   is the genre's 2bc, the lid you sprint under, rather than on every
-#   landing.
+# * the level climbs *inside its first beat*, and that beat carries the
+#   showpiece too, because it is the only stretch of this level that is
+#   laid whole on every single visit;
+# * the way out is written down, and it is a **stair and not a ladder**
+#   -- the ladder was built and measured, and a fifth of its ride was a
+#   flat wall at arm's length;
+# * three beats became two and a filler;
+# * the floor palette is written out, because the theme's own is five
+#   kinds of pale grey and painted this level as a car park.
+#
+# Measured over 24 unpinned runs after all four: designed content 59% of
+# the level, 97% of it placed exactly as authored, no beat under 94%,
+# hop share 81%, and **0 jammed frames of 550** against the 85 of 619 it
+# started at.
 LEVEL = Level("THE VAULT", "gold", rise=5, gap=2.4, exit="ladder",
-              band=10.0, profile="plaza", breaks=3,
+              band=8.5, profile="plaza", breaks=4,
               landmark="hoard",
               # Warm-dark and committed: raw gold paving underfoot,
               # blackstone for everything built, bullion for the prize,
-              # lava for the light. Dark enough to light itself, which
+              # lava for the light. Dark enough to need lighting, which
               # is what puts a lamp at the far end of every stretch and
-              # nowhere in between.
+              # nothing decorative in between.
               ground="rawgold", sub="deepslate", rock="blackstone",
               accent="gold", glow="glowstone", liquid="lava",
               props=("torch", "chain", "lanternpost", "pebbles"),
               dark=0.62, step=("gold", "hop"),
               # Twelve materials with the dominant one at 17%, which is
               # the shape a real terrace of the reference measures as:
-              # one committed hue and a long tail of grit under it. The
-              # theme's own mix is five kinds of pale grey and painted
-              # this level as a car park.
+              # one committed hue with a long tail of grit under it. The
+              # gold theme's own mix is deepslate, stone, gravel,
+              # andesite, cobble and iron -- five kinds of pale grey --
+              # and half of the last contact sheet of this level was a
+              # grey plate with gold cubes standing on it.
               floor=(("blackstone", 3), ("rawgold", 3), ("gold", 2),
                      ("deepslate", 2), ("goldore", 1), ("copper", 1),
                      ("iron", 1), ("magma", 1), ("obsidian", 1),
                      ("chiselled", 1), ("tuff", 1), ("gravel", 1)),
+              # ``breaks=4`` on a full floor, against the default of two
+              # and the three this level used to carry. The old note here
+              # said a fourth break "took the whole level's placement
+              # down with it", and it was right about a design whose
+              # landings all wanted ground: a landing that needs a
+              # pedestal cannot be laid over a hole. Nearly everything
+              # here floats, so the objection is gone -- measured, same
+              # pin and same seeds, breaks 3 -> 4 moved the no-jump
+              # walker from 49% to 46% with fidelity, exactness, jam and
+              # empty frame all unchanged to the decimal.
               beats=[
-    # THE DOOR AND THE RACKING. The threshold and the whole of the
-    # level's climb in one beat, for the reason above: a rise split
-    # across a beat boundary is a rise the machinery in between undoes.
+    # THE DOOR, THE RACKING AND THE MELT -- the whole idea of the level
+    # in one beat, and *why* it is one beat is the most useful thing
+    # measured on this module.
+    #
+    # A beat is laid whole or not at all and is truncated from the end,
+    # and **machinery is inserted between beats**: the lock across the
+    # first floor break and the crossing through the hoard gate both
+    # leave the body back at lift 1. So a rise written in one beat and
+    # spent in the next is a rise that mostly does not happen, and a
+    # showpiece that depends on that rise fails silently while still
+    # reading as placed. That is exactly what happened here. With the
+    # fall and the bounce written as their own beat the pad was usually
+    # fed by a level hop rather than by a three-block drop: **the bounce
+    # fired 5 times in 20**, its landing was placed at a fallback height
+    # on 9 of 9 tries and never once as authored -- 0% exact -- and that
+    # one node dragged its beat to 76% and took the two landings behind
+    # it down with it.
+    #
+    # Moved inside this beat, where the drop off the rack is guaranteed
+    # because the rack is four nodes earlier in the same list, the
+    # **bounce fires 11 times in 16 and every node of this beat is 100%
+    # exact over 24 runs**. The whole level moved with it: designed
+    # content 51% -> 59%, exactness 93% -> 97%, hop share 85% -> 81%.
+    #
+    # An eight-node beat is against the usual advice -- a beat lays
+    # about four fifths of its nodes and the tail is where a design goes
+    # to die. It is right here because this particular beat measured
+    # **149 landings asked and 149 laid** over 24 runs: it opens the
+    # level, so it never competes with anything for terrace and it is
+    # never truncated. Check that number before adding a ninth node.
     #
     # 1. A glowstone sill flush in the raw-gold paving, lit, with a lid
-    #    two cells over it. This is the reference's own way of saying
-    #    where a level begins -- an emissive block on a rise, on screen
-    #    two seconds before it is reached, and the palette changing
-    #    completely at that block with no blend. Below is WOOLWORKS,
-    #    which is pink wool on timber; from here it is gold and black.
-    # 2. Through the vault door on foot, under its lintel, three cells
-    #    over the take-off. A doorway is walked and never jumped: one
-    #    impulse always rises 1.25 m and the head then sweeps the two
-    #    cells above every take-off, so an arc under a lid low enough to
-    #    read as a door is refused every time. It is second in the beat
-    #    and not first because a walk needs its predecessor within half
-    #    a metre and a beat boundary does not promise that.
-    # 3-5. The racking: iron shelf, a course of bars, and the lit top
-    #    tier. Three +1 hops at arc 3.2 -- a reach of 2.53 against a +1
-    #    window of 2.00-3.10, centred rather than at the top of it,
-    #    because a +1 written at 3.6 is a reach of 2.92 and is the arc
-    #    that has to fall back. What varies is not the jump, it is the
-    #    ``hug``: 2.6, 2.8, 3.0, so the rack steps *out* over the lava
-    #    as it climbs and the last tier stands clear of the wall with
-    #    the room under it.
-    #
-    # Everything after the opener is on ``step_y``, which is measured
-    # from the landing before rather than from the terrace and is
-    # therefore true wherever the opener actually came down -- it
-    # carries ``spread``, so it lands a block high or low about a fifth
-    # of the time, and ``lift + 1`` on the node after it is then a rise
-    # of two, which nothing in this motion model makes.
-    #
-    # One moat, on node 3, and node 4 floats because of it: the bowl is
-    # a radius of three and a pedestal cannot stand in the hole the
-    # landing before has just dug. The lava is the light in here as much
-    # as the lamps are.
-    #
-    # The ``cave`` shell is on the beat's **last** node, which is the
-    # only place a shell may go -- it is painted the moment its landing
-    # commits and its roof then refuses the next arc of the same beat.
-    # At lift 4 it grows a roof and no walls (``_shell`` skips a wall
-    # column with nothing under it), which is exactly what is wanted:
-    # the vault's ceiling four blocks over the top of the racking, and
-    # the dark brow across the top of the frame that this tower's shots
-    # have never had.
+    #    two cells over it. The reference's own way of saying where a
+    #    level begins: an emissive block on a rise, on screen two
+    #    seconds before it is reached, with the palette changing
+    #    completely at that block and no blend. Below is WOOLWORKS,
+    #    which is pink wool and timber; from here it is gold and black.
+    # 2. Through the vault door on foot, under its lintel three cells
+    #    over the take-off. **A doorway is walked and never jumped**:
+    #    one impulse always rises 1.25 m and the head then sweeps the
+    #    two cells above every take-off, so an arc under a lid low
+    #    enough to read as a door is refused every time. This is the
+    #    genre's 2bc -- the lid you sprint under -- and the only honest
+    #    form of it this kernel has. It is second in the beat and not
+    #    first because a walk needs its predecessor within half a metre
+    #    and a beat boundary does not promise that.
+    # 3. Up onto the bottom shelf of the racking. +1 at arc 3.2: a reach
+    #    of 2.53 against a +1 window of 2.00-3.10, centred rather than
+    #    at the top of it, because a +1 written at 3.6 is a reach of
+    #    2.92 and is the arc that has to fall back. The first lava cut
+    #    is under this jump.
+    # 4. Along that shelf on foot, under the next bar. The level's
+    #    second walk, at position four, which is where the cheapest verb
+    #    this engine has belongs: a flat leg costs the terrace two
+    #    metres where a jump costs three, so the beats behind it fit. It
+    #    floats because the moat on node 3 has just dug a bowl of radius
+    #    three and a pedestal cannot stand in a hole.
+    # 5-6. Two more +1 hops, to the course of bars and then to the lit
+    #    top tier, four blocks up and the highest ground in the body of
+    #    the level. What varies across the rack is not the jump -- all
+    #    three are the same 3.2 -- it is the ``hug``: 2.6, 2.8, 3.0, so
+    #    the shelving steps *out* over the lava as it climbs and the top
+    #    tier stands clear of the wall with the room under it.
+    # 7. **Off the top and down into the melt.** ``step_y=-3`` at arc
+    #    4.6: a reach of 3.92 against a -3 window of 3.72-6.05, and all
+    #    three of the arcs placement may try (4.6, 5.24, 5.89) are
+    #    inside it. Written on ``step_y`` rather than on ``lift`` so
+    #    that it is three blocks below *the tier the body actually
+    #    reached* -- which is what makes the next node possible.
+    # 8. **The melt throws you back out.** A slime pad is fed by the
+    #    fall onto it and by nothing else: off this drop the arrival is
+    #    13.37 m/s and the pad returns 12.83, against the 10.58 that
+    #    clearing two blocks needs, so ``step_y=2`` -- the only rise in
+    #    this engine that is not a hop -- onto a stack of bullion. Off a
+    #    two-block drop it would be 11.22 and still fire; off one block,
+    #    8.87, and it silently becomes an ordinary hop with the beat
+    #    still reading as placed. The pad is ``magma`` and not slime
+    #    because a pad's material is free -- ``SPRINGY`` is imported by
+    #    ``spiralplan`` and never read, and the physics is entirely
+    #    ``kind="bounce"`` against the previous landing's impact -- and
+    #    a green cube in a strongroom is not a place. Both nodes float:
+    #    a pad offered only cells with ground under them finds none at
+    #    the foot of a fall.
     ("door", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1, deco="lamp",
                 ceiling=2, orbs=1),
               n("blackstone", arc=2.9, step_y=0, hug=2.8, kind="walk",
                 ceiling=3, deco="lintel"),
               n("iron", arc=3.2, step_y=1, hug=2.6, moat=True, orbs=1),
+              n("chiselled", arc=2.9, step_y=0, hug=2.8, kind="walk",
+                pedestal=False, ceiling=3),
               n("gold", arc=3.2, step_y=1, hug=2.8, pedestal=False),
               n("glow", arc=3.2, step_y=1, hug=3.0, pedestal=False,
-                deco="lamp", orbs=2, shell="cave")]),
-    # THE MELT. The showpiece, written **second** and not last: a beat's
-    # budget is spent on ``arc`` and the longest arc in the last beat is
-    # eaten first, which is always the level's best jump.
-    #
-    # 1. **Off the top of the racking, three blocks down and 4.9 of arc
-    #    out, onto a magma pad standing in the lava.** A reach of 4.22
-    #    against a -3 window of 3.72-6.05. Written at ``lift=1`` with
-    #    ``spread=1`` rather than on ``step_y``, because this beat
-    #    follows either the rack at lift 4, or the rack truncated at
-    #    lift 3, or a piece of machinery at lift 1 -- and 4.22 is inside
-    #    the window at *every one* of those: level (2.00-4.26, by four
-    #    centimetres), -1, -2 and -3. A short arc here is a jump that
-    #    exists on paper at one of those heights and at none of the
-    #    others.
-    # 2. **The melt throws you back out.** A slime pad is fed by the
-    #    fall onto it and by nothing else: the arithmetic is
-    #    ``bounce_launch(impact)``, and off this drop the impact is
-    #    13.37 and the launch 12.83 against the 10.58 that clearing two
-    #    blocks needs -- so ``step_y=2``, the only rise in this engine
-    #    that is not a hop, onto a stack of bullion. Off a two-block
-    #    drop it would be 11.22 and still fire; off one block, 8.87, and
-    #    it silently becomes an ordinary hop with the beat still reading
-    #    as placed. The pad is ``magma`` and not slime because the
-    #    material of a pad is free -- ``SPRINGY`` is imported and never
-    #    read -- and a green cube in a strongroom is not a place.
-    #    ``pedestal=False`` on both: a pad offered only cells with
-    #    ground under them finds none at the foot of a fall, and the
-    #    moat has just dug the ground out anyway.
-    # 3. Across the ledger plank on foot, under an iron bar at three.
-    #    The level's second walk, at position three rather than at the
-    #    tail, because a beat lays about four fifths of its nodes and a
-    #    verb written last is written and never seen.
-    # 4. Down off the stack onto the first pier, one block and 4.4 of
-    #    arc -- a reach of 3.72 against a -1 window of 2.35-4.98. The
-    #    level's second-longest jump, and it hands the filler a body at
-    #    lift 2 over the melt rather than on the floor.
-    ("melt", [n("magma", arc=4.9, lift=1, form="slime", hug=3.4, spread=1,
+                deco="lamp", orbs=2),
+              n("magma", arc=4.6, step_y=-3, form="slime", hug=3.4,
                 pedestal=False, moat=True, orbs=2),
               n("gold", arc=3.6, step_y=2, kind="bounce", hug=2.8,
-                spread=1, pedestal=False, orbs=3),
-              n("chiselled", arc=2.9, step_y=0, hug=3.0, kind="walk",
-                pedestal=False, ceiling=3, deco="lintel"),
-              n("blackstone", arc=4.4, step_y=-1, hug=3.2, pedestal=False,
-                orbs=2)]),
-], filler=[
-    # THE PIERS, and on a level whose script is nine landings this is
-    # most of what is seen, because the filler repeats and a script's
-    # tail does not. Three landings that close into a loop: a blackstone
-    # pier standing in the melt, a gold ledger plank walked across to
-    # the next one, and a half-height shelf of iron bars.
+                spread=1, pedestal=False, orbs=3)]),
+    # THE LEDGER ROOM. The quiet beat, and the level's only interior.
+    # Four landings: onto a pier, across the ledger plank on foot under
+    # a bar, up onto the bullion with the second lava cut under the
+    # jump, and then **down one block and 4.4 of arc out** onto the last
+    # pier -- a reach of 3.79 against a -1 window of 2.35-4.98, the
+    # level's second-longest jump, and the one that hands the filler a
+    # body at lift 2 over the lava rather than back on the floor.
     #
-    # It opens at **lift 2**, not lift 1. Following another script beat
-    # that is free and it is the one real lever a level has against
+    # It opens at ``lift=2`` with ``spread=2``. Following the beat above
+    # that is free, and it is the one real lever a level has against
     # "half the jumps are at ground level"; following machinery it costs
-    # a fallback, which ``spread=2`` covers. The seam where the loop
-    # closes is a jump too -- half a filler's fidelity is lost there --
-    # and it is a -0.5 off the slab across 3.4 of arc, a reach of 2.73
-    # against a window that opens at 2.00.
+    # a fallback, which the spread covers.
     #
-    # The shelf is ``form="slab"``, written on ``lift`` and not on
-    # ``step_y``: a slab stands half a block down in its own cell, so
-    # ``lift 3`` is a walking surface at 3.5 and a *half* step up off
-    # the plank. Slabs and stairs are the commonest non-cube form in the
-    # reference by a wide margin and this tower barely uses them; a
-    # half-height ledge is cheap, reads as deliberate architecture, and
-    # buys reach (3.78 m at +0.5 against 3.10 at +1).
+    # The second moat is here rather than in the filler and it is for
+    # the eye, not for a number: measured, adding it moved empty frame,
+    # jam, fidelity and walk coverage by nothing at all. What it does is
+    # make the level's own premise true past its first third. The
+    # contact sheet before it had a glowing floor for eight frames and
+    # then black and grey towers against open sky for the rest.
     #
-    # No moat anywhere in here, and that is not taste: the filler loops,
-    # and the second lap digs away the ground the first lap's pedestals
-    # are standing on. This level's lava is in the two beats that play
-    # once.
+    # The ``shell="cave"`` is on the beat's **last** node, which is the
+    # only place a shell may go: it is painted the moment its landing
+    # commits and its roof then refuses the next arc of the same beat.
+    # At lift 2 it grows a roof and open sides -- ``_shell`` skips a
+    # wall column with nothing under it -- which is what is wanted here,
+    # because what this level's sheet is short of is not walls but the
+    # dark brow across the top of the frame that the reference has in
+    # 73% of its shots.
+    ("ledger", [n("blackstone", arc=3.4, lift=2, hug=2.8, spread=2,
+                  ceiling=2, orbs=1),
+                n("chiselled", arc=2.9, step_y=0, hug=3.0, kind="walk",
+                  ceiling=3, deco="lintel"),
+                n("gold", arc=3.2, step_y=1, hug=2.6, pedestal=False,
+                  moat=True, orbs=1),
+                n("blackstone", arc=4.4, step_y=-1, hug=3.4,
+                  pedestal=False, shell="cave", orbs=2)]),
+], filler=[
+    # THE PIERS. The filler repeats and a script's tail does not, so the
+    # level's character lives here: a blackstone pier standing in the
+    # melt, a gold ledger plank walked across to the next one, and a
+    # half-height shelf of iron bars.
+    #
+    # The shelf is ``form="slab"``, written on ``lift`` and deliberately
+    # not on ``step_y``: a slab stands half a block down in its own
+    # cell, so ``lift 3`` is a walking surface at 3.5 and a *half* step
+    # up off the plank. Stairs and slabs are the commonest non-cube form
+    # in the reference by a wide margin and this tower barely uses them;
+    # a half-height ledge is cheap, reads as deliberate architecture and
+    # buys reach -- 3.78 m at +0.5 against 3.10 at +1.
+    #
+    # The seam where the loop closes is a jump like any other, and half
+    # of what a filler ever loses is there: it is -0.5 off the slab
+    # across 3.4 of arc, a reach of 2.73 against a window that opens at
+    # 2.00.
+    #
+    # No ``moat`` anywhere in here, and that is not taste. The filler
+    # loops, and the second lap digs away the ground the first lap's
+    # pedestals are standing on -- measured elsewhere at 27,859
+    # "pedestal will not stand" refusals from one keyword. This level's
+    # lava is in the two beats that play once.
     ("piers", [n("blackstone", arc=3.4, lift=2, hug=2.8, spread=2,
                  ceiling=2, orbs=1),
                n("gold", arc=2.9, step_y=0, hug=2.6, kind="walk",
@@ -223,47 +268,89 @@ LEVEL = Level("THE VAULT", "gold", rise=5, gap=2.4, exit="ladder",
                n("iron", arc=3.6, lift=3, form="slab", hug=3.0,
                  pedestal=False, orbs=1)]),
 ], exit_beats=[
-    # THE STRONGROOM SHAFT. Written out rather than left to the
-    # generated climb, which hangs its column mid-lane with nothing
-    # within a cell of its middle index to anchor on, is refused
-    # silently, and hands the level a six- or seven-step staircase
-    # instead -- thirty landings of the eighty-four this level used to
-    # spend on machinery. Check ``--report``'s move mix for the word
-    # ``climb``; if it is missing, this is a staircase again.
+    # THE STRONGROOM STAIR. Five landings written out rather than left
+    # to the generated climb, which hangs its ladder column mid-lane
+    # with nothing within a cell of its middle index to anchor on, is
+    # refused silently, and hands the level a six- or seven-step
+    # staircase instead -- thirty of the eighty-four machinery landings
+    # this level used to spend, with nothing anywhere reporting it.
     #
-    # Three landings. The foot of the shaft, lit, at **hug 2.8**; four
-    # blocks of ladder; and a gold lip **out at hug 3.8** with a lid
-    # over it.
+    # **It is a stair and not a ladder, and that is this module's
+    # largest single measurement.** A ladder was written first and
+    # exactly to the recipe -- launch at ``hug=2.8``, ``step_y=4``, its
+    # own pedestal to anchor on, no shaft shell, the lip thrown out to
+    # 3.8 -- and it worked: ``climb`` appeared in the move mix 16 times
+    # and the exit cost three landings instead of five. And a fifth of
+    # the ride was a flat blackstone wall at arm's length. Instrumented
+    # over four seeds by bucketing every jammed frame by the segment
+    # *and the move* that laid it:
     #
-    # The two ``hug`` numbers are the whole of this level's worst
-    # measurement. The old sheet had six consecutive frames of flat wall
-    # at arm's length during the climb out -- 13.7% of the level's
-    # frames against the tower's 1.8% -- and the launch block is what
-    # causes that, not the ladder: measured elsewhere on this tower, a
-    # launch at ``hug=2.2`` gives 69 jammed frames of 1,293 and the same
-    # level at 2.8 gives 0 of 1,280. ``hug`` on the climb node itself is
-    # inert. The lip is thrown out to 3.8 for the other half of it: the
-    # camera locks onto the landing through take-off and flight, so a
-    # lip tucked against the core aims the whole ride at the cliff.
+    #     ascent/climb    545 frames   114 jammed   20.9%
+    #     every other move in the level              0.0%
     #
-    # ``pedestal=True`` on the column is the load-bearing line and the
-    # reason this branch fires at all -- ``_climb_move`` wants solid
-    # rock within one cell of the column at its middle index and at its
-    # top, and out in the lane the landing's own stack is the only
-    # candidate there is. There is deliberately no ``shell="shaft"``
-    # round it: the tube is what puts the body inside the wall.
+    # 114 of the level's 135 jammed frames were the ride, and the rays
+    # were hitting the column's own pedestal. That is not something to
+    # tune around: the wall a ladder hangs on *is* the wall in the lens,
+    # and no ``hug`` moves it, because ``hug`` on a climb node is inert.
+    # Four arms, same pin, same seeds, swapped on the live ``Level``
+    # inside one process with nothing else changed:
     #
-    # The arithmetic of the height: the foot is lift 1, the ladder gains
-    # four, the lip gains one, and the crossing into THE WEIR descends
-    # one -- a surface of 7.0 against the next terrace's 6.0, which is
-    # exactly this level's ``rise`` of 5. A column that overshoots is a
-    # level above that opens by dropping back down to its own terrace,
-    # which is the owner's "it puts a ladder there and then jumps back
-    # down to a lower part".
-    n("glow", arc=3.2, lift=1, hug=2.8, spread=2, deco="lamp", orbs=1),
-    n("blackstone", arc=2.4, step_y=4, kind="climb", climb_style="ladder",
-      hug=2.0, pedestal=True, pedestal_style="blackstone", spread=0,
-      orbs=2),
-    n("gold", arc=3.2, step_y=1, hug=3.8, spread=0, pedestal=False,
-      ceiling=3, orbs=2),
+    #     ladder, 3 landings             designed 145  jam 5.4%  ride jam 114
+    #     6-tread stair, stair budget    designed 137  jam 1.0%  ride jam   0
+    #     6-tread stair, ladder budget   designed 146  jam 1.1%  ride jam   4
+    #     **5-tread stair, ladder budget designed 145  jam 1.0%  ride jam   0**
+    #
+    # Unchecked placements were 0 and exactness 100% in all four. RULES
+    # 3 says a climb exit belongs on about one level in five and is for
+    # a level whose *idea* is the climb; this level's idea is the melt
+    # and the racking, and the ladder was spending a fifth of its worst
+    # frames to say otherwise.
+    #
+    # ``exit="ladder"`` in the header is therefore a **budget
+    # declaration and not a description of this list**: it reserves
+    # three landings' worth of terrace rather than a staircase's seven.
+    # The authored exit is five, so it is under-reserved by about five
+    # metres of arc -- deliberately, and measured. With the honest stair
+    # reserve the beats above lose the terrace they need and the
+    # ``piers`` filler never plays at all: 0 landings in 16 runs against
+    # 7, and designed content 137 against 145. If a neighbour's rewrite
+    # ever pushes this exit into the chasm -- the symptoms are unchecked
+    # placements above zero, or ``ascent`` landings climbing past six --
+    # set ``exit="stair"`` and take that loss.
+    #
+    # The shape: the foot of the stair is a lit landing at **lift 2**,
+    # which is what makes it five treads and not six; then gold and
+    # blackstone treads a block at a time on ``step_y``, so each is a
+    # rise from the tread before rather than from a terrace the body may
+    # not be standing on; and the last is a lit lip **out at hug 3.6**
+    # with nothing under it. The lip is thrown out rather than tucked in
+    # at 2.4 because the camera locks onto the landing through take-off
+    # and flight: a lip against the core aims the last second of the
+    # level at the cliff.
+    #
+    # Every tread carries a lid. The exit is the emptiest third of any
+    # level in this tower -- a staircase with sky on five sides of it --
+    # and a ``ceiling`` beam is the cheapest overhead mass a level
+    # author has and is legal over a +1 hop, whose apex is 1.25 against
+    # a lid at three. Measured here, same pin and same seeds: empty
+    # frame 46.7% -> 45.9%, for no change at all in fidelity, exactness,
+    # unchecked count or jam. It also darkens the climb, which on a
+    # vault is the right direction.
+    #
+    # The arithmetic of the height: the foot is lift 2, four treads gain
+    # four, and the crossing into THE WEIR descends one -- a surface of
+    # 7.0 against the next terrace's 6.0, which is exactly this level's
+    # ``rise`` of 5. A stair that overshoots is a level above that opens
+    # by dropping back down onto its own terrace, which is the owner's
+    # "it puts a ladder there and then jumps back down to a lower part".
+    n("glow", arc=3.2, lift=2, hug=2.8, spread=2, deco="lamp", ceiling=3,
+      orbs=1),
+    n("gold", arc=3.0, step_y=1, hug=2.6, spread=0, confine=True,
+      ceiling=3),
+    n("blackstone", arc=3.0, step_y=1, hug=2.8, spread=0, confine=True,
+      ceiling=3),
+    n("gold", arc=3.0, step_y=1, hug=3.0, spread=0, confine=True,
+      ceiling=3, orbs=1),
+    n("glow", arc=3.0, step_y=1, hug=3.6, spread=0, pedestal=False,
+      ceiling=3, deco="lamp", orbs=2),
 ])

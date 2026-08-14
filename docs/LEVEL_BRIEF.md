@@ -134,6 +134,17 @@ the rest and is worth reading in full.
   leaving the move mix *by name*, hop share going 82% -> 87% through the rule,
   and the level getting 16% **shorter** in frames. Check the move mix by name
   after any change near your exit.
+- **Do not exit by ladder.** Measured properly on one level, bucketing every
+  jammed frame by segment *and* move over four seeds: the `ascent/climb` ride
+  was **20.9% jammed** and every other move in that level was **0.0%** — 114 of
+  its 135 jammed frames were the ride, with the rays hitting the ladder's own
+  pedestal. It is not tunable: the wall a ladder hangs on *is* the wall in your
+  lens, and `hug` on a climb node is inert. Same level, same seeds, four arms:
+  a **five-tread stair** read jam 1.0% against the ladder's 5.4% for *identical*
+  designed content (145 landings each). A bubble is the other good answer —
+  4.7x the ride speed, one level measured 14.9% -> 6.6% swapping to it. Ladders
+  are a third of the roster's exits and they are the single biggest remaining
+  visual defect in the tower. Pick a stair or a bubble.
 - **A bubble column beats a ladder for an exit, and it is not close.** A body
   rides a ladder at 2.35 m/s and a bubble at 11.0, so the same eight blocks
   are on screen for a quarter of the time — and a climbing body has its face

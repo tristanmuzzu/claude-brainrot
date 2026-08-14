@@ -7,7 +7,8 @@ and ``docs/TOWER.md``.
 
 from ._base import Level, n
 
-# A whitewashed campanile over a churchyard that has flooded to the sill.
+# A pale limestone campanile over a churchyard that has flooded to the
+# sill.
 #
 # One sentence: *you come in through the lych-gate at path level, and
 # from there the ground is water -- you cross the drowned nave on the
@@ -21,11 +22,11 @@ from ._base import Level, n
 # same three materials. Two levels of thirty-three share the ``village``
 # theme and they cannot both be a red street. So this one is the other
 # thing a village has: the stone thing at the end of it, pale and
-# vertical, with water round its foot. Bone-white plaster and moss where
-# level 3 is terracotta and tile; a shelf with the drop outboard where
-# level 3 is a full plaza; the route on a *tower* where level 3's route
-# is on roofs. Between a black sculk gallery below and a wool level
-# above, this is the pale one.
+# vertical, with water round its foot. Bone and honey stone with moss in
+# the joints where level 3 is terracotta and tile; a shelf with the drop
+# genuinely outboard where level 3 is a full plaza; the route on a
+# *tower* where level 3's route is on roofs. Between a black sculk
+# gallery below and a wool level above, this is the pale one.
 #
 # **``rise=4`` is the smallest in the tower, and that is the budget this
 # level spends.** The exit reserve is ``(need + 1) * 3.2`` measured from
@@ -181,7 +182,7 @@ LEVEL = Level("THE BELFRY", "village", rise=4, gap=3.0, exit="ladder",
                 pedestal=False, pedestal_style="spruce", ceiling=3,
                 orbs=2),
               n("mossy", arc=3.4, lift=1, hug=4.2, spread=0,
-                pedestal=False, moat=True, orbs=1)]),
+                pedestal=False, moat=True, ceiling=3, orbs=1)]),
 ], filler=[
     # The tower, and on a level that lays about eleven designed landings
     # this loop is more than half of them -- it repeats and the tail of
@@ -249,11 +250,40 @@ LEVEL = Level("THE BELFRY", "village", rise=4, gap=3.0, exit="ladder",
     # five, for a level whose *idea* is the climb. A bell tower is the
     # example that rule is written about.
     #
-    # **The launch block is at ``hug=2.8``, and that is the level's
-    # jammed-lens number.** Measured elsewhere on this tower: 69 jammed
-    # frames of 1,293 with the launch at 2.2 and 0 of 1,280 at 2.8.
-    # ``hug`` on the climb node itself is inert -- 2.0 through 3.0
-    # produce identical worlds -- so only this one matters.
+    # **The launch block's ``hug`` is most of the level's jammed-lens
+    # number.** With the design settled, jam by segment over four seeds
+    # and 2,430 frames reads **nave 0%, cornice 0%, lychgate 0%** --
+    # every wall-filled frame this level has is machinery. At the 2.8
+    # the rest of the tower settled on, the level reads **3.7%**; at
+    # 3.2, **1.2%**, for 2.3 points of empty frame. Further out again
+    # (3.6) buys no more jam and costs another point of sky, so 3.2 is
+    # the knee. ``hug`` on the climb node itself is inert -- 2.0 through
+    # 3.0 produce identical worlds -- so only this one matters.
+    #
+    # What is left at 1.2% is **the bell's own posts**, and it is not
+    # fixable from here. Sampling the material every ray lands on when
+    # most of the lens is close: 709 hits of sandstone under the
+    # ``landmark`` crossing against 141 anywhere else. ``_lm_g_bell``
+    # stands two five-tall columns of ``theme.rock`` one cell either
+    # side of a three-cell passage and the course is steered between
+    # them -- so being under the bell is a wall to the left and a wall
+    # to the right, by construction. Whatever ``rock`` is made of, it is
+    # a wall; the landmark is frozen and this is the price of it, and
+    # the frames either side of it are the best in the level.
+    #
+    # **And the ladder carries no beam, which was tried and is the
+    # trap this document warns about.** ``ceiling=3`` on the climb node
+    # -- the joists under the ringing floor, and the exit climb is 36%
+    # of the frames spent on this level and the emptiest part of any
+    # level in this tower -- measured **48.1% empty down to 45.3%** with
+    # the jam unmoved, and it is a mirage: the lid stands in the ladder
+    # column, ``_climb_move`` finds nothing to hang on, and the climb
+    # silently becomes hops. The giveaway is that the level got 16%
+    # *shorter* in frames, because a ladder is ridden at 2.35 m/s and a
+    # hop is not, and the proof is that ``climb`` left the move mix by
+    # name and the hop share went 82% to 87%, through the 85% rule.
+    # Nothing reports it. Check the mix for ``climb`` after touching
+    # anything here.
     #
     # **No ``shell="shaft"`` round it**, which the version this replaces
     # had. The tube is what puts the body inside the wall, and the
@@ -273,7 +303,7 @@ LEVEL = Level("THE BELFRY", "village", rise=4, gap=3.0, exit="ladder",
     # above it, and the crossing comes down onto it. What it must not do
     # is finish *below* four, which is why the footing is an absolute
     # ``lift`` rather than a ``step_y`` and why it is 2 rather than 1.
-    n("glow", arc=3.4, lift=2, hug=2.8, spread=1, confine=True,
+    n("glow", arc=3.4, lift=2, hug=3.2, spread=1, confine=True,
       pedestal_style="cobble", ceiling=3, deco="lamp", orbs=1),
     n("rock", arc=2.4, step_y=4, kind="climb", climb_style="ladder",
       hug=2.4, pedestal_style="cobble", spread=0, confine=True, orbs=2),
