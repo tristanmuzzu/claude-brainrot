@@ -62,7 +62,7 @@ from ._base import Level, n
 # the same colour rather than as a mushroom that wandered in from
 # another biome, and the course runs *under* its cap.
 LEVEL = Level("REEF GARDEN", "coral", rise=6, gap=2.8, exit="bubble",
-              band=11.0, profile="ledge", shelf=4.5, breaks=0,
+              band=11.0, profile="ledge", shelf=4.5, breaks=3,
               landmark="greatcap",
               ground="sand", sub="sandstone", rock="prismarine",
               accent="coral_red", glow="sealantern", liquid="water",

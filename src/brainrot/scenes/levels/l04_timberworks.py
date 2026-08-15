@@ -62,7 +62,7 @@ from ._base import Level, n
 # lap); 1 gives 44% and **34%**; 2 gives 45% and 40%; 3 gives 39% and
 # 48%. One break is the only one that is comfortably inside both.
 LEVEL = Level("THE TIMBERWORKS", "mine", rise=5, gap=2.6, exit="ladder",
-              band=11.0, profile="plaza", breaks=1, landmark="crane",
+              band=11.0, profile="plaza", breaks=3, landmark="crane",
               ground="oak", sub="darkoak", rock="spruce", accent="log",
               glow="lantern", liquid="water", dark=0.45,
               step=("oak", "hop"),

@@ -63,7 +63,7 @@ from ._base import Level, n
 # composition rule: dark mass across the top of the frame, the level's
 # own pale ground across the bottom, sky as a slot between them.
 LEVEL = Level("THE BELFRY", "village", rise=4, gap=3.0, exit="ladder",
-              band=9.5, shelf=4.0, profile="ledge", breaks=0,
+              band=9.5, shelf=4.0, profile="ledge", breaks=3,
               landmark="bell",
               # Warm limestone, green moss and dark timber. ``rock`` is
               # the bell frame's own posts as well as the terrace's

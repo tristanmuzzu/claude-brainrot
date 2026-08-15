@@ -70,7 +70,7 @@ from ._base import Level, n
 #   treads still reach lift 3 and still drop two into the flood, which
 #   is the shape; the fourth only bought a block.
 LEVEL = Level("SUNKEN TEMPLE", "desert", rise=4, gap=2.6, exit="bubble",
-              band=9.0, profile="plaza", shelf=4.0, breaks=0,
+              band=9.0, profile="plaza", shelf=4.0, breaks=3,
               landmark="arch",
               ground="sandstone", sub="terracotta", rock="chiselled",
               accent="gold", glow="glowstone", liquid="water",

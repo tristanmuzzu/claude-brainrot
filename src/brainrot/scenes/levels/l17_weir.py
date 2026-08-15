@@ -133,7 +133,7 @@ from ._base import Level, n
 #   the aim at one corridor bend, which is the tower's own open item 1
 #   and not something a level can fix from here.
 LEVEL = Level("THE WEIR", "plains", rise=7, gap=3.0, exit="bubble",
-              band=11.0, shelf=5.0, breaks=0, landmark="tree",
+              band=11.0, shelf=5.0, breaks=3, landmark="tree",
               ground="moss", sub="gravel", rock="stonebrick",
               accent="darkoak", glow="lantern", liquid="water",
               # Fifteen distinct kinds once the four roles are added on

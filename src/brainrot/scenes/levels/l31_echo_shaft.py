@@ -102,7 +102,7 @@ from ._base import Level, n
 #   enough for calcite to read as white against the sculk, and it is the
 #   calcite that carries every frame's value contrast.
 LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="stair",
-              band=10.5, shelf=4.5, profile="plaza", breaks=0,
+              band=10.5, shelf=4.5, profile="plaza", breaks=3,
               landmark="crane",
               # Black ground, black cliff, and everything the shaft-
               # sinkers built in white calcite, so the level is the one

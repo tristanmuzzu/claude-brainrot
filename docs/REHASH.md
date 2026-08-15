@@ -1,11 +1,26 @@
-# The parkour rehash: a level is a climb you cannot re-enter
+# The parkour rehash: the course flies over its terrace
 
-Plan only. Nothing here is built yet. Written 2026-08-16 from the owner's
-review of the live tower, and it supersedes parts of `docs/RULES.md` and
+**Built 2026-08-16.** Written first as a plan, from the owner's review of the
+live tower, and then carried out in one pass across the engine, all thirty-three
+level modules and the probes. It supersedes parts of `docs/RULES.md` and
 `docs/RESEARCH.md` — see § "What this retires".
 
 Read `docs/TOWER.md` for the tower's design and `docs/RULES.md` for the
-constitution a level satisfies today. This document changes the constitution.
+constitution a level satisfies. This document changed that constitution.
+
+**Where it ended up**, 6 runs × 260 landings unless said otherwise:
+
+| | before | after |
+|---|---|---|
+| missed jumps that walk back into the course | **87.9%** | **2.0%** |
+| levels with one | all of them | **1 of 33** |
+| landings resting on the terrace | 15.9 a level (80%) | **3.3 a level (17%)** |
+| a level walked end to end, no jumps | 2 of 24 | **0 of 55**, 34% mean |
+| landmarks framed at 25° / 40° | 55% / 30% | **68% / 63%** |
+| unchecked emergency placements | 0.31% | **0.64%** |
+| the design placed as authored | 97.9% | **95.6%** |
+| designed content, share of the course | 52% | **58%** |
+| frame cost against `parkour` in one process | 1.46 | **1.78** |
 
 ---
 
@@ -48,34 +63,46 @@ test is **reachability**:
 
 > **P-RE.** A body that misses a jump, falls, and then walks — stepping up at
 > most one block, dropping any distance, never jumping — must not arrive back
-> at any landing of that level except its **first**.
+> at any landing of that level except its **entry apron**.
 
 Three outcomes for a missed jump and only one of them is a defect. **Dead**:
 it lands in the void, or on ground that connects to nothing. **Back to the
-start**: it can walk to the level's first landing and begin again — this is
-what the owner describes and it is the *wanted* outcome. **Shortcut**: it can
-walk back to landing 1 or later, so the fall cost nothing and every jump
-before the one it re-enters at was decoration. Target: **zero shortcuts.**
+start**: it reaches the entry apron and no further — this is what the owner
+describes and it is the *wanted* outcome. **Shortcut**: it can walk back onto
+anything above that apron, so the fall cost nothing and every jump before the
+one it re-enters at was decoration. Target: **zero shortcuts.**
+
+**The apron is geometry, not generosity**, and getting that definition right
+was most of the probe's development. A level below tops its climb out one
+block over this terrace so that its crossing can *descend* onto it; the
+crossing lands on the terrace itself; and the first landing off the terrace
+can only be one block up, because nothing rises two in one ballistic move. All
+of those are walkable from the ground whatever anybody designs, they arrive
+interleaved rather than in a neat prefix, and walking back to any of them is
+walking back to the beginning. So the apron is *every* landing at or under one
+block over the terrace, capped at six — and what stops a level living down
+there is the design check, which allows exactly one.
 
 Written: `tools/reentry_probe.py`, held by `tests/test_reentry.py`.
 
-**The baseline, 6 runs × 260 landings of the tower as it stands:**
+**The baseline it started from, and where it is now** (the same probe, 4–6
+runs × 240–260 landings):
 
-| | now | target |
+| | before | after |
 |---|---|---|
-| missed jumps that are a **shortcut** | **87.9%** | **0** |
-| — back to the start | 5.1% | (fine) |
-| — dead | 7.0% | (fine) |
-| levels with at least one shortcut | **71 of 71** | 0 |
-| landings standing on the terrace | 80.2%, **15.9 a level** | 1–2 a level |
-| levels that never drop | **1 of 71** | all |
-| air under a landing | median **0** blocks | — |
+| missed jumps that are a **shortcut** | **87.9%** | **2.0%** |
+| — back to the apron | 5.1% | 30.8% |
+| — dead | 7.0% | **67.2%** |
+| levels with at least one shortcut | **71 of 71** | **1 of 33** |
+| landings standing on the terrace | 80.2%, 15.9 a level | **17%, 3.3 a level** |
+| air under a landing | median **0** blocks | median **2** |
 
-Two things follow immediately, and they are the whole rebuild:
+Two things follow, and they are the whole rebuild:
 
-- **A level climbs, monotonically, from its floor to its exit.** Start on the
-  terrace, and every landing after that is at or above the one before. The
-  level ends at the height the next level's floor wants. "Always going higher
+- **A level climbs.** Start on the terrace, gain a block, and cruise three to
+  six blocks over it for the rest of the level; a drop of up to three is a
+  showpiece and anything more is the deck coming back down. The level ends
+  higher than it began and the way out finishes the job. "Always going higher
   and higher above the level from start to finish, and then the next level
   starts and it goes again."
 - **The terrace stops being the ground the course stands on and becomes the
@@ -88,106 +115,127 @@ Falls therefore do not need void beneath them. They need the terrace under
 them to be **unable to climb back**, which is true for free once the course is
 three or more blocks above it with no pedestal, no staircase and no ramp.
 
-## 3. What this does to the shape of a level
+## 3. What it did to the shape of a level
 
-**The exit climb dissolves, and that is the largest single win here.** Today
-the climb out is a separate appendage: 29–37% of every level, a staircase of
-treads hugging the core, authored by all 33 levels via `exit_beats` with
-`_ascent_stair` underneath as a fallback. It is also, by construction, both
-the most floor-attached thing in the tower and a literal re-entry path.
+**The exit climb shrank, and that was the largest single win.** It was a
+separate appendage: 29–37% of every level, a staircase of treads hugging the
+core, authored by all thirty-three levels via `exit_beats` with
+`_ascent_stair` underneath as a fallback — simultaneously the most
+floor-attached thing in the tower and a literal re-entry path.
 
-If the level itself climbs from its floor to the next level's floor, the exit
-is just the last two or three beats of the level. `ascent` stops being a third
-of the course; the crossing over the chasm remains, and it is the one place a
-level is allowed to lose a block (`hop_span(-1)` reaches 4.98 m against a
-level 4.26, which is why the crossing descends by design).
+A level's course now cruises two to six blocks over its own terrace, so the
+way out has only `rise + 1 - deck` left to gain: one to three treads where it
+used to be five or seven. The authored *share* of the exit therefore fell —
+46% against 55% — while the design got better, because what fills the gap is
+the crossing and the walk along the last of the terrace to it, both aimed at
+the chasm rather than written down. `tests/test_tower.py` was rewritten to
+hold what now matters: the improvised staircase stays under 30% of the exit,
+and the design, the crossing and the walk to it are over 70% of it together.
 
-**A level's climb budget is its `rise`.** Roster today: rise 4 (8 levels), 5
-(7), 6 (8), 7 (5), 8 (5). Over nine to twelve landings, a rise of 5 is five
-`+1` hops and the rest flat — comfortably inside the physics, since nothing
-rises two blocks in one ballistic move and consecutive hops may rise at most
-one.
+The crossing itself is untouched, and it is still the one place a level is
+allowed to lose a block (`hop_span(-1)` reaches 4.98 m against a level 4.26,
+which is why it descends by design).
 
-**Floor contact is a budget, not an accident.** One landing per level touches
-the terrace — the opener. A second is allowed where the level's idea needs it
-(a landmark's threshold, a doorway). Everything else is airborne or stands on
-authored structure that itself does not reach the ground.
+**`Level.deck` is the number the rest of the machinery aims at**: where the
+script and the filler leave the body, computed once in `levels/_base.py`. A
+gated landmark stands on a plinth that tall; the exit knows what is left to
+climb; the design check knows what the filler has to come back to.
+
+**Floor contact is now a budget of one.** The apron is the level's beginning;
+everything after it is at least two blocks up. Measured, the tower runs at 3.3
+floor-contact landings a level, and every one of them is geometry rather than
+design: the crossing's own landing on the terrace, the apron, and the tread
+the level below topped out on.
 
 ## 4. What this retires
 
 State it plainly so nobody re-derives it as a regression:
 
 - **`bypass_probe`'s 46% target goes.** `docs/RESEARCH.md` measured the real
-  Parkour Spiral save at 46% no-jump walk coverage and we deliberately match
-  it at 47%. The reference map is paced for a twenty-minute run; this strip is
-  on screen for fifteen seconds. The owner has asked for the harder thing
-  knowingly. Coverage becomes a *reported* number, not a criterion.
-- **"Levels are not monotonic climbs" goes.** RESEARCH.md §: 36 of 43
-  reference levels descend somewhere and 22 dip below their own start. We are
-  deliberately doing the opposite. The one sanctioned descent is the chasm
-  crossing.
+  Parkour Spiral save at 46% no-jump walk coverage and the tower deliberately
+  matched it at 47%. The reference map is paced for a twenty-minute run; this
+  strip is on screen for fifteen seconds. Coverage is a *reported* number now
+  — and it came out at **34% mean, 0 of 55 levels walkable end to end**, which
+  is harder than the reference rather than softer.
+- **"Levels are not monotonic climbs" goes.** RESEARCH.md: 36 of 43 reference
+  levels descend somewhere and 22 dip below their own start. This tower climbs
+  on balance and its drops are showpieces of at most three blocks.
 - **"Levels descend by falling off edges" goes** as a source of free variety.
-  A fall is now a failure state, not a route.
-- **`docs/RULES.md` §0 and §3 need rewriting** against P-RE once Phase 1
-  lands.
+  A fall is a failure state now, not a route.
+- **`breaks=0` goes with the lock.** Nineteen levels had chosen no floor
+  breaks because any break at all forced the lock, and the lock cost them one
+  to three landings. A course three blocks up flies over a break, so the lock
+  is skipped and breaks are free obstacles again: the whole roster is at three
+  or four, and that alone took a no-jump walker from 70% of a level to 48%
+  and from 2 levels walkable end to end to none.
 
-Nothing about the *look* is retired: material counts, the 14-material floors,
-enclosure, landmarks, the groove, the frame-emptiness budget all stand.
+Nothing about the *look* is retired: material counts, the fourteen-material
+floors, enclosure, landmarks, the groove and the frame-emptiness budget all
+stand, and the terrace is untouched.
 
-## 5. Engine work (Phase 1)
+## 5. The engine, as built
 
-Ordered by how much of the complaint each closes.
+1. **`pedestal_default = False` on `handplan.Course`.** A landing that cannot
+   build a column to the ground used to be *refused*; floating is the default
+   here and the generated tower keeps the opposite, which is the one thing the
+   two formats genuinely disagree about.
+2. **`lift_floor = DECK_MIN`.** `spread` lets placement fall back through
+   neighbouring heights, and an authored landing three blocks up was quietly
+   being placed one block up. A fallback may go up and never under the deck;
+   the floor never rises above what the node asked for, so the apron keeps its
+   own height.
+3. **Machinery keeps the body's height.** `_here_lift()` — floored at two,
+   because the one place the body legitimately is lower is the apron and a hop
+   from there to two is an ordinary +1. It is used by the lock's approach and
+   island, the doorway's approach, `_recover_lifts` and the unchecked
+   emergency landing. Every one of those asked for `lift=1` before, which on a
+   climbing level is a staircase down to the terrace and back.
+4. **The lock is skipped while the course is flying.** It exists to get a body
+   across a hole in ground it is running on; three blocks up the hole is
+   scenery. The break stays uncrossed and unmarked, so a level whose course
+   does come back down is still offered it.
+5. **A gated landmark stands on a plinth as tall as the level's deck**, so the
+   course goes through its doorway rather than past its foot — and the plinth
+   stops short of the passage, so a fall through the doorway carries on down
+   instead of landing in it. Worth 4.5 points of re-entry and 1.6 points of
+   unchecked placement on its own, and it took landmarks framed at 40° from
+   30% of levels to 63%.
+6. **`noclimb`: nothing may be built in the ring beside a landing, between the
+   terrace and the landing's own height.** Terrain dressing was three quarters
+   of what was left once the designs were raised — the landings were out of
+   reach and the scenery beside them was a staircase. Reserved rather than
+   checked, because dressing runs after the course is laid.
+7. **The exit starts from the deck.** Eighteen levels opened their exit with
+   an absolute `lift` — the foot of a staircase standing on the ground — which
+   on a flying course is the whole level dropping back down. They are written
+   `step_y=0` now, and `_feat_ascent` prepends one +1 hop when a level is
+   entered so late that its own beats never climbed.
 
-1. **`pedestal` defaults to `False`** in `Course._node`. Today a landing that
-   cannot build a column to the ground is *refused* (`_pedestal`: "never found
-   ground: it is a stilt"), so floating is opt-in per node. Invert it. The 1–2
-   floor-contact landings a level is allowed say `pedestal=True` explicitly.
-2. **Monotonic lift, enforced.** A design-time check in
-   `tools/tower_probe.py --design-only` (instant, no world) refusing any
-   authored node whose surface is below the one before it, bar the crossing.
-   Cheap, and it catches the whole class before anything is rendered.
-3. **The exit becomes the level's own last beats.** `exit_beats` stays as a
-   mechanism; `_ascent_stair` becomes a genuine emergency rather than 17% of
-   the climb. Watch the stuck rate here — this is the change most likely to
-   move it, and `TRACE` round `Course._attempt` is how it gets diagnosed.
-   Every reduction this format has ever had came from reading that table and
-   not one from reading the code.
-4. **`Course._walk_bridge` stops laying free ground.** It currently lays
-   terrain under any `walk` leg that crosses air — 98% of walk legs did — which
-   is a re-entry path being built automatically under the one verb that is not
-   a jump. A walk becomes an authored platform or the leg is refused.
-5. **`LIFT_MAX = 6` versus a rise of 7 or 8.** Ten levels want more climb than
-   the cap allows. Open air over a level is the next three rises minus
-   `FLOOR_T = 5`, so 8–15 blocks; 7 and 8 are probably fine and the cap is
-   probably conservative. **Measure it before raising it** — a landing too
-   high has the next turn's floor slab for a ceiling. Cheapest alternative:
-   cap the roster's rises at 6, which touches ten level headers and nothing
-   else.
-6. **Gated landmarks must move or move earlier.** `_landmark_nodes` steers the
-   course through a structure's passage at apron level, which is terrace
-   height — that fights a course that has already climbed away from the
-   terrace. Two answers, both cheap: enter the gate in the level's first two
-   beats while the body is still low, or raise the gate to an upper storey of
-   the structure. Locks (`_lock_nodes`) are unaffected and stay useful: an
-   island floated over a floor break is already airborne.
-7. **The head-hitter stays at three above the take-off.** Unchanged, and the
-   reason is in `_ceiling_cells`: a body is 1.8 m and a jump rises 1.25, so a
-   lid at two is a lid inside the player. Faithful `2bc` needs jump-cancel in
-   `parkourkit`, which is a physics change and not this one.
+**Two things on the plan's list turned out not to be needed.**
+`Course._walk_bridge` lays ground under a walk leg *at the walk's own height*,
+so it is a platform rather than a ramp and it creates no re-entry; it stays.
+And `LIFT_MAX = 6` is exactly right rather than conservative: the open air
+over a level is the next three rises minus `FLOOR_T`, which the three-window
+rule holds at eight or more, and a landing at lift 6 needs exactly eight. What
+climbs past it is the exit, which is written on `step_y` and is not clamped.
 
-## 6. The probe (Phase 0) — **done**
+## 6. The probe
 
 `tools/reentry_probe.py --runs 6 --blocks 260`, ten seconds, no window.
-`--levels` prints one line per level, worst first, which is the authoring
-feedback loop for Phase 3. Sections: re-entry (the criterion), floor contact,
-the climb, and two numbers reported but not gated.
+`--levels` prints one line per level, worst first, and `--only NAME` filters
+it. Sections: re-entry (the criterion), floor contact, the climb, and two
+numbers reported but not gated.
 
-Four things it does that a naive version gets wrong, each of them a wrong
+Five things it does that a naive version gets wrong, each of them a wrong
 answer that was measured before it was fixed:
 
 - **A jump that was made is not a fall.** Early in an arc the body is still
   over the block it left; a sample coming to rest there is not a miss, and
   counting it makes every jump in the tower read as a shortcut.
+- **Only a ballistic move can be missed.** A walk is on the ground for its
+  whole length, a climb is on a ladder and a bubble ride is inside a column of
+  water. Sampling a fall from one measures the walkway it is standing on, and
+  leaving them in read as re-entry on every walk leg in the tower.
 - **The fall is sampled along the whole arc**, not from the landing. A miss
   happens anywhere between the two blocks, and where it comes down decides
   everything.
@@ -197,67 +245,75 @@ answer that was measured before it was fixed:
   spectacular pass and is the probe's own doing. `KEEP` holds ninety-six
   landings and `LAG` judges two levels back, because a level's exit climb and
   crossing are laid *after* its last terrace landing.
-- **One flood per level, not one per landing.** Reachability is a component
-  id; union-find over the walkable surface answers ten landings for the price
-  of one.
+- **Walking is not symmetric, so the search runs backwards.** A body steps up
+  one block and drops four; "are these two spots connected" is the wrong
+  question, and a union-find answers it wrongly in a way that looks right — a
+  landing four blocks over the terrace can always walk *down* to it, and a
+  symmetric flood then reports the terrace as able to walk back up. It is one
+  reverse breadth-first search per level per target set.
 
 `tests/test_reentry.py` holds it against worlds small enough to check by hand:
 a course on a continuous floor must read all shortcut, the same course over
-the void must read all dead, and a floor under the opening landing alone must
-read "back to the start". The third test is one cell wide on purpose — extend
-its slab by three cells and the answer flips to shortcut, which is the whole
-design in miniature.
+the void must read all dead, a floor under the opening landing alone must read
+"back to the start", and the apron must be excused. The third test is one cell
+wide on purpose — extend its slab by three cells and the answer flips to
+shortcut, which is the whole design in miniature.
 
-Every later phase is judged against this file. The runner and the spiral were
-both fixed exactly this way — turn the complaint into a number, write the
-probe, then rewrite against it — and neither was fixable before the number
-existed.
+## 7. How the thirty-three levels were re-authored
 
-## 7. Phases, and where subagents go
+Not by hand, landing by landing, and not by an agent per level either. The
+transform is mechanical and the judgement is in the exceptions:
 
-| phase | what | subagents |
-|---|---|---|
-| 0 | `reentry_probe`, targets agreed | no |
-| 1 | engine, § 5 above, one context, `TRACE` loop | no |
-| 2 | pilot three levels by hand — one ledge, one interior, one vertical (BALCONIES, CISTERN, ECHO SHAFT) — reviewed with `tools/level_review.py --level N --all` until the frames are right. Produces the authoring recipe. | no |
-| 3 | the other 30 levels against the recipe | **yes** |
-| 4 | whole-roster verification | no |
+1. **A source-level rewrite through `ast`**, editing the exact offsets of each
+   `lift=` keyword so every comment and every hand-chosen number outside it
+   survives. Each level's landings move up by the least that clears the deck,
+   *preserving the deltas* — the shape of a level is its rises, so the arcs
+   stay legal wherever they were legal before.
+2. **The filler is flattened to the deck**, because it repeats and anything it
+   gains it gives back at the seam.
+3. **`tower_probe --design-only` names what broke**, instantly and by level,
+   beat and node index. It went 170 complaints → 57 → 0, and every one of the
+   57 was a real authoring decision: a walk that had to swap places with the
+   hop after it so the level could get off its apron, a fall that had to stop
+   two blocks higher, a filler whose ladder had to move into the script
+   because a climb inside a loop comes back down at the seam.
+4. **The exits were trimmed by the same method** — whole `n(...)` calls
+   deleted from the middle of `exit_beats`, and a single ladder or bubble
+   shortened when there was nothing to delete.
 
-Phase 3 is the clean fan-out: one agent per level module, each touching
-exactly one file, each verified by `tower_probe --design-only` (instant, on
-paper) plus its own `level_review`. Batches of five or six; the main thread
-reads the frames and merges. Each agent must be told: **one level per
-process** — the phase pin in the review tools is a class-level patch and the
-tool refuses a second — and no agent runs the full test suite.
+The scripts are throwaway and live in the session scratchpad; the *method* is
+the durable part, and it is the third time on this project that a mechanical
+AST pass plus an instant design checker has beaten hand-editing.
 
-Phases 0, 1, 2 and 4 are single-context work with a measurement loop. Fanning
-out on the engine is how four agents each fix the stuck rate a different
-incompatible way.
+## 8. Verified
 
-## 8. Verification at the end (Phase 4)
+| | |
+|---|---|
+| `reentry_probe` | shortcut **2.0%**, 1 level of 33, apron 2.9 a level |
+| `tower_probe` | design 100% legal on paper, **95.6%** placed as authored, designed content **58%** of the course |
+| `spiral_probe --plan tower` | twice-claimed 0, off-lattice 0, unchecked **0.64%**, cone-alone walkability **0 m** |
+| `bypass_probe` | **34%** mean, **0 of 55** levels walkable end to end |
+| `landmark_probe` | **68%** of levels at 25°, **63%** at 40°, 3.25 a minute |
+| `spiral_probe` (generated) | unchecked **0.24%**, built terrain 94.4% — unchanged |
+| `frame_cost` | parkour 2.04, runner 2.16, spiral 2.62, **tower 3.63** ms |
+| `pytest` | 640 passed, 34 skipped |
 
-`reentry_probe` (the criterion), `tower_probe` (fidelity — the design is
-100% legal on paper and ≥94% placed as authored), `spiral_probe --plan tower`
-(safety: nothing twice-claimed, body never inside the world, unchecked
-placements ≤ 0.5%), `landmark_probe` (structures still seen), `frame_cost`
-(a floating course draws *fewer* cells than a pedestalled one, so this should
-improve), `roster_sheet` (do the levels still read as places), and
-`python -m pytest tests/`.
+## 9. Still open
 
-## 9. Risks, honestly
-
-- **The stuck rate.** Removing the pedestal requirement makes placement
-  *easier*, but removing the generated staircase removes the recovery of last
-  resort. Net effect unknown; `TRACE` is the instrument.
-- **Frames of nothing.** A course three to six blocks above its terrace looks
-  down at the terrace, which is good, but it also looks out at sky. Frame
-  emptiness is currently 44–56% and the budget is 48%. Watch `level_review`'s
-  emptiness number per level, not just the roster mean.
-- **The camera.** It locks onto the landing through take-off and flight, and a
-  rising course means more of the frame is the sky above the core. May need
-  the tangent blend re-tuned; it is `_look`'s `lock` ramp and `RIDE_OUT`.
-- **The move mix.** 82% plain hop today, and a monotonic climb is hop-shaped.
-  The non-hop share (walk 8, slide 4, climb 3, bounce 2, bubble 1) partly
-  lives in the exit staircase that is being dissolved. Expect it to fall
-  before it rises, and buy it back with authored ladders, vines and slides
+- **Frame cost.** tower/parkour went 1.46 → 1.78 and the tower is 3.63 ms
+  against the 3.5 the criteria ask for. The likely causes are all cell counts:
+  the terrace is dressed *and* the course is a separate set of blocks above
+  it, where before the two were the same cells. Measure `emit_layer` and the
+  dressing pass before optimising anything.
+- **One level still has a shortcut** and eight levels have an apron over the
+  cap of six, which means more landings at terrace height than the geometry
+  needs. `reentry_probe --levels --only NAME` names them.
+- **The move mix.** A flying course is hop-shaped and the exit staircase that
+  carried the slides and climbs is mostly gone. Non-hop share is 16% on the
+  tower against 6% on the generated spiral, so this is not urgent, but the
+  answer when it becomes urgent is authored ladders, vines and slides
   *between airborne platforms* rather than against the core.
+- **The camera.** A course three to six blocks up sits closer to the slab
+  overhead, and the contact sheet shows more frames with a ceiling across the
+  top than before. It reads as enclosure rather than as a fault, but it is
+  worth a pass with `level_review`'s emptiness number per level.

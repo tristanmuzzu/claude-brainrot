@@ -72,7 +72,7 @@ from ._base import Level, n
 #   nodes and a verb written last is written and never seen. It measures
 #   at 13% of all moves and takes the hop share to 82%.
 LEVEL = Level("THE APIARY", "honey", rise=4, gap=2.8, exit="ladder",
-              band=11.0, profile="plaza", breaks=0, landmark="comb",
+              band=11.0, profile="plaza", breaks=3, landmark="comb",
               # Green ground, amber everything-that-is-built. The old
               # table made the ground hay as well as the hives, so the
               # whole frame was one value of gold and the hive stacks

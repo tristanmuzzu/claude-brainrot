@@ -23,7 +23,7 @@ resurrections.)
 
 **Now verified on real Windows hardware with a GPU**, which turned up several
 things the software-rasteriser cloud sessions could not have seen — see
-"Landmines" below. 640 passed, 34 skipped, including a Win32 suite that
+"Landmines" below. 641 passed, 34 skipped, including a Win32 suite that
 exercises the real window API.
 
 The runner has a real collision model. Obstacles carry hitboxes derived from
@@ -754,6 +754,104 @@ REACH `no move: hop`, WART FIELDS `landing occupied`, THE WHITE STAIR
 `pedestal will not stand`, THE QUARRY `no move: bubble`, MARKET STREET
 `no move: climb`.
 
+## The course flies over its terrace (rebuilt 2026-08-16)
+
+**The owner's third and sharpest complaint about the tower's parkour**, and
+the one that changed the format: the jumps went from a block resting on the
+floor to another block resting on the floor -- "they're attached to the floor,
+but the player keeps jumping from one to the next" -- so missing one cost
+nothing. His own criterion, and it is better than "put it over the void":
+
+> if you fall, you should theoretically have to go back to the beginning of
+> that level to attempt the parkour again, and there should not be any point
+> in the level where you go down to a ground block and from there go up again.
+
+That is a **reachability** question, not a void question, and `docs/REHASH.md`
+is the whole record: the plan, what was built, what it measured, and the four
+things the probe itself had to get right before its number meant anything.
+`tools/reentry_probe.py` is the number. **87.9% of missed jumps walked back
+into the middle of the course; it is 2.0% now, on one level of thirty-three.**
+
+The shape, in one paragraph. A level is entered on its terrace, steps up off
+it once, and everything after that stands **at least two blocks over the
+ground** -- a body steps up one, so anything at one is a landing a fall walks
+back onto. The terrace is untouched, fully themed and fully dressed: it is the
+place the course flies over and the place a fall lands, and it is a dead end
+because the course left it at landing one. Falls therefore do not need void
+under them, which is what keeps the levels looking like places.
+
+Five numbers moved with it, and two of them are the *other* complaints this
+tower has had:
+
+| | before | after |
+|---|---|---|
+| missed jumps that re-enter the course | 87.9% | **2.0%** |
+| landings resting on the terrace | 15.9 a level | **3.3 a level** |
+| a level walked end to end without jumping | 2 of 24 | **0 of 55** (34% mean) |
+| landmarks framed at 25 / 40 degrees | 55% / 30% | **68% / 63%** |
+| unchecked emergency placements | 0.31% | **0.64%** |
+
+**`Level.deck` is the new number every part of the machinery aims at**: how
+high over its own terrace a level's course cruises, computed in
+`levels/_base.py` from where the script and the filler leave the body. The
+exit climbs `rise + 1 - deck` and nothing more; a gated landmark stands on a
+plinth that tall; the design checker knows what the filler has to come back
+to. `tools/level_climb.py` prints it for one level or the whole roster and is
+the reading tool for all of this.
+
+Seven engine changes, each found by measuring and not one by reading the code
+(`docs/REHASH.md` section 5 has the full list and the numbers):
+
+- **pedestals are off by default on this tower** -- a stack down to the ground
+  is a staircase back up to the landing it holds;
+- **a fallback height may go up and never under the deck** -- `spread` was
+  quietly placing an authored landing three blocks up at one block up, and
+  that was the largest single source of re-entry after the designs;
+- **machinery keeps the body's height** (`_here_lift`, floored at two): the
+  lock's approach, the doorway's approach, every recovery hop and the one
+  unchecked emergency landing all asked for `lift=1`, which on a climbing
+  level is a staircase down to the terrace and back;
+- **the lock is skipped while the course is flying** -- it exists to cross a
+  hole in ground the body is running on, and three blocks up that hole is
+  scenery;
+- **a gated landmark stands on a plinth as tall as the deck**, and the plinth
+  stops short of its own passage so a fall through the doorway carries on down
+  rather than landing in it (4.5 points of re-entry and 1.6 of unchecked
+  placement on its own);
+- **`noclimb`**: nothing may be built in the ring beside a landing between the
+  terrace and that landing's height. Dressing was three quarters of what was
+  left once the designs were raised -- the landings were out of reach and the
+  scenery beside them was a staircase;
+- **the exit starts from the deck.** Eighteen levels opened theirs with an
+  absolute `lift`, which on a flying course is the whole level dropping back
+  down.
+
+**`breaks=0` is gone from the roster and that is a consequence, not a taste.**
+Nineteen levels had chosen no floor breaks because any break forced the lock
+and the lock cost them landings. The lock is skipped now, so breaks are free
+obstacles again: everything is at three or four, and that alone took a no-jump
+walker from 70% of a level to 48% and from two levels walkable end to end to
+none.
+
+**All thirty-three level modules were re-authored by a source-level `ast`
+pass, not by hand and not by an agent each.** Each landing moves up by the
+least that clears the deck, *preserving the deltas* -- the shape of a level is
+its rises, so its arcs stay legal wherever they were legal -- and the filler is
+flattened to the deck because it repeats and anything it gains it gives back at
+the seam. `tower_probe --design-only` then named what broke, by level, beat and
+node: 170 complaints, then 57, then none, and every one of the 57 was a real
+authoring decision. Third time on this project that a mechanical AST pass plus
+an instant design checker has beaten hand-editing.
+
+**Two things on the plan turned out not to be needed**, and both are worth
+knowing before anybody re-derives them. `_walk_bridge` lays its ground at the
+walk's *own height*, so it is a platform rather than a ramp and creates no
+re-entry. And `LIFT_MAX = 6` is exactly right rather than conservative: open
+air over a level is the next three rises minus `FLOOR_T`, which the
+three-window rule holds at eight or more, and a landing at lift 6 needs exactly
+eight. What climbs past it is the exit, written on `step_y`, which is not
+clamped.
+
 ## Linux (added 2026-08-09, verified on the owner's Ubuntu box)
 
 Runs on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200% scaling) with the same
@@ -780,6 +878,18 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
+00. **Frame cost is the one criterion the rehash lost.** tower/parkour went
+   1.46 -> **1.78** in one process (parkour 2.04, runner 2.16, spiral 2.62,
+   tower 3.63 ms), against the 3.5 ms the tower's criteria ask for. Nothing
+   was optimised for it and the likely cause is cell count rather than draw
+   order: the terrace is dressed *and* the course is a separate set of blocks
+   above it, where before the two were the same cells. Measure `emit_layer`
+   and the dressing pass before changing anything, and read the note on a busy
+   machine under item 5 -- only the ratio survives.
+0a. **One level of thirty-three still lets a fall back onto its course**, and
+   eight have an apron over the probe's cap of six -- more landings at terrace
+   height than the geometry needs. `python tools/reentry_probe.py --levels
+   --only NAME` names them; `docs/REHASH.md` is the criterion.
 0. **The generated staircase is 16% of the exit climb**, and what is left of
    it is per-level authoring rather than an engine change -- see "What the
    exit climb is made of" above for the decomposition and the per-level
@@ -841,10 +951,10 @@ touching any of it — the reasoning is there, this is the short list:
    which is a real change to `_reserve_landmark`. What *did* work is letting
    a refused stored landing fall through to the next one (56 -> 62), which is
    the same shape as the authored-exit recovery.
-0c. ~~The gated structures cost 0.74 ms a frame~~ **Met.** Measured
-   2026-08-14 with all four scenes in one process: parkour 1.91, tower 2.79,
-   spiral 2.07, runner 1.83 ms/frame, tower/parkour 1.46. The 3.74 ms on
-   record predates the level rebuild. The tower's criteria ask for 3.5.
+0c. ~~The gated structures cost 0.74 ms a frame~~ **Was met, and the rehash
+   lost it again -- see item 00.** Measured 2026-08-14 with all four scenes in
+   one process: parkour 1.91, tower 2.79, spiral 2.07, runner 1.83 ms/frame,
+   tower/parkour 1.46. The 3.74 ms on record predates the level rebuild.
 1. **A wall fills the lens on 1.8-2.9% of frames**, and the biggest cause is
    now known and fixed: bucketing every jammed frame by what the body was
    *doing* said **climb 42.0% and bubble 30.3% against hop 1.0%** -- three
@@ -1070,6 +1180,12 @@ long jumps you need a different motion model, not a bigger number.
   screen. `--seam` prints what the level below hands it and what the level
   above opens with. **One level per process**: the phase pin is a class-level
   patch and the tool refuses a second.
+- `python tools/level_climb.py` prints what every level does *vertically* --
+  the height of each authored landing over its own terrace, the deck the
+  filler holds, and what the exit still has to climb (`rise + 1 - deck`).
+  Instant, builds nothing, and it is the reading tool for the rehash: `low`
+  under 2 on any level is a landing a fall can walk back onto. One level's
+  name as an argument prints that level landing by landing.
 - `python tools/tower_probe.py --runs 16 --blocks 340` is the hand-built
   tower's acceptance test *for the design*: every authored jump checked against
   the physics on paper (`--design-only` needs nothing built and is instant),
@@ -1119,19 +1235,21 @@ long jumps you need a different motion model, not a bigger number.
   mean, 0 of 42 levels walkable end to end**, against the real map's 46% and
   0 of 43.
 - `python tools/reentry_probe.py --runs 6 --blocks 260` is the acceptance test
-  for the parkour rehash planned in `docs/REHASH.md`, and it is the owner's own
+  for the parkour rehash (`docs/REHASH.md`), and it is the owner's own
   criterion as a number: a body that misses a jump and then *walks* -- up one,
   down any, never jumping -- must not arrive back at any landing of that level
-  but its first. A miss is **dead** (the void, or ground connecting to
-  nothing), **back to the start** (fine, and the wanted outcome), or a
+  but its **entry apron**. A miss is **dead** (the void, or ground connecting
+  to nothing), **back to the start** (fine, and the wanted outcome), or a
   **shortcut** (the defect: the fall cost nothing and every jump before the
   re-entry point was decoration). Also floor contact -- landings resting on the
-  terrace, by pedestal or directly -- and whether the level climbs
-  monotonically. Baseline on the tower as it stands: **shortcut 87.9%, 71 of 71
-  levels, 80.2% of landings on the floor, 1 of 71 levels never drops**. Ten
-  seconds, no window. `--levels` is the per-level table Phase 3 authors against;
-  `tests/test_reentry.py` holds the walker itself against worlds checkable by
-  hand.
+  terrace, by pedestal or directly -- the apron's own size, and what the level
+  climbs. **Shortcut 87.9% before the rehash and 2.0% after, on one level of
+  thirty-three.** Ten seconds, no window. `--levels [--only NAME]` is the
+  per-level table to author against; `tests/test_reentry.py` holds the walker
+  itself against worlds checkable by hand, and the four things it has to get
+  right before its number means anything are in `docs/REHASH.md` section 6 --
+  the shortest of them being that walking is not symmetric, so it searches
+  backwards.
 - `python tools/parkour_probe.py --runs 24 --motion-runs 12` is the parkour
   scene's acceptance test in numbers: interpenetration, grid alignment,
   emergency hops, the hop distribution and its ramp, and whether the body ever
@@ -1395,7 +1513,7 @@ long jumps you need a different motion model, not a bigger number.
   nothing can walk up the tower without touching the parkour).
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~230s). **640
+- Run `python -m pytest tests/` before committing; it is fast (~255s). **641
   passed, 34 skipped.** The Win32 suite skips off Windows and the X11 suite
   skips without a display, so a green run means less on the other platform's
   machine -- check the count.

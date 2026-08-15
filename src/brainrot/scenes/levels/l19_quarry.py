@@ -81,7 +81,7 @@ from ._base import Level, n
 # lens measured 20.9% of its frames jammed against 0.0% for every other
 # move in the level it was instrumented on, and a bubble goes up at 11.0.
 LEVEL = Level("THE QUARRY", "desert", rise=8, gap=3.0, exit="bubble",
-              band=10.5, profile="plaza", breaks=0, landmark="crane",
+              band=10.5, profile="plaza", breaks=3, landmark="crane",
               # Hot, worked and industrial, and deliberately nothing like
               # SUNKEN TEMPLE, which is this tower's other desert: that
               # one is pale sandstone, gold and wet green prismarine, a

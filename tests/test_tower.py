@@ -415,10 +415,17 @@ def test_the_way_out_is_mostly_the_level_writing_it() -> None:
     the engine improvised it, and that label is load-bearing in eight other
     places -- so the project's own notes recorded the exit as machinery and as
     an authoring job still to be done, when in fact all thirty-three levels
-    write one. Measured here rather than assumed: over half the exit climb is
-    the level's own design, and what is left is the crossing plus the
-    generated staircase that finishes a climb the design did not reach the top
-    of.
+    write one.
+
+    What it is made of moved with the rehash (``docs/REHASH.md``) and the
+    numbers moved with it. A level's course now cruises three to six blocks
+    over its own terrace, so the way out has only ``rise + 1 - deck`` left to
+    gain -- one to three treads where it used to be five or seven. The
+    authored share therefore *falls* while the design gets better: what fills
+    the gap is the crossing and the walk along the last of the terrace to it,
+    both of them aimed at the chasm rather than written down. The thing to
+    hold is the improvised staircase, which is what a level that did not top
+    out costs.
     """
     kinds: Counter = Counter()
     for run in range(3):
@@ -428,8 +435,12 @@ def test_the_way_out_is_mostly_the_level_writing_it() -> None:
                 kinds[blk.get("origin") or "other"] += 1
     total = sum(kinds.values())
     assert total > 150, f"only {total} exit landings -- nothing was measured"
-    assert kinds["design"] > total * 0.5, \
-        f"the levels wrote {kinds['design']} of {total} exit landings"
+    assert kinds["stair"] < total * 0.3, \
+        f"the engine improvised {kinds['stair']} of {total} exit landings"
+    aimed = kinds["design"] + kinds["crossing"] + kinds["approach"]
+    assert aimed > total * 0.7, (
+        f"only {aimed} of {total} exit landings are the design, the crossing "
+        f"or the walk to it")
     # The reliability chain is the last thing before the unchecked hop. It
     # firing at all means an exit could not be built any other way.
     assert kinds["recover"] + kinds["other"] <= total * 0.02, dict(kinds)

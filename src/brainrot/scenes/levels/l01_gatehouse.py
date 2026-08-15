@@ -79,7 +79,7 @@ from ._base import Level, n
 # first two and in the filler, which repeats -- a beat is laid whole or not
 # at all, and this level lays about seven of its own landings a run.
 LEVEL = Level("THE GATEHOUSE", "plains", rise=4, gap=2.8, exit="stair",
-              band=10.5, profile="plaza", shelf=4.0, breaks=0,
+              band=10.5, profile="plaza", shelf=4.0, breaks=3,
               landmark="cabin",
               ground="grass", sub="moss", rock="mossy", accent="oak",
               liquid="water", glow="lantern",

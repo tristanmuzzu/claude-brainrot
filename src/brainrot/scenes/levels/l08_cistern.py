@@ -83,7 +83,7 @@ from ._base import Level, n
 #   of the frame; the white is then spent where it is worth something,
 #   on the landings, which are named literally.
 LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
-              band=10.0, profile="plaza", breaks=1, landmark="cluster",
+              band=10.0, profile="plaza", breaks=3, landmark="cluster",
               ground="dripstone", sub="deepslate", rock="dripstone",
               accent="amethyst", liquid="water", glow="lantern",
               dark=0.32, sky=(102, 92, 116),

@@ -97,7 +97,7 @@ from ._base import Level, n
 # green. At 3 the same leaves are a foot over the head, which is the
 # thing this level is for.
 LEVEL = Level("CANOPY WALK", "jungle", rise=6, gap=2.2, exit="vine",
-              band=7.5, profile="ledge", shelf=5.0, breaks=0,
+              band=7.5, profile="ledge", shelf=5.0, breaks=3,
               landmark="tree",
               ground="moss", sub="podzol", rock="junglelog",
               accent="jungleleaf", liquid="water", glow="lantern",

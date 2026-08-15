@@ -129,7 +129,7 @@ from ._base import Level, n
 # water in it.
 LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="bubble",
               landmark="arch",
-              band=10.5, profile="plaza", breaks=2,
+              band=10.5, profile="plaza", breaks=3,
               # Six roles. Quartz paving underfoot and calcite for
               # everything built, so the piers, the plinths, the treads
               # and the arch's own two columns are a shade off the floor

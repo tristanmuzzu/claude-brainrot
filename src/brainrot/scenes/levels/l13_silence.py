@@ -127,7 +127,7 @@ from ._base import Level, n
 # neither blocks a walker -- and it is the bowl the moat digs that stops
 # one, because a walker can get into it and cannot step back out.
 LEVEL = Level("THE SILENCE", "deepdark", rise=8, gap=3.0, exit="bubble",
-              band=10.5, shelf=4.0, profile="plaza", breaks=0,
+              band=10.5, shelf=4.0, profile="plaza", breaks=3,
               landmark="cabin",
               # Black ground, black spoil, and the camp's timber as the
               # accent so that the one warm colour in the level is the

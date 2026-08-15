@@ -137,7 +137,7 @@ from ._base import Level, n
 # of ``climb`` a visit, and a four-block bubble is one. The walk in the
 # brackets is what pays for it -- see that beat.
 LEVEL = Level("SPORE HOLLOW", "mushroom", rise=4, gap=3.0, exit="bubble",
-              band=10.0, shelf=5.0, profile="ledge", breaks=2,
+              band=10.0, shelf=5.0, profile="ledge", breaks=3,
               landmark="greatcap",
               # Red ground, bone-white stem, black water, and the
               # shroomlight doing the only job light does here.

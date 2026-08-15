@@ -62,7 +62,7 @@ from ._base import Level, n
 #   water in it that stops a walker, and everything downstream of one
 #   is ``pedestal=False`` and has nothing under it at all.
 LEVEL = Level("WOOLWORKS", "rainbow", rise=6, gap=2.4, exit="ladder",
-              band=10.0, shelf=4.5, profile="ledge", breaks=0,
+              band=10.0, shelf=4.5, profile="ledge", breaks=3,
               landmark="stripes",
               # Six roles, all set. Violet ground and indigo sub are the
               # dye that has soaked into the building; quartz is every

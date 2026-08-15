@@ -153,7 +153,7 @@ from ._base import Level, n
 # and cannot step back out. 15% mean against a 55% ceiling and the real
 # map's own 46%, and 0 of 7 walks reach the end.
 LEVEL = Level("THE PILLARS", "end", rise=7, gap=3.2, exit="bubble",
-              band=12.0, shelf=5.5, breaks=0, landmark="hoodoo",
+              band=12.0, shelf=5.5, breaks=3, landmark="hoodoo",
               # Violet court, pale plinths, black colonnade, chorus for
               # the growth on it, cold light, and water in the two holes
               # the paving has fallen through.

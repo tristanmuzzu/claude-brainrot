@@ -37,7 +37,7 @@ from ._base import Level, n
 # gives away is a block the climb out has to buy back, at a landing a
 # block, out of the same terrace the design is written on.
 LEVEL = Level("WINDMILL REACH", "farm", rise=6, gap=3.0, exit="stair",
-              band=10.5, shelf=5.0, breaks=0, landmark="windmill",
+              band=10.5, shelf=5.0, breaks=3, landmark="windmill",
               ground="hay", sub="coarse", rock="oak", accent="darkoak",
               liquid="water", glow="lantern",
               # Thirteen materials with hay at about a fifth of the

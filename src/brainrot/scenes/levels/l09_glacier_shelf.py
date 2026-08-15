@@ -82,7 +82,7 @@ from ._base import Level, n
 # at a corridor bend. It also makes this the tight level between two
 # broad ones -- THE CISTERN below is 10.5 and THE APIARY above is 11.0.
 LEVEL = Level("GLACIER SHELF", "ice", rise=5, gap=3.2, exit="bubble",
-              band=9.0, shelf=5.0, breaks=0, landmark="arch",
+              band=9.0, shelf=5.0, breaks=3, landmark="arch",
               ground="snow", sub="packedice", rock="blueice",
               accent="calcite", liquid="water", glow="lantern",
               candy=("blueice", "packedice"),

@@ -108,7 +108,7 @@ from ._base import Level, n
 # Written at 4.9 the fallback arrives at 10.9, the bounce is silently
 # refused, and the beat still reads as placed.
 LEVEL = Level("BLUE RUN", "ice", rise=4, gap=2.8, exit="ladder",
-              band=9.0, profile="ledge", shelf=5.0, breaks=0,
+              band=9.0, profile="ledge", shelf=5.0, breaks=3,
               landmark="arch",
               ground="blueice", sub="spruce", rock="packedice",
               accent="calcite", glow="sealantern", liquid="water",
