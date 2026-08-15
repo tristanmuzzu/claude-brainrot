@@ -23,7 +23,7 @@ resurrections.)
 
 **Now verified on real Windows hardware with a GPU**, which turned up several
 things the software-rasteriser cloud sessions could not have seen — see
-"Landmines" below. 634 passed, 34 skipped, including a Win32 suite that
+"Landmines" below. 640 passed, 34 skipped, including a Win32 suite that
 exercises the real window API.
 
 The runner has a real collision model. Obstacles carry hitboxes derived from
@@ -1118,6 +1118,20 @@ long jumps you need a different motion model, not a bigger number.
   reads as if levels were much harder to walk than they are. Currently **47%
   mean, 0 of 42 levels walkable end to end**, against the real map's 46% and
   0 of 43.
+- `python tools/reentry_probe.py --runs 6 --blocks 260` is the acceptance test
+  for the parkour rehash planned in `docs/REHASH.md`, and it is the owner's own
+  criterion as a number: a body that misses a jump and then *walks* -- up one,
+  down any, never jumping -- must not arrive back at any landing of that level
+  but its first. A miss is **dead** (the void, or ground connecting to
+  nothing), **back to the start** (fine, and the wanted outcome), or a
+  **shortcut** (the defect: the fall cost nothing and every jump before the
+  re-entry point was decoration). Also floor contact -- landings resting on the
+  terrace, by pedestal or directly -- and whether the level climbs
+  monotonically. Baseline on the tower as it stands: **shortcut 87.9%, 71 of 71
+  levels, 80.2% of landings on the floor, 1 of 71 levels never drops**. Ten
+  seconds, no window. `--levels` is the per-level table Phase 3 authors against;
+  `tests/test_reentry.py` holds the walker itself against worlds checkable by
+  hand.
 - `python tools/parkour_probe.py --runs 24 --motion-runs 12` is the parkour
   scene's acceptance test in numbers: interpenetration, grid alignment,
   emergency hops, the hop distribution and its ramp, and whether the body ever
@@ -1381,7 +1395,7 @@ long jumps you need a different motion model, not a bigger number.
   nothing can walk up the tower without touching the parkour).
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~220s). **634
+- Run `python -m pytest tests/` before committing; it is fast (~230s). **640
   passed, 34 skipped.** The Win32 suite skips off Windows and the X11 suite
   skips without a display, so a green run means less on the other platform's
   machine -- check the count.
