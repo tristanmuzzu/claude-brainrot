@@ -74,7 +74,7 @@ LEVEL = Level("THE BALCONIES", "mesa", rise=8, gap=3.0, exit="ladder",
     # lintel is a `ceiling` beam and the leg under it is a `walk`.
     ("sill", [n("lantern", arc=3.2, lift=1, hug=3.0, spread=1,
                 deco="lamp", orbs=1, ceiling=2),
-              n("terra_white", arc=2.9, lift=1, hug=3.0, kind="walk",
+              n("terra_white", arc=2.9, lift=2, hug=3.0, kind="walk",
                 spread=0, ceiling=3)]),
     # The balconies, and the level's whole shape in one beat: a stone
     # standing in the seep at the foot of the cliff, a *walk* out
@@ -114,16 +114,16 @@ LEVEL = Level("THE BALCONIES", "mesa", rise=8, gap=3.0, exit="ladder",
     # single run: the lava has to be somewhere the viewer will
     # certainly see it, and everything downstream of it floats, so the
     # bowl it digs cannot take a pedestal with it.
-    ("balconies", [n("oak", arc=3.4, lift=1, hug=2.8, spread=2,
+    ("balconies", [n("oak", arc=3.4, lift=2, hug=2.8, spread=2,
                      pedestal=False, moat=True),
-                   n("terra_white", arc=3.2, lift=1, hug=3.6, form="wide",
+                   n("terra_white", arc=3.2, lift=2, hug=3.6, form="wide",
                      kind="walk", pedestal=False, spread=0, ceiling=3,
                      orbs=1),
-                   n("terra_yellow", arc=3.4, lift=2, hug=3.8,
+                   n("terra_yellow", arc=3.4, lift=3, hug=3.8,
                      pedestal=False, spread=1, ceiling=2),
-                   n("terra_orange", arc=3.0, lift=3, hug=4.4,
+                   n("terra_orange", arc=3.0, lift=4, hug=4.4,
                      pedestal=False, spread=1, deco="lamp", orbs=1),
-                   n("terra_red", arc=4.9, lift=1, hug=3.0, pedestal=False,
+                   n("terra_red", arc=4.9, lift=2, hug=3.0, pedestal=False,
                      spread=2, orbs=2)]),
     # The yard under the balconies, where the lava seep out of the
     # cliff crosses the terrace and the one stone standing in it is the
@@ -133,18 +133,18 @@ LEVEL = Level("THE BALCONIES", "mesa", rise=8, gap=3.0, exit="ladder",
     # written second the lava was authored and never once built. The
     # landing after it floats, so the bowl the moat digs cannot take
     # the ground out from under it.
-    ("seep", [n("terra_white", arc=3.4, lift=1, hug=2.8, spread=1,
+    ("seep", [n("terra_white", arc=3.4, lift=2, hug=2.8, spread=1,
                 moat=True, ceiling=2, orbs=1),
-              n("terra_orange", arc=3.0, lift=1, hug=3.2, kind="walk",
+              n("terra_orange", arc=3.0, lift=2, hug=3.2, kind="walk",
                 spread=0, pedestal=False, ceiling=3)]),
     # The gallery, run under the storey above: a bay bored through the
     # buttress, crossed on foot with a beam at three over the head. The
     # shell goes on the beat's last node, never its first -- it is
     # painted the moment its landing commits and its walls are then in
     # the way of the next landing of the same beat.
-    ("gallery", [n("terra_white", arc=3.4, lift=2, hug=2.6, spread=1,
+    ("gallery", [n("terra_white", arc=3.4, lift=3, hug=2.6, spread=1,
                    pedestal=False, ceiling=3),
-                 n("oak", arc=2.9, lift=2, hug=2.6, kind="walk", spread=0,
+                 n("oak", arc=2.9, lift=3, hug=2.6, kind="walk", spread=0,
                    pedestal=False, ceiling=3, shell="hall", orbs=1)]),
 ], filler=[
     # The balcony run again, and this is what the level mostly *is*: in
@@ -156,11 +156,11 @@ LEVEL = Level("THE BALCONIES", "mesa", rise=8, gap=3.0, exit="ladder",
     # where +1 stops at 3.10. No ``moat`` anywhere here: the filler
     # loops, and a second lap digs away the ground the first lap's
     # pedestals are standing on.
-    ("ledgerun", [n("terra_orange", arc=3.4, lift=1, hug=2.8, spread=1,
+    ("ledgerun", [n("terra_orange", arc=3.4, lift=3, hug=2.8, spread=1,
                     ceiling=2),
-                  n("terra_white", arc=3.4, lift=2, form="slab", hug=3.4,
+                  n("terra_white", arc=3.4, lift=3, form="slab", hug=3.4,
                     pedestal=False, spread=1),
-                  n("terra_yellow", arc=3.4, lift=2, hug=4.2,
+                  n("terra_yellow", arc=3.4, lift=3, hug=4.2,
                     pedestal=False, spread=1, orbs=1)]),
 ], exit_beats=[
     # The way out, written down rather than left to the generated
@@ -203,12 +203,10 @@ LEVEL = Level("THE BALCONIES", "mesa", rise=8, gap=3.0, exit="ladder",
     # decks after it float, because a deck with a pedestal under it
     # nine blocks over the terrace is not a balcony, it is another
     # column in the lens.
-    n("terra_orange", arc=2.8, lift=1, hug=2.4, spread=1, ceiling=2),
+    n("terra_orange", arc=2.8, step_y=0, hug=2.4, spread=1, ceiling=2),
     n("terra_white", arc=2.4, step_y=5, kind="climb", climb_style="ladder",
       hug=2.0, pedestal=True, pedestal_style="terra_orange", spread=0,
       deco="lamp", orbs=2),
-    n("oak", arc=3.2, step_y=1, hug=3.0, spread=0, pedestal=False,
-      ceiling=3),
     n("terra_yellow", arc=3.2, step_y=1, hug=3.8, pedestal=False,
       spread=0, deco="lamp", orbs=2),
 ])

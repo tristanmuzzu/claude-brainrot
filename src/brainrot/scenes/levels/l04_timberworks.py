@@ -124,13 +124,13 @@ LEVEL = Level("THE TIMBERWORKS", "mine", rise=5, gap=2.6, exit="ladder",
     # written ``pedestal_style="log"`` and dug a hole full of logs,
     # which is solid, which a no-jump walker strolls across. Never put
     # ``pedestal_style`` on a ``moat`` node.
-    ("sawbench", [n("glow", arc=3.2, lift=1, form="slab", spread=0,
+    ("sawbench", [n("glow", arc=3.2, lift=1, spread=0,
                     deco="lamp", orbs=1),
-                  n("sub", arc=2.8, lift=1, kind="walk", spread=0,
+                  n("sub", arc=3.0, lift=2, spread=0,
                     ceiling=3, moat=True),
-                  n("accent", arc=3.2, lift=2, spread=0, pedestal=False,
+                  n("accent", arc=3.2, lift=3, spread=0, pedestal=False,
                     orbs=1),
-                  n("ground", arc=3.2, lift=3, spread=0,
+                  n("ground", arc=3.2, lift=4, spread=0,
                     pedestal_style="darkoak", ceiling=3, orbs=2)]),
     # Off the end of the pile, and this is the level's long jump. It is
     # written at 4.4 because it is a *descent*: nothing rises two blocks
@@ -146,10 +146,10 @@ LEVEL = Level("THE TIMBERWORKS", "mine", rise=5, gap=2.6, exit="ladder",
     # up onto the next pile. The level's two ``moat`` landings are eight
     # metres apart: the pond a moat digs is three cells across, and two
     # any closer means the second stands in the hole the first dug.
-    ("pond", [n("rock", arc=4.4, lift=1, spread=2, orbs=2),
-              n("ground", arc=3.2, lift=1, spread=0, moat=True,
+    ("pond", [n("rock", arc=4.4, lift=2, spread=2, orbs=2),
+              n("ground", arc=3.2, lift=2, spread=0, moat=True,
                 ceiling=3),
-              n("accent", arc=3.2, lift=2, spread=0, pedestal=False,
+              n("accent", arc=3.2, lift=3, spread=0, pedestal=False,
                 orbs=1)]),
 ], exit_beats=[
     # The headframe: a launch board hard against the rock inside a
@@ -189,9 +189,9 @@ LEVEL = Level("THE TIMBERWORKS", "mine", rise=5, gap=2.6, exit="ladder",
     # this level's ten landings. It is also, for what it is worth,
     # exactly what the reference's own ladder levels look like: a dark
     # climb with a lit doorway at the top.
-    n("rock", arc=2.8, lift=1, hug=2.8, spread=1, confine=True,
+    n("rock", arc=2.8, step_y=0, hug=2.8, spread=1, confine=True,
       ceiling=3, shell="hall"),
-    n("ladder", arc=2.4, step_y=5, kind="climb", climb_style="ladder",
+    n("ladder", arc=2.4, step_y=3, kind="climb", climb_style="ladder",
       hug=2.6, pedestal_style="darkoak", spread=0, confine=True,
       deco="lamp", orbs=2),
 ], filler=[
@@ -225,11 +225,11 @@ LEVEL = Level("THE TIMBERWORKS", "mine", rise=5, gap=2.6, exit="ladder",
     # preference: the filler loops, and a second lap digs the ground out
     # from under the pedestals the first lap stood up -- 27,859 refusals
     # from one keyword, on the level that found it.
-    ("stacks", [n("accent", arc=4.4, lift=1, spread=2, pedestal=False,
+    ("stacks", [n("accent", arc=4.4, lift=3, spread=2, pedestal=False,
                   orbs=2),
-                n("ground", arc=2.8, lift=2, form="slab", kind="walk",
+                n("ground", arc=2.8, lift=3, form="slab", kind="walk",
                   spread=0, pedestal_style="darkoak", ceiling=3,
                   deco="lamp"),
-                n("rock", arc=3.2, lift=3, form="slab", spread=0,
+                n("rock", arc=3.2, lift=3, spread=0,
                   pedestal_style="log", orbs=2)]),
 ])

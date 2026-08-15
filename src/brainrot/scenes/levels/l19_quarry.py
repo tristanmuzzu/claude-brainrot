@@ -191,19 +191,19 @@ LEVEL = Level("THE QUARRY", "desert", rise=8, gap=3.0, exit="bubble",
     #    at the far end of a stretch and none in the middle distance.
     ("cut", [n("glow", arc=3.2, lift=1, hug=3.2, spread=1, deco="lamp",
                ceiling=2, orbs=1),
-             n("spruce", arc=2.9, step_y=0, hug=3.0, kind="walk",
+             n("spruce", arc=3.2, step_y=1, hug=3.0,
                ceiling=3, deco="lintel"),
-             n("sandstone", arc=3.2, step_y=1, hug=2.8, moat=True,
+             n("sandstone", arc=2.9, step_y=0, hug=2.8, kind="walk", moat=True,
                orbs=1),
              n("copper", arc=3.2, step_y=1, hug=2.6, pedestal=False,
                deco="lamp", orbs=1),
              n("copper", arc=2.8, step_y=0, hug=3.0, kind="walk",
                pedestal=False, ceiling=3),
-             n("chiselled", arc=4.9, step_y=-2, hug=3.6, pedestal=False,
+             n("chiselled", arc=4.9, lift=2, step_y=-1, hug=3.6, pedestal=False,
                moat=True, orbs=2),
              n("sandstone", arc=2.8, step_y=1, hug=5.0, pedestal=False,
                ceiling=2, orbs=1),
-             n("copper", arc=3.4, step_y=-1, hug=8.8, pedestal=False,
+             n("copper", arc=3.2, lift=2, step_y=0, hug=8.0, pedestal=False,
                deco="lamp", orbs=2)]),
     # THE BENCHES. Back in off the spur and up the worked face, and this
     # is the one beat written in half blocks.
@@ -245,15 +245,15 @@ LEVEL = Level("THE QUARRY", "desert", rise=8, gap=3.0, exit="bubble",
     # see-through and a walker wades it -- it is the radius-three bowl,
     # which a walker can get into and cannot step out of. Node 1 floats,
     # so the bowl cannot take the ground from under it.
-    ("benches", [n("sandstone", arc=3.2, lift=1, hug=6.4, spread=1,
+    ("benches", [n("sandstone", arc=3.0, lift=3, hug=6.4, spread=1,
                    moat=True, orbs=1),
-                 n("chiselled", arc=3.0, lift=2, hug=4.6, spread=0,
+                 n("chiselled", arc=3.0, lift=4, hug=4.6, spread=0,
                    pedestal=False, ceiling=2, orbs=1),
-                 n("sandstone", arc=3.2, lift=3, form="slab", hug=3.8,
+                 n("sandstone", arc=3.2, lift=5, form="slab", hug=3.8,
                    spread=0, pedestal=False),
-                 n("chiselled", arc=3.2, lift=4, form="slab", hug=3.4,
+                 n("chiselled", arc=3.2, lift=6, form="slab", hug=3.4,
                    spread=0, pedestal=False, orbs=1),
-                 n("copper", arc=3.2, lift=4, hug=3.2, spread=0,
+                 n("copper", arc=3.2, lift=6, hug=3.2, spread=0,
                    pedestal=False, ceiling=3, deco="lamp", orbs=2)]),
 ], filler=[
     # THE SPOIL. The filler repeats and the tail of a script does not, so
@@ -288,13 +288,13 @@ LEVEL = Level("THE QUARRY", "desert", rise=8, gap=3.0, exit="bubble",
     # plinths are standing on -- 27,859 "pedestal will not stand"
     # refusals from one keyword when it was last instrumented. This
     # level's water is all in the beat that plays once.
-    ("spoil", [n("ground", arc=4.4, lift=2, hug=3.6, spread=1, ceiling=2,
+    ("spoil", [n("ground", arc=4.4, lift=6, hug=3.6, spread=1, ceiling=2,
                  orbs=1),
                n("spruce", arc=2.8, step_y=0, hug=3.4, kind="walk",
                  ceiling=3, deco="lamp"),
                n("chiselled", arc=3.4, step_y=1, hug=3.0, pedestal=False,
                  orbs=1),
-               n("copper", arc=3.2, step_y=1, hug=3.2, pedestal=False,
+               n("copper", arc=3.2, step_y=-1, hug=3.2, pedestal=False,
                  orbs=1)]),
 ], exit_beats=[
     # THE FLOODED JOINT. Eight blocks, the joint-tallest rise in the
@@ -362,9 +362,9 @@ LEVEL = Level("THE QUARRY", "desert", rise=8, gap=3.0, exit="bubble",
     # **Check ``--report``'s move mix for the word ``bubble``.** If it is
     # missing this is an eight-tread staircase reserved for three, and the
     # level has no way out of its own idea.
-    n("glow", arc=3.2, lift=2, hug=3.4, spread=2, confine=True,
+    n("glow", arc=3.2, step_y=0, hug=3.4, spread=2, confine=True,
       deco="lamp", ceiling=3, orbs=1),
-    n("sandstone", arc=2.4, step_y=6, kind="bubble", hug=2.4,
+    n("sandstone", arc=2.4, step_y=2, kind="bubble", hug=2.4,
       pedestal=True, pedestal_style="chiselled", spread=0, orbs=2),
     n("copper", arc=3.2, step_y=1, hug=3.6, spread=0, pedestal=False,
       deco="lamp", ceiling=3, orbs=2),

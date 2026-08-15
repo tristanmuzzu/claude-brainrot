@@ -140,7 +140,7 @@ LEVEL = Level("THE BELFRY", "village", rise=4, gap=3.0, exit="ladder",
     #   can honestly express.
     ("lychgate", [n("glow", arc=3.2, lift=1, hug=2.8,
                     spread=1, ceiling=3, deco="lamp", orbs=1),
-                  n("accent", arc=2.6, lift=2, form="slab", hug=2.8,
+                  n("accent", arc=2.6, lift=3, form="slab", hug=2.8,
                     kind="walk", spread=1, ceiling=3, deco="lintel",
                     shell="tunnel")]),
     # The drowned nave, and this is the level's showpiece beat. Three
@@ -176,12 +176,12 @@ LEVEL = Level("THE BELFRY", "village", rise=4, gap=3.0, exit="ladder",
     #   it is 8.0 m from the first moat, which it has to be: the bowls
     #   are radius three and a second one inside that radius stands in
     #   the hole the first dug.
-    ("nave", [n("rock", arc=3.2, lift=2, hug=3.0, spread=1, moat=True,
+    ("nave", [n("rock", arc=3.2, lift=3, hug=3.0, spread=1, moat=True,
                 orbs=1),
-              n("ground", arc=4.6, lift=2, hug=3.6, spread=1,
+              n("ground", arc=4.6, lift=3, hug=3.6, spread=1,
                 pedestal=False, pedestal_style="spruce", ceiling=3,
                 orbs=2),
-              n("mossy", arc=3.4, lift=1, hug=4.2, spread=0,
+              n("mossy", arc=3.4, lift=2, hug=4.2, spread=0,
                 pedestal=False, moat=True, ceiling=3, orbs=1)]),
 ], filler=[
     # The tower, and on a level that lays about eleven designed landings
@@ -237,7 +237,7 @@ LEVEL = Level("THE BELFRY", "village", rise=4, gap=3.0, exit="ladder",
                    pedestal_style="spruce", ceiling=3, orbs=1),
                  n("accent", arc=2.6, lift=2, hug=3.2, kind="walk",
                    spread=1, ceiling=3, deco="lintel"),
-                 n("ground", arc=3.2, lift=3, hug=3.6, spread=0,
+                 n("ground", arc=3.2, lift=2, hug=3.6, spread=0,
                    pedestal=False, pedestal_style="spruce", ceiling=3,
                    orbs=2),
                  n("sub", arc=4.4, lift=2, hug=4.2, spread=0,
@@ -313,8 +313,8 @@ LEVEL = Level("THE BELFRY", "village", rise=4, gap=3.0, exit="ladder",
     # because every landing was placed. Another level instrumented exactly
     # that; ``tower_probe --design-only`` now asks the question for the whole
     # roster and this was the only level that failed it.
-    n("glow", arc=3.4, lift=1, hug=3.2, spread=1, confine=True,
+    n("glow", arc=3.4, step_y=0, hug=3.2, spread=1, confine=True,
       pedestal_style="cobble", ceiling=3, deco="lamp", orbs=1),
-    n("rock", arc=2.4, step_y=4, kind="climb", climb_style="ladder",
+    n("rock", arc=2.4, step_y=3, kind="climb", climb_style="ladder",
       hug=2.4, pedestal_style="cobble", spread=0, confine=True, orbs=2),
 ])

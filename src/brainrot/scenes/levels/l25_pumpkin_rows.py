@@ -230,7 +230,7 @@ LEVEL = Level("PUMPKIN ROWS", "farm", rise=4, gap=2.8, exit="stair",
                     orbs=1),
                   n("rock", arc=3.0, step_y=1, hug=3.6, pedestal=False,
                     ceiling=3, pedestal_style="darkoak", orbs=1),
-                  n("ground", arc=5.2, step_y=-3, hug=4.0, pedestal=False,
+                  n("ground", arc=5.2, lift=2, step_y=-2, hug=4.0, pedestal=False,
                     moat=True, orbs=2),
                   n("accent", arc=3.2, step_y=1, hug=3.6, pedestal=False,
                     orbs=1)]),
@@ -262,13 +262,13 @@ LEVEL = Level("PUMPKIN ROWS", "farm", rise=4, gap=2.8, exit="stair",
     # The ``shell`` is on the beat's **last** node, the only place a
     # shell may go: it is painted the moment its landing commits and its
     # roof then refuses the next arc of the same beat.
-    ("leat", [n("rock", arc=3.4, lift=2, hug=3.0, spread=1, ceiling=3,
+    ("leat", [n("rock", arc=3.4, lift=3, hug=3.0, spread=1, ceiling=3,
                 pedestal_style="darkoak", orbs=1),
               n("gravel", arc=3.0, step_y=1, form="slab", hug=3.4,
                 radial=1.2, pedestal_style="stone"),
               n("accent", arc=3.2, step_y=0, hug=2.9, radial=-1.2,
                 moat=True, orbs=1),
-              n("oak", arc=3.6, step_y=-1, hug=3.8, pedestal=False,
+              n("oak", arc=3.6, lift=2, step_y=-1, hug=3.8, pedestal=False,
                 shell="cave", orbs=2)]),
     # THE FAR ROWS. Short, and its point in its first node, because a
     # beat is truncated in the *middle* once the terrace budget runs
@@ -280,7 +280,7 @@ LEVEL = Level("PUMPKIN ROWS", "farm", rise=4, gap=2.8, exit="stair",
     # standing on nothing, with the drop under it and the sky behind it.
     # Silhouettes against sky are legible and anything against the cliff
     # is not, and this is the level's turn signal.
-    ("farrows", [n("glow", arc=3.4, lift=2, hug=3.9, spread=1,
+    ("farrows", [n("glow", arc=3.4, lift=3, hug=3.9, spread=1,
                    pedestal=False, deco="lamp", orbs=1),
                  n("rock", arc=2.9, step_y=0, kind="walk", hug=3.9,
                    pedestal=False, ceiling=3, shell="tunnel")]),
@@ -312,13 +312,13 @@ LEVEL = Level("PUMPKIN ROWS", "farm", rise=4, gap=2.8, exit="stair",
     # of what a filler ever loses is there: it is level, off the cart
     # board back onto a bale at ``arc`` 3.2, a reach of 2.52 against a
     # window that runs to 4.26.
-    ("drills", [n("rock", arc=3.2, lift=2, hug=2.9, spread=1, ceiling=3,
+    ("drills", [n("rock", arc=3.2, lift=3, hug=2.9, spread=1, ceiling=3,
                   pedestal_style="darkoak", orbs=1),
                 n("glow", arc=2.9, step_y=0, kind="walk", hug=3.1,
                   ceiling=3, deco="lamp"),
                 n("accent", arc=3.2, step_y=1, hug=3.7, radial=1.0,
                   pedestal=False, orbs=1),
-                n("oak", arc=3.6, step_y=-1, hug=3.0, radial=-1.0,
+                n("oak", arc=3.6, lift=3, step_y=-1, hug=3.0, radial=-1.0,
                   pedestal=False, orbs=1)]),
 ], exit_beats=[
     # THE STACK. Six landings up a flight of bales built against the
@@ -378,14 +378,10 @@ LEVEL = Level("PUMPKIN ROWS", "farm", rise=4, gap=2.8, exit="stair",
     # flight -- a lip tucked against the core aims the last second of
     # the level at the cliff, and a lip over the drop aims it at sky
     # with the next level standing in it.
-    n("glow", arc=3.2, lift=1, hug=3.0, spread=1, ceiling=3,
+    n("glow", arc=3.2, step_y=0, hug=3.0, spread=1, ceiling=3,
       pedestal_style="darkoak", deco="lamp", orbs=1),
     n("oak", arc=2.9, step_y=0, kind="walk", hug=3.0, spread=0,
       confine=True, ceiling=3),
-    n("rock", arc=2.9, step_y=1, hug=3.2, spread=0, confine=True,
-      ceiling=3, pedestal_style="hay"),
-    n("accent", arc=2.9, step_y=1, hug=2.8, spread=0, confine=True,
-      pedestal_style="pumpkin", orbs=1),
     n("rock", arc=2.9, step_y=1, hug=3.4, spread=0, confine=True,
       pedestal_style="hay"),
     n("glow", arc=3.0, step_y=1, hug=4.0, spread=0, pedestal=False,

@@ -90,6 +90,96 @@ def _beats(lv) -> list:
     return out
 
 
+#: The one landing of a level that is allowed to stand on the terrace: the
+#: first of the first beat, which is where the crossing from the level below
+#: puts the body down. Every other landing is at least two blocks up, because
+#: a body steps up one -- so a landing at ``lift=1`` is one a fall walks
+#: straight back onto, and a jump you can walk back to is a jump that cost
+#: nothing to miss. ``docs/REHASH.md`` is the whole argument.
+DECK_MIN = 2
+
+
+#: The most a single authored landing may lose. A fall onto another platform
+#: is a showpiece and the format's only genuinely long jump; a fall of four or
+#: more is the deck coming back down to meet the terrace.
+DROP_MAX = 3.0
+
+
+def cruise(lv) -> float:
+    """The walking height the level's own course leaves the body at.
+
+    Its filler repeats and holds its height (``check_climb``), so this is
+    where the exit starts from -- and on a level whose deck reaches the next
+    terrace on its own, there is nothing left for an exit to climb.
+    """
+    surf = 1.0
+    for _name, specs in list(lv.beats) + list(lv.filler):
+        for spec in specs:
+            surf = _surface(spec, surf)
+    return surf
+
+
+def check_climb(lv) -> list[str]:
+    """A level flies over its terrace, and it climbs on balance.
+
+    Four rules. The first is the safety criterion of ``docs/REHASH.md`` in
+    design data, and the rest are the owner's shape:
+
+    * **only the threshold touches the floor.** Everything after the level's
+      first landing stands at least ``DECK_MIN`` blocks over the terrace, so a
+      body that falls to the ground cannot step back up onto it. One block up
+      is one step up, and one step up is a jump that cost nothing to miss.
+    * **a drop is a showpiece, not a route.** Descents are allowed -- a
+      crevasse you fall into, a balcony you come off, the quarry -- because a
+      fall onto another platform four blocks over the terrace is not the thing
+      the criterion forbids. Falling more than ``DROP_MAX`` at once is.
+    * **the level ends higher than it began.** Whatever happens in between,
+      the way out is up.
+    * **the filler holds its height.** It repeats, so anything it gains it
+      gives back at the seam where it loops -- the one descent nobody writes
+      and everybody ships. Put the level's character in its materials, its
+      verbs and its lids; put the climb in the script.
+    """
+    out: list[str] = []
+    floor = 1.0                     # the terrace's own walking surface
+    surf, prev_name, opened = None, "", None
+    for b, (name, specs) in enumerate(lv.beats):
+        for k, spec in enumerate(specs):
+            got = _surface(spec, surf if surf is not None else floor)
+            if b == 0 and k == 0:
+                opened = got
+            elif got < floor + DECK_MIN - 1e-6:
+                out.append(f"{lv.name}/{name}[{k}]: stands {got - floor:.1f} "
+                           f"over the terrace -- only a level's first landing "
+                           f"may be under {DECK_MIN:.0f}")
+            if surf is not None and surf - got > DROP_MAX + 1e-6:
+                out.append(f"{lv.name}/{name}[{k}]: falls {surf - got:.1f} "
+                           f"from {prev_name} -- more than {DROP_MAX:.0f} is "
+                           f"the deck coming back down to the terrace")
+            surf, prev_name = got, f"{name}[{k}]"
+    if surf is not None and opened is not None and surf < opened - 1e-6:
+        out.append(f"{lv.name}: the script ends {opened - surf:.1f} below "
+                   f"where it opened -- the way out is up")
+    if lv.filler:
+        top, fsurf = surf, surf
+        for name, specs in lv.filler:
+            for k, spec in enumerate(specs):
+                got = _surface(spec, fsurf if fsurf is not None else floor)
+                if got < floor + DECK_MIN - 1e-6:
+                    out.append(f"{lv.name}/{name}[{k}] (filler): stands "
+                               f"{got - floor:.1f} over the terrace")
+                if fsurf is not None and fsurf - got > DROP_MAX + 1e-6:
+                    out.append(f"{lv.name}/{name}[{k}] (filler): falls "
+                               f"{fsurf - got:.1f}")
+                fsurf = got
+        if top is not None and fsurf is not None and abs(fsurf - top) > 1e-6:
+            out.append(f"{lv.name}: the filler ends {fsurf - floor:.1f} over "
+                       f"the terrace where it began {top - floor:.1f} -- it "
+                       f"repeats, so anything it gains it gives back at the "
+                       f"seam")
+    return out
+
+
 def check_design() -> list[str]:
     """Every authored jump against the physics. Returns the complaints."""
     bad: list[str] = []
@@ -126,11 +216,15 @@ def check_design() -> list[str]:
         # engine, and it is pure arithmetic, so it belongs here where it costs
         # nothing to ask.
         if lv.exit_beats:
-            surface = None
+            # From where the level's own course leaves the body, not from the
+            # terrace. The design climbs now (``check_climb``), so an exit
+            # written on ``step_y`` starts at the deck the script cruises at
+            # and a checker that assumes the floor under-counts it by the whole
+            # height of the level.
+            surface = cruise(lv) - 1.0
             for spec in lv.exit_beats:
                 if spec.get("step_y") is not None:
-                    surface = (0 if surface is None else surface) \
-                        + spec["step_y"]
+                    surface += spec["step_y"]
                 elif spec.get("lift") is not None:
                     surface = spec["lift"]
             if surface is not None and surface > lv.rise + 1:
@@ -146,6 +240,7 @@ def check_design() -> list[str]:
         # hop has and which the fidelity probe reported as a beat that never
         # once came out as authored. The filler is walked twice so that the
         # seam where it loops back on itself is checked too.
+        bad.extend(check_climb(lv))
         prev = None
         surf = 1.0
         for beat, specs in list(lv.beats) + list(lv.filler) * 2:

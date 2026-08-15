@@ -18,11 +18,14 @@ out of.
 Three outcomes for a missed jump, and only one of them is a defect:
 
 * **dead** -- it lands where nothing connects, or in the void. Fine.
-* **start** -- it can walk back to the level's *first* landing. Fine, and it is
-  what the owner describes: you go back to the beginning and start again.
-* **shortcut** -- it can walk back to landing 1 or later. **This is the
-  defect.** The fall cost nothing, the climb is optional, and every jump before
-  the one it re-enters at was decoration.
+* **start** -- it can walk back to the level's **entry apron** and no further:
+  the crossing's own landing on the terrace and the one step up off it, which
+  is as far down as a level can begin (nothing rises two blocks in one
+  ballistic move). Fine, and it is what the owner describes -- you go back to
+  the beginning and start again.
+* **shortcut** -- it can walk back onto any landing above that apron. **This is
+  the defect.** The fall cost nothing, the climb is optional, and every jump
+  before the one it re-enters at was decoration.
 
 Four sections:
 
@@ -34,10 +37,10 @@ pedestal built down to the cone's own terrain, or terrain directly beneath the
 block. The rehash allows one, or two where the level's idea needs it. Measured
 on the tower as it stands: 83.2%, which is the whole complaint.
 
-**The climb.** Whether a level rises monotonically from its floor to its exit,
-how far above the terrace each landing stands, and where it drops. The chasm
-crossing is the one sanctioned descent (``hop_span(-1)`` reaches further than
-a level jump, which is why it descends by design) and is excluded.
+**The climb.** How far above its terrace a level's course runs, whether it
+ends higher than it began, and where it drops. The chasm crossing is the one
+sanctioned descent (``hop_span(-1)`` reaches further than a level jump, which
+is why it descends by design) and is excluded.
 
 **Reported, not gated.** How much air is under a landing. It is the number the
 complaint sounds like and it is deliberately *not* the criterion: a landing on
@@ -81,6 +84,12 @@ FALL_MAX = 60
 #: Cells one level's flood may visit. A level is eighty to a hundred blocks of
 #: arc and a corridor nine wide, so this is an order of magnitude of slack.
 BUDGET = 40000
+#: Moves a body can miss. A walk is on the ground for its whole length, a
+#: climb is on a ladder and a bubble ride is inside a column of water -- none
+#: of the three has a moment where the body is in the air with nothing under
+#: it, so sampling a fall from one measures the walkway it is standing on.
+#: Leaving them in read as re-entry on every walk leg in the tower.
+MISSABLE = frozenset(("hop", "slide", "bounce"))
 #: Points sampled along a jump to fall from. A miss happens anywhere along the
 #: arc, not only at its middle -- and the two ends are excluded because a body
 #: standing on either landing has not missed anything.
@@ -90,6 +99,24 @@ MISS_SAMPLES = 7
 #: walked against a world that has had its own floor taken away -- which reads
 #: as a catastrophic pass and is the probe's own doing. Two levels of slack.
 KEEP = 96
+#: How much of a level counts as its beginning: the *leading* run of landings
+#: at terrace height or one block over it. Three or four of them is normal and
+#: none of them is a design decision -- the level below's exit tops out one
+#: block over this terrace so its crossing can descend onto it, the crossing
+#: lands on the terrace itself, and the first landing off it can only be one
+#: block up because nothing rises two in one ballistic move. They are all
+#: mutually walkable and they are all the beginning.
+#:
+#: A landing one block over the terrace is walkable from it whatever else is
+#: true, so counting them as the apron is geometry rather than generosity --
+#: and there is no *ordering* to it either: the level below's climb tops out
+#: over this terrace, its walk to the chasm lip runs along beside it, the
+#: crossing lands on it and the level's own first landing steps off it, and
+#: those arrive interleaved with a dozen others. What stops a level living
+#: down there is the design check (``tower_probe.check_climb``, which allows
+#: exactly one) and this cap, which is a backstop: six is more than the
+#: geometry ever needs and far less than a course laid on the floor.
+ENTRY_MAX = 6
 #: How far behind the frontier a level is judged. Its own exit climb and
 #: crossing are laid *after* its last terrace landing, so a level judged the
 #: moment the bearing leaves it is judged without its way out.
@@ -128,64 +155,44 @@ def fall_to(course, x: int, z: int, y: float):
     return None
 
 
-class Union:
-    """Union-find over walkable surface cells.
+def reaches(course, lv, targets) -> set:
+    """Every cell a body could *walk from* onto one of ``targets``.
 
-    One flood per level rather than one per missed jump: the answer to "can
-    these two spots reach each other" is a component id, and a component map is
-    the same work for ten landings as for one.
+    Run backwards, and it has to be. Walking is not symmetric -- a body steps
+    up one block and drops four -- so "these two spots are connected" is the
+    wrong question and answering it with a union-find gets the wrong answer in
+    a way that looks right: a landing four blocks over the terrace can always
+    walk *down* to it, and a symmetric flood then reports the terrace as able
+    to walk back up.
+
+    One reverse breadth-first search per level per target set, rather than one
+    forward walk per missed jump: the answer is a membership test afterwards.
     """
-
-    def __init__(self) -> None:
-        self.up: dict[tuple[int, int, int], tuple[int, int, int]] = {}
-
-    def find(self, c):
-        up = self.up
-        root = c
-        while up.get(root, root) != root:
-            root = up[root]
-        while up.get(c, c) != c:
-            up[c], c = root, up[c]
-        return root
-
-    def join(self, a, b) -> None:
-        ra, rb = self.find(a), self.find(b)
-        if ra != rb:
-            self.up[ra] = rb
-
-
-def flood(course, lv, seeds, uf: Union) -> None:
-    """Walk out from every seed, joining everything one walk can connect."""
     cone = course.cone
-    seen = set()
-    queue = deque()
-    for s in seeds:
-        if s is None or s in seen:
-            continue
-        seen.add(s)
-        uf.up.setdefault(s, s)
-        queue.append(s)
+    seen = {c for c in targets if c is not None}
+    queue = deque(seen)
     steps = 0
     while queue and steps < BUDGET:
         x, y, z = queue.popleft()
         steps += 1
         for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             nx, nz = x + dx, z + dz
-            ny = surface(course, nx, nz, y)
-            if ny is None:
-                continue
-            cell = (nx, ny, nz)
-            uf.up.setdefault(cell, cell)
-            uf.join((x, y, z), cell)
-            if cell in seen:
-                continue
-            # Wandering onto another level is not this walk: getting back up
-            # from there is that level's exit climb, which is parkour.
-            nu = cone.unwrap(nx, nz, ny)
-            if not (lv.u0 - 0.02 <= nu <= lv.u1 + 0.02):
-                continue
-            seen.add(cell)
-            queue.append(cell)
+            # Predecessors: a body standing at ``ny`` in the next column can
+            # step to ``y`` if it is at most one block up and at most ``DROP``
+            # down. That window is the reverse of the forward rule and nothing
+            # else in this walker knows about direction.
+            for ny in range(y - STEP_UP, y + DROP + 1):
+                cell = (nx, ny, nz)
+                if cell in seen or not stands(course, nx, ny, nz):
+                    continue
+                # Wandering onto another level is not this walk: getting back
+                # up from there is that level's exit climb, which is parkour.
+                nu = cone.unwrap(nx, nz, ny)
+                if not (lv.u0 - 0.02 <= nu <= lv.u1 + 0.02):
+                    continue
+                seen.add(cell)
+                queue.append(cell)
+    return seen
 
 
 # --------------------------------------------------------------------------
@@ -200,7 +207,7 @@ def miss_points(blk: dict):
     arrives at landing ``i`` is stored on landing ``i - 1``.
     """
     move = blk.get("move")
-    if move is None:
+    if move is None or move.kind not in MISSABLE:
         return ()
     pts = move.points(MISS_SAMPLES)
     return tuple(pts[1:-1]) if len(pts) > 2 else ()
@@ -213,7 +220,7 @@ def judge(course, lv, blocks: list[dict]) -> dict:
         "level": lv.index, "theme": lv.theme.name, "landings": len(blocks),
         "shortcut": 0, "to_start": 0, "dead": 0, "misses": 0,
         "worst_reentry": -1, "floor_contact": 0, "drops": 0, "drop_total": 0,
-        "held": 0,
+        "held": 0, "reentry_cells": 0, "apron": 0, "apron_all": 0,
         "air": [], "lift_first": None, "lift_last": None, "climb": 0,
         "authors": Counter(), "shortcut_at": [],
     }
@@ -278,30 +285,40 @@ def judge(course, lv, blocks: list[dict]) -> dict:
                 continue
             falls.append((i, rest))
     out["held"] = held
-    uf = Union()
-    flood(course, lv, [c for c in stand if c] + [c for _i, c in falls if c],
-          uf)
 
-    # A landing's own cell is where the body would be standing had it not
-    # missed, so the walk back is judged against the *earlier* landings only.
-    roots = {}
-    for j, cell in enumerate(stand):
-        if cell is not None:
-            roots.setdefault(uf.find(cell), []).append(j)
+    # **The beginning of a level is an apron, not a landing.** A body crosses
+    # the chasm onto the next terrace and steps up off it, and neither of those
+    # can be anywhere but on the ground: nothing rises two blocks in one
+    # ballistic move, so the first landing off a terrace is one block over it
+    # whatever the design says. Both are the beginning, and walking back to
+    # either of them is the outcome the owner asked for.
+    #
+    # It is the *leading* run of them and at most two, which is the difference
+    # between a rule and a loophole: a level laid entirely one block over its
+    # own floor would otherwise be all apron and read as a clean pass, which is
+    # the tower this rehash exists to replace. ``tools/tower_probe.py``
+    # ``check_climb`` is the same rule stated in design data.
+    low = [j for j, blk in enumerate(blocks)
+           if course.surface(blk) <= lv.y + 1.0 + 1e-6]
+    entry = set(low[:ENTRY_MAX])
+    out["apron_all"] = len(low)
+    above = [c for j, c in enumerate(stand) if c is not None and j not in entry]
+    back = reaches(course, lv, above)
+    home = reaches(course, lv, [c for j, c in enumerate(stand)
+                                if c is not None and j in entry])
+    out["reentry_cells"] = len(back)
+    out["apron"] = len(entry)
     for i, rest in falls:
         out["misses"] += 1
         if rest is None:
             out["dead"] += 1
-            continue
-        reach = [j for j in roots.get(uf.find(rest), ()) if j < i]
-        if not reach:
-            out["dead"] += 1
-        elif max(reach) == 0:
+        elif rest in back:
+            out["shortcut"] += 1
+            out["shortcut_at"].append(i)
+        elif rest in home:
             out["to_start"] += 1
         else:
-            out["shortcut"] += 1
-            out["worst_reentry"] = max(out["worst_reentry"], max(reach))
-            out["shortcut_at"].append(i)
+            out["dead"] += 1
     return out
 
 
@@ -374,6 +391,9 @@ def run(runs: int, blocks: int) -> dict:
         "levels_monotonic": sum(1 for lv in levels if not lv["drops"]),
         "climb_mean": sum(lv["climb"] for lv in levels) / n,
         "lift_last_mean": sum(lv["lift_last"] for lv in levels) / n,
+        "apron_mean": sum(lv["apron"] for lv in levels) / n,
+        "apron_worst": max((lv["apron_all"] for lv in levels), default=0),
+        "apron_all": sum(lv["apron_all"] for lv in levels) / n,
         "air_median": air[len(air) // 2] if air else 0,
         "air_zero": sum(1 for a in air if a <= 0) / max(1, len(air)),
         "per_level": levels,
@@ -386,6 +406,10 @@ def main() -> int:
     ap.add_argument("--blocks", type=int, default=260)
     ap.add_argument("--levels", action="store_true",
                     help="one line per level judged")
+    ap.add_argument("--top", type=int, default=40,
+                    help="how many level rows to print, worst first")
+    ap.add_argument("--only", default="",
+                    help="only levels whose name contains this")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
     got = run(args.runs, args.blocks)
@@ -413,6 +437,11 @@ def main() -> int:
           f"{got['levels_over_two']} of {got['levels']} levels")
     print(f"  share of all landings   "
           f"{100 * got['floor_contact'] / max(1, got['landings']):.1f}%")
+    print(f"  the entry apron                {got['apron_all']:.1f} "
+          f"landings a level, worst {got['apron_worst']}, "
+          f"{got['apron_mean']:.1f} of them excused  "
+          f"(the tread the level below tops out on, the crossing's own "
+          f"landing, and the step up off it)")
     print("the climb")
     print(f"  levels that never drop   {got['levels_monotonic']} of "
           f"{got['levels']}   ({got['drops']} drops outside the crossing)")
@@ -426,9 +455,11 @@ def main() -> int:
         print("\nper level (worst first)")
         rows = sorted(got["per_level"],
                       key=lambda r: (-r["shortcut"], -r["floor_contact"]))
+        if args.only:
+            rows = [r for r in rows if args.only.upper() in r["theme"].upper()]
         print(f"  {'lvl':>4} {'place':16} {'land':>4} {'short':>6} "
               f"{'floor':>6} {'drops':>6} {'climb':>6}")
-        for r in rows[:40]:
+        for r in rows[:args.top]:
             print(f"  {r['level']:>4} {r['theme'][:16]:16} "
                   f"{r['landings']:>4} {r['shortcut']:>6} "
                   f"{r['floor_contact']:>6} {r['drops']:>6} "

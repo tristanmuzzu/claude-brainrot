@@ -66,10 +66,14 @@ class FakeCourse:
 
 
 class FakeMove:
-    """A straight hop from one stand point to the next, apex a metre up."""
+    """A straight hop from one stand point to the next, apex a metre up.
 
-    def __init__(self, frm, to) -> None:
-        self.frm, self.to = frm, to
+    ``kind`` matters: the probe only samples falls from moves a body can
+    actually miss, so a walk or a ladder ride contributes nothing.
+    """
+
+    def __init__(self, frm, to, kind="hop") -> None:
+        self.frm, self.to, self.kind = frm, to, kind
 
     def points(self, samples):
         out = []
@@ -90,7 +94,7 @@ def block(x, y, z, **kw) -> dict:
     return out
 
 
-def course_of(blocks, rock=(), y=0):
+def course_of(blocks, rock=(), y=1):
     """Wire up landings, their moves and a world holding them."""
     cone = FakeCone(rock)
     course = FakeCourse(cone, [(b["x"], b["y"], b["z"]) for b in blocks])
@@ -99,6 +103,8 @@ def course_of(blocks, rock=(), y=0):
         blocks[i]["move"] = FakeMove(
             (a["x"], course.surface(a), a["z"]),
             (b["x"], course.surface(b), b["z"]))
+    # ``y`` is the terrace's own walking surface: a rock floor whose top cell
+    # is y=0 is walked at y=1, and the probe's entry apron is measured off it.
     level = SimpleNamespace(index=1, u0=0.0, u1=1.0, y=y,
                             theme=SimpleNamespace(name="TEST"))
     return course, level
@@ -113,15 +119,15 @@ def floor(x0, x1, z0, z1, y):
 
 def test_a_course_on_a_continuous_floor_is_all_shortcut():
     """Four landings on a terrace: every fall walks straight back up."""
-    blocks = [block(x, 1, 0) for x in (0, 3, 6, 9)]
-    course, level = course_of(blocks, rock=floor(-4, 14, -4, 4, 0))
+    blocks = [block(x, 1, 0) for x in (0, 3, 6, 9, 12, 15, 18)]
+    course, level = course_of(blocks, rock=floor(-4, 24, -4, 4, 0))
     got = probe.judge(course, level, blocks)
     assert got["misses"] > 0
-    # The first jump can only ever reach landing 0, which is "back to the
-    # start" and legitimate; every later one re-enters mid-course.
-    assert got["to_start"] > 0 and got["shortcut"] > 0, got
+    # The leading run at terrace height is the entry apron and is capped;
+    # everything past it is a course you can walk back onto, which is the
+    # defect, and a level laid entirely down there is the old tower.
+    assert got["shortcut"] > 0, got
     assert got["shortcut"] + got["to_start"] == got["misses"], got
-    assert got["worst_reentry"] >= 1
     # ...and it is the floor doing it.
     assert got["floor_contact"] == len(blocks)
 
@@ -139,7 +145,7 @@ def test_the_same_course_over_the_void_is_dead():
 
 def test_a_floor_only_at_the_opening_sends_you_back_to_the_start():
     """The shape the rehash asks for: the fall lands where only the level's
-    first landing is reachable."""
+    entry apron is reachable."""
     blocks = [block(0, 1, 0), block(3, 1, 0), block(6, 1, 0)]
     # Ground under the opening landing only. A fall from the first jump comes
     # down on it and can step back up onto landing 0; a fall from the second
@@ -150,6 +156,23 @@ def test_a_floor_only_at_the_opening_sends_you_back_to_the_start():
     got = probe.judge(course, level, blocks)
     assert got["shortcut"] == 0, got
     assert got["to_start"] > 0 and got["dead"] > 0, got
+
+
+def test_the_entry_apron_is_the_beginning_and_not_a_shortcut():
+    """A landing one block over the terrace is the step up off it.
+
+    Nothing rises two blocks in one ballistic move, so a level entered across
+    a chasm onto its own ground *must* have one landing at terrace + 1 before
+    it can be anywhere else. Walking back to that is walking back to the
+    beginning; the criterion is about the landings above it.
+    """
+    blocks = [block(0, 1, 0), block(3, 1, 0), block(6, 2, 0), block(9, 3, 0)]
+    course, level = course_of(blocks, rock=floor(-4, 14, -4, 4, 0))
+    got = probe.judge(course, level, blocks)
+    # Landings 0 and 1 stand at y=2 -- the terrace is at y=1, so both are the
+    # apron. The two above them are not reachable from the ground at all.
+    assert got["shortcut"] == 0, got
+    assert got["to_start"] > 0, got
 
 
 def test_a_pedestal_down_to_the_terrace_counts_as_floor_contact():
@@ -177,7 +200,7 @@ def test_a_jump_that_is_made_is_not_counted_as_a_fall():
 def test_the_climb_is_measured_and_the_crossing_is_exempt():
     blocks = [block(0, 1, 0), block(3, 2, 0), block(6, 3, 0),
               block(9, 2, 0, origin="crossing")]
-    course, level = course_of(blocks, rock=(), y=0)
+    course, level = course_of(blocks, rock=())
     got = probe.judge(course, level, blocks)
     assert got["drops"] == 0, "the crossing descends by design"
     assert got["climb"] == pytest.approx(1.0)

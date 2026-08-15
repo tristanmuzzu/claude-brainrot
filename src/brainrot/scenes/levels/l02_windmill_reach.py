@@ -61,12 +61,15 @@ LEVEL = Level("WINDMILL REACH", "farm", rise=6, gap=3.0, exit="stair",
     # feet in its first two seconds and the walker who never jumps drops
     # into the cut there.
     #
-    # Written at lift 1 and not 2: the identical beat one block higher
-    # measures two thirds of the placement.
-    ("sill", [n("glow", arc=3.2, lift=1, form="slab", spread=0, hug=3.0,
-                deco="lamp", orbs=1),
-              n("rock", arc=2.8, lift=1, kind="walk", spread=0, hug=3.0,
-                ceiling=3, moat=True, pedestal_style="coarse")]),
+    # **The lantern stone is the one landing on this level standing on the
+    # ground**, and the sack ladder now comes straight off it. A body steps
+    # up one block, so anything at lift 1 is something a fall walks back
+    # onto: the apron is where a level begins and everything after it is at
+    # least two up (``docs/REHASH.md``). The walk that used to be here has
+    # moved up the ladder to the loading stage, where it reads better
+    # anyway -- you walk *inside* the mill rather than past its door.
+    ("sill", [n("glow", arc=3.2, lift=1, spread=0, hug=3.0,
+                deco="lamp", orbs=1, moat=True)]),
     # The mill, second beat and third landing: the sack ladder up the
     # roundhouse, four blocks in one move, and a stride in under the cap
     # on to the loading stage with the miller's lantern on it.
@@ -87,7 +90,7 @@ LEVEL = Level("WINDMILL REACH", "farm", rise=6, gap=3.0, exit="stair",
     # the ladder were sea and sky, and are now the inside of the mill.
     ("race", [n("rock", arc=2.4, step_y=4, kind="climb",
                 climb_style="ladder", hug=2.4, spread=0,
-                pedestal_style="darkoak", orbs=2),
+                pedestal=True, pedestal_style="darkoak", orbs=2),
               n("ground", arc=2.7, lift=5, kind="walk", spread=0, hug=2.6,
                 ceiling=3, shell="cave", deco="lamp", orbs=1)]),
     # The wheel pit, and the level's descent: off the stage and three
@@ -108,9 +111,9 @@ LEVEL = Level("WINDMILL REACH", "farm", rise=6, gap=3.0, exit="stair",
     # machinery is inserted *between* beats and leaves the body back at
     # lift 1, so a fall written far from the climb that fed it is a fall
     # that does not happen.
-    ("pit", [n("accent", arc=5.2, lift=2, spread=1, hug=2.6, ceiling=5,
+    ("pit", [n("accent", arc=5.2, lift=3, spread=1, hug=2.6, ceiling=5,
                pedestal=False, orbs=3),
-             n("stone", arc=3.2, lift=2, spread=1, hug=2.8, moat=True,
+             n("stone", arc=3.2, lift=3, spread=1, hug=2.8, moat=True,
                pedestal_style="gravel", orbs=1)]),
     # The rick, climbing back out of the pit, and three different
     # questions in three landings:
@@ -122,11 +125,11 @@ LEVEL = Level("WINDMILL REACH", "farm", rise=6, gap=3.0, exit="stair",
     #   0.34, so the feet plant dead centre. Placement, not distance.
     # * **top course** -- off the rail onto the stack, another half step,
     #   with the gantry the sacks swing from checked in overhead.
-    ("rick", [n("ground", arc=3.2, lift=3, spread=1, hug=2.8, ceiling=5,
+    ("rick", [n("ground", arc=3.2, lift=4, spread=1, hug=2.8, ceiling=5,
                 orbs=1),
-              n("rock", arc=3.0, lift=3, form="fence", spread=0, hug=2.6,
+              n("rock", arc=3.0, lift=4, form="fence", spread=0, hug=2.6,
                 radial=0.9),
-              n("ground", arc=3.0, lift=4, spread=0, hug=2.6, radial=-0.9,
+              n("ground", arc=3.0, lift=5, spread=0, hug=2.6, radial=-0.9,
                 ceiling=3, orbs=1)]),
 ], filler=[
     # The yard, which is what the terrace plays if it outlasts the
@@ -134,13 +137,13 @@ LEVEL = Level("WINDMILL REACH", "farm", rise=6, gap=3.0, exit="stair",
     # boards, out onto the rail and back up. No ``moat`` anywhere in here
     # -- the loop's second lap would dig away the ground the first lap's
     # pedestals stand on.
-    ("yard", [n("ground", arc=4.2, lift=3, spread=2, hug=2.8, ceiling=5,
+    ("yard", [n("ground", arc=4.2, lift=5, spread=2, hug=2.8, ceiling=5,
                 orbs=1),
-              n("rock", arc=2.7, lift=3, kind="walk", spread=0, hug=2.6,
+              n("rock", arc=2.7, lift=5, kind="walk", spread=0, hug=2.6,
                 radial=0.9),
-              n("accent", arc=3.0, lift=3, form="fence", spread=0,
+              n("accent", arc=3.0, lift=5, form="fence", spread=0,
                 hug=2.4, radial=-0.9),
-              n("ground", arc=3.0, lift=4, spread=0, hug=2.6, orbs=1)]),
+              n("ground", arc=3.0, lift=5, spread=0, hug=2.6, orbs=1)]),
 ], exit_beats=[
     # Out over the top course of the rick that is being built against the
     # cliff: bale, board, bale, board, and the last lantern in the level
@@ -184,14 +187,15 @@ LEVEL = Level("WINDMILL REACH", "farm", rise=6, gap=3.0, exit="stair",
     # sixth took this level's mean exit climb from 11.0 landings to 5.5
     # and the tower's generated staircase from 134 landings a sweep to
     # 126. The lamp and the last orb moved onto the new top tread.
+    #
+    # **And it is two treads now, not five.** The yard cruises five blocks
+    # over the terrace since the rehash, so what the climb has left to gain
+    # is the level's rise of six minus that, plus the one block the crossing
+    # brings back down: two. The level does its own climbing on the sack
+    # ladder in its second beat, which is a better thing to watch than a
+    # staircase and was always the level's own idea.
     n("ground", arc=3.0, step_y=1, spread=0, confine=True, ceiling=6,
       pedestal_style="coarse", orbs=1),
     n("log", arc=2.9, step_y=1, hug=2.2, spread=0, confine=True,
-      ceiling=6, pedestal_style="hay", radial=0.9),
-    n("ground", arc=3.0, step_y=1, hug=2.2, spread=0, confine=True,
-      ceiling=6, pedestal_style="coarse", radial=-0.9, orbs=1),
-    n("log", arc=2.9, step_y=1, hug=2.2, spread=0, confine=True,
-      ceiling=6, pedestal_style="hay", radial=0.9),
-    n("ground", arc=3.0, step_y=1, hug=2.2, spread=0, confine=True,
-      ceiling=6, pedestal_style="coarse", radial=-0.9, deco="lamp", orbs=1),
+      ceiling=6, pedestal_style="hay", radial=0.9, deco="lamp", orbs=1),
 ])

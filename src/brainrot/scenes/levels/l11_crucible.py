@@ -166,9 +166,10 @@ LEVEL = Level("THE CRUCIBLE", "nether", rise=5, gap=3.0, exit="ladder",
     # costs three and the beats behind it then fit.
     ("taphole", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1, deco="lamp",
                    ceiling=2, orbs=1),
-                 n("blackstone", arc=2.9, step_y=0, hug=2.8, kind="walk",
+                 n("blackstone", arc=3.2, step_y=1, hug=2.8,
                    ceiling=3),
-                 n("accent", arc=3.2, step_y=1, hug=2.6, moat=True, orbs=1),
+                 n("accent", arc=2.9, step_y=0, hug=2.6, kind="walk", moat=True,
+                   orbs=1),
                  n("rock", arc=2.9, step_y=0, hug=2.8, kind="walk",
                    pedestal=False, ceiling=3),
                  n("blackstone", arc=3.2, step_y=1, hug=3.0,
@@ -197,7 +198,7 @@ LEVEL = Level("THE CRUCIBLE", "nether", rise=5, gap=3.0, exit="ladder",
     #    out**, the longest jump here. A descent is the only long jump
     #    this model has, and it is written at the same reach of 3.92 for
     #    the same reason as node 1.
-    ("furnace", [n("rock", arc=4.6, lift=1, hug=3.2, spread=1,
+    ("furnace", [n("rock", arc=4.6, lift=2, hug=3.2, spread=1,
                    pedestal=False, moat=True, ceiling=2, orbs=2),
                  n("accent", arc=2.9, step_y=0, hug=3.0, kind="walk",
                    pedestal=False, ceiling=3, deco="lintel"),
@@ -205,7 +206,7 @@ LEVEL = Level("THE CRUCIBLE", "nether", rise=5, gap=3.0, exit="ladder",
                    pedestal=False),
                  n("glow", arc=3.2, step_y=1, hug=2.6, pedestal=False,
                    deco="lamp", orbs=1),
-                 n("rock", arc=4.6, step_y=-2, hug=3.8, pedestal=False,
+                 n("rock", arc=4.6, lift=2, step_y=-2, hug=3.8, pedestal=False,
                    orbs=2)]),
 ], filler=[
     # THE SLAG RUN, and this is what the level mostly *is*, because the
@@ -215,11 +216,11 @@ LEVEL = Level("THE CRUCIBLE", "nether", rise=5, gap=3.0, exit="ladder",
     # step back up onto the heap. No moat anywhere in here: the filler
     # loops, and the second lap digs away the ground the first lap's
     # pedestals are standing on.
-    ("slagrun", [n("blackstone", arc=3.4, lift=1, hug=2.8, spread=1,
+    ("slagrun", [n("blackstone", arc=3.4, lift=2, hug=2.8, spread=1,
                    ceiling=2, orbs=1),
                  n("soulsand", arc=2.9, step_y=0, hug=2.6, kind="walk",
                    ceiling=3),
-                 n("accent", arc=3.2, step_y=1, hug=3.2, pedestal=False,
+                 n("accent", arc=3.2, step_y=0, hug=3.2, pedestal=False,
                    orbs=1)]),
 ], exit_beats=[
     # THE FLUE. Written out rather than left to the generated climb,
@@ -271,8 +272,8 @@ LEVEL = Level("THE CRUCIBLE", "nether", rise=5, gap=3.0, exit="ladder",
     # `rise`. A column that overshoots is a level above that opens by
     # dropping back down to its own terrace, which is the owner's "it
     # puts a ladder there and then jumps back down to a lower part".
-    n("rock", arc=3.2, lift=1, hug=2.4, spread=2, deco="lamp", orbs=1),
-    n("blackstone", arc=2.4, step_y=4, kind="climb", climb_style="ladder",
+    n("rock", arc=3.2, step_y=0, hug=2.4, spread=2, deco="lamp", orbs=1),
+    n("blackstone", arc=2.4, step_y=3, kind="climb", climb_style="ladder",
       hug=2.0, pedestal=True, pedestal_style="netherbrick", spread=0,
       orbs=2),
     n("accent", arc=3.2, step_y=1, hug=3.8, spread=0, pedestal=False,

@@ -218,10 +218,10 @@ LEVEL = Level("THE GATE", "end", rise=4, gap=3.0, exit="stair",
     #    dark brow across the top of the frame.
     ("gatehouse", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1,
                      deco="lamp", ceiling=3, orbs=1),
-                   n("sub", arc=2.9, step_y=0, hug=3.0, kind="walk",
+                   n("sub", arc=3.2, step_y=1, hug=3.0,
                      spread=0, ceiling=3, pedestal_style="obsidian",
                      orbs=1),
-                   n("rock", arc=3.2, step_y=1, hug=3.0, spread=0,
+                   n("rock", arc=2.9, step_y=0, hug=3.0, kind="walk", spread=0,
                      pedestal_style="obsidian", orbs=1),
                    n("accent", arc=2.9, step_y=0, hug=3.0, kind="walk",
                      spread=0, ceiling=3, pedestal_style="obsidian"),
@@ -230,7 +230,7 @@ LEVEL = Level("THE GATE", "end", rise=4, gap=3.0, exit="stair",
                    n("accent", arc=2.9, step_y=0, hug=3.2, kind="walk",
                      spread=0, pedestal=False, ceiling=3,
                      pedestal_style="obsidian", orbs=1),
-                   n("sub", arc=4.9, step_y=-2, hug=4.4, spread=0,
+                   n("sub", arc=4.9, lift=2, step_y=-1, hug=4.4, spread=0,
                      pedestal=False, deco="lamp", orbs=2),
                    n("rock", arc=3.2, step_y=1, hug=3.0, spread=0,
                      pedestal=False, shell="cave", orbs=1)]),
@@ -271,7 +271,7 @@ LEVEL = Level("THE GATE", "end", rise=4, gap=3.0, exit="stair",
     # out by six tenths of a block took the whole level from 5.7% to 1.5%.
     # The core face is a wall like any other, and a body at 2.6 has it
     # inside the probe's three-metre threshold across half the ray fan.
-    ("court", [n("ground", arc=3.4, lift=1, hug=2.9, spread=1, moat=True,
+    ("court", [n("ground", arc=3.4, lift=2, hug=2.9, spread=1, moat=True,
                  ceiling=3, orbs=1),
                n("accent", arc=2.9, step_y=0, hug=3.2, kind="walk",
                  spread=0, pedestal=False, ceiling=3,
@@ -306,13 +306,13 @@ LEVEL = Level("THE GATE", "end", rise=4, gap=3.0, exit="stair",
     # four-block shelf that wobbles about +/-1.3 still has ground under
     # them, and the two that float go out to 3.4 and 3.8 where the core
     # face is out of the lens.
-    ("causeway", [n("ground", arc=4.4, lift=1, hug=2.9, spread=1,
+    ("causeway", [n("ground", arc=4.4, lift=4, hug=2.9, spread=1,
                     ceiling=3, orbs=1),
                   n("accent", arc=2.9, step_y=0, hug=3.0, kind="walk",
                     spread=0, ceiling=3, pedestal_style="obsidian"),
                   n("glow", arc=3.2, step_y=1, hug=3.4, spread=0,
                     pedestal=False, orbs=1),
-                  n("rock", arc=3.4, step_y=1, hug=3.8, spread=0,
+                  n("rock", arc=3.4, step_y=-1, hug=3.8, spread=0,
                     pedestal=False, orbs=1)]),
 ], exit_beats=[
     # THE CROWN. A black-and-white stair up the back of the gatehouse,
@@ -357,10 +357,7 @@ LEVEL = Level("THE GATE", "end", rise=4, gap=3.0, exit="stair",
     # good answer and belongs to THE PILLARS, whose idea is the climb.
     # This level's idea is the gate, and a stair on the gate's own
     # obsidian is a quieter ending rather than a worse one.
-    n("glow", arc=3.2, lift=1, hug=2.9, spread=2, confine=True,
+    n("glow", arc=3.2, step_y=0, hug=2.9, spread=2, confine=True,
       deco="lamp", ceiling=3, shell="cave", orbs=1),
-    n("accent", arc=3.0, step_y=1, hug=2.9, spread=0, ceiling=3),
-    n("sub", arc=3.0, step_y=1, hug=3.1, spread=0, ceiling=3, orbs=1),
-    n("accent", arc=3.0, step_y=1, hug=3.3, spread=0),
     n("glow", arc=3.2, step_y=1, hug=3.5, spread=0, deco="lamp", orbs=2),
 ])

@@ -150,7 +150,7 @@ LEVEL = Level("BLUE RUN", "ice", rise=4, gap=2.8, exit="ladder",
     # is off the floor.
     ("startgate", [n("glow", arc=3.2, lift=1, hug=2.8, spread=1,
                      ceiling=3, deco="lamp", orbs=1),
-                   n("spruce", arc=2.9, lift=1, hug=2.8, kind="walk",
+                   n("spruce", arc=2.9, lift=2, hug=2.8, kind="walk",
                      spread=0, pedestal_style="spruce", ceiling=3,
                      deco="lintel", shell="cave")]),
     # **The level is this beat**, and it is five nodes in one rather than
@@ -196,16 +196,16 @@ LEVEL = Level("BLUE RUN", "ice", rise=4, gap=2.8, exit="ladder",
     # The two ponds are 13.8 m apart, which they have to be: the bowl is
     # a radius-three disc dug the moment its landing commits, and a
     # second one inside that radius stands in the hole the first made.
-    ("flume", [n("rock", arc=3.2, lift=2, hug=2.6, spread=1, moat=True,
+    ("flume", [n("rock", arc=3.2, lift=3, hug=2.6, spread=1, moat=True,
                  pedestal_style="spruce", ceiling=3, orbs=1),
-               n("ground", arc=5.4, lift=2, kind="slide", form="ice",
+               n("ground", arc=5.4, lift=3, kind="slide", form="ice",
                  hug=3.0, spread=1, pedestal=False,
                  pedestal_style="blueice", ceiling=3, orbs=2),
-               n("rock", arc=3.2, lift=3, hug=2.6, spread=1,
+               n("rock", arc=3.2, lift=4, hug=2.6, spread=1,
                  pedestal_style="spruce", ceiling=3),
-               n("spruce", arc=5.2, lift=1, hug=3.0, spread=1,
+               n("spruce", arc=5.2, lift=2, hug=3.0, spread=1,
                  form="slime", pedestal=False, moat=True, orbs=2),
-               n("ground", arc=3.4, lift=3, hug=2.6, kind="bounce",
+               n("ground", arc=3.4, lift=4, hug=2.6, kind="bounce",
                  spread=1, pedestal=False, pedestal_style="spruce",
                  orbs=3)]),
     # The sump: down between the run's own banks to the flooded floor of
@@ -219,9 +219,9 @@ LEVEL = Level("BLUE RUN", "ice", rise=4, gap=2.8, exit="ladder",
     # bottom of the run. The way out of it is a +1 **slide**, a reach of
     # 2.92 against an ice window of 2.67 to 4.36 -- a hop would do it
     # too, and the ice is what the bank is made of.
-    ("sump", [n("rock", arc=4.4, lift=1, hug=2.6, spread=1, moat=True,
+    ("sump", [n("rock", arc=4.4, lift=2, hug=2.6, spread=1, moat=True,
                 pedestal_style="spruce", ceiling=3, orbs=1),
-              n("ground", arc=3.6, lift=2, kind="slide", form="ice",
+              n("ground", arc=3.6, lift=3, kind="slide", form="ice",
                 hug=3.0, spread=1, pedestal=False,
                 pedestal_style="blueice", ceiling=3, orbs=1)]),
 ], filler=[
@@ -249,7 +249,7 @@ LEVEL = Level("BLUE RUN", "ice", rise=4, gap=2.8, exit="ladder",
                  n("rock", arc=4.8, lift=3, kind="slide", form="ice",
                    hug=3.4, spread=0, pedestal=False,
                    pedestal_style="spruce", orbs=2),
-                 n("spruce", arc=3.6, lift=2, hug=3.0, spread=0,
+                 n("spruce", arc=3.6, lift=3, hug=3.0, spread=0,
                    pedestal=False, pedestal_style="spruce", ceiling=3)]),
 ], exit_beats=[
     # The way out is the run's headwall: a timber launch board on the
@@ -283,10 +283,8 @@ LEVEL = Level("BLUE RUN", "ice", rise=4, gap=2.8, exit="ladder",
     # is the emptiest third of every level in this tower, but it is also
     # the only place the run needs to see where it is going, and a roofed
     # leap into a hole reads as a wall.
-    n("spruce", arc=3.2, lift=2, hug=2.8, spread=1,
+    n("spruce", arc=3.2, step_y=0, hug=2.8, spread=1,
       pedestal_style="spruce", ceiling=3, orbs=1),
-    n("ground", arc=3.6, step_y=1, kind="slide", form="ice", hug=2.4,
-      spread=0, pedestal_style="spruce", ceiling=3),
     n("ground", arc=3.6, step_y=1, kind="slide", form="ice", hug=2.4,
       spread=0, pedestal_style="spruce", ceiling=3, orbs=1),
     n("rock", arc=3.6, step_y=1, kind="slide", form="ice", hug=2.6,

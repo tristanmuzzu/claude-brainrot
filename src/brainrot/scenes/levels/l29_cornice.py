@@ -192,12 +192,12 @@ LEVEL = Level("THE CORNICE", "snow", rise=6, gap=3.0, exit="ladder",
     #    roster.
     ("crown", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1, deco="lamp",
                  ceiling=5, orbs=1),
-               n("deepslate", arc=2.9, step_y=0, hug=3.0, kind="walk",
+               n("deepslate", arc=3.2, step_y=1, hug=3.0,
                  ceiling=5),
-               n("frost", arc=3.2, step_y=1, hug=3.0, orbs=1),
+               n("frost", arc=2.9, step_y=0, hug=3.0, kind="walk", orbs=1),
                n("packedice", arc=4.0, step_y=1, kind="slide", form="ice",
                  hug=3.2, orbs=1),
-               n("ground", arc=5.0, lift=0, form="floor", hug=3.4,
+               n("ground", arc=4.2, lift=2, hug=3.4,
                  spread=0, moat=True, orbs=2),
                n("frost", arc=3.2, step_y=1, hug=3.2, pedestal=False,
                  orbs=1)]),
@@ -255,7 +255,7 @@ LEVEL = Level("THE CORNICE", "snow", rise=6, gap=3.0, exit="ladder",
     # is wanted: what this tower's sheets are short of is not walls but
     # the dark brow across the top of the frame that the reference has in
     # 73% of its shots.
-    ("glaze", [n("frost", arc=3.4, lift=2, hug=3.2, spread=1, ceiling=5,
+    ("glaze", [n("frost", arc=3.4, lift=4, hug=3.2, spread=1, ceiling=5,
                  orbs=1),
                n("blueice", arc=5.2, step_y=0, kind="slide", form="ice",
                  hug=3.2, pedestal=False, orbs=2),
@@ -263,7 +263,7 @@ LEVEL = Level("THE CORNICE", "snow", rise=6, gap=3.0, exit="ladder",
                  ceiling=5),
                n("frost", arc=3.2, step_y=1, hug=3.6, pedestal=False,
                  moat=True, orbs=1),
-               n("snow", arc=4.8, step_y=-2, hug=3.8, pedestal=False,
+               n("snow", arc=4.8, lift=3, step_y=-2, hug=3.8, pedestal=False,
                  shell="cave", orbs=2)]),
     # THE SECOND CRACK -- the quiet beat, and the level's device said a
     # second time in three landings rather than six.
@@ -276,9 +276,9 @@ LEVEL = Level("THE CORNICE", "snow", rise=6, gap=3.0, exit="ladder",
     # its edge -- which is a ``slide`` rather than a hop because the exit
     # staircase and this level's two crack landings are the only places
     # a non-hop verb can live at all, and the hop share is a rule.
-    ("crack", [n("frost", arc=3.4, lift=2, hug=3.4, spread=1, ceiling=5,
+    ("crack", [n("frost", arc=3.4, lift=4, hug=3.4, spread=1, ceiling=5,
                  orbs=1),
-               n("ground", arc=4.4, lift=0, form="floor", hug=3.6,
+               n("ground", arc=4.4, lift=2, hug=3.6,
                  spread=0, moat=True, orbs=2),
                n("packedice", arc=4.0, step_y=1, kind="slide", form="ice",
                  hug=3.4, pedestal=False, orbs=1)]),
@@ -301,11 +301,11 @@ LEVEL = Level("THE CORNICE", "snow", rise=6, gap=3.0, exit="ladder",
     # **No ``moat`` anywhere in here.** The filler loops, and the second
     # lap digs away the ground the first lap's pedestals are standing on.
     # This level's three ponds are all in beats that play once.
-    ("slabs", [n("frost", arc=3.2, lift=2, hug=3.0, spread=1, ceiling=5,
+    ("slabs", [n("frost", arc=3.2, lift=3, hug=3.0, spread=1, ceiling=5,
                  orbs=1),
                n("deepslate", arc=2.9, step_y=0, hug=3.0, kind="walk",
                  ceiling=5),
-               n("packedice", arc=4.4, step_y=-1, kind="slide", form="ice",
+               n("packedice", arc=4.4, lift=3, step_y=0, kind="slide", form="ice",
                  hug=3.4, pedestal=False, orbs=1)]),
 ], exit_beats=[
     # THE FRACTURE STAIR. The crown wall steps as it tears, and the way
@@ -365,11 +365,11 @@ LEVEL = Level("THE CORNICE", "snow", rise=6, gap=3.0, exit="ladder",
     # than tucked in at 2.4, because the camera locks onto the landing
     # through take-off and flight: a lip against the core aims the last
     # second of the level at the cliff.
-    n("glow", arc=3.0, lift=2, hug=2.8, spread=1, deco="lamp", ceiling=3,
+    n("glow", arc=3.0, step_y=0, hug=2.8, spread=1, deco="lamp", ceiling=3,
       shell="cave", orbs=1),
     n("frost", arc=3.0, step_y=1, hug=2.6, spread=0, confine=True,
       ceiling=3),
-    n("packedice", arc=3.6, step_y=1, kind="slide", form="ice", hug=2.6,
+    n("packedice", arc=3.6, step_y=0, kind="slide", form="ice", hug=2.6,
       spread=0, confine=True, ceiling=3, orbs=1),
     n("deepslate", arc=3.0, step_y=1, hug=2.6, spread=0, confine=True,
       ceiling=3, shell="tunnel"),

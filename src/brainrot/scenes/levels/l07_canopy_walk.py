@@ -134,7 +134,7 @@ LEVEL = Level("CANOPY WALK", "jungle", rise=6, gap=2.2, exit="vine",
     # motion model can honestly put one over.
     ("sill", [n("glow", arc=3.0, lift=1, hug=2.8, spread=1, ceiling=3,
                 deco="lamp", orbs=1),
-              n("mossy", arc=2.9, lift=1, hug=2.8, kind="walk", spread=0,
+              n("mossy", arc=2.9, lift=2, hug=2.8, kind="walk", spread=0,
                 ceiling=3, deco="lintel", shell="cave")]),
     # **The whole level is this beat**, and it is five nodes rather than
     # two beats of two and three because of where the terrace runs out.
@@ -202,15 +202,15 @@ LEVEL = Level("CANOPY WALK", "jungle", rise=6, gap=2.2, exit="vine",
     # have to be: the pond is a radius-three bowl dug the moment its
     # landing commits, and a second one inside that radius stands in the
     # hole the first made.
-    ("boardwalk", [n("junglelog", arc=3.2, lift=2, hug=2.6, spread=1,
+    ("boardwalk", [n("junglelog", arc=3.2, lift=3, hug=2.6, spread=1,
                      moat=True, ceiling=3, orbs=1),
-                   n("oak", arc=2.6, lift=2, hug=3.0, kind="walk", spread=1,
+                   n("oak", arc=2.6, lift=3, hug=3.0, kind="walk", spread=1,
                      pedestal=False),
-                   n("oak", arc=3.2, lift=3, hug=3.2, spread=0,
+                   n("oak", arc=3.2, lift=4, hug=3.2, spread=0,
                      pedestal=False, pedestal_style="jungleleaf", ceiling=3),
-                   n("mushroomred", arc=5.2, lift=1, hug=2.8, spread=0,
+                   n("mushroomred", arc=5.2, lift=2, hug=2.8, spread=0,
                      pedestal=False, moat=True, orbs=2),
-                   n("junglelog", arc=3.4, lift=3, hug=3.0, kind="bounce",
+                   n("junglelog", arc=3.4, lift=4, hug=3.0, kind="bounce",
                      spread=1, pedestal=False, orbs=3)]),
     # The spur, and it is the level's turn signal: the walkway branches
     # out past the edge of its own shelf on a bough that leans over the
@@ -224,9 +224,9 @@ LEVEL = Level("CANOPY WALK", "jungle", rise=6, gap=2.2, exit="vine",
     # ledge's width wobbles about 1.3 either side of the 5.0 it asked
     # for -- so the landing floats over nothing, which is the point, and
     # ``pedestal=False`` is therefore not optional but structural.
-    ("spur", [n("oak", arc=3.4, lift=3, hug=3.4, spread=2, pedestal=False,
+    ("spur", [n("oak", arc=3.4, lift=4, hug=3.4, spread=2, pedestal=False,
                 pedestal_style="jungleleaf", ceiling=3),
-              n("glow", arc=3.2, lift=3, hug=5.0, spread=1, pedestal=False,
+              n("glow", arc=3.2, lift=4, hug=5.0, spread=1, pedestal=False,
                 deco="lamp", orbs=2)]),
 ], filler=[
     # The walkway itself, and on a terrace this long it is a third of
@@ -248,13 +248,13 @@ LEVEL = Level("CANOPY WALK", "jungle", rise=6, gap=2.2, exit="vine",
     # pedestals are standing on -- one keyword in a filler once produced
     # 27,859 "pedestal will not stand" refusals. This level's water is
     # the two ponds in the script.
-    ("understory", [n("oak", arc=3.4, lift=2, hug=2.6, spread=1,
+    ("understory", [n("oak", arc=3.4, lift=4, hug=2.6, spread=1,
                       pedestal=False, pedestal_style="jungleleaf",
                       ceiling=3, orbs=1),
-                    n("mossy", arc=2.6, lift=2, hug=3.0, kind="walk",
+                    n("mossy", arc=2.6, lift=4, hug=3.0, kind="walk",
                       spread=0, pedestal=False,
                       pedestal_style="jungleleaf", ceiling=3),
-                    n("junglelog", arc=3.2, lift=3, hug=3.4, spread=0,
+                    n("junglelog", arc=3.2, lift=4, hug=3.4, spread=0,
                       pedestal_style="junglelog", orbs=1)]),
 ], exit_beats=[
     # The way out is the walkway carrying on: four boards climbing the
@@ -291,7 +291,7 @@ LEVEL = Level("CANOPY WALK", "jungle", rise=6, gap=2.2, exit="vine",
     # here, not the lids: a tread standing on its own column of trunk is
     # mass under the eye where an open shelf has nothing, and it took the
     # empty frame from 44% to 42% at no cost to fidelity at all.
-    n("oak", arc=3.2, lift=3, hug=2.8, spread=2, pedestal_style="junglelog",
+    n("oak", arc=3.2, step_y=0, hug=2.8, spread=2, pedestal_style="junglelog",
       ceiling=3, orbs=1),
     n("junglelog", arc=2.9, step_y=1, hug=2.6, spread=0,
       pedestal_style="junglelog", ceiling=3),

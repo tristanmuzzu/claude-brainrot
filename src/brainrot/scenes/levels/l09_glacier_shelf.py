@@ -108,7 +108,7 @@ LEVEL = Level("GLACIER SHELF", "ice", rise=5, gap=3.2, exit="bubble",
     # at lift 1.
     ("sill", [n("glow", arc=3.0, lift=1, hug=3.0, spread=0, deco="lamp",
                 orbs=1),
-              n("frost", arc=2.9, lift=1, hug=2.8, kind="walk", spread=0,
+              n("frost", arc=2.9, lift=2, hug=2.8, kind="walk", spread=0,
                 ceiling=3)]),
     # The seracs, and the whole shape of the level in one beat: three
     # slides up the ice to four blocks over the terrace, then straight
@@ -131,13 +131,13 @@ LEVEL = Level("GLACIER SHELF", "ice", rise=5, gap=3.2, exit="bubble",
     # with nothing under it and the meltwater dug out underneath it: a
     # floe caught in the split, and the only ground within reach is the
     # far side of the crevasse.
-    ("seracs", [n("packedice", arc=3.5, lift=2, kind="slide", form="ice",
+    ("seracs", [n("packedice", arc=3.5, lift=3, kind="slide", form="ice",
                   hug=2.6, spread=0, orbs=1),
-                n("blueice", arc=3.6, lift=3, kind="slide", form="ice",
+                n("blueice", arc=3.6, lift=4, kind="slide", form="ice",
                   hug=3.2, spread=0, ceiling=3),
-                n("packedice", arc=3.5, lift=4, kind="slide", form="ice",
+                n("packedice", arc=3.5, lift=5, kind="slide", form="ice",
                   hug=3.8, spread=0, deco="lintel", orbs=1),
-                n("frost", arc=4.6, lift=1, hug=2.4, spread=1,
+                n("frost", arc=4.6, lift=2, hug=2.4, spread=1,
                   pedestal=False, moat=True, orbs=2)]),
     # The bottom of the split. A stone standing in the meltwater, and a
     # walk out of it under the ice -- the one stretch of this level with
@@ -169,9 +169,9 @@ LEVEL = Level("GLACIER SHELF", "ice", rise=5, gap=3.2, exit="bubble",
     # whole: a shell roof sits in the cell the head sweeps at a hop's
     # apex, so a roof over a jump is a roof with a hole in it, and a
     # walk has no apex to punch one.
-    ("meltcave", [n("calcite", arc=3.0, lift=1, hug=2.6, spread=1,
+    ("meltcave", [n("calcite", arc=3.0, lift=2, hug=2.6, spread=1,
                     moat=True, ceiling=3, orbs=1),
-                  n("frost", arc=2.8, lift=1, hug=2.6, kind="walk",
+                  n("frost", arc=2.8, lift=2, hug=2.6, kind="walk",
                     spread=0, pedestal=False, ceiling=3, shell="cave",
                     orbs=1)]),
     # Out of the cave and onto the calving face: two pans of ice with
@@ -182,9 +182,9 @@ LEVEL = Level("GLACIER SHELF", "ice", rise=5, gap=3.2, exit="bubble",
     # the drop directly off the far side. The third pond is under the
     # first of them, 6.2 m clear of the one in the cave, and it is what
     # takes the walker off the last third of the terrace.
-    ("calving", [n("blueice", arc=3.4, lift=2, kind="slide", form="ice",
+    ("calving", [n("blueice", arc=3.4, lift=3, kind="slide", form="ice",
                    hug=3.4, spread=1, pedestal=False, moat=True, orbs=1),
-                 n("packedice", arc=4.4, lift=2, kind="slide", form="ice",
+                 n("packedice", arc=4.4, lift=3, kind="slide", form="ice",
                    hug=4.2, spread=0, pedestal=False, ceiling=3)]),
 ], filler=[
     # The level's voice rather than its surprise, and on a level that
@@ -203,11 +203,11 @@ LEVEL = Level("GLACIER SHELF", "ice", rise=5, gap=3.2, exit="bubble",
     # No `moat` anywhere in here, and that is not taste: the filler
     # loops, and the second lap digs away the ground the first lap's
     # pedestals are standing on.
-    ("floes", [n("packedice", arc=3.4, lift=2, kind="slide", form="ice",
+    ("floes", [n("packedice", arc=3.4, lift=3, kind="slide", form="ice",
                  hug=3.0, spread=2, ceiling=3, orbs=1),
                n("blueice", arc=3.5, lift=3, kind="slide", form="ice",
                  hug=4.0, spread=1, pedestal=False),
-               n("frost", arc=4.4, lift=1, hug=2.6, spread=1,
+               n("frost", arc=4.4, lift=3, hug=2.6, spread=1,
                  pedestal=False, orbs=2)]),
 ], exit_beats=[
     # The way out of the crevasse is the **moulin**: the shaft a glacier
@@ -264,9 +264,9 @@ LEVEL = Level("GLACIER SHELF", "ice", rise=5, gap=3.2, exit="bubble",
     # either way). The `ceiling` beam is the cheap half of a roof over
     # the chimney: a `cave` shell here does the same job for the sky and
     # puts a wall back beside the body, which is what was being fixed.
-    n("packedice", arc=2.8, lift=1, hug=2.8, spread=1, confine=True,
+    n("packedice", arc=2.8, step_y=0, hug=2.8, spread=1, confine=True,
       ceiling=3),
-    n("blueice", arc=2.4, step_y=4, kind="bubble", hug=2.0, pedestal=True,
+    n("blueice", arc=2.4, step_y=2, kind="bubble", hug=2.0, pedestal=True,
       pedestal_style="packedice", spread=0, deco="lamp", orbs=2),
     n("frost", arc=3.0, step_y=1, hug=2.8, spread=0, pedestal=False,
       ceiling=3, orbs=1),

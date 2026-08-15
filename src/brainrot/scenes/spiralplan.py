@@ -1199,7 +1199,7 @@ class Section:
     floor. Those two are the whole reason the parkour is not optional.
     """
 
-    __slots__ = ("band", "breaks", "gap", "hard", "index", "landmark",
+    __slots__ = ("band", "breaks", "deck", "gap", "hard", "index", "landmark",
                  "profile", "rise", "shelf", "signature", "theme", "u0",
                  "u1", "y")
 
@@ -1263,6 +1263,12 @@ class Section:
         #: unwalkable *along*. Zero for generated levels (their contract is
         #: unchanged); the hand-built ones choose.
         self.breaks = 0
+        #: How high over its own terrace this level's course runs, in blocks.
+        #: One for a generated level, whose course *is* on its terrace; a
+        #: designed one says so (``levels._base.Level.deck``) and the gated
+        #: landmark is stood on a plinth that tall so the course goes through
+        #: its doorway rather than past its foot.
+        self.deck = 1
 
     @property
     def u_edge(self) -> float:
@@ -2327,6 +2333,20 @@ class Course:
     #: not been dressed yet a third of the time.
     ahead = AHEAD
 
+    #: Does a landing that says nothing about it build a stack down to the
+    #: ground? Yes here and no on the hand-built tower, and it is the one thing
+    #: the two formats genuinely disagree about. A generated level is terrain
+    #: with parkour cut into it: every landing is the top of a dune, a stump or
+    #: a pier, which is what keeps it from reading as cubes hung over a field.
+    #: A designed level is the opposite by intent -- the terrace is the place
+    #: you fly over, and a stack down to it is a staircase back up. See
+    #: ``docs/REHASH.md``.
+    pedestal_default = True
+
+    #: The lowest height, in blocks over a level's terrace, that a landing may
+    #: *fall back* to when the one it asked for will not go. See ``_node``.
+    lift_floor = 0
+
     def __init__(self, rng, cone: Cone, hop_rng=None) -> None:
         self.rng = rng
         self.hop_rng = hop_rng or rng
@@ -2348,6 +2368,15 @@ class Course:
         self.headroom: set[tuple[int, int, int]] = set()
         #: Every cell the body will pass through on a move already solved.
         self.pathcells: set[tuple[int, int, int]] = set()
+        #: **The cells that would be a step back up onto a landing.** A body
+        #: steps up one block, so anything solid beside a landing and within a
+        #: block of its height is a way back onto the course from the ground it
+        #: fell to -- and a jump you can walk back to is a jump that cost
+        #: nothing to miss. Terrain dressing is what fills them: an outcrop,
+        #: a dune, a pond rim, a landmark's own mass. Empty on the generated
+        #: tower, whose course stands *on* its terrace and is meant to.
+        #: See ``docs/REHASH.md`` and ``tools/reentry_probe.py``.
+        self.noclimb: set[tuple[int, int, int]] = set()
         #: Ladders, vines, water columns, cobweb. Drawn, never solid, but
         #: reserved -- a wall built through a ladder is a ladder in a wall.
         self.softcells: set[tuple[int, int, int]] = set()
@@ -2911,7 +2940,7 @@ class Course:
             if got is not None:
                 return got
         for arc in (3, 4, 2, 5, 6):
-            for lift in (1, 0, 2, 3, 4):
+            for lift in self._recover_lifts():
                 for radial in (0.0, 2.0, -2.0, 4.0, -4.0):
                     node = self._node(theme.rock, arc=arc, lift=lift,
                                       radial=radial,
@@ -2950,6 +2979,16 @@ class Course:
                     if got is not None:
                         return got
         return None
+
+    def _recover_lifts(self):
+        """Heights a recovery hop may be laid at, best first.
+
+        Ground first here: a generated level is terrain, and a recovery that
+        stands on it reads as the terrain it is standing on. The hand-built
+        tower overrides this, because down there is the terrace it has spent
+        the level climbing away from.
+        """
+        return (1, 0, 2, 3, 4)
 
     def _abandon(self, prev: dict) -> None:
         """The feature being given up on gets a chance to clean up after itself.
@@ -3073,6 +3112,13 @@ class Course:
         th = u * cone.wind
         cx, cz = iround(math.cos(th) * r), iround(math.sin(th) * r)
         cy = self.floor_at_cell(u, cx, cz)
+        if self.lift_floor:
+            # Level with the body rather than back down on the terrace. This
+            # is the one unchecked landing in the module, so it is also the one
+            # that cannot be argued with later -- and dropping the body to the
+            # floor here undoes a level's whole climb and leaves a landing a
+            # fall walks back onto. A flat hop is no less safe than a drop.
+            cy = max(cy, ifloor(self.surface(prev)) - 1)
         # A tuple is truthy whether or not it is (0, 0), so this cannot be
         # written as ``step or (1, 0)`` -- which is what it said until ruff
         # pointed out that the fallback was unreachable. A zero step gives a
@@ -3858,7 +3904,7 @@ class Course:
 
     def _node(self, style: str, arc: float = 3.0, lift: int = 1,
               radial: float = 0.0, kind: str = "hop", form: str = "full",
-              deco: str | None = None, orbs: int = 0, pedestal: bool = True,
+              deco: str | None = None, orbs: int = 0, pedestal: bool | None = None,
               pedestal_style: str | None = None,
               climb_style: str | None = None,
               spread: int = 2, moat: bool = False, step_y: int | None = None,
@@ -3879,7 +3925,14 @@ class Course:
         through. Two is generous and right for a free hop; a staircase wants
         zero, because a stair whose steps are sometimes two blocks apart is not
         a staircase.
+
+        ``pedestal`` left unsaid takes :attr:`pedestal_default`, which is the
+        one thing the two towers disagree about: a generated level is terrain
+        with parkour cut into it and a designed one is a course flown over its
+        own terrace. See the attribute.
         """
+        if pedestal is None:
+            pedestal = self.pedestal_default
         if label != "ascent" and ramp:
             # Not the exit climb, and not a distance somebody chose on purpose.
             # A hand-built level's gaps are the design: stretching them by a
@@ -3896,10 +3949,19 @@ class Course:
         top = 0 if form == "floor" else LIFT_MAX
         low = 0 if form == "floor" else 1
         lift = min(max(lift, low), top)
+        # **A fallback may go up; it may not go under the deck.** ``spread`` is
+        # how many neighbouring heights placement is allowed to try, and on the
+        # hand-built tower an authored landing three blocks over its terrace
+        # was quietly being placed one block over it -- which is a landing a
+        # fall steps straight back onto, and it was the largest single source
+        # of re-entry left after the designs themselves were raised. The floor
+        # never rises above what the node asked for, so a level's one apron
+        # landing keeps its own height. Zero on the generated tower.
+        floor = min(lift, self.lift_floor) if form != "floor" else low
         lifts = [lift]
         for d in range(1, spread + 1):
             for cand in (lift - d, lift + d):
-                if low <= cand <= top:
+                if max(low, floor) <= cand <= top:
                     lifts.append(cand)
         if step_y is not None:
             lifts = [lift]
@@ -4262,6 +4324,32 @@ class Course:
             pulls = (0.0,)
         else:
             pulls = (0.0, 1.0, 2.0)
+        # **A gate stands on a plinth as tall as the level's course.** The
+        # passage is what the crossing is aimed at, and a passage cut through
+        # the bottom of a structure is a passage on the floor -- which is
+        # exactly where a designed level's course no longer goes. Raising the
+        # whole blueprint and filling under it puts the doorway on the running
+        # line; the plinth is a solid mass with vertical sides, so it adds
+        # nothing a body can walk up. Zero on the generated tower, whose
+        # course runs on its terrace and whose contract is unchanged.
+        lift = max(0, getattr(section, "deck", 1) - 1) if gate is not None \
+            else 0
+        if lift:
+            dt0, dt1, dr0, dr1, _dy1 = gate[0]
+            # The plinth carries the structure and stops short of its doorway.
+            # Filled under the passage as well it is a floor you can fall on to
+            # and walk straight through -- measured as the last big source of
+            # re-entry in the tower, because a doorway sits right beside the
+            # running line by construction. Left open, the passage is a hole in
+            # the mound with the crossing's own landings floating in it, and a
+            # fall through it carries on down to the terrace.
+            door = {(dt, dr) for dt in range(dt0, dt1 + 1)
+                    for dr in range(dr0, dr1 + 1)}
+            foot = {(dt, dr) for dt, dy, dr, _s in cells if dy == 0} - door
+            cells = [(dt, dy + lift, dr, s) for dt, dy, dr, s in cells] + [
+                (dt, dy, dr, section.theme.sub)
+                for dt, dr in sorted(foot) for dy in range(lift)]
+            props = [(dt, dy + lift, dr, kind) for dt, dy, dr, kind in props]
         for pull in pulls:
             r = base_r - pull
 
@@ -4272,7 +4360,7 @@ class Course:
             void: set = set()
             if gate is not None:
                 (dt0, dt1, dr0, dr1, dy1), kind = gate
-                void = {at(dt, dy, dr)
+                void = {at(dt, dy + lift, dr)
                         for dt in range(dt0, dt1 + 1)
                         for dy in range(0, dy1 + 1)
                         for dr in range(dr0, dr1 + 1)}
@@ -4326,7 +4414,7 @@ class Course:
             # real map's streets do anyway.
             cross = None
             if gate is not None:
-                cross = self._gate_crossing(at, y, gate[1])
+                cross = self._gate_crossing(at, y, gate[1], lift)
                 if cross is None:
                     continue            # a gate with no way in is a wall
             held = {c for c, _ in placed}
@@ -4342,7 +4430,7 @@ class Course:
             return True
         return False
 
-    def _gate_crossing(self, at, y: int, kind: str):
+    def _gate_crossing(self, at, y: int, kind: str, lift: int = 0):
         """The landings that take the course through a gate, or ``None``.
 
         Three of them: one on the ground short of the structure, one inside
@@ -4363,11 +4451,15 @@ class Course:
             edge = i in (0, len(dts) - 1)
             cell = None
             for dr in ((0, -1, -2) if edge else (0,)):
-                c = at(dt, 0, dr)
+                c = at(dt, lift, dr)
                 if cone.rock(c) or not self.free((c,)) or self.reserved((c,)):
                     continue
-                if not cone.rock((c[0], c[1] - 1, c[2])):
-                    continue            # nothing under it to stand a block on
+                if not lift and not cone.rock((c[0], c[1] - 1, c[2])):
+                    # Nothing under it to stand a block on. Only asked of a
+                    # gate on the floor: a raised one carries its own plinth
+                    # under the doorway, and the two landings either side of
+                    # the structure are ordinary floating course.
+                    continue
                 # The body's own two cells, and for a hop the two the head
                 # sweeps through on the way: a landing under a lintel it
                 # cannot get to is not a landing.
@@ -4574,7 +4666,7 @@ class Course:
         """
         if (cell in self.headroom or cell in self.ground
                 or cell in self.softcells or cell in self.struct
-                or cell in self._hold_cells):
+                or cell in self.noclimb or cell in self._hold_cells):
             return False
         x, y, z = cell
         for dx in range(-margin, margin + 1):
@@ -4913,7 +5005,8 @@ class Course:
                 # remaining stuck landing: on the ground, below the level it
                 # was climbing to, with no legal hop at any offered distance.
                 arc=rng.uniform(2.7, 3.1) if on_ground else 2.7,
-                step_y=1, pedestal=on_ground, pedestal_style=theme.sub,
+                step_y=1, pedestal=on_ground and self.pedestal_default,
+                pedestal_style=theme.sub,
                 spread=0, confine=on_ground, label="ascent",
                 origin="stair",
                 # Weaves, but does not change *form*: a slab step stands half

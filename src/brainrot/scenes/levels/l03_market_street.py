@@ -80,9 +80,9 @@ LEVEL = Level("MARKET STREET", "village", rise=7, gap=3.0, exit="ladder",
     # The walk is *second* on purpose: first in a beat it follows
     # machinery at an arbitrary height and a walk needs its predecessor
     # within half a metre.
-    ("gate", [n("glow", arc=3.2, lift=1, form="slab", spread=0,
+    ("gate", [n("glow", arc=3.2, lift=1, spread=0,
                 deco="lamp", orbs=1),
-              n("rock", arc=2.8, lift=1, form="slab", kind="walk",
+              n("rock", arc=2.8, lift=2, kind="walk",
                 spread=0, shell="tunnel")]),
     # The market, and this is the level: four landings that climb the
     # furniture of a stall from the paving to the ridge tiles, and then
@@ -122,14 +122,14 @@ LEVEL = Level("MARKET STREET", "village", rise=7, gap=3.0, exit="ladder",
     #   ever touch it. It is the beat's last node, which is where a moat
     #   has to go -- a moat is painted the moment its landing commits and
     #   the pond then swallows the next landing of the same beat.
-    ("stalls", [n("oak", arc=3.0, lift=1, form="fence", spread=0,
+    ("stalls", [n("oak", arc=3.0, lift=2, form="fence", spread=0,
                   deco="post", orbs=1),
-                n("rock", arc=2.7, lift=2, spread=0),
-                n("accent", arc=3.2, lift=3, spread=0, deco="lintel",
+                n("rock", arc=2.7, lift=3, spread=0),
+                n("accent", arc=3.2, lift=4, spread=0, deco="lintel",
                   orbs=1),
-                n("accent", arc=3.2, lift=4, spread=0,
+                n("accent", arc=3.2, lift=5, spread=0,
                   pedestal_style="plaster"),
-                n("accent", arc=4.4, lift=4, spread=1, ceiling=3,
+                n("accent", arc=4.4, lift=5, spread=1, ceiling=3,
                   pedestal=False, moat=True, orbs=2)]),
 ], exit_beats=[
     # The way out is the watchtower at the end of the street, and you
@@ -157,8 +157,8 @@ LEVEL = Level("MARKET STREET", "village", rise=7, gap=3.0, exit="ladder",
     # three lamps and the only thing in the closing seconds that says
     # which way out is. The generated staircase is still underneath as
     # the fallback, in ``spawn``.
-    n("rock", arc=3.6, lift=4, hug=2.8, spread=3, confine=True),
-    n("ladder", arc=2.4, step_y=4, kind="climb", climb_style="ladder",
+    n("rock", arc=3.6, step_y=0, hug=2.8, spread=3, confine=True),
+    n("ladder", arc=2.4, step_y=3, kind="climb", climb_style="ladder",
       hug=2.6, pedestal_style="plaster", spread=0, confine=True,
       deco="lamp", orbs=2),
 ], filler=[
@@ -202,13 +202,11 @@ LEVEL = Level("MARKET STREET", "village", rise=7, gap=3.0, exit="ladder",
     # loops, and the second lap digs away the ground the first lap's
     # pedestals stand on. The level's water is the gutter under the
     # market jump, in a beat that plays once.
-    ("ridge", [n("accent", arc=4.4, lift=4, spread=2, deco="lintel",
+    ("ridge", [n("accent", arc=4.4, lift=5, spread=2, deco="lintel",
                  orbs=1),
-               n("glow", arc=3.6, lift=4, spread=0, deco="lamp",
+               n("glow", arc=3.6, lift=5, spread=0, deco="lamp",
                  ceiling=3),
-               n("oak", arc=4.9, lift=2, spread=1, ceiling=3,
+               n("oak", arc=4.9, lift=5, spread=1, ceiling=3,
                  pedestal=False, orbs=2),
-               n("rock", arc=2.4, step_y=4, kind="climb",
-                 climb_style="ladder", hug=2.4, spread=0,
-                 pedestal_style="plaster", orbs=2)]),
+               n("rock", arc=3.2, lift=5, spread=1, orbs=1)]),
 ])

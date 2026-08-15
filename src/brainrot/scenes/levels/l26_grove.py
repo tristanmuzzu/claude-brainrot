@@ -240,7 +240,7 @@ LEVEL = Level("THE GROVE", "warped", rise=8, gap=3.0, exit="stair",
     #    and its roof then refuses the next arc of the same beat.
     ("crack", [n("glow", arc=3.2, lift=1, hug=3.2, spread=1, deco="lamp",
                  ceiling=3, moat=True, orbs=1),
-               n("blackstone", arc=2.9, step_y=0, hug=3.2, kind="walk",
+               n("blackstone", arc=3.2, step_y=1, hug=3.2,
                  spread=0, ceiling=3, deco="lintel", pedestal=False),
                n("soulsand", arc=2.9, step_y=0, hug=3.2, kind="walk",
                  spread=0, ceiling=3, pedestal=False, orbs=1),
@@ -248,7 +248,7 @@ LEVEL = Level("THE GROVE", "warped", rise=8, gap=3.0, exit="stair",
                  pedestal=False, orbs=1),
                n("warped", arc=3.0, step_y=1, hug=3.6, spread=0,
                  pedestal_style="warped", ceiling=3, orbs=1),
-               n("gold", arc=4.9, step_y=-2, hug=4.4, spread=0,
+               n("gold", arc=4.9, lift=2, step_y=-1, hug=4.4, spread=0,
                  pedestal=False, orbs=2),
                n("warped", arc=3.0, step_y=1, hug=3.4, spread=0,
                  pedestal_style="warped", shell="cave", deco="lamp",
@@ -285,7 +285,7 @@ LEVEL = Level("THE GROVE", "warped", rise=8, gap=3.0, exit="stair",
     #    a legal descent -- 4 -> 2 is a drop of two and wants 3.12 m of
     #    reach, more than an opener that also has to be legal *up* one
     #    can ask for.
-    ("spill", [n("rawgold", arc=3.4, lift=2, hug=3.2, spread=1, ceiling=3,
+    ("spill", [n("rawgold", arc=3.4, lift=3, hug=3.2, spread=1, ceiling=3,
                  orbs=1),
                n("soulsand", arc=2.9, step_y=0, hug=3.2, kind="walk",
                  spread=0, ceiling=3),
@@ -333,13 +333,13 @@ LEVEL = Level("THE GROVE", "warped", rise=8, gap=3.0, exit="stair",
     # -- 27,859 "pedestal will not stand" refusals from one keyword when
     # it was instrumented elsewhere. This level's two pools are in beats
     # that play once.
-    ("thicket", [n("warped", arc=3.4, lift=2, hug=3.0, spread=1,
+    ("thicket", [n("warped", arc=3.4, lift=4, hug=3.0, spread=1,
                    pedestal_style="warped", ceiling=3, orbs=1),
                  n("soulsand", arc=2.9, step_y=0, hug=3.0, kind="walk",
                    spread=0, ceiling=3),
                  n("rawgold", arc=3.2, step_y=1, hug=3.4, spread=0,
                    pedestal=False, orbs=1),
-                 n("gold", arc=4.4, step_y=-2, hug=3.8, spread=0,
+                 n("gold", arc=4.4, lift=4, step_y=-1, hug=3.8, spread=0,
                    pedestal_style="rawgold", orbs=2)]),
 ], exit_beats=[
     # THE TREASURE STAIR. The hoard is piled against the cliff at the end
@@ -426,12 +426,8 @@ LEVEL = Level("THE GROVE", "warped", rise=8, gap=3.0, exit="stair",
     # a corridor between the cliff and the drop and there is less slack
     # in it than the numbers suggest; re-measure both seeds after any
     # change here.
-    n("glow", arc=3.6, lift=2, hug=2.9, spread=1, confine=True,
+    n("glow", arc=3.6, step_y=0, hug=2.9, spread=1, confine=True,
       deco="lamp", ceiling=3, shell="cave", orbs=1),
-    n("gold", arc=2.9, step_y=1, hug=2.6, spread=0,
-      pedestal_style="blackstone", orbs=1),
-    n("warped", arc=2.9, step_y=1, hug=3.1, spread=0,
-      pedestal_style="blackstone"),
     n("gold", arc=2.9, step_y=1, hug=2.6, spread=0,
       pedestal_style="blackstone", orbs=1),
     n("warped", arc=2.9, step_y=1, hug=2.9, spread=0,

@@ -99,7 +99,7 @@ LEVEL = Level("SUNKEN TEMPLE", "desert", rise=4, gap=2.6, exit="bubble",
     # motion model can express honestly.
     ("doorstep", [n("glowstone", arc=3.2, lift=1, hug=3.0, spread=1,
                     deco="lamp", orbs=1),
-                  n("chiselled", arc=2.9, lift=1, hug=3.0, kind="walk",
+                  n("chiselled", arc=2.9, lift=2, hug=3.0, kind="walk",
                     spread=0, ceiling=3, deco="lintel")]),
     # The porch, already flooded, and the temple's own stair out of it.
     # The first landing stands in the water it dug; the two treads above
@@ -107,7 +107,7 @@ LEVEL = Level("SUNKEN TEMPLE", "desert", rise=4, gap=2.6, exit="bubble",
     # wherever the body happened to arrive, and the top one is gold and
     # lit -- the highest dry stone in the level and the thing you aim
     # at from the door.
-    ("steps", [n("chiselled", arc=3.2, lift=1, hug=3.0, spread=1,
+    ("steps", [n("chiselled", arc=3.2, lift=2, hug=3.0, spread=1,
                  moat=True, ceiling=2, orbs=1),
                n("sandstone", arc=3.0, step_y=1, hug=2.8, spread=0,
                  pedestal=False, ceiling=2),
@@ -121,9 +121,9 @@ LEVEL = Level("SUNKEN TEMPLE", "desert", rise=4, gap=2.6, exit="bubble",
     # node, never the first: a shell is painted the moment its landing
     # commits and the walls it puts up are then in the way of the next
     # landing of the same beat.
-    ("nave", [n("prismarine", arc=4.2, lift=1, hug=3.2, spread=1,
+    ("nave", [n("prismarine", arc=4.2, lift=2, hug=3.2, spread=1,
                 pedestal=False, moat=True, ceiling=2, orbs=2),
-              n("chiselled", arc=3.4, lift=2, hug=3.2, spread=0,
+              n("chiselled", arc=3.4, lift=3, hug=3.2, spread=0,
                 pedestal=False, shell="hall", orbs=1)]),
 ], filler=[
     # The aisle down the side of the nave, and this is where the level's
@@ -132,11 +132,11 @@ LEVEL = Level("SUNKEN TEMPLE", "desert", rise=4, gap=2.6, exit="bubble",
     # crossed on foot, and a step up on to the next column top. No moat
     # here on purpose -- the filler loops, and the second lap digs away
     # the ground the first lap's pedestals are standing on.
-    ("colonnade", [n("chiselled", arc=3.2, lift=1, hug=2.8, spread=1,
+    ("colonnade", [n("chiselled", arc=3.2, lift=3, hug=2.8, spread=1,
                      radial=0.8, ceiling=3, orbs=1),
-                   n("sandstone", arc=2.9, lift=1, hug=2.8, kind="walk",
+                   n("sandstone", arc=2.9, lift=3, hug=2.8, kind="walk",
                      spread=0, radial=-0.8, ceiling=3),
-                   n("prismarine", arc=3.2, lift=2, hug=3.0, spread=0,
+                   n("prismarine", arc=3.2, lift=3, hug=3.0, spread=0,
                      radial=0.8, pedestal=False, orbs=1)]),
 ], exit_beats=[
     # The flooded well in the sanctuary. Written out rather than left to
@@ -161,8 +161,8 @@ LEVEL = Level("SUNKEN TEMPLE", "desert", rise=4, gap=2.6, exit="bubble",
     # 48% rule and at 47%/82% on the two numbers it is actually near, so
     # the trade is the wrong way round here. Try it again on a level
     # with frame trouble.
-    n("chiselled", arc=3.0, lift=1, hug=2.4, spread=2, deco="lamp",
+    n("chiselled", arc=3.0, step_y=0, hug=2.4, spread=2, deco="lamp",
       orbs=1),
-    n("prismarine", arc=3.0, step_y=4, kind="bubble", climb_style="water",
+    n("prismarine", arc=3.0, step_y=2, kind="bubble", climb_style="water",
       spread=0, deco="lamp", orbs=2),
 ])

@@ -195,11 +195,11 @@ LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="bubble",
     # 6. Back in off the bar onto a bronze bollard standing in the water.
     ("sill", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1, deco="lamp",
                 ceiling=3, orbs=1),
-              n("rock", arc=3.2, lift=1, hug=3.0, ceiling=3),
+              n("rock", arc=3.2, lift=2, hug=3.0, ceiling=3),
               n("accent", arc=2.9, step_y=0, hug=3.0, kind="walk", ceiling=3),
               n("ground", arc=3.2, step_y=1, hug=3.2, orbs=1),
               n("ground", arc=3.2, step_y=1, hug=3.4),
-              n("sub", arc=4.9, step_y=-2, hug=4.8, moat=True, pedestal=False,
+              n("sub", arc=4.9, lift=2, step_y=-2, hug=4.8, moat=True, pedestal=False,
                 orbs=2),
               n("copper", arc=3.2, step_y=1, hug=3.0, pedestal=False,
                 orbs=1)]),
@@ -225,13 +225,13 @@ LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="bubble",
     # rather than a hall or a tunnel because it is carved *into* the
     # cliff -- on a ledge a walled shell can only find footing on the
     # core side, which stands a wall right beside the lens.
-    ("basin", [n("rock", arc=3.4, lift=1, hug=3.0, spread=1, ceiling=3,
+    ("basin", [n("rock", arc=3.4, lift=2, hug=3.0, spread=1, ceiling=3,
                  orbs=1),
-               n("ground", arc=2.8, lift=2, hug=2.8, form="slab", kind="walk",
+               n("ground", arc=2.8, lift=3, hug=2.8, form="slab", kind="walk",
                  deco="lamp"),
-               n("accent", arc=3.4, lift=2, hug=4.4, moat=True,
+               n("accent", arc=3.4, lift=3, hug=4.4, moat=True,
                  pedestal=False, orbs=1),
-               n("rock", arc=3.2, lift=3, hug=3.2, pedestal=False,
+               n("rock", arc=3.2, lift=4, hug=3.2, pedestal=False,
                  shell="grotto", orbs=2)]),
     # THE CAUSEWAY -- what is left of the road out to the gate: three
     # piers over open water with nothing under two of them, at the
@@ -259,9 +259,9 @@ LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="bubble",
     # is level with wherever the body actually got to and is never
     # refused. Worth three points of hop share on its own -- 84% -> 81%,
     # walk 10% -> 13% -- for no fidelity at all.
-    ("causeway", [n("rock", arc=3.4, lift=2, hug=3.2, spread=1, ceiling=5,
+    ("causeway", [n("rock", arc=3.4, lift=3, hug=3.2, spread=1, ceiling=5,
                     orbs=1),
-                  n("accent", arc=3.2, lift=3, hug=3.4, pedestal=False,
+                  n("accent", arc=3.2, lift=4, hug=3.4, pedestal=False,
                     ceiling=5, orbs=1),
                   n("copper", arc=2.9, step_y=0, hug=3.6, kind="walk",
                     pedestal=False, deco="post", ceiling=5, orbs=1)]),
@@ -279,11 +279,11 @@ LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="bubble",
     # digs away the ground the first lap's pedestals are standing on --
     # 27,859 "pedestal will not stand" refusals on the level that found
     # it. Both of this level's ponds are in beats that play once.
-    ("moorings", [n("rock", arc=3.6, lift=2, hug=3.0, spread=2, ceiling=3,
+    ("moorings", [n("rock", arc=3.6, lift=4, hug=3.0, spread=2, ceiling=3,
                     orbs=1),
-                  n("ground", arc=2.9, lift=2, hug=3.0, kind="walk",
+                  n("ground", arc=2.9, lift=4, hug=3.0, kind="walk",
                     ceiling=3, deco="lamp"),
-                  n("copper", arc=3.2, lift=3, hug=3.2, pedestal=False,
+                  n("copper", arc=3.2, lift=4, hug=3.2, pedestal=False,
                     orbs=1)]),
 ], exit_beats=[
     # THE SLUICE. The gate's own culvert, with the tide forcing water
@@ -324,8 +324,8 @@ LEVEL = Level("THE SEA GATE", "prismarine", rise=5, gap=2.8, exit="bubble",
     # block ``hop_span(-1)`` comes down on the crossing. A climb that
     # overshoots is the owner's "it puts a ladder there and then jumps
     # back down to a lower part".
-    n("ground", arc=2.8, lift=1, hug=2.8, spread=1, confine=True, ceiling=3),
-    n("rock", arc=2.4, step_y=4, kind="bubble", climb_style="water", hug=2.0,
+    n("ground", arc=2.8, step_y=0, hug=2.8, spread=1, confine=True, ceiling=3),
+    n("rock", arc=2.4, step_y=1, kind="bubble", climb_style="water", hug=2.0,
       pedestal=True, pedestal_style="prismarine", spread=0, deco="lamp",
       orbs=2),
     n("glow", arc=3.0, step_y=1, hug=3.2, spread=0, pedestal=False,

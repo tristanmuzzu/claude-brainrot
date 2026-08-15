@@ -112,9 +112,20 @@ LEVEL = Level("THE GATEHOUSE", "plains", rise=4, gap=2.8, exit="stair",
     # shin height. The ``ceiling`` lid does the same job honestly, three
     # cells over the feet and checked against the arc rather than drawn near
     # it, and the tunnel supplies the walls.
-    ("gate", [n("glow", arc=3.2, lift=1, form="slab", spread=1,
-                deco="lamp", orbs=1),
-              n("cobble", arc=2.8, lift=1, form="slab", kind="walk",
+    #
+    # **The threshold is the only thing on this level standing on the
+    # ground, and the gate arch has gone up a storey.** A body steps up one
+    # block, so a landing one over the terrace is one a fall walks straight
+    # back onto -- and the level after it would be optional. The lantern
+    # stone is the apron, the level's beginning, the one landing the design
+    # is allowed down there; everything after it is at least two up. See
+    # ``docs/REHASH.md`` and ``tools/reentry_probe.py``. The arch is now the
+    # gate's upper opening rather than its door, which is also why the walk
+    # is at position *three*: a walk needs its predecessor within half a
+    # metre and the two landings before it are the climb up to it.
+    ("gate", [n("glow", arc=3.2, lift=1, spread=1, deco="lamp", orbs=1),
+              n("cobble", arc=3.2, lift=2, spread=0, ceiling=3),
+              n("cobble", arc=2.8, lift=2, kind="walk",
                 spread=0, shell="tunnel", ceiling=3)]),
     # Out across the ditch: onto the kerb, over the drawbridge deck on foot
     # under its beam, and up onto the far pier standing in dug water.
@@ -138,10 +149,10 @@ LEVEL = Level("THE GATEHOUSE", "plains", rise=4, gap=2.8, exit="stair",
     # allows rather than pressed against the top of it -- an arc of 3.6
     # reaches 2.92, so it is the arc that has to fall back, and a fallback is
     # not exact.
-    ("causeway", [n("mossy", arc=3.4, lift=1, spread=1),
-                  n("oak", arc=2.8, lift=1, kind="walk", spread=0,
+    ("causeway", [n("mossy", arc=3.4, lift=3, spread=1),
+                  n("oak", arc=2.8, lift=3, kind="walk", spread=0,
                     ceiling=3),
-                  n("oak", arc=3.2, lift=2, spread=0, moat=True,
+                  n("oak", arc=3.2, lift=4, spread=0, moat=True,
                     orbs=2)]),
     # The ditch, and the level's one showpiece: up onto the far bank, a long
     # fall into the green mire standing in the flooded bottom, and the bounce
@@ -168,9 +179,9 @@ LEVEL = Level("THE GATEHOUSE", "plains", rise=4, gap=2.8, exit="stair",
     #
     # This is the only move in the level that gains height without a jump,
     # and the one thing on it a viewer would call a trick.
-    ("ditch", [n("mossy", arc=3.4, lift=2, spread=1),
-               n("slime", arc=4.9, lift=1, spread=0, moat=True, orbs=1),
-               n("mossy", arc=3.6, lift=2, kind="bounce", spread=1,
+    ("ditch", [n("mossy", arc=3.4, lift=4, spread=1),
+               n("slime", arc=4.9, lift=2, spread=0, moat=True, orbs=1),
+               n("mossy", arc=3.6, lift=3, kind="bounce", spread=1,
                  orbs=3)]),
     # The wall-head, and this is the beat that gets off the floor: out of
     # the ditch, up the two courses of the curtain wall and onto a merlon
@@ -191,9 +202,9 @@ LEVEL = Level("THE GATEHOUSE", "plains", rise=4, gap=2.8, exit="stair",
     # over the court with the ditch cut away beneath it is a merlon over
     # water, and it is the one place on the level where the walker is stopped
     # by a hole rather than by a jump it cannot make.
-    ("wallhead", [n("mossy", arc=3.4, lift=1, spread=1),
-                  n("cobble", arc=3.2, lift=2, spread=0, ceiling=3),
-                  n("mossy", arc=3.2, lift=3, spread=0, pedestal=False,
+    ("wallhead", [n("mossy", arc=3.4, lift=4, spread=1),
+                  n("cobble", arc=3.2, lift=4, spread=0, ceiling=3),
+                  n("mossy", arc=3.2, lift=4, spread=0,
                     moat=True, orbs=1)]),
 ], filler=[
     # The court itself, and on a level this tight the filler is most of
@@ -225,10 +236,10 @@ LEVEL = Level("THE GATEHOUSE", "plains", rise=4, gap=2.8, exit="stair",
     # its landing commits and eats into the next landing of the same beat,
     # and a filler loops -- so it goes last, and the loop back over it is
     # the 4.4 m jump rather than a stride.
-    ("court", [n("podzol", arc=4.4, lift=1, spread=1, orbs=1),
-               n("oak", arc=2.8, lift=1, kind="walk", spread=0,
+    ("court", [n("podzol", arc=4.4, lift=4, spread=1, orbs=1),
+               n("oak", arc=2.8, lift=4, kind="walk", spread=0,
                  ceiling=3, deco="lamp"),
-               n("cobble", arc=3.2, lift=2, spread=0, moat=True,
+               n("cobble", arc=3.2, lift=4, spread=0, moat=True,
                  orbs=1)]),
 ], exit_beats=[
     # The way out is the **mural stair**: the flight of steps built into the
@@ -294,13 +305,16 @@ LEVEL = Level("THE GATEHOUSE", "plains", rise=4, gap=2.8, exit="stair",
     # 2.2% of ascent frames still jammed -- reads **4.5%** on the same six
     # seeds, because out there the lane meets the outer wall this stretch of
     # the tower has. Only the two ends of a stair want room.
-    n("cobble", arc=2.8, lift=1, hug=2.8, spread=1, confine=True,
-      ceiling=5, deco="lamp"),
-    n("rock", arc=2.9, step_y=1, hug=2.6, spread=0, confine=True,
-      radial=0.9),
-    n("accent", arc=3.0, step_y=1, hug=2.6, spread=0, confine=True,
-      ceiling=3, radial=-0.9, orbs=1),
-    n("rock", arc=2.9, step_y=1, hug=2.8, spread=0, confine=True,
-      radial=0.9),
+    #
+    # **It is two treads now, not four, and the level's own deck is why.**
+    # The court runs four blocks over the terrace and the next one is five
+    # higher than this one, so what is left to climb is one block and the
+    # block the crossing brings back down. That is the rehash's whole trade:
+    # a course that flies gets to the chasm most of the way up the wall, and
+    # the exit stops being a third of the level. Written on ``step_y``,
+    # which is relative, so a deck that comes out a block low still leaves a
+    # legal stair -- ``lift`` would silently clamp at ``LIFT_MAX``.
+    n("cobble", arc=2.9, step_y=0, hug=2.8, spread=1, ceiling=5,
+      deco="lamp"),
     n("cobble", arc=3.0, step_y=1, hug=3.2, spread=0, deco="lamp", orbs=2),
 ])

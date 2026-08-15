@@ -129,7 +129,7 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     #      with nothing reporting it.
     ("coping", [n("glow", arc=3.0, lift=1, spread=2, deco="lamp", orbs=1,
                   ceiling=3, pedestal_style="dripstone"),
-                n("calcite", arc=2.9, lift=1, kind="walk", spread=0,
+                n("calcite", arc=2.9, lift=2, kind="walk", spread=0,
                   ceiling=3, moat=True),
                 n("calcite", arc=3.2, step_y=1, spread=0, pedestal=False,
                   orbs=1)]),
@@ -172,13 +172,13 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     # The rise and the drop are inside *one* beat and that is not
     # tidiness: a beat that opens by dropping off the height the beat
     # before it climbed to drops nothing about half the time.
-    ("tank", [n("calcite", arc=3.2, lift=2, spread=1, ceiling=3, orbs=1,
+    ("tank", [n("calcite", arc=3.2, lift=3, spread=1, ceiling=3, orbs=1,
                 pedestal_style="dripstone"),
               n("calcite", arc=3.2, step_y=1, spread=0, orbs=1,
                 pedestal_style="dripstone"),
-              n("slime", arc=4.6, lift=1, spread=0, pedestal=False,
+              n("slime", arc=4.6, lift=2, spread=0, pedestal=False,
                 moat=True, orbs=2),
-              n("amethyst", arc=3.4, lift=3, kind="bounce", spread=1,
+              n("amethyst", arc=3.4, lift=4, kind="bounce", spread=1,
                 pedestal=False, orbs=3)]),
     # The geode: the tank wall opened out into two metres of crystal
     # chamber. Two metres and not fifteen seconds -- the real map is
@@ -197,11 +197,11 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     # three in a row jam the lens on 10-21% of frames, and the reference
     # is fully enclosed 6.1% of the way with a median enclosed run of
     # two metres (RESEARCH 4).
-    ("geode", [n("amethyst", arc=3.2, lift=2, spread=1, ceiling=3, orbs=1,
+    ("geode", [n("amethyst", arc=3.2, lift=3, spread=1, ceiling=3, orbs=1,
                  pedestal_style="dripstone"),
-               n("amethyst", arc=3.0, lift=2, kind="walk", spread=0,
+               n("amethyst", arc=3.0, lift=3, kind="walk", spread=0,
                  shell="cave", deco="lamp"),
-               n("calcite", arc=3.2, lift=3, spread=0, deco="lamp", orbs=2)]),
+               n("calcite", arc=3.2, lift=4, spread=0, deco="lamp", orbs=2)]),
 ], filler=[
     # The drip run, and this is where the level's character actually
     # lives: the filler repeats and a script's tail does not. Four
@@ -222,13 +222,13 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     # anywhere in here, and that is a rule rather than a preference --
     # the filler loops, and the second lap digs the ground out from
     # under the pedestals the first lap stood up.
-    ("drip", [n("calcite", arc=3.2, lift=2, spread=1, ceiling=3, orbs=1,
+    ("drip", [n("calcite", arc=3.2, lift=4, spread=1, ceiling=3, orbs=1,
                 pedestal_style="dripstone"),
-              n("ground", arc=2.9, lift=2, kind="walk", spread=0,
+              n("ground", arc=2.9, lift=4, kind="walk", spread=0,
                 ceiling=3, deco="lamp"),
-              n("amethyst", arc=3.2, lift=3, spread=0, pedestal=False,
+              n("amethyst", arc=3.2, lift=4, spread=0, pedestal=False,
                 orbs=1),
-              n("ground", arc=4.4, lift=1, spread=0, pedestal=False,
+              n("ground", arc=4.4, lift=4, spread=0, pedestal=False,
                 orbs=2, deco="lamp")]),
 ], exit_beats=[
     # The overflow well in the corner of the tank. Written out rather
@@ -255,7 +255,7 @@ LEVEL = Level("THE CISTERN", "dripstone", rise=6, gap=2.8, exit="bubble",
     # both cost designed content, because a lid that will not fit
     # refuses the launch landing outright and the fallback for a refused
     # ascent node is the generated staircase.
-    n("calcite", arc=3.0, lift=1, hug=2.4, spread=2, deco="lamp", orbs=1),
-    n("calcite", arc=3.0, step_y=6, kind="bubble", climb_style="water",
+    n("calcite", arc=3.0, step_y=0, hug=2.4, spread=2, deco="lamp", orbs=1),
+    n("calcite", arc=3.0, step_y=3, kind="bubble", climb_style="water",
       spread=0, deco="lamp", orbs=2, pedestal_style="dripstone"),
 ])

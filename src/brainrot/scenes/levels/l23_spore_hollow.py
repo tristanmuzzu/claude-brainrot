@@ -188,7 +188,7 @@ LEVEL = Level("SPORE HOLLOW", "mushroom", rise=4, gap=3.0, exit="bubble",
     # the next landing of the same beat.
     ("crust", [n("glow", arc=3.0, lift=1, hug=3.0, spread=0, deco="lamp",
                  orbs=1),
-               n("coarse", arc=2.9, lift=1, hug=3.0, kind="walk", spread=0,
+               n("coarse", arc=2.9, lift=2, hug=3.0, kind="walk", spread=0,
                  ceiling=3, shell="tunnel")]),
     # THE SINKHOLE. The crust gives way: two steps up a stem, the
     # two-block fall into the pool onto the spore mat, and the throw two
@@ -227,11 +227,11 @@ LEVEL = Level("SPORE HOLLOW", "mushroom", rise=4, gap=3.0, exit="bubble",
     #
     # The pad sits half a metre further out than the rest of the level,
     # which is what makes the fall read as a fall *into* something.
-    ("sinkhole", [n("rock", arc=3.3, lift=2, hug=3.0, spread=0),
-                  n("accent", arc=3.2, lift=3, hug=3.0, spread=0),
-                  n("slime", arc=5.0, lift=1, hug=3.4, form="slime",
+    ("sinkhole", [n("rock", arc=3.3, lift=3, hug=3.0, spread=0),
+                  n("accent", arc=3.2, lift=4, hug=3.0, spread=0),
+                  n("slime", arc=5.0, lift=2, hug=3.4, form="slime",
                     spread=0, pedestal=False, moat=True, orbs=1),
-                  n("accent", arc=3.6, lift=3, hug=3.0, kind="bounce",
+                  n("accent", arc=3.6, lift=4, hug=3.0, kind="bounce",
                     spread=1, orbs=3)]),
     # THE BRACKETS. Shelf fungus cantilevered out of the cliff over its
     # own pool, climbing a block at a time.
@@ -273,7 +273,7 @@ LEVEL = Level("SPORE HOLLOW", "mushroom", rise=4, gap=3.0, exit="bubble",
     # because the only other non-hop moves it has are the bounce and the
     # ride out. With it, 82% and 9% over twenty-four runs and 80% and 11%
     # over eight.
-    ("brackets", [n("rock", arc=4.4, lift=1, hug=3.0, spread=1, moat=True,
+    ("brackets", [n("rock", arc=4.4, lift=2, hug=3.0, spread=1, moat=True,
                     orbs=1),
                   n("sub", arc=2.4, step_y=0, hug=3.0, kind="walk", spread=0,
                     pedestal=False, ceiling=3),
@@ -311,9 +311,9 @@ LEVEL = Level("SPORE HOLLOW", "mushroom", rise=4, gap=3.0, exit="bubble",
     # jam the lens on 10-21% of frames; the version this replaces had
     # four, one of which was a ``grotto`` -- a bay carved into the core
     # wall, which is to say a lens full of cliff by construction.
-    ("gills", [n("accent", arc=3.2, lift=2, hug=3.0, spread=0, orbs=1),
-               n("rock", arc=3.4, lift=3, hug=2.8, spread=0, form="slab"),
-               n("accent", arc=3.2, lift=4, hug=3.0, spread=0, form="slab",
+    ("gills", [n("accent", arc=3.2, lift=3, hug=3.0, spread=0, orbs=1),
+               n("rock", arc=3.4, lift=4, hug=2.8, spread=0, form="slab"),
+               n("accent", arc=3.2, lift=4, hug=3.0, spread=0,
                  shell="cave", orbs=1)]),
 ], filler=[
     # THE SPORE PATH. Off the gills, a lit stride along the crust under
@@ -338,10 +338,10 @@ LEVEL = Level("SPORE HOLLOW", "mushroom", rise=4, gap=3.0, exit="bubble",
     # a reach of 3.72 against the 2.35-4.98 a descent of one allows, and
     # the same number is legal level, which is what it is asked from when
     # machinery lands between two laps.
-    ("spores", [n("accent", arc=4.4, lift=1, hug=3.0, spread=1, orbs=1),
+    ("spores", [n("accent", arc=4.4, lift=4, hug=3.0, spread=1, orbs=1),
                 n("coarse", arc=2.4, step_y=0, kind="walk", hug=3.0,
                   spread=0, ceiling=3, deco="lamp"),
-                n("rock", arc=3.2, step_y=1, hug=2.8, spread=0,
+                n("rock", arc=3.2, step_y=0, hug=2.8, spread=0,
                   pedestal=False, orbs=1)]),
 ], exit_beats=[
     # THE FLOODED STEM. A lit block at its foot and then the water column
@@ -392,8 +392,8 @@ LEVEL = Level("SPORE HOLLOW", "mushroom", rise=4, gap=3.0, exit="bubble",
     #
     # **Check ``--report``'s move mix for the word ``bubble``.** If it is
     # missing, this is a staircase and the level has lost its way out.
-    n("rock", arc=4.2, lift=1, hug=2.8, spread=1, deco="lamp",
+    n("rock", arc=4.2, step_y=0, hug=2.8, spread=1, deco="lamp",
       shell="cave"),
-    n("mushroomstem", arc=2.6, step_y=4, kind="bubble", climb_style="water",
+    n("mushroomstem", arc=2.6, step_y=1, kind="bubble", climb_style="water",
       pedestal=True, spread=0, orbs=2),
 ])

@@ -189,7 +189,7 @@ LEVEL = Level("THE WEIR", "plains", rise=7, gap=3.0, exit="bubble",
     # though the diagnosis was wrong.
     ("headgate", [n("glow", arc=3.2, lift=1, spread=1, hug=2.8,
                     deco="lamp", orbs=1),
-                  n("stonebrick", arc=2.8, lift=1, kind="walk", spread=0,
+                  n("stonebrick", arc=2.8, lift=2, kind="walk", spread=0,
                     hug=2.8, shell="tunnel", ceiling=3, deco="lamp")]),
     # The dam, and the whole of the level's one idea in one beat: up onto
     # the coping, out along the crest with the held water either side,
@@ -224,13 +224,13 @@ LEVEL = Level("THE WEIR", "plains", rise=7, gap=3.0, exit="bubble",
     #    level past 4.4. It lands floating over the plunge pool the
     #    second moat digs, 8.1 m clear of the first, which is well past
     #    the radius at which two ponds fight.
-    ("crest", [n("stonebrick", arc=3.2, lift=2, spread=1, hug=3.0,
+    ("crest", [n("stonebrick", arc=3.2, lift=3, spread=1, hug=3.0,
                  ceiling=3, deco="post"),
-               n("mossy", arc=3.2, lift=2, spread=0, hug=3.4, moat=True,
+               n("mossy", arc=3.2, lift=3, spread=0, hug=3.4, moat=True,
                  ceiling=3, orbs=1),
-               n("stonebrick", arc=3.2, lift=3, spread=0, hug=3.0,
+               n("stonebrick", arc=3.2, lift=4, spread=0, hug=3.0,
                  pedestal=False, deco="lamp"),
-               n("mossy", arc=4.9, lift=1, spread=1, hug=3.6,
+               n("mossy", arc=4.9, lift=2, spread=1, hug=3.6,
                  pedestal=False, moat=True, orbs=2)]),
     # The tail-race: out of the pool onto a scoured boulder, and across
     # the mill's plank walk over the outfall.
@@ -245,9 +245,9 @@ LEVEL = Level("THE WEIR", "plains", rise=7, gap=3.0, exit="bubble",
     # which is where a non-hop verb fires -- a beat lays about half its
     # nodes, so a verb written at a beat's tail is written and never seen.
     # Its own moat is the outfall, 6.0 m from the plunge pool.
-    ("tailrace", [n("gravel", arc=3.2, lift=2, spread=1, hug=2.8,
+    ("tailrace", [n("gravel", arc=3.2, lift=3, spread=1, hug=2.8,
                     pedestal=False, ceiling=3),
-                  n("darkoak", arc=2.8, lift=2, kind="walk", spread=0,
+                  n("darkoak", arc=2.8, lift=3, kind="walk", spread=0,
                     hug=2.8, pedestal=False, moat=True, ceiling=3,
                     orbs=1)]),
 ], filler=[
@@ -269,10 +269,10 @@ LEVEL = Level("THE WEIR", "plains", rise=7, gap=3.0, exit="bubble",
     # **No ``moat`` anywhere in here**, and that is not taste: the filler
     # loops, and the second lap digs away the ground the first lap's
     # pedestals are standing on.
-    ("ford", [n("mossy", arc=4.4, lift=1, spread=1, hug=3.0, orbs=1),
-              n("cobble", arc=2.8, lift=1, kind="walk", spread=0,
+    ("ford", [n("mossy", arc=4.4, lift=3, spread=1, hug=3.0, orbs=1),
+              n("cobble", arc=2.8, lift=3, kind="walk", spread=0,
                 hug=3.2, ceiling=3),
-              n("stonebrick", arc=3.2, lift=2, spread=0, hug=2.8,
+              n("stonebrick", arc=3.2, lift=3, spread=0, hug=2.8,
                 pedestal=False, orbs=1)]),
 ], exit_beats=[
     # The **boil**: the standing upwelling at the foot of a real weir,
@@ -308,9 +308,9 @@ LEVEL = Level("THE WEIR", "plains", rise=7, gap=3.0, exit="bubble",
     # inside the tube wall; the lids on the launch and the lip do the
     # same job honestly, and a beam chained beat to beat is what fills
     # the one column of the lens fan that looks where you are going.
-    n("stonebrick", arc=3.2, lift=1, hug=2.8, spread=1, confine=True,
+    n("stonebrick", arc=3.2, step_y=0, hug=2.8, spread=1, confine=True,
       ceiling=3, deco="lamp"),
-    n("mossy", arc=2.4, step_y=6, kind="bubble", hug=2.0, pedestal=True,
+    n("mossy", arc=2.4, step_y=4, kind="bubble", hug=2.0, pedestal=True,
       pedestal_style="stonebrick", spread=0, deco="lamp", orbs=2),
     n("stonebrick", arc=3.0, step_y=1, hug=2.8, spread=0, pedestal=False,
       ceiling=3, orbs=1),

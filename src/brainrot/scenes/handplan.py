@@ -55,6 +55,14 @@ AHEAD = 26
 MACHINERY = frozenset({"ascent", "start", "stuck", "recover", "lock",
                        "landmark"})
 
+#: The lowest a landing of this tower may stand over its own terrace, apart
+#: from the one apron landing a level opens on. A body steps up one block, so
+#: anything at one is something a fall walks straight back onto -- and a jump
+#: you can walk back to is a jump that cost nothing to miss. The design side
+#: of the same rule is ``tools/tower_probe.py`` ``check_climb``; the number it
+#: is held to is ``tools/reentry_probe.py``. See ``docs/REHASH.md``.
+DECK_MIN = 2
+
 
 # ---------------------------------------------------------------------------
 # The building
@@ -119,6 +127,10 @@ class Cone(sp.Cone):
             1.0, "", design.profile, design.shelf, design.landmark,
             design.band)
         section.breaks = design.breaks
+        #: The height this level's course runs at, which the machinery aims
+        #: at: a gated landmark is stood on a plinth this tall, so the course
+        #: goes through its passage instead of past its foot.
+        section.deck = design.deck
         self.sections.append(section)
 
 
@@ -189,6 +201,44 @@ class Course(sp.Course):
 
     ahead = AHEAD
 
+    #: **The course flies over its terrace; it does not stand on it.** A stack
+    #: of terrain down to the ground is a staircase back up to the landing it
+    #: holds, and a landing you can walk back up to is a jump that cost nothing
+    #: to miss. See ``docs/REHASH.md`` and ``tools/reentry_probe.py``; the
+    #: generated tower keeps the opposite default and its own contract.
+    pedestal_default = False
+
+    #: ...and a landing never falls back under the deck. See
+    #: ``spiralplan.Course._node``.
+    lift_floor = DECK_MIN
+
+    def _body_lift(self) -> int:
+        """Where the body actually is over its terrace, unfloored."""
+        prev = self.blocks[-1]
+        lv = self.cone.level(self.cone.level_index(self.u_of(prev)))
+        return round(self.surface(prev) - lv.y)
+
+    def _here_lift(self) -> int:
+        """How far above its own terrace the course is standing, in blocks.
+
+        Machinery -- the lock, the approach to a doorway, a recovery hop -- is
+        inserted *between* script beats, and every one of them used to ask for
+        ``lift=1``. On a level whose course climbs, that is not a neutral
+        default but a staircase back down to the terrace: it undoes the climb,
+        it lands the body a step above the ground it is meant to have left, and
+        the fall from the next jump walks straight back up. Asking where the
+        body actually is costs one lookup.
+        """
+        prev = self.blocks[-1]
+        lv = self.cone.level(self.cone.level_index(self.u_of(prev)))
+        # Floored at two, and that floor is the whole rule: one block over the
+        # terrace is one step up, so a machinery landing there is a landing a
+        # fall walks back onto -- and the body reaches it off the apron, which
+        # is the one place a level *is* one block up. A hop from the apron to
+        # two is an ordinary +1 and legal from anywhere.
+        return max(DECK_MIN, min(sp.LIFT_MAX,
+                                 round(self.surface(prev) - lv.y)))
+
     def _level_budget(self):
         """As the generator's, except that a climb out is not a staircase.
 
@@ -212,6 +262,52 @@ class Course(sp.Course):
         if kind != "stair" and need >= 3:
             want -= (max(1, need) - 2) * sp.ASCENT_ARC
         return lv, need, want, radius
+
+    def _commit(self, prev: dict, node: dict, got: dict) -> dict:
+        blk = super()._commit(prev, node, got)
+        self._reserve_noclimb(blk)
+        return blk
+
+    def _reserve_noclimb(self, blk: dict) -> None:
+        """Hold the cells a fall could climb back up on, beside this landing.
+
+        The course flies over its terrace now, so a fall lands on the terrace
+        -- and the terrace is *dressed*: outcrops, dunes, pond rims, the foot
+        of a landmark. Measured, that dressing was three quarters of what was
+        left of the re-entry rate after the design itself was raised: the
+        landings were out of reach and the scenery beside them was a
+        staircase. Nothing may be built in the ring around a landing between
+        the terrace and the landing's own height.
+
+        Reserved rather than checked, and for the reason everything else here
+        is: dressing runs *after* the course is laid, so a check at placement
+        time would be asking about cells nothing has filled in yet.
+        """
+        lv = self.cone.level(self.cone.level_index(self.u_of(blk)))
+        top = int(self.surface(blk))
+        if top - lv.y < DECK_MIN:
+            return                      # the apron: it is meant to be reachable
+        for x, y, z in sp.footprint(blk["x"], blk["y"], blk["z"],
+                                    blk["form"]) or ((blk["x"], blk["y"],
+                                                      blk["z"]),):
+            for dx in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    for cy in range(lv.y, top):
+                        self.noclimb.add((x + dx, cy, z + dz))
+
+    def _recover_lifts(self):
+        """As the kernel's, but starting from where the body is.
+
+        A recovery hop is the commonest machinery there is and it used to be
+        laid at ``lift=1`` -- so a single refused landing on a level running
+        four blocks up put the body back on the terrace, and everything after
+        it inherited the mistake. Upward before downward for the same reason
+        the far-side recovery exists: a hop that loses height on this format
+        cascades.
+        """
+        here = self._here_lift()
+        out = [here, here + 1, here - 1, here + 2, here - 2, DECK_MIN, 1]
+        return tuple(dict.fromkeys(x for x in out if 1 <= x <= sp.LIFT_MAX))
 
     def _choose_feature(self, lv) -> list[dict]:
         # Two machinery-inserted features and one script, in the order the
@@ -295,9 +391,22 @@ class Course(sp.Course):
         run = max(0.0, dist - 3.4)
         if run > 1.2:
             legs = max(1, int(math.ceil(run / 4.0)))
-            for _ in range(legs):
-                out.append(self._node(theme.rock, arc=run / legs, lift=1,
+            # At the height the body is already at, not at one -- and
+            # *climbing* to the doorway's own, a block a leg. The stored
+            # landings inside the structure are cells and cannot move: the
+            # gate stands on a plinth as tall as the level's deck, so an
+            # approach that stays low arrives under the passage and the leg
+            # into it is a jump of two or three, which no body has. Measured
+            # before this climbed, seven crossings a sweep fell through to the
+            # unchecked answer and the test that says they must not, failed.
+            here = self._here_lift()
+            want = max(DECK_MIN, self._gate_lift(lv))
+            for i in range(legs):
+                step = max(here, min(want, here + i + 1)) if want > here \
+                    else here
+                out.append(self._node(theme.rock, arc=run / legs, lift=step,
                                       spread=1, ramp=False, label="landmark"))
+                here = step
         prev = None
         inside = set(void)
         for cell in ahead:
@@ -315,6 +424,19 @@ class Course(sp.Course):
             prev = cell
         self.segment = "landmark"
         return out
+
+    def _gate_lift(self, lv) -> int:
+        """How high over its terrace this level's doorway stands, in blocks.
+
+        The stored crossing cells are the answer -- they were laid out with the
+        structure and they carry the plinth's height with them -- rather than
+        the design's ``deck``, which is what the plinth was *asked* for and not
+        always what fitted.
+        """
+        plan = self.landmark_cross.get(lv.index)
+        if not plan or not plan[0]:
+            return DECK_MIN
+        return max(DECK_MIN, int(plan[0][0][1] - lv.y) + 1)
 
     def _gate_ahead(self, lv) -> list:
         """The stored landings the frontier has not gone past yet.
@@ -491,6 +613,14 @@ class Course(sp.Course):
         only way across is to arrive the way the course arrives. The script
         beat that was due plays right after; the cursor is untouched.
         """
+        if self._here_lift() > DECK_MIN:
+            # **A course already above the terrace needs no lock.** The lock
+            # exists to get a body across a hole in ground it is running on;
+            # three blocks up, the hole is scenery it flies over, and the lock's
+            # own approach legs would be a staircase down to the lip and back.
+            # The break stays uncrossed and unmarked, so a level whose course
+            # comes back down to the terrace is still offered it.
+            return None
         cone = self.cone
         radius = max(6.0, cone.rim_at(lv.y))
         for b0, b1 in cone.floor_breaks(lv):
@@ -513,16 +643,22 @@ class Course(sp.Course):
             # ordinary hops, ending two blocks up so the island is a drop.
             run = max(0.0, dist - 1.3)
             legs = max(1, int(math.ceil(run / 4.2)))
+            # At the height the body is running at, and one higher for the
+            # last approach so the island is still a drop. Written as ``1``
+            # and ``2`` this laid a staircase down to the terrace and back --
+            # the lock was 19 of the landings a sweep that a fall could walk
+            # onto, second only to the crossing's own.
+            here = self._here_lift()
             for i in range(legs):
                 out.append(self._node(
                     theme.rock, arc=max(2.6, run / legs),
-                    lift=2 if i == legs - 1 else 1, spread=1,
+                    lift=here + 1 if i == legs - 1 else here, spread=1,
                     label="lock"))
             out.append(self._node(
-                theme.accent, arc=width / 2 + 1.4, lift=1,
+                theme.accent, arc=width / 2 + 1.4, lift=here,
                 pedestal=False, spread=0, orbs=1, label="lock"))
             out.append(self._node(
-                theme.rock, arc=width / 2 + 1.2, lift=1, spread=1,
+                theme.rock, arc=width / 2 + 1.2, lift=here, spread=1,
                 label="lock"))
             self.segment = "lock"
             return out
@@ -552,19 +688,30 @@ class Course(sp.Course):
         if need <= 0:
             return [self._crossing(rng, lv)]
         design = self.cone.design(lv.index)
+        # **Off the apron first.** A level entered near its own end has no room
+        # for the beats that would have climbed, so the exit is asked for with
+        # the body still one block over the terrace -- and every landing of it
+        # is then something a fall walks back onto. One ordinary +1 hop fixes
+        # it, and it is the same hop the level's first beat would have made.
+        lead = []
+        if self._body_lift() < DECK_MIN:
+            lead = [self._node(lv.theme.rock, arc=3.0, lift=DECK_MIN,
+                               spread=0, ramp=False, label="ascent",
+                               origin="deck")]
         if design.exit_beats:
             theme = THEME_BY_NAME[design.name]
-            out = [self._node(**{**_resolve(spec, theme), "label": "ascent",
-                                 "origin": "design"})
-                   for spec in design.exit_beats]
+            out = lead + [self._node(**{**_resolve(spec, theme),
+                                        "label": "ascent",
+                                        "origin": "design"})
+                          for spec in design.exit_beats]
             out.append(self._crossing(rng, lv))
             return out
         kind = design.exit
         if kind != "stair" and need >= 3:
             built = self._ascent_climb(rng, lv, need, kind)
             if built:
-                return built
-        return self._ascent_stair(rng, lv, need)
+                return lead + built
+        return lead + self._ascent_stair(rng, lv, need)
 
 
 def _resolve(spec: dict, theme: Theme) -> dict:

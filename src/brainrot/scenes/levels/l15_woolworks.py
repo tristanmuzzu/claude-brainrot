@@ -124,9 +124,9 @@ LEVEL = Level("WOOLWORKS", "rainbow", rise=6, gap=2.4, exit="ladder",
     # level wants over its head anyway.
     ("dyehouse", [n("glow", arc=3.2, lift=1, hug=3.0, form="slab", spread=1,
                     deco="lamp", orbs=1),
-                  n("oak", arc=2.9, lift=1, hug=3.0, kind="walk", spread=0,
+                  n("oak", arc=2.9, lift=2, hug=3.0, kind="walk", spread=0,
                     ceiling=3, moat=True, deco="lintel"),
-                  n("rock", arc=3.2, lift=2, hug=2.8, spread=0,
+                  n("rock", arc=3.2, lift=3, hug=2.8, spread=0,
                     pedestal=False, shell="tunnel", orbs=1)]),
     # The drying line, and this is the beat that answers "half the jumps
     # are at ground level". Its middle two landings are skeins hung over
@@ -159,13 +159,13 @@ LEVEL = Level("WOOLWORKS", "rainbow", rise=6, gap=2.4, exit="ladder",
     # up here, and only something over the head answers them). A lid at
     # three above the take-off is legal over a +1 hop: one impulse rises
     # 1.25 m, so the arc passes a metre and a half under it.
-    ("skeins", [n("rock", arc=3.4, lift=1, hug=2.8, spread=1, moat=True,
+    ("skeins", [n("rock", arc=3.4, lift=2, hug=2.8, spread=1, moat=True,
                   orbs=1),
                 n("accent", arc=3.2, step_y=1, hug=2.6, spread=0,
                   pedestal=False, ceiling=3, orbs=1),
                 n("rock", arc=3.2, step_y=1, hug=2.4, spread=0,
                   pedestal=False, ceiling=3, orbs=2),
-                n("accent", arc=4.9, step_y=-2, hug=3.0, spread=0,
+                n("accent", arc=4.9, lift=2, step_y=-2, hug=3.0, spread=0,
                   pedestal=False, orbs=2)]),
     # The vat floor: water cut through the width of the shelf with a bolt
     # of wool standing in it, and the duckboard between two vats walked
@@ -183,13 +183,13 @@ LEVEL = Level("WOOLWORKS", "rainbow", rise=6, gap=2.4, exit="ladder",
     # half the time, which is the right place for it: a beat's tail is
     # where a thing goes when it is worth having and not worth losing the
     # beat over.
-    ("vats", [n("rock", arc=3.4, lift=1, hug=3.0, spread=1, moat=True,
+    ("vats", [n("rock", arc=3.4, lift=2, hug=3.0, spread=1, moat=True,
                 orbs=1),
-              n("oak", arc=2.9, lift=1, hug=2.8, kind="walk", spread=0,
+              n("oak", arc=2.9, lift=2, hug=2.8, kind="walk", spread=0,
                 pedestal=False, ceiling=3, deco="lintel"),
-              n("accent", arc=3.2, lift=2, hug=2.6, spread=0,
+              n("accent", arc=3.2, lift=3, hug=2.6, spread=0,
                 pedestal=False, orbs=2),
-              n("rock", arc=3.2, lift=3, hug=2.4, spread=0,
+              n("rock", arc=3.2, lift=4, hug=2.4, spread=0,
                 pedestal=False, ceiling=3, orbs=1)]),
 ], filler=[
     # The works, repeated, and on the long turns this is most of what the
@@ -212,11 +212,11 @@ LEVEL = Level("WOOLWORKS", "rainbow", rise=6, gap=2.4, exit="ladder",
     # legal at -2, at -1 and level at once. 4.4 is a reach of 3.72
     # against a -2 window that opens at 3.12 and a level one that shuts
     # at 4.26; 3.2 is 2.54 and is refused outright at -2.
-    ("hanks", [n("rock", arc=4.4, lift=1, hug=2.8, spread=1, ceiling=3,
+    ("hanks", [n("rock", arc=4.4, lift=4, hug=2.8, spread=1, ceiling=3,
                  orbs=1),
-               n("oak", arc=2.9, lift=1, hug=2.8, kind="walk", spread=0,
+               n("oak", arc=2.9, lift=4, hug=2.8, kind="walk", spread=0,
                  ceiling=3, deco="lintel"),
-               n("accent", arc=3.2, lift=2, hug=2.6, spread=0,
+               n("accent", arc=3.2, lift=4, hug=2.6, spread=0,
                  pedestal=False, orbs=2)]),
 ], exit_beats=[
     # The hoist to the drying loft: a lit bolt at the foot of the rack
@@ -257,10 +257,8 @@ LEVEL = Level("WOOLWORKS", "rainbow", rise=6, gap=2.4, exit="ladder",
     # **Check ``--report``'s move mix for the word ``climb``.** If it is
     # missing, this is a staircase again and the level has lost a third
     # of itself with no error anywhere.
-    n("rock", arc=2.8, lift=1, hug=2.8, spread=1, confine=True,
+    n("rock", arc=2.8, step_y=0, hug=2.8, spread=1, confine=True,
       deco="lamp", orbs=1),
-    n("accent", arc=3.2, step_y=1, hug=2.6, spread=0, confine=True,
-      orbs=1),
-    n("ladder", arc=2.4, step_y=4, kind="climb", climb_style="ladder",
+    n("ladder", arc=2.4, step_y=3, kind="climb", climb_style="ladder",
       hug=2.4, pedestal_style="oak", spread=0, confine=True, orbs=2),
 ])

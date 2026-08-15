@@ -26,6 +26,8 @@ drop), ``ceiling`` is a checked lid, ``moat`` digs liquid under the jump,
 
 from __future__ import annotations
 
+from ..parkourkit import FORMS
+
 #: Material roles a level may name instead of a material. Writing ``"rock"``
 #: rather than ``"cobble"`` is what lets one design be re-skinned by giving
 #: its level a different theme, and what keeps a level readable as a *shape*.
@@ -56,9 +58,9 @@ class Level:
     is recognised by. ``skin`` re-skins the base theme.
     """
 
-    __slots__ = ("band", "beats", "breaks", "exit", "exit_beats", "filler",
-                 "gap", "landmark", "name", "profile", "rise", "shelf",
-                 "skin", "theme")
+    __slots__ = ("band", "beats", "breaks", "deck", "exit", "exit_beats",
+                 "filler", "gap", "landmark", "name", "profile", "rise",
+                 "shelf", "skin", "theme")
 
     def __init__(self, name: str, theme: str, rise: int, gap: float,
                  exit: str, beats, filler=(), profile: str = "ledge",
@@ -87,6 +89,24 @@ class Level:
         #: before a single block is laid. Capped by ``BAND_MAX``.
         self.band = band
         self.skin = skin
+        #: **The height this level's course runs at**, in blocks over its own
+        #: terrace, taken from where the script and the filler leave the body.
+        #: The filler holds its height (``tower_probe.check_climb``) so this is
+        #: one number rather than a range, and it is what the rest of the
+        #: machinery aims at: a gated landmark is stood on a plinth this tall
+        #: so its passage is on the running line rather than on the floor, and
+        #: the exit climb has only ``rise + 1 - deck`` left to gain. See
+        #: ``docs/REHASH.md``.
+        surf = 1.0
+        for _name, specs in list(self.beats) + list(self.filler):
+            for spec in specs:
+                if spec.get("step_y") is not None:
+                    surf += spec["step_y"]
+                else:
+                    form = spec.get("form", "full")
+                    lift = 0 if form == "floor" else spec.get("lift", 1)
+                    surf = lift + FORMS.get(form, 1.0)
+        self.deck = max(1, int(round(surf - 1.0)))
 
 
 # ---------------------------------------------------------------------------

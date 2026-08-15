@@ -120,9 +120,9 @@ LEVEL = Level("THE APIARY", "honey", rise=4, gap=2.8, exit="ladder",
     # is the arc that spends its life falling back.
     ("yardgate", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1,
                     deco="lamp", orbs=1),
-                  n("sub", arc=2.9, lift=1, hug=3.0, kind="walk", spread=0,
+                  n("sub", arc=2.9, lift=2, hug=3.0, kind="walk", spread=0,
                     ceiling=3, deco="lintel"),
-                  n("rock", arc=3.2, lift=2, hug=2.8, spread=0,
+                  n("rock", arc=3.2, lift=3, hug=2.8, spread=0,
                     ceiling=3, orbs=1)]),
     # The stack, and this is the beat that answers "half the jumps are at
     # ground level". Its four landings stand at one, two, two and three
@@ -156,13 +156,13 @@ LEVEL = Level("THE APIARY", "honey", rise=4, gap=2.8, exit="ladder",
     # mix and every walk figure identical to the last decimal over eight
     # runs. Recorded as a lead rather than a rule, but do not spend a
     # pass on it.)
-    ("stack", [n("rock", arc=3.2, lift=1, hug=2.8, spread=1, moat=True,
+    ("stack", [n("rock", arc=3.2, lift=2, hug=2.8, spread=1, moat=True,
                  orbs=1),
-               n("accent", arc=3.2, lift=2, hug=2.6, spread=0,
+               n("accent", arc=3.2, lift=3, hug=2.6, spread=0,
                  pedestal=False, orbs=1),
-               n("sub", arc=2.9, lift=2, hug=2.6, kind="walk", spread=0,
+               n("sub", arc=2.9, lift=3, hug=2.6, kind="walk", spread=0,
                  pedestal=False, ceiling=3),
-               n("rock", arc=3.2, lift=3, hug=2.6, spread=0,
+               n("rock", arc=3.2, lift=4, hug=2.6, spread=0,
                  pedestal=False, ceiling=3, orbs=2)]),
     # Off the end of the row, and this is the level's long jump and its
     # descent. Nothing rises two blocks in one impulse, so the only way
@@ -183,10 +183,10 @@ LEVEL = Level("THE APIARY", "honey", rise=4, gap=2.8, exit="ladder",
     # nothing after it goes down: the drop from the crown board to the
     # exit ladder's launch is two blocks, under the three the rule
     # allows, and the ladder is the highest thing here.
-    ("trough", [n("ground", arc=4.4, lift=1, hug=3.2, spread=2, orbs=2),
-                n("rock", arc=3.4, lift=1, hug=3.2, spread=0, moat=True,
+    ("trough", [n("ground", arc=4.4, lift=2, hug=3.2, spread=2, orbs=2),
+                n("rock", arc=3.4, lift=2, hug=3.2, spread=0, moat=True,
                   pedestal=False, ceiling=3, orbs=1),
-                n("accent", arc=3.2, lift=2, hug=3.0, spread=0,
+                n("accent", arc=3.2, lift=3, hug=3.0, spread=0,
                   pedestal=False, orbs=1)]),
 ], exit_beats=[
     # The hive house at the end of the yard: a lit board hard against the
@@ -209,9 +209,9 @@ LEVEL = Level("THE APIARY", "honey", rise=4, gap=2.8, exit="ladder",
     # tried on SUNKEN TEMPLE and both cost designed content, because a lid
     # that will not fit refuses the launch outright and the fallback for a
     # refused ascent node is the generated staircase.
-    n("rock", arc=2.8, lift=1, hug=2.6, spread=1, confine=True,
+    n("rock", arc=2.8, step_y=0, hug=2.6, spread=1, confine=True,
       deco="lamp", orbs=1),
-    n("ladder", arc=2.4, step_y=4, kind="climb", climb_style="ladder",
+    n("ladder", arc=2.4, step_y=2, kind="climb", climb_style="ladder",
       hug=2.4, pedestal_style="oak", spread=0, confine=True, orbs=2),
 ], filler=[
     # The yard, and this is where the level's character actually lives:
@@ -233,10 +233,10 @@ LEVEL = Level("THE APIARY", "honey", rise=4, gap=2.8, exit="ladder",
     # back round is a drop of one across 3.2 of arc -- a reach of 2.52
     # against a window of 2.35 to 4.98 -- and it stays legal level as
     # well, which is what the ``spread`` on the opener is there to use.
-    ("meadow", [n("rock", arc=3.2, lift=1, hug=2.8, spread=1,
+    ("meadow", [n("rock", arc=3.2, lift=3, hug=2.8, spread=1,
                   ceiling=3, orbs=1),
-                n("sub", arc=2.9, lift=1, hug=2.8, kind="walk", spread=0,
+                n("sub", arc=2.9, lift=3, hug=2.8, kind="walk", spread=0,
                   ceiling=3, deco="lintel"),
-                n("accent", arc=3.2, lift=2, hug=2.6, spread=0,
+                n("accent", arc=3.2, lift=3, hug=2.6, spread=0,
                   pedestal=False, orbs=2)]),
 ])

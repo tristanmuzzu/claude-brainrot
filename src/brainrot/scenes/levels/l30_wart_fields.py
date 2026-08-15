@@ -240,11 +240,11 @@ LEVEL = Level("WART FIELDS", "crimson", rise=6, gap=3.0, exit="stair",
     #    closer means the second stands in the hole the first dug.
     ("gate", [n("glow", arc=3.2, lift=1, hug=3.2, spread=1, deco="lamp",
                 orbs=1),
-              n("sub", arc=2.9, lift=1, hug=3.2, kind="walk", spread=0,
+              n("sub", arc=2.9, lift=2, hug=3.2, kind="walk", spread=0,
                 ceiling=3, deco="lintel"),
               n("rock", arc=3.2, step_y=1, hug=3.0, spread=0, orbs=1),
               n("accent", arc=3.2, step_y=1, hug=3.2, spread=0, ceiling=3),
-              n("sub", arc=4.9, step_y=-2, hug=3.6, spread=0,
+              n("sub", arc=4.9, lift=2, step_y=-2, hug=3.6, spread=0,
                 pedestal=False, moat=True, orbs=2),
               n("sub", arc=2.9, step_y=0, hug=3.4, kind="walk", spread=0,
                 pedestal=False, ceiling=3, deco="lamp"),
@@ -282,12 +282,12 @@ LEVEL = Level("WART FIELDS", "crimson", rise=6, gap=3.0, exit="stair",
     # what survives whole over a jump is the rough one; and it is the
     # only enclosure in the level, because one shell is a pinch and three
     # in a row jam the lens on 10-21% of frames.
-    ("rows", [n("accent", arc=3.4, lift=2, hug=3.0, spread=2, ceiling=3,
+    ("rows", [n("accent", arc=3.4, lift=3, hug=3.0, spread=2, ceiling=3,
                 orbs=1),
-              n("sub", arc=2.9, lift=2, hug=3.2, kind="walk", spread=0,
+              n("sub", arc=2.9, lift=3, hug=3.2, kind="walk", spread=0,
                 ceiling=3, deco="lamp"),
               n("accent", arc=3.2, step_y=1, hug=2.9, spread=0, orbs=1),
-              n("rock", arc=4.4, step_y=-1, hug=3.8, spread=0,
+              n("rock", arc=4.4, lift=2, step_y=-1, hug=3.8, spread=0,
                 pedestal=False, shell="cave", orbs=2)]),
     # THE BANK. Three nodes, and it is written knowing exactly what it
     # is: the placement table says a third beat lays **0.6 landings a
@@ -298,11 +298,11 @@ LEVEL = Level("WART FIELDS", "crimson", rise=6, gap=3.0, exit="stair",
     #
     # It carries no moat and no light, both of which used to be here and
     # are now in the first beat, where they are seen.
-    ("bank", [n("accent", arc=3.4, lift=2, hug=3.0, spread=2, ceiling=3,
+    ("bank", [n("accent", arc=3.4, lift=3, hug=3.0, spread=2, ceiling=3,
                 orbs=1),
-              n("sub", arc=2.9, lift=2, hug=3.2, kind="walk", spread=0,
+              n("sub", arc=2.9, lift=3, hug=3.2, kind="walk", spread=0,
                 ceiling=3, deco="lintel"),
-              n("rock", arc=4.4, step_y=-1, hug=3.8, spread=0,
+              n("rock", arc=4.4, lift=2, step_y=-1, hug=3.8, spread=0,
                 pedestal=False, orbs=2)]),
 ], filler=[
     # THE BEDS, repeated for as long as the terrace lasts, and this is
@@ -333,7 +333,7 @@ LEVEL = Level("WART FIELDS", "crimson", rise=6, gap=3.0, exit="stair",
               n("sub", arc=2.9, lift=2, hug=3.2, kind="walk", spread=0,
                 ceiling=3, deco="lamp"),
               n("accent", arc=3.2, step_y=1, hug=2.9, spread=0, orbs=1),
-              n("rock", arc=4.4, step_y=-1, hug=3.6, spread=0,
+              n("rock", arc=4.4, lift=2, step_y=-1, hug=3.6, spread=0,
                 pedestal=False, orbs=1)]),
 ], exit_beats=[
     # THE HEADWALL. Seven landings up the retaining wall at the end of
@@ -375,7 +375,7 @@ LEVEL = Level("WART FIELDS", "crimson", rise=6, gap=3.0, exit="stair",
     # landing through take-off and flight: a lip tucked against the core
     # aims the last second of the level at the cliff, and a lip over the
     # drop aims it at sky with the next level standing in it.
-    n("glow", arc=3.2, lift=2, hug=3.0, spread=2, deco="lamp", ceiling=3,
+    n("glow", arc=3.2, step_y=0, hug=3.0, spread=2, deco="lamp", ceiling=3,
       orbs=1),
     n("sub", arc=2.9, step_y=0, hug=3.2, kind="walk", spread=0,
       confine=True, ceiling=3, deco="lintel"),

@@ -240,14 +240,14 @@ LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="bubble",
     #    node before it just dug.
     ("sill", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1, deco="lamp",
                 orbs=1),
-              n("accent", arc=2.9, lift=1, hug=3.0, kind="walk", ceiling=3,
+              n("accent", arc=3.2, lift=2, hug=3.0, ceiling=3,
                 pedestal_style="gold"),
               n("rock", arc=3.2, step_y=1, hug=3.0, orbs=1),
               n("deepslate", arc=2.9, step_y=0, hug=4.2, kind="walk",
                 pedestal=False, deco="post"),
               n("chiselled", arc=3.2, step_y=1, hug=3.2, ceiling=3,
                 pedestal_style="deepslate"),
-              n("ground", arc=4.9, lift=0, form="floor", hug=3.6, spread=0,
+              n("ground", arc=4.9, lift=2, hug=3.6, spread=0,
                 moat=True, orbs=2),
               n("rock", arc=2.9, step_y=1, form="slab", kind="walk",
                 hug=3.4, pedestal=False, ceiling=3,
@@ -287,7 +287,7 @@ LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="bubble",
     #    reasons: it leaves the body at lift 1 where the machinery that
     #    follows can pick it up, and a ``moat`` blocks the *next*
     #    landing of its own beat, so it can only ever be last.
-    ("colonnade", [n("rock", arc=3.4, lift=1, hug=2.8, spread=1, orbs=1),
+    ("colonnade", [n("rock", arc=3.4, lift=3, hug=2.8, spread=1, orbs=1),
                    n("ground", arc=2.8, step_y=1, form="slab", kind="walk",
                      hug=2.8, ceiling=3, pedestal_style="gold",
                      deco="lamp"),
@@ -297,7 +297,7 @@ LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="bubble",
                      ceiling=3, deco="post"),
                    n("chiselled", arc=3.2, step_y=1, hug=3.2, ceiling=3,
                      pedestal_style="deepslate", orbs=1),
-                   n("deepslate", arc=4.9, step_y=-2, hug=3.6, pedestal=False,
+                   n("deepslate", arc=4.9, lift=3, step_y=-2, hug=3.6, pedestal=False,
                      moat=True, orbs=2)]),
     # THE BASIN -- the flooded half of the court, and the stretch that
     # goes furthest out from the wall: along the dark route stripe, up
@@ -314,14 +314,14 @@ LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="bubble",
     # one-cell beam spread along the direction of travel and five of
     # them roof nearly the whole arc in the one column of the ray fan
     # that looks where you are going.
-    ("basin", [n("rock", arc=3.4, lift=1, hug=3.0, spread=1, orbs=1),
+    ("basin", [n("rock", arc=3.4, lift=3, hug=3.0, spread=1, orbs=1),
                n("deepslate", arc=2.9, step_y=0, hug=3.0, kind="walk",
                  ceiling=5, pedestal_style="deepslate"),
                n("accent", arc=3.2, step_y=1, hug=3.6, deco="post",
                  pedestal_style="gold", orbs=1),
                n("ground", arc=2.9, step_y=0, hug=3.8, kind="walk",
                  pedestal_style="gold"),
-               n("ground", arc=4.9, lift=0, form="floor", hug=4.0, spread=0,
+               n("ground", arc=4.9, lift=2, hug=4.0, spread=0,
                  moat=True, orbs=2),
                n("rock", arc=3.4, step_y=1, hug=3.6, pedestal=False,
                  ceiling=3, orbs=1)]),
@@ -342,12 +342,12 @@ LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="bubble",
     # -- 27,859 "pedestal will not stand" refusals on the level that
     # found it. All three of this level's ponds are in beats that play
     # once.
-    ("court", [n("deepslate", arc=3.4, lift=1, hug=2.8, spread=1, orbs=1),
+    ("court", [n("deepslate", arc=3.4, lift=3, hug=2.8, spread=1, orbs=1),
                n("ground", arc=2.9, step_y=0, hug=2.8, kind="walk",
                  ceiling=3, pedestal_style="gold"),
                n("accent", arc=3.2, step_y=1, hug=3.0, deco="lamp",
                  pedestal_style="gold", orbs=1),
-               n("rock", arc=3.4, step_y=-1, hug=3.2, pedestal=False,
+               n("rock", arc=3.4, lift=1, step_y=-1, hug=3.2, pedestal=False,
                  ceiling=3, pedestal_style="deepslate")]),
 ], exit_beats=[
     # THE WHITE STAIR itself: the flight through the arch, and the only
@@ -404,10 +404,8 @@ LEVEL = Level("THE WHITE STAIR", "quartz", rise=5, gap=2.8, exit="bubble",
     # way round: the camera locks onto the landing through take-off and
     # flight, so a lip tucked against the core aims the last second of
     # the level at a cliff face.
-    n("glow", arc=3.2, lift=2, hug=2.8, spread=1, confine=True, deco="lamp",
+    n("glow", arc=3.2, step_y=0, hug=2.8, spread=1, confine=True, deco="lamp",
       ceiling=3, orbs=1),
-    n("ground", arc=2.9, step_y=1, hug=2.6, spread=0, confine=True,
-      radial=0.9),
     n("accent", arc=3.0, step_y=1, hug=2.6, spread=0, confine=True,
       ceiling=3, radial=-0.9, orbs=1),
     n("rock", arc=2.9, step_y=1, hug=2.8, spread=0, confine=True,

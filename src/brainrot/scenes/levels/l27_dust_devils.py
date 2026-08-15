@@ -231,13 +231,13 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
     #    pedestal cannot stand in a hole.
     ("capstone", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1,
                     deco="lamp", ceiling=7, orbs=1),
-                  n("terra_white", arc=3.0, lift=1, hug=3.2, kind="walk",
+                  n("terra_white", arc=3.0, lift=2, hug=3.2, kind="walk",
                     spread=0, ceiling=7),
                   n("terra_orange", arc=3.2, step_y=1, hug=3.4,
                     pedestal_style="terra_red", ceiling=7, orbs=1),
                   n("terra_white", arc=3.2, step_y=1, hug=3.0,
                     pedestal_style="terra_orange", ceiling=5, orbs=1),
-                  n("terra_red", arc=5.2, step_y=-2, hug=3.8, moat=True,
+                  n("terra_red", arc=5.2, lift=2, step_y=-2, hug=3.8, moat=True,
                     orbs=2),
                   n("redsand", arc=3.0, step_y=0, hug=3.4, kind="walk",
                     spread=0, pedestal=False, ceiling=7)]),
@@ -277,7 +277,7 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
     # place a shell may go: it is painted the moment its landing commits
     # and its walls would then be in the way of the next landing of the
     # same beat.
-    ("slot", [n("terra_yellow", arc=3.2, lift=2, hug=3.0, spread=1,
+    ("slot", [n("terra_yellow", arc=3.2, lift=3, hug=3.0, spread=1,
                 ceiling=7, orbs=1),
               n("terra_white", arc=3.0, step_y=0, hug=3.0, kind="walk",
                 spread=0, ceiling=7),
@@ -285,7 +285,7 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
                 pedestal_style="terra_red", ceiling=5, orbs=1),
               n("terra_yellow", arc=3.2, step_y=1, form="slab", hug=3.2,
                 ceiling=5),
-              n("terra_red", arc=4.0, step_y=-1, hug=3.0, shell="grotto",
+              n("terra_red", arc=4.0, lift=2, step_y=-1, hug=3.0, shell="grotto",
                 orbs=1)]),
     # THE FIELD -- the hoodoos themselves, and the level's high ground.
     # Three spires weaving across the lane: one out toward the rim, the
@@ -304,7 +304,7 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
     # This ends at lift 4 and nothing after it goes down more than two,
     # which is `docs/RULES.md` §3: a level's descent belongs in its first
     # two thirds and the exit is the highest thing in it.
-    ("field", [n("terra_white", arc=3.4, lift=2, hug=3.2, spread=1,
+    ("field", [n("terra_white", arc=3.4, lift=3, hug=3.2, spread=1,
                  radial=1.2, pedestal_style="terra_orange", ceiling=5,
                  orbs=1),
                n("terra_red", arc=3.2, step_y=1, hug=3.6, radial=-1.3,
@@ -330,11 +330,11 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
     # **No `moat` anywhere in here.** The filler loops, and a second lap
     # digs away the ground the first lap's pedestals are standing on --
     # one keyword, 27,859 refusals.
-    ("windgap", [n("terra_orange", arc=3.4, lift=3, hug=3.0, spread=2,
+    ("windgap", [n("terra_orange", arc=3.4, lift=5, hug=3.0, spread=2,
                    ceiling=7, orbs=1),
                  n("terra_white", arc=3.0, step_y=0, hug=3.0, kind="walk",
                    spread=0, ceiling=7),
-                 n("terra_yellow", arc=4.6, step_y=-1, hug=3.6, ceiling=5,
+                 n("terra_yellow", arc=4.6, lift=5, step_y=-1, hug=3.6, ceiling=5,
                    orbs=1),
                  n("terra_red", arc=3.2, step_y=1, hug=3.0,
                    pedestal_style="terra_orange", ceiling=5)]),
@@ -388,9 +388,9 @@ LEVEL = Level("DUST DEVILS", "mesa", rise=7, gap=3.0, exit="bubble",
     # at once, which 2.8 does not -- 2.12 of reach is under a descent's
     # minimum, because a descending arc covers that much ground before it
     # arrives.
-    n("terra_orange", arc=3.4, lift=2, hug=2.8, spread=1, confine=True,
+    n("terra_orange", arc=3.4, step_y=0, hug=2.8, spread=1, confine=True,
       ceiling=5, shell="cave"),
-    n("terra_white", arc=2.4, step_y=5, kind="bubble", hug=2.0,
+    n("terra_white", arc=2.4, step_y=2, kind="bubble", hug=2.0,
       pedestal=True, pedestal_style="terra_orange", spread=0, orbs=2),
     n("terra_yellow", arc=3.0, step_y=1, hug=3.2, spread=0,
       pedestal=False, ceiling=7, deco="lamp", orbs=1),

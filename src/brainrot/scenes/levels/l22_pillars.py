@@ -253,10 +253,10 @@ LEVEL = Level("THE PILLARS", "end", rise=7, gap=3.2, exit="bubble",
     #    refused with the rest of the beat abandoned behind it.
     ("colonnade", [n("glow", arc=3.2, lift=1, hug=3.0, spread=1,
                      deco="lamp", ceiling=3, moat=True, orbs=1),
-                   n("rock", arc=2.9, step_y=0, hug=3.0, kind="walk",
+                   n("rock", arc=3.2, step_y=1, hug=3.0,
                      spread=0, ceiling=3, deco="lintel",
                      pedestal=False),
-                   n("sub", arc=3.2, step_y=1, hug=3.4, spread=0,
+                   n("sub", arc=2.9, step_y=0, hug=3.4, kind="walk", spread=0,
                      pedestal=False, orbs=1),
                    n("rock", arc=4.2, step_y=0, hug=4.4, form="slab",
                      spread=0, pedestal=False, orbs=2),
@@ -264,7 +264,7 @@ LEVEL = Level("THE PILLARS", "end", rise=7, gap=3.2, exit="bubble",
                      pedestal_style="obsidian", orbs=1),
                    n("accent", arc=3.2, step_y=1, hug=3.8, spread=0,
                      pedestal_style="obsidian", orbs=1),
-                   n("sub", arc=5.2, step_y=-2, hug=3.0, spread=0,
+                   n("sub", arc=5.2, lift=2, step_y=-2, hug=3.0, spread=0,
                      pedestal=False, deco="lamp", shell="cave",
                      orbs=2)]),
     # THE STAND. The second pool, a stride under a second fallen lintel,
@@ -312,7 +312,7 @@ LEVEL = Level("THE PILLARS", "end", rise=7, gap=3.2, exit="bubble",
     # sides -- ``_shell`` skips a wall column with nothing under it --
     # which is what is wanted: what this sheet is short of is not walls
     # but the dark brow across the top of the frame.
-    ("stand", [n("ground", arc=3.4, lift=1, hug=3.0, spread=1,
+    ("stand", [n("ground", arc=3.4, lift=2, hug=3.0, spread=1,
                  moat=True, ceiling=3, orbs=1),
                n("rock", arc=2.9, step_y=0, hug=3.0, kind="walk",
                  spread=0, ceiling=3, deco="lintel", pedestal=False),
@@ -362,13 +362,13 @@ LEVEL = Level("THE PILLARS", "end", rise=7, gap=3.2, exit="bubble",
     # -- 27,859 "pedestal will not stand" refusals from one keyword when
     # it was instrumented. This level's water is in the two beats that
     # play once.
-    ("court", [n("ground", arc=4.4, lift=1, hug=3.0, spread=1,
+    ("court", [n("ground", arc=4.4, lift=4, hug=3.0, spread=1,
                  ceiling=3, orbs=1),
                n("rock", arc=2.9, step_y=0, hug=3.0, kind="walk",
                  spread=0, ceiling=3, deco="lintel"),
                n("sub", arc=3.2, step_y=1, hug=3.2, spread=0,
                  pedestal=False, orbs=1),
-               n("accent", arc=3.4, step_y=1, hug=3.4, spread=0,
+               n("accent", arc=3.4, step_y=-1, hug=3.4, spread=0,
                  pedestal=False, orbs=1)]),
 ], exit_beats=[
     # THE LAST PILLAR. The colonnade's one unbroken shaft, and it is
@@ -453,9 +453,9 @@ LEVEL = Level("THE PILLARS", "end", rise=7, gap=3.2, exit="bubble",
     # 1.8-4.2 that come out as rock. It is left at 2.8 because that is
     # where it happens to be written and there is no reason to move it
     # back.
-    n("glow", arc=3.2, lift=1, hug=2.9, spread=2, confine=True,
+    n("glow", arc=3.2, step_y=0, hug=2.9, spread=2, confine=True,
       deco="lamp", ceiling=3, shell="cave", orbs=1),
-    n("rock", arc=2.4, step_y=6, kind="bubble", hug=2.8, pedestal=True,
+    n("rock", arc=2.4, step_y=3, kind="bubble", hug=2.8, pedestal=True,
       pedestal_style="obsidian", spread=0, orbs=2),
     n("sub", arc=3.2, step_y=1, hug=3.6, spread=0, pedestal=False,
       deco="lamp", ceiling=3, orbs=2),

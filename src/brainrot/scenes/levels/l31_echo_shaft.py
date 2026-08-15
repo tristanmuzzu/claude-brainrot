@@ -218,12 +218,12 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="stair",
     #    "pedestal will not stand" refusals elsewhere in this roster.
     ("shafthead", [n("glow", arc=3.2, lift=1, hug=3.2, spread=1,
                      deco="lamp", moat=True, ceiling=3, orbs=1),
-                   n("ground", arc=2.9, step_y=0, hug=3.2, kind="walk",
+                   n("ground", arc=3.2, step_y=1, hug=3.2,
                      pedestal=False, ceiling=3),
-                   n("accent", arc=3.0, step_y=1, hug=3.4, pedestal=False,
+                   n("accent", arc=2.9, step_y=0, hug=3.4, kind="walk", pedestal=False,
                      ceiling=2, orbs=1),
                    n("accent", arc=3.0, step_y=1, hug=3.8, orbs=1),
-                   n("rock", arc=4.9, step_y=-2, hug=4.4, spread=1,
+                   n("rock", arc=4.9, lift=2, step_y=-1, hug=4.4, spread=1,
                      pedestal=False, moat=True, orbs=2),
                    n("accent", arc=3.2, step_y=1, hug=4.0, pedestal=False,
                      orbs=1)]),
@@ -250,7 +250,7 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="stair",
     # a jump is a roof with a hole in the middle of it -- and at lift 1
     # because ``_shell`` skips any wall column with nothing under it, so
     # a bay written higher is a roof with open sides, which is not a bay.
-    ("drip", [n("rock", arc=3.4, lift=1, hug=3.4, spread=1, moat=True,
+    ("drip", [n("rock", arc=3.4, lift=2, hug=3.4, spread=1, moat=True,
                 ceiling=2, orbs=1),
               n("accent", arc=2.9, step_y=0, hug=3.4, kind="walk",
                 pedestal=False, shell="cave", ceiling=3, deco="lamp",
@@ -323,7 +323,7 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="stair",
                   pedestal=False, ceiling=3),
                 n("glow", arc=3.0, step_y=1, hug=3.0, pedestal=False,
                   deco="lamp", ceiling=2, orbs=1),
-                n("accent", arc=4.4, step_y=-2, hug=3.8, pedestal=False,
+                n("accent", arc=4.4, lift=2, step_y=-2, hug=3.8, pedestal=False,
                   orbs=2)]),
 ], exit_beats=[
     # THE CUT STAIR. Eight treads winding up the inside of the shaft
@@ -384,9 +384,8 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="stair",
     # the inside of a shaft ought to read as indoors, and at the theme's
     # inherited ``dark=0.86`` the lid would have been free *and*
     # invisible, which is the arrangement worth avoiding.
-    n("accent", arc=3.2, lift=1, hug=3.0, spread=2, confine=True,
+    n("accent", arc=3.2, step_y=0, hug=3.0, spread=2, confine=True,
       deco="lamp", ceiling=3, orbs=1),
-    n("calcite", arc=3.0, step_y=1, hug=3.2, spread=0, ceiling=2),
     n("deepslate", arc=3.0, step_y=1, hug=3.2, spread=0, ceiling=2, orbs=1),
     n("calcite", arc=3.0, step_y=1, hug=3.2, spread=0, ceiling=2),
     n("glow", arc=3.0, step_y=1, hug=3.2, spread=0, deco="lamp",

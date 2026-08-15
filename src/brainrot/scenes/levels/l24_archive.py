@@ -192,7 +192,7 @@ LEVEL = Level("THE ARCHIVE", "library", rise=5, gap=2.8, exit="bubble",
                 n("oak", arc=2.9, step_y=0, hug=3.2, kind="walk",
                   ceiling=3),
                 n("bookshelf", arc=3.0, step_y=1, hug=3.6, orbs=1),
-                n("darkoak", arc=4.9, step_y=-2, hug=4.0, moat=True, orbs=2),
+                n("darkoak", arc=4.9, lift=2, step_y=-1, hug=4.0, moat=True, orbs=2),
                 n("bookshelf", arc=3.2, step_y=1, hug=3.6, pedestal=False,
                   orbs=1)]),
     # THE CATALOGUE. The quiet beat and the level's only interior: the
@@ -218,7 +218,7 @@ LEVEL = Level("THE ARCHIVE", "library", rise=5, gap=2.8, exit="bubble",
     # column with nothing under it), which is exactly what is wanted:
     # what this tower's sheets are short of is not walls but the dark
     # brow across the top of the frame.
-    ("catalogue", [n("darkoak", arc=3.4, lift=2, hug=3.2, spread=1,
+    ("catalogue", [n("darkoak", arc=3.4, lift=3, hug=3.2, spread=1,
                      ceiling=3, orbs=1),
                    n("oak", arc=2.9, step_y=0, hug=3.2, kind="walk",
                      ceiling=3),
@@ -248,7 +248,7 @@ LEVEL = Level("THE ARCHIVE", "library", rise=5, gap=2.8, exit="bubble",
     # to 74%; it is on the last node because a shell is painted the
     # moment its landing commits and its roof then refuses the next arc
     # of the same beat.
-    ("gallery", [n("darkoak", arc=3.4, lift=3, hug=3.8, spread=1,
+    ("gallery", [n("darkoak", arc=3.4, lift=4, hug=3.8, spread=1,
                    pedestal=False, deco="lamp", orbs=1),
                  n("oak", arc=2.9, step_y=0, hug=3.8, kind="walk",
                    pedestal=False, ceiling=3),
@@ -272,11 +272,11 @@ LEVEL = Level("THE ARCHIVE", "library", rise=5, gap=2.8, exit="bubble",
     # The seam where the loop closes is a jump like any other and half
     # of what a filler ever loses is there: it is +1 off the low case
     # back onto a case end, which is what the opener asks for.
-    ("aisles", [n("bookshelf", arc=3.2, lift=3, hug=2.8, spread=1,
+    ("aisles", [n("bookshelf", arc=3.2, lift=5, hug=2.8, spread=1,
                   ceiling=3, orbs=1),
                 n("oak", arc=2.9, step_y=0, hug=2.8, kind="walk",
                   ceiling=3),
-                n("darkoak", arc=3.6, step_y=-1, hug=3.4, pedestal=False,
+                n("darkoak", arc=3.6, lift=5, step_y=0, hug=3.4, pedestal=False,
                   orbs=1)]),
 ], exit_beats=[
     # THE WELLHEAD. The hall drains into the well at the end of it and
@@ -319,10 +319,10 @@ LEVEL = Level("THE ARCHIVE", "library", rise=5, gap=2.8, exit="bubble",
     # overshoots is a level above that opens by dropping onto its own
     # terrace, which is the owner's "it puts a ladder there and then
     # jumps back down to a lower part".
-    n("plaster", arc=2.8, lift=1, hug=2.8, spread=1, confine=True,
+    n("plaster", arc=2.8, step_y=0, hug=2.8, spread=1, confine=True,
       ceiling=3, shell="cave"),
-    n("oak", arc=2.4, step_y=4, kind="bubble", hug=2.0, pedestal=True,
+    n("oak", arc=2.4, step_y=1, kind="bubble", hug=2.0, pedestal=True,
       pedestal_style="cobble", spread=0, deco="lamp", orbs=2),
-    n("glow", arc=3.0, step_y=1, hug=3.2, spread=0, pedestal=False,
+    n("glow", arc=3.0, step_y=0, hug=3.2, spread=0, pedestal=False,
       ceiling=3, deco="lamp", orbs=1),
 ])

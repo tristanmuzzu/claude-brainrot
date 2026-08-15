@@ -210,15 +210,16 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
     #    field is not a place.
     ("crust", [n("glow", arc=3.2, lift=1, hug=3.2, spread=1, deco="lamp",
                  ceiling=2, orbs=1),
-               n("blackstone", arc=2.9, step_y=0, hug=3.0, kind="walk",
+               n("blackstone", arc=3.2, step_y=1, hug=3.0,
                  ceiling=3, deco="lintel"),
-               n("accent", arc=3.2, step_y=1, hug=2.8, moat=True, orbs=1),
+               n("accent", arc=2.9, step_y=0, hug=2.8, kind="walk", moat=True,
+                       orbs=1),
                n("soulsand", arc=2.9, step_y=0, hug=3.0, kind="walk",
                  pedestal=False, ceiling=3),
                n("blackstone", arc=3.2, step_y=1, hug=3.4),
                n("glow", arc=3.2, step_y=1, hug=3.6, pedestal=False,
                  deco="lamp", orbs=2),
-               n("magma", arc=5.2, step_y=-3, form="slime", hug=3.8,
+               n("magma", arc=5.2, lift=2, step_y=-2, form="slime", hug=3.8,
                  pedestal=False, moat=True, orbs=2),
                n("accent", arc=3.6, step_y=2, kind="bounce", hug=3.2,
                  spread=1, pedestal=False, orbs=3)]),
@@ -258,13 +259,13 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
     # wants terrain under it cannot be laid over a hole. What it costs
     # is one basalt column, and the crust's own cap, the ash bank's cap
     # every lap and the whole flight of the exit still stand on theirs.
-    ("soffit", [n("blackstone", arc=4.0, lift=1, hug=3.0, spread=2,
+    ("soffit", [n("blackstone", arc=4.0, lift=2, hug=3.0, spread=2,
                   ceiling=2, pedestal=False, orbs=1),
                 n("soulsand", arc=2.9, step_y=0, hug=2.8, kind="walk",
                   pedestal=False, ceiling=3, deco="lintel"),
                 n("accent", arc=3.2, step_y=1, hug=3.4, pedestal=False,
                   orbs=1),
-                n("netherrack", arc=4.4, step_y=-1, hug=3.8,
+                n("netherrack", arc=4.4, lift=2, step_y=-1, hug=3.8,
                   pedestal=False, shell="cave", orbs=2)]),
 ], filler=[
     # THE ASH BANK, and this is what the level mostly *is*, because the
@@ -315,7 +316,7 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
                    ceiling=2, pedestal=False, orbs=1),
                  n("soulsand", arc=2.9, step_y=0, hug=3.0, kind="walk",
                    pedestal=False, ceiling=3),
-                 n("accent", arc=3.2, step_y=1, hug=3.6, orbs=1)]),
+                 n("accent", arc=3.2, step_y=0, hug=3.6, orbs=1)]),
 ], exit_beats=[
     # THE TALL STACK. Six landings up the outside of the last flue,
     # written out rather than left to the generated staircase.
@@ -372,7 +373,7 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
     # landing through take-off and flight: a lip tucked against the core
     # aims the last second of the level at the cliff, and a lip over the
     # drop aims it at sky with the next level standing in it.
-    n("glow", arc=3.2, lift=2, hug=3.0, spread=2, deco="lamp", ceiling=3,
+    n("glow", arc=3.2, step_y=0, hug=3.0, spread=2, deco="lamp", ceiling=3,
       orbs=1),
     n("blackstone", arc=2.9, step_y=0, hug=2.8, kind="walk", spread=0,
       confine=True, ceiling=3, deco="lintel"),

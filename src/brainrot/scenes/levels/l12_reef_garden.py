@@ -108,7 +108,7 @@ LEVEL = Level("REEF GARDEN", "coral", rise=6, gap=2.8, exit="bubble",
     # 2.52 against a +1 window that shuts at 3.10.
     ("tideline", [n("glow", arc=3.2, lift=1, hug=3.0, form="slab", spread=1,
                     deco="lamp", orbs=1),
-                  n("sub", arc=2.8, lift=1, hug=3.0, kind="walk", spread=0,
+                  n("sub", arc=2.8, lift=2, hug=3.0, kind="walk", spread=0,
                     ceiling=3, moat=True),
                   n("accent", arc=3.2, step_y=1, hug=2.8, spread=0,
                     pedestal=False, orbs=1)]),
@@ -160,13 +160,13 @@ LEVEL = Level("REEF GARDEN", "coral", rise=6, gap=2.8, exit="bubble",
     # bounce needs, so the pad silently was not one. Taking off from 4.0
     # puts it at 2.0, which is an ordinary free landing height, and the
     # arrival is 12.2-13.5.
-    ("lagoon", [n("rock", arc=3.2, lift=1, hug=3.0, spread=1, ceiling=3,
+    ("lagoon", [n("rock", arc=3.2, lift=2, hug=3.0, spread=1, ceiling=3,
                   orbs=1),
                 n("accent", arc=3.2, step_y=1, hug=2.8, spread=0,
                   ceiling=3),
                 n("coral_pink", arc=3.2, step_y=1, hug=2.6, spread=0,
                   orbs=1),
-                n("moss", arc=4.9, step_y=-2, hug=3.2, form="slime",
+                n("moss", arc=4.9, lift=2, step_y=-2, hug=3.2, form="slime",
                   spread=0, pedestal=False, moat=True),
                 n("accent", arc=3.6, step_y=2, hug=3.0, kind="bounce",
                   spread=1, pedestal=False, orbs=3)]),
@@ -203,13 +203,13 @@ LEVEL = Level("REEF GARDEN", "coral", rise=6, gap=2.8, exit="bubble",
     # is on the beat's **last** node, because a shell is painted the
     # moment its landing commits and the walls it puts up are then in the
     # way of the next landing of the same beat.
-    ("bars", [n("ground", arc=4.4, lift=1, hug=2.8, spread=1, moat=True,
+    ("bars", [n("ground", arc=4.4, lift=2, hug=2.8, spread=1, moat=True,
                 orbs=1),
-              n("sub", arc=2.8, lift=2, hug=2.6, form="slab", kind="walk",
+              n("sub", arc=2.8, lift=3, hug=2.6, form="slab", kind="walk",
                 spread=0, pedestal=False, deco="lamp"),
-              n("ground", arc=3.4, lift=3, hug=3.0, form="slab", spread=0,
+              n("ground", arc=3.4, lift=4, hug=3.0, form="slab", spread=0,
                 pedestal=False, orbs=1),
-              n("coral_pink", arc=3.2, lift=3, hug=2.6, spread=0,
+              n("coral_pink", arc=3.2, lift=4, hug=2.6, spread=0,
                 shell="grotto", orbs=2)]),
 ], filler=[
     # The character, repeated, and on a terrace this long the filler is
@@ -236,11 +236,11 @@ LEVEL = Level("REEF GARDEN", "coral", rise=6, gap=2.8, exit="bubble",
     # at 2.0, so coming back round is a drop of one and wants a reach in
     # the 2.35-4.98 window. 4.4 has it, and stays legal level as well,
     # which is what the ``spread`` on that node is there to use.
-    ("fans", [n("ground", arc=4.4, lift=1, hug=2.6, spread=2,
+    ("fans", [n("ground", arc=4.4, lift=4, hug=2.6, spread=2,
                 pedestal=False, orbs=2),
-              n("rock", arc=2.8, lift=1, hug=2.6, kind="walk", spread=0,
+              n("rock", arc=2.8, lift=4, hug=2.6, kind="walk", spread=0,
                 ceiling=3, deco="lamp"),
-              n("accent", arc=3.2, lift=2, hug=2.8, spread=0,
+              n("accent", arc=3.2, lift=4, hug=2.8, spread=0,
                 pedestal=False, orbs=1)]),
 ], exit_beats=[
     # The blue hole: a well cut through the reef with the water coming up
@@ -273,7 +273,7 @@ LEVEL = Level("REEF GARDEN", "coral", rise=6, gap=2.8, exit="bubble",
     # **Check the move mix in ``--report`` for the word ``bubble``.** If
     # it is missing, this beat is six steps of staircase and the level
     # has lost a third of itself with no error anywhere.
-    n("rock", arc=3.0, lift=1, hug=2.4, spread=2, deco="lamp", orbs=1),
-    n("prismarine", arc=3.0, step_y=5, kind="bubble", climb_style="water",
+    n("rock", arc=3.0, step_y=0, hug=2.4, spread=2, deco="lamp", orbs=1),
+    n("prismarine", arc=3.0, step_y=3, kind="bubble", climb_style="water",
       spread=0, deco="lamp", orbs=2),
 ])

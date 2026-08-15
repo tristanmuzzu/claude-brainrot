@@ -168,7 +168,7 @@ LEVEL = Level("ROPE BRIDGE", "jungle", rise=7, gap=2.8, exit="bubble",
     # walk's 2.4 m limit and a rise of 0.5 against its 0.55.
     ("bridgehead", [n("glow", arc=3.2, lift=1, hug=3.8, spread=1,
                       deco="lamp", orbs=1),
-                    n("rock", arc=2.6, lift=2, form="slab", hug=3.8,
+                    n("rock", arc=2.6, lift=3, form="slab", hug=3.8,
                       kind="walk", spread=1, ceiling=3, deco="lintel",
                       shell="tunnel")]),
     # **The span, and the whole level is this beat.** Five landings, and
@@ -225,18 +225,18 @@ LEVEL = Level("ROPE BRIDGE", "jungle", rise=7, gap=2.8, exit="bubble",
     # ``_moat`` fills the bowl with ``pedestal_style or theme.liquid``,
     # so naming one digs a hole and fills it with something solid and
     # walkable.
-    ("thespan", [n("accent", arc=3.2, lift=2, hug=4.6, spread=1,
+    ("thespan", [n("accent", arc=3.2, lift=3, hug=4.6, spread=1,
                    pedestal=False, pedestal_style="spruce", ceiling=3,
                    deco="post", orbs=1),
-                 n("accent", arc=4.4, lift=2, hug=5.6, spread=1,
+                 n("accent", arc=4.4, lift=3, hug=5.6, spread=1,
                    pedestal=False, pedestal_style="spruce", ceiling=3,
                    orbs=2),
-                 n("accent", arc=3.2, lift=3, hug=5.0, spread=1,
+                 n("accent", arc=3.2, lift=4, hug=5.0, spread=1,
                    pedestal=False, pedestal_style="spruce", ceiling=3,
                    deco="post", orbs=1),
-                 n("mossy", arc=5.0, lift=1, hug=4.6, spread=0,
+                 n("mossy", arc=5.0, lift=2, hug=4.6, spread=0,
                    pedestal=False, moat=True, orbs=2),
-                 n("sub", arc=3.6, lift=2, hug=4.0, spread=1, ceiling=3,
+                 n("sub", arc=3.6, lift=3, hug=4.0, spread=1, ceiling=3,
                    orbs=1)]),
     # The shallows: one wet boulder out in the current with the level's
     # second pool round its foot and a slab of the bank overhanging it.
@@ -278,7 +278,7 @@ LEVEL = Level("ROPE BRIDGE", "jungle", rise=7, gap=2.8, exit="bubble",
     # level 4.4 is a reach of 3.72 -- so from lift 2 it is the jump as
     # written, and from lift 1 the spread drops it to a level one rather
     # than an illegal rise.
-    ("shallows", [n("mossy", arc=4.4, lift=2, hug=4.6, spread=1,
+    ("shallows", [n("mossy", arc=4.4, lift=3, hug=4.6, spread=1,
                     pedestal=False, moat=True, ceiling=3, orbs=2)]),
 ], filler=[
     # More bridge, and on a terrace this long the loop is more of what
@@ -316,10 +316,10 @@ LEVEL = Level("ROPE BRIDGE", "jungle", rise=7, gap=2.8, exit="bubble",
     # it, where a run of floating landings has nothing at all. It
     # repeats with the loop, which is the only way one landing's worth
     # of mass is seen more than once.
-    ("planks", [n("accent", arc=3.2, lift=2, hug=4.8, spread=1,
+    ("planks", [n("accent", arc=3.2, lift=3, hug=4.8, spread=1,
                   pedestal=False, pedestal_style="spruce", ceiling=3,
                   deco="post", orbs=1),
-                n("rock", arc=2.6, lift=2, hug=4.8, kind="walk", spread=1,
+                n("rock", arc=2.6, lift=3, hug=4.8, kind="walk", spread=1,
                   pedestal=False, pedestal_style="spruce", ceiling=3,
                   deco="lintel"),
                 n("accent", arc=3.2, lift=3, hug=5.4, spread=1,
@@ -372,9 +372,9 @@ LEVEL = Level("ROPE BRIDGE", "jungle", rise=7, gap=2.8, exit="bubble",
     # down on to it. What it must not do is finish *below* seven, which
     # is why the footing carries ``spread=1`` and not the 2 an ordinary
     # landing would.
-    n("glow", arc=3.2, lift=1, hug=3.2, spread=1, confine=True,
+    n("glow", arc=3.2, step_y=0, hug=3.2, spread=1, confine=True,
       ceiling=3, deco="lamp", orbs=1),
-    n("mossy", arc=2.4, step_y=7, kind="bubble", climb_style="water",
+    n("mossy", arc=2.4, step_y=5, kind="bubble", climb_style="water",
       hug=2.4, pedestal=True, pedestal_style="mossy", spread=0,
       confine=True, orbs=2),
 ])
