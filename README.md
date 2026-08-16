@@ -2,6 +2,7 @@
 
 *Subway Surfers while CC is thinking.*
 
+[![PyPI](https://img.shields.io/pypi/v/claude-brainrot)](https://pypi.org/project/claude-brainrot/)
 [![tests](https://github.com/tristanmuzzu/claude-brainrot/actions/workflows/ci.yml/badge.svg)](https://github.com/tristanmuzzu/claude-brainrot/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows-informational)](#platform-support)
@@ -95,39 +96,36 @@ seed chose.
 
 ## Install
 
-Python 3.11 or newer, and `git`. There is nothing to compile and no GPU
-requirement — `pip` pulls two wheels (raylib ~2 MB, Pillow) and that is the
-whole dependency list.
+Python 3.11 or newer. There is nothing to compile and no GPU requirement —
+`pip` pulls two wheels (raylib ~2 MB, Pillow) and that is the whole dependency
+list. It is a long-running background tool rather than a library, so
+[pipx](https://pipx.pypa.io/) or [uv](https://docs.astral.sh/uv/) is the
+tidiest way in:
+
+```bash
+pipx install claude-brainrot     # or: uv tool install claude-brainrot
+```
 
 <details open>
 <summary><b>Linux (GNOME/Wayland — Ubuntu, Fedora, …)</b></summary>
 
 ```bash
-sudo apt install -y git python3-venv     # Debian/Ubuntu; skip if you have them
-git clone https://github.com/tristanmuzzu/claude-brainrot
-cd claude-brainrot
-python3 -m venv .venv
-source .venv/bin/activate
-pip install .
+pipx install claude-brainrot     # or: pip install claude-brainrot
 
 brainrot install        # hooks, plus the gnome-shell extension
 brainrot extension load # load it into the running shell (or just log out and in)
 brainrot run            # long-lived; leave it running
 ```
 
-Verified on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200% scaling) — `brainrot
-doctor` reports 14 checks passing from a clean clone.
+Verified on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200% scaling) —
+`brainrot doctor` reports 14 checks passing.
 </details>
 
 <details open>
 <summary><b>Windows 10/11</b></summary>
 
 ```powershell
-git clone https://github.com/tristanmuzzu/claude-brainrot
-cd claude-brainrot
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install .
+pipx install claude-brainrot     # or: pip install claude-brainrot
 
 brainrot install        # writes hooks into ~/.claude/settings.json
 brainrot run            # long-lived; leave it running
@@ -143,9 +141,21 @@ silently reverts to its default. Install from
 prints the config path it is genuinely reading.
 </details>
 
+<details>
+<summary><b>From source</b>, to change something</summary>
+
+```bash
+git clone https://github.com/tristanmuzzu/claude-brainrot
+cd claude-brainrot
+python3 -m venv .venv && source .venv/bin/activate   # Windows: py -m venv .venv
+pip install -e ".[dev]"
+```
+</details>
+
 The hooks are written with the **absolute path** of the interpreter you
-installed into, so the daemon and the hooks work whether or not the venv is
-activated. Move or delete the venv and you must re-run `brainrot install`.
+installed into, so the daemon and the hooks work whether or not any venv is
+activated. Move or remove that interpreter and you must re-run `brainrot
+install`.
 
 <details>
 <summary>Why Linux needs that extra <code>extension</code> step</summary>
