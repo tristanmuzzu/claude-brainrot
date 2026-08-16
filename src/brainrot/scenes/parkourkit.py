@@ -193,6 +193,24 @@ class Move:
     def rise(self) -> float:
         return self.to[1] - self.frm[1]
 
+    def speed_in(self) -> float:
+        """Ground speed the body enters this move at."""
+        return _leg_speed(self.legs[0])
+
+    def speed_out(self) -> float:
+        """Ground speed the body leaves this move at.
+
+        Which is the number the block *after* the move needs: the run across a
+        landing has to start at whatever speed arrived on it, or the body
+        changes pace in the one frame it touches down.
+        """
+        return _leg_speed(self.legs[-1])
+
+
+def _leg_speed(leg: dict) -> float:
+    frm, to = leg["frm"], leg["to"]
+    return math.dist((frm[0], frm[2]), (to[0], to[2])) / max(1e-6, leg["dur"])
+
 
 def _leg_at(leg: dict, t: float) -> tuple[float, float, float]:
     frm, to = leg["frm"], leg["to"]
@@ -302,6 +320,102 @@ def bounce_launch(impact: float) -> float:
 def fall_speed(drop: float) -> float:
     """Impact speed after falling ``drop`` metres from rest."""
     return math.sqrt(max(0.0, 2.0 * GRAVITY * drop))
+
+
+# ---------------------------------------------------------------------------
+# The run across a landing
+# ---------------------------------------------------------------------------
+#
+# What used to happen between two flights was a constant: the body arrived at
+# the arc's speed, was set to the material's walking speed for the length of
+# the block, and then set back. Both of those are one-frame steps of about a
+# metre and a half a second, twice per landing, at four landings a second --
+# and a step in speed is a thing the eye reads as a *stop* however short it is.
+# The owner's report was that the body "clicks into something and sticks to
+# whatever block he's on" before jumping again, which is exactly what a square
+# wave in the speed looks like from inside the head.
+#
+# So the crossing is a velocity profile now, and it is the ordinary one: brake
+# as hard as the ground allows, cruise at the material's own speed if there is
+# any room left to, and accelerate back up in time to leave at the speed the
+# next move needs. On a one-cell landing -- 0.68 m, which is most of them --
+# there is no room, so the body barely slows: it *runs over* the block, which
+# is what a player chaining jumps does and what nothing in this project's
+# motion could previously express.
+#
+# The two ends are exact by construction. ``speed_at(0)`` is the speed the
+# body arrived with and ``speed_at(length)`` is the speed the next move
+# begins at, so there is no step at either boundary for any material, any
+# block length or any move -- including a ladder, which the body now decelerates
+# into rather than snapping to a stop at.
+
+#: How hard a body may brake on the ground, and how hard it may accelerate.
+#: Vanilla's ground friction is fierce and its sprint acceleration is not, and
+#: the asymmetry is what makes a wide platform read as a breather: the body
+#: sheds speed onto it quickly and has to work to get it back.
+GROUND_DECEL = 42.0
+GROUND_ACCEL = 26.0
+#: Below this a "run" is a stall, whatever the material says.
+CRAWL = 0.45
+
+
+class GroundRun:
+    """A braking-cruising-accelerating crossing of one landing.
+
+    ``speed_at`` is the standard trapezoid: the pointwise minimum of what the
+    body can still be doing having braked from ``v_in``, and what it can be
+    doing and still reach ``v_out`` by the far edge -- floored by the second
+    constraint, so a short block whose next move is fast never dips to the
+    material speed at all, because it physically cannot.
+    """
+
+    __slots__ = ("length", "v_in", "v_out", "cruise", "decel", "accel", "dur")
+
+    def __init__(self, length: float, v_in: float, v_out: float,
+                 cruise: float, decel: float = GROUND_DECEL,
+                 accel: float = GROUND_ACCEL) -> None:
+        self.length = max(0.0, length)
+        self.v_in = max(CRAWL, v_in)
+        self.v_out = max(CRAWL, v_out)
+        self.cruise = max(CRAWL, cruise)
+        self.decel = decel
+        self.accel = accel
+        self.dur = self._integrate()
+
+    def speed_at(self, s: float) -> float:
+        s = min(max(0.0, s), self.length)
+        v_in, v_out, cruise = self.v_in, self.v_out, self.cruise
+        # What the body is doing having tried to reach the cruise speed from
+        # the near edge.
+        if v_in >= cruise:
+            want = math.sqrt(max(cruise * cruise, v_in * v_in
+                                 - 2.0 * self.decel * s))
+        else:
+            want = min(cruise, math.sqrt(v_in * v_in + 2.0 * self.accel * s))
+        back = self.length - s
+        # ...capped by what it could brake from and still be this fast, and
+        # floored by what it has to be doing to reach ``v_out`` in time.
+        ceil = math.sqrt(v_out * v_out + 2.0 * self.decel * back)
+        floor = math.sqrt(max(0.0, v_out * v_out - 2.0 * self.accel * back))
+        return max(floor, min(want, ceil), CRAWL)
+
+    def _integrate(self) -> float:
+        """How long the crossing takes: ``ds / v(s)``, by trapezoid.
+
+        Numerically, because the closed form has three cases and two of them
+        have sub-cases, and this is called once per landing.
+        """
+        if self.length <= 1e-9:
+            return 0.0
+        n = 16
+        h = self.length / n
+        total = 0.0
+        prev = 1.0 / self.speed_at(0.0)
+        for i in range(1, n + 1):
+            cur = 1.0 / self.speed_at(h * i)
+            total += (prev + cur) * 0.5 * h
+            prev = cur
+        return total
 
 
 # ---------------------------------------------------------------------------

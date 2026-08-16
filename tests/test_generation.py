@@ -26,9 +26,9 @@ from brainrot.rng import Seed
 from brainrot.scenes.runner import ROW as RUNNER_ROW
 from brainrot.scenes.runner import SEGMENT_TABLE as RUNNER_SEGMENTS
 from brainrot.scenes.parkour import (
-    AIR_MAX, AIR_MIN, AIR_SPEED, BAND, COURSE_ALT, EDGE, FORMS, GRAVITY,
-    HEADROOM, MIN_HOP, RAMP_BLOCKS, SEGMENT_TABLE, VY_MAX, VY_MIN, fit_gap,
-    flight, hop_span, max_gap)
+    AIR_MAX, AIR_MIN, AIR_SPEED, APPROACH_MIN, BAND, COURSE_ALT, EDGE, FORMS,
+    GRAVITY, HEADROOM, MIN_HOP, RAMP_BLOCKS, SEGMENT_TABLE, VY_MAX, VY_MIN,
+    fit_gap, flight, hop_span, max_gap)
 
 
 def context(run: int) -> scene_api.SceneContext:
@@ -468,10 +468,19 @@ def test_parkour_jumps_stay_physical(run: int) -> None:
     falling when it arrives. Landing while still rising means it came up
     through the side of the block rather than onto it.
 
-    Horizontal speed is checked too, and checked for equality rather than for a
-    ceiling: constant pace is the whole motion model. A hop that crosses its
-    gap at some other speed is one that was solved for a duration, which is the
-    thing that made the short hops float.
+    Horizontal speed is checked too, and the statement is the motion model
+    itself: a player has **one** jump impulse and spends all of it every time,
+    so what they choose is how fast they are running when they use it. Every
+    hop is therefore one of exactly three things -- a sprint jump at the top
+    speed a body has, a slower approach that lands the *whole* impulse on the
+    far end, or, on a gap short enough that even a sprint would overshoot a
+    full jump, a lower arc taken at the floor speed. Nothing in between, and
+    nothing outside.
+
+    The version this replaces asserted a *constant* horizontal speed, which
+    put the whole of the player's choice into the arc: a two-metre hop came
+    out apexing at 0.28 m against vanilla's 1.25, and a run of those is a run
+    of skips.
     """
     scene = grow_parkour(run)
     for i, (a, b) in enumerate(zip(scene.blocks, scene.blocks[1:])):
@@ -485,8 +494,14 @@ def test_parkour_jumps_stay_physical(run: int) -> None:
         assert dur >= vy0 / GRAVITY - 1e-9, (
             f"{where}: still rising after {dur:.3f} s, apex at "
             f"{vy0 / GRAVITY:.3f} s -- it arrives through the side")
-        assert gap / dur == pytest.approx(AIR_SPEED, abs=1e-6), (
-            f"{where}: crossed at {gap / dur:.2f} m/s")
+        speed = gap / dur
+        assert APPROACH_MIN - 1e-6 <= speed <= AIR_SPEED + 1e-6, (
+            f"{where}: crossed at {speed:.2f} m/s")
+        assert (abs(speed - AIR_SPEED) < 1e-6
+                or abs(vy0 - VY_MAX) < 1e-6
+                or abs(speed - APPROACH_MIN) < 1e-6), (
+            f"{where}: crossed at {speed:.2f} m/s taking off at {vy0:.2f} m/s "
+            "-- neither a sprint, nor the whole impulse, nor the floor")
         # and the arc genuinely ends on the surface it was solved for
         landed = frm[1] + vy0 * dur - 0.5 * GRAVITY * dur * dur
         assert landed == pytest.approx(to[1], abs=1e-6)
@@ -753,7 +768,17 @@ def test_parkour_lands_on_the_block_it_aimed_for() -> None:
     The landing point is where the next run-up starts, so an approximate
     arrival is a take-off point that drifts, and the orbs strung on the next
     hop were hung against the take-off that was promised.
+
+    Stated about ``stand`` rather than about ``pos``, which is a distinction
+    the frame clock forces: an arrival almost never falls on a frame boundary,
+    and whatever is left of that frame is now spent running across the block
+    rather than thrown away. So the *feet touch down* exactly on the near edge
+    and the body is already a fraction of a frame's run past it -- along the
+    line to the take-off point, and never further than one frame at the
+    fastest the body ever goes.
     """
+    from brainrot.scenes.parkour import AIR_SPEED
+
     scene = build_parkour(4)
     landings = 0
     for _ in range(7200):
@@ -764,7 +789,9 @@ def test_parkour_lands_on_the_block_it_aimed_for() -> None:
             landings += 1
             blk = scene.blocks[scene.jump_index]
             assert scene.stand == pytest.approx(scene._land_point(blk))
-            assert scene.pos == pytest.approx(scene.stand)
+            assert scene.run_s <= AIR_SPEED / 60.0 + 1e-9, (
+                "a landing spent more than a frame running")
+            assert math.dist(scene.pos, scene.stand) <= scene.run_s + 1e-9
             assert scene.stand[1] == pytest.approx(scene.surface(blk))
             edge = EDGE[blk["form"]]
             assert abs(scene.stand[0] - blk["x"]) <= edge + 1e-9

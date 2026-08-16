@@ -39,6 +39,21 @@ from . import spiralplan as sp
 #: subject here is tall and close: the wall is three metres away and the thing
 #: worth seeing is how far it goes up and how far it goes down.
 FOV = 82.0
+#: The camera's own smoothing, and the flat scene's reasoning applies here
+#: unchanged -- see ``parkour.FOV_GAIN`` and the block beneath it. Every one of
+#: these replaced a value that was switched between two constants at a phase
+#: boundary: the lens zoomed two degrees at every take-off and back at every
+#: landing, the eye was dropped 0.17 m in a single frame when the feet touched
+#: down, and the walk bob appeared and vanished whole. Eight steps a second,
+#: which is what "he clicks into something and sticks to the block" is from
+#: inside the head.
+FOV_GAIN = 1.4
+FOV_EASE = 6.0
+DIP_W = 13.0
+DIP_ZETA = 1.0
+DIP_KEEP = 0.6
+DIP_CAP = 9.0
+FOOT_EASE = 9.0
 #: How far a piece of furniture is still drawn, and how far out of the camera's
 #: own direction. The strip is portrait with about fifty degrees of horizontal
 #: field, so most of a sphere around the body is behind it.
@@ -209,7 +224,17 @@ class SpiralScene(Scene):
         self.stride = 0.0
         self.climbed = 0.0
         self.base_y = blk["y"]
-        self.land_dip = 0.0
+        #: The eye's own suspension: how far below its resting place it is, and
+        #: how fast it is getting there. See :data:`DIP_W`.
+        self.dip = 0.0
+        self.dip_v = 0.0
+        #: How much of the walk bob is showing, 0..1. Eased, never switched.
+        self.foot = 1.0
+        #: Field of view, eased toward what the speed asks for.
+        self.fov = FOV
+        #: Ground speed this frame, which is what the lens is hung off.
+        self.speed = 0.0
+        self.run_s = 0.0
         self.yaw = 0.0
         self.pitch = 0.10
         self._flick = 0.0
@@ -366,14 +391,34 @@ class SpiralScene(Scene):
         allows. Soul sand takes twice as long as stone to cross and ice half,
         and that one number is most of what makes a ring feel like what it is
         made of.
+
+        And the pace is a *profile* between the two moves either side of it,
+        not a constant for the length of the block. Set as a constant, the
+        crossing began and ended with the body's speed jumping by a metre and
+        a half a second in one frame -- more for a web or a ladder, which it
+        used to arrive at and leave from as if teleported. :class:`GroundRun`
+        brakes as hard as the ground allows, spends whatever room is left at
+        the material's own speed, and is back up to the next move's speed by
+        the far edge; on a one-cell landing there is no room, so the body
+        simply runs over it, which is what a player chaining jumps does.
         """
         blk = self._block()
         self.run_from = list(self.course.land_point(blk))
         self.run_to = list(self.course.takeoff_point(blk))
         self.run_len = math.dist((self.run_from[0], self.run_from[2]),
                                  (self.run_to[0], self.run_to[2]))
+        self.run_s = 0.0
         self.ground_speed = self.course.ground_speed(blk)
-        self.ground_dur = max(0.07, self.run_len / self.ground_speed)
+        out = blk["move"]
+        if out is None:
+            self.course.spawn()
+            out = blk["move"]
+        self.run = tp.GroundRun(
+            self.run_len,
+            self.move.speed_out() if self.move is not None else self.ground_speed,
+            out.speed_in() if out is not None else tp.AIR_SPEED,
+            self.ground_speed)
+        self.ground_dur = max(0.05, self.run.dur)
         self.phase = "ground"
         self.phase_t = 0.0
         self.pos = list(self.run_from)
@@ -395,7 +440,9 @@ class SpiralScene(Scene):
         self.index += 1
         blk = self._block()
         self.pos = list(self.course.land_point(blk))
-        self.land_dip = 1.0
+        # The eye carries the body's downward speed into the legs rather than
+        # being dropped a fixed distance in one frame.
+        self.dip_v = max(self.dip_v, DIP_KEEP * min(DIP_CAP, abs(self.vy)))
         self.swing = 1.0
         self.burst.spawn(self.pos[0], self.pos[1] - 0.1, self.pos[2],
                          self._colour(self._style_of(blk)),
@@ -436,26 +483,65 @@ class SpiralScene(Scene):
             self.cone.lamps = [c for c in self.cone.lamps if c[1] >= floor]
         self._begin_ground()
 
+    def _step_ground(self, dt: float) -> float:
+        """Run some of the way across the block. Returns the time it took."""
+        remain = self.run_len - self.run_s
+        if remain <= 1e-6:
+            self._begin_move()
+            return 0.0
+        v = self.run.speed_at(self.run_s)
+        step = v * dt
+        used = dt
+        if step >= remain:
+            # Only the time that actually crossed the block is spent here. The
+            # rest of the frame belongs to the flight, and handing it back is
+            # the difference between a take-off and a fraction of a frame
+            # standing on the far edge at nothing much a second.
+            used = min(dt, remain / v)
+            step = remain
+        self.run_s += step
+        f = self.run_s / self.run_len
+        self.pos = [self.run_from[i] + (self.run_to[i] - self.run_from[i]) * f
+                    for i in range(3)]
+        self.stride += step
+        self.vy = 0.0
+        self.phase_t += used
+        if self.run_s >= self.run_len - 1e-9:
+            self._begin_move()
+        return used
+
+    def _step_move(self, dt: float) -> float:
+        """Fly, climb or ride some of the move. Returns the time it took."""
+        move = self.move
+        remain = move.dur - self.phase_t
+        if remain <= 1e-9:
+            self._land()
+            return 0.0
+        used = min(dt, remain)
+        was = self.pos[1]
+        self.phase_t += used
+        self.pos = list(move.at(self.phase_t))
+        self.vy = (self.pos[1] - was) / max(1e-5, used)
+        if move.kind in ("climb", "bubble", "web"):
+            self.stride += 0.4 * used
+        if self.phase_t >= move.dur - 1e-9:
+            self._land()
+        return used
+
     def update(self, dt: float) -> None:
         self.elapsed += dt
-        self.phase_t += dt
-        if self.phase == "ground":
-            f = min(1.0, self.phase_t / self.ground_dur)
-            self.pos = [self.run_from[i] + (self.run_to[i] - self.run_from[i]) * f
-                        for i in range(3)]
-            self.stride += self.ground_speed * dt
-            self.vy = 0.0
-            if self.phase_t >= self.ground_dur:
-                self._begin_move()
-        else:
-            move = self.move
-            was = self.pos[1]
-            self.pos = list(move.at(self.phase_t))
-            self.vy = (self.pos[1] - was) / max(1e-5, dt)
-            if move.kind in ("climb", "bubble", "web"):
-                self.stride += 0.4 * dt
-            if self.phase_t >= move.dur:
-                self._land()
+        was = (self.pos[0], self.pos[2])
+        # A frame is spent across as many phases as it reaches into. A landing
+        # or a take-off almost never falls on a frame boundary, and the old
+        # loop threw whatever was left of the frame away at every one of them.
+        left = dt
+        for _ in range(8):
+            if left <= 1e-9:
+                break
+            left -= (self._step_ground(left) if self.phase == "ground"
+                     else self._step_move(left))
+        self.speed = math.dist(was, (self.pos[0], self.pos[2])) / dt \
+            if dt > 0.0 else 0.0
         self.climbed = self.pos[1] - self.base_y
         want = self._indoor_want()
         # Eased over about a third of a second, because the transition happens
@@ -463,7 +549,7 @@ class SpiralScene(Scene):
         # frame's exposure reads as a rendering fault rather than as going
         # indoors.
         self.indoor += (want - self.indoor) * min(1.0, dt * 3.2)
-        self.land_dip = max(0.0, self.land_dip - dt * 4.6)
+        self._settle(dt)
         self.swing = max(0.0, self.swing - dt * 3.0)
         self.mine = max(0.0, self.mine - dt * 3.2)
         self.ring_flash = max(0.0, self.ring_flash - dt * 0.5)
@@ -652,14 +738,31 @@ class SpiralScene(Scene):
             if self.phase == "ground" else 0.0
         self._roll += (roll - self._roll) * min(1.0, dt * 9.0)
 
+    def _settle(self, dt: float) -> None:
+        """Advance everything the camera rides on that is not a position.
+
+        A damped spring for the landing, an ease for the bob and another for
+        the lens. All three replaced a value switched at a phase boundary, and
+        a whole-frame step in the eye or the field of view reads as a jolt
+        however correct the frames either side of it are.
+        """
+        acc = -DIP_W * DIP_W * self.dip - 2.0 * DIP_ZETA * DIP_W * self.dip_v
+        self.dip_v += acc * dt
+        self.dip += self.dip_v * dt
+        want_foot = 1.0 if self.phase == "ground" else 0.0
+        self.foot += (want_foot - self.foot) * min(1.0, dt * FOOT_EASE)
+        want_fov = FOV + FOV_GAIN * max(0.0, self.speed - tp.RUN_SPEED)
+        self.fov += (want_fov - self.fov) * min(1.0, dt * FOV_EASE)
+
     def _aim_camera(self) -> None:
-        dip = self.land_dip ** 1.4 * 0.17 - math.sin(self.land_dip * math.pi) * 0.02
         step = self.stride * STRIDE_RATE
-        ground = self.phase == "ground"
-        bob = abs(math.sin(step)) * 0.055 if ground else 0.0
-        sway = math.sin(step * 0.5) * 0.045 if ground else 0.0
+        # ``sin^2``: ``|sin|`` with the corner taken off. The head still rises
+        # twice a stride, without the eye's velocity reversing inside one frame
+        # at the bottom of every step.
+        bob = (0.5 - 0.5 * math.cos(2.0 * step)) * 0.055 * self.foot
+        sway = math.sin(step * 0.5) * 0.045 * self.foot
         cam = self.camera
-        eye_y = self.pos[1] + tp.EYE - dip + bob
+        eye_y = self.pos[1] + tp.EYE - self.dip + bob
         cam.position = (self.pos[0] + math.cos(self.yaw) * sway, eye_y,
                         self.pos[2] + math.sin(self.yaw) * sway)
         look = 5.5
@@ -670,7 +773,7 @@ class SpiralScene(Scene):
         fx, fz = math.sin(self.yaw), -math.cos(self.yaw)
         cam.up = (math.sin(self._roll) * -fz, math.cos(self._roll),
                   math.sin(self._roll) * fx)
-        cam.fovy = FOV + (2.0 if self.phase == "move" else 0.0)
+        cam.fovy = self.fov
 
     # -- drawing -----------------------------------------------------------
 

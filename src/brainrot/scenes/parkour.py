@@ -52,6 +52,7 @@ from ..engine.scene import Scene, SceneContext, register
 from ..engine import textures
 from ..engine.sky import SkyDome
 from ..engine.textures import cloud_blob
+from .parkourkit import GroundRun
 
 #: A gap is blocks *of air*, so the centre-to-centre step is one more.
 #:
@@ -66,8 +67,24 @@ from ..engine.textures import cloud_blob
 #: for; a table that still offered 1 would be describing a hop the generator
 #: cannot lay. One block of air is a step, not a jump, and a run of them back
 #: to back is the shuffling the rebuild was asked to get rid of.
-GAP_EASY = (2, 2, 2, 2, 3, 3, 3, 3, 4, 4)
-GAP_HARD = (2, 3, 3, 3, 3, 4, 4, 4, 5, 5)
+#: And the tables lean high, which is the *shape* of the jump and not merely
+#: its length. There is one jump impulse in this game and one horizontal
+#: speed, so how high an arc goes is decided entirely by how far it has to
+#: reach: a hop at the top of what the rise allows apexes at the familiar
+#: 1.25 blocks, and a two-block one apexes at a third of a metre. Measured
+#: over the old tables, the mean hop apexed at 0.53 m -- 43% of a vanilla
+#: jump, which is not a jump anybody recognises but a *skip*, and a run of
+#: skips is most of what "it looks bot-like" was. Nothing about the physics
+#: had to change to fix it; asking for the gaps a real course has was enough,
+#: and it is *faster* as well, because a longer hop at the same speed covers
+#: more ground for the same landing.
+#:
+#: A level gap of four is not on either table because it cannot be jumped --
+#: :func:`max_gap` puts the ceiling at three -- so the fours and fives here
+#: only ever come out at their full width when the rise that was drawn with
+#: them is a drop, and :func:`fit_gap` narrows them back when it is not.
+GAP_EASY = (2, 2, 3, 3, 3, 3, 4, 4, 4, 4)
+GAP_HARD = (3, 3, 3, 3, 4, 4, 4, 5, 5, 5)
 #: Rises pair with gaps because the physics ties them together: falling is the
 #: only thing that buys reach, so the hard table drops more often. It is also
 #: what keeps the long hops honest -- a five-block gap is only jumpable off a
@@ -120,6 +137,16 @@ AIR_SPEED = 7.10
 #: Vanilla walk. What holding the block down does: you cross it slower, you do
 #: not stand still.
 WALK_SPEED = 4.317
+#: Slowest a body will approach a jump. A short gap taken with the full jump
+#: impulse is a *precision jump* and is done at a walk in the real game -- but
+#: a strip that walks up to every two-metre gap is a strip that stops, so the
+#: floor is vanilla's sprint: the body is never slower than a player running
+#: flat out, it simply stops getting the sprint-jump's forward impulse on the
+#: gaps that do not need it. Hops shorter than ``RUN_SPEED * 0.6 m`` -- 0.6 s
+#: being a level jump's hang time -- get a lower arc rather than a slower
+#: approach, which is the one place this leaves vanilla and it is the right
+#: place: those are the hops a player takes without thinking.
+APPROACH_MIN = RUN_SPEED
 #: A hop is legal exactly when the take-off it needs is one a body has. Zero is
 #: stepping off an edge without jumping; :data:`JUMP_V` is the only jump there
 #: is. Everything the generator lays down is checked against this pair, which
@@ -299,9 +326,21 @@ class ParkourScene(Scene):
         self.run_from = list(self.stand)
         self.run_to = list(self.stand)
         self.vy0 = 0.0
+        #: Horizontal speed of the hop in progress. Not a constant any more --
+        #: see :func:`flight`.
+        self.air_speed = AIR_SPEED
         self.pos = list(self.stand)
         self.vy = 0.0
-        self.land_dip = 0.0
+        #: How far the eye is below where it rests, and how fast it is getting
+        #: there. A spring, kicked by the impact -- see :data:`DIP_W`.
+        self.dip = 0.0
+        self.dip_v = 0.0
+        #: How much of the walk bob is showing, 0..1. Eased, not switched.
+        self.foot = 1.0
+        #: Field of view, eased toward what the speed asks for.
+        self.fov = FOV
+        #: Cruise speed a held duck is asking for, 0 when nobody is holding one.
+        self.hold_speed = 0.0
         self.distance = 0.0
         #: Ground distance covered, which is what drives the walk cycle. Time
         #: would drive it too, but then the bob keeps swinging in mid-air.
@@ -757,8 +796,9 @@ class ParkourScene(Scene):
         dur, vy0 = flight(frm, to)
         if dur <= 0.0:
             return False
-        for i in range(1, ARC_SAMPLES):
-            f = i / ARC_SAMPLES
+        n = _samples(frm, to)
+        for i in range(1, n):
+            f = i / n
             t = dur * f
             x = frm[0] + (to[0] - frm[0]) * f
             z = frm[2] + (to[2] - frm[2]) * f
@@ -1302,6 +1342,9 @@ class ParkourScene(Scene):
         self.takeoff = list(self.pos)
         self.land_at = list(self._land_point(target))
         self.air_dur, self.vy0 = flight(self.takeoff, self.land_at)
+        self.air_speed = math.dist((self.takeoff[0], self.takeoff[2]),
+                                   (self.land_at[0], self.land_at[2])) \
+            / self.air_dur
         self._rehang(target)
         self.phase = "air"
         self.phase_t = 0.0
@@ -1333,9 +1376,13 @@ class ParkourScene(Scene):
         self.pos = list(self.stand)
         self.phase = "ground"
         self.phase_t = 0.0
+        # The eye carries the body's downward speed into the legs rather than
+        # being dropped a fixed distance. Capped, and only ever added to what
+        # the spring is already doing, so two landings close together do not
+        # cancel.
+        self.dip_v = max(self.dip_v, DIP_KEEP * min(DIP_CAP, abs(self.vy)))
         self.vy = 0.0
         self._speed = RUN_SPEED
-        self.land_dip = 1.0
         self.swing = 1.0
         landed_on = self.blocks[self.jump_index]
         # a scuff of block-coloured dust at the feet, kicked up by the landing
@@ -1454,14 +1501,33 @@ class ParkourScene(Scene):
         is not a number anybody chose -- it is that distance at running pace.
         A wide platform is still a breather, because crossing three blocks
         takes half a second; it is just a breather you spend moving.
+
+        And it is crossed at a *profile* rather than at a constant, which is
+        the second half of the same idea and was missing until the owner named
+        what was left: the body arrived at the arc's speed, dropped to sprint
+        pace for a tenth of a second, and jumped back up to the arc's speed
+        again. Two steps of a metre and a half a second, four times a second,
+        which reads from inside the head as sticking to each block on the way
+        past. :class:`GroundRun` brakes and accelerates instead, so the speed
+        is the same number either side of every landing and every take-off.
         """
         self.run_from = list(self.stand)
         self.run_to = list(self._takeoff_point(blk))
         self.run_len = math.dist((self.run_from[0], self.run_from[2]),
                                  (self.run_to[0], self.run_to[2]))
         self.run_s = 0.0
-        self.ground_speed = RUN_SPEED
-        self.ground_dur = max(GROUND_MIN, self.run_len / RUN_SPEED)
+        self.ground_speed = self.hold_speed or RUN_SPEED
+        # Both ends are known: the hop just flown ran at one speed the whole
+        # way, and the next one is solved here against the take-off point the
+        # autopilot is heading for. An early take-off moves that point a
+        # little and the profile is a metre or two a second out for the last
+        # frame of the crossing, which is a hundredth of what it was worth
+        # getting right.
+        nxt = self.blocks[min(self.jump_index + 1, len(self.blocks) - 1)]
+        self.run = GroundRun(self.run_len, self.air_speed,
+                             flight_speed(self.run_to, self._land_point(nxt)),
+                             self.ground_speed)
+        self.ground_dur = max(GROUND_MIN, self.run.dur)
 
     # -- being driven -----------------------------------------------------
 
@@ -1493,15 +1559,36 @@ class ParkourScene(Scene):
             # against the real take-off point in :meth:`_begin_air`, so an early
             # jump is a shorter run-up and a different hop -- not the same hop
             # started sooner.
+            #
+            # Expressed as "the block ends here" and not as "the clock ran
+            # out", because the crossing is a distance covered at a speed and
+            # the clock is a consequence of it rather than the other way
+            # round.
+            self.run_len = self.run_s
             self.ground_dur = min(self.ground_dur, self.phase_t)
         elif intent.duck:
             # Vanilla's own answer to "hold this block": walk it instead of
             # sprinting it. Crossing takes longer because you are slower, which
             # is a thing a body does; stretching the clock while the position
             # was read off that clock was not.
-            self.ground_speed = WALK_SPEED
-            self.ground_dur = min(self.run_len / WALK_SPEED, HOLD_MAX) \
-                if self.run_len else HOLD_MAX
+            self._hold(WALK_SPEED)
+        elif self.hold_speed:
+            self._hold(0.0)
+
+    def _hold(self, cruise: float) -> None:
+        """Re-cruise the crossing in progress, without moving the body.
+
+        The profile is a function of where along the block the feet are, so
+        rebuilding it mid-crossing changes the speed from here on and nothing
+        else -- which is what pressing and releasing a key ought to do.
+        """
+        if cruise == self.hold_speed:
+            return
+        self.hold_speed = cruise
+        self.ground_speed = cruise or RUN_SPEED
+        self.run = GroundRun(self.run_len, AIR_SPEED, AIR_SPEED,
+                             self.ground_speed)
+        self.ground_dur = max(GROUND_MIN, self.run.dur)
 
     @property
     def driven(self) -> bool:
@@ -1560,44 +1647,80 @@ class ParkourScene(Scene):
                 self.burst.spawn(orb["x"], orb["y"], orb["z"], ORB_COLOR,
                                  count=9, speed=2.2, rng=self.hop_rng)
 
+    def _step_ground(self, dt: float) -> float:
+        """Run some of the way across the block. Returns the time it took.
+
+        Advanced by *distance covered at a speed*, never by a fraction of the
+        phase's duration. That distinction is the whole of it: the duration is
+        something a player can change mid-phase (jump ends it early, holding
+        the block stretches it), and a position interpolated against a
+        duration that moves underneath it moves with it. Jump used to snap the
+        feet to the far edge in a single frame -- three and a half metres, two
+        hundred metres a second -- and holding the block dragged the body
+        *backwards* across it, because the denominator grew faster than the
+        numerator.
+        """
+        remain = self.run_len - self.run_s
+        if remain <= 1e-6:
+            self._begin_air()
+            return 0.0
+        v = self.run.speed_at(self.run_s)
+        step = v * dt
+        used = dt
+        if step >= remain:
+            # The block runs out part way through the frame. Take only the
+            # time that actually crossed it and hand the rest back, or the
+            # body spends the remainder of the frame standing on the far edge
+            # -- a fraction of a frame at nearly zero speed, twice per landing,
+            # four landings a second. That stall is small enough to be
+            # invisible frame by frame and is exactly what a run of them reads
+            # as.
+            used = min(dt, remain / v)
+            step = remain
+        self.run_s += step
+        f = self.run_s / self.run_len
+        self.pos[0] = self.run_from[0] + (self.run_to[0] - self.run_from[0]) * f
+        self.pos[1] = self.run_from[1]
+        self.pos[2] = self.run_from[2] + (self.run_to[2] - self.run_from[2]) * f
+        self.vy = 0.0
+        self.phase_t += used
+        self.stride += step
+        if self.run_s >= self.run_len - 1e-9:
+            self._begin_air()
+        return used
+
+    def _step_air(self, dt: float) -> float:
+        """Fly some of the arc. Returns the time it took."""
+        remain = self.air_dur - self.phase_t
+        if remain <= 1e-9:
+            self._land()
+            return 0.0
+        used = min(dt, remain)
+        t = self.phase_t + used
+        f = t / self.air_dur
+        self.pos[0] = self.takeoff[0] + (self.land_at[0] - self.takeoff[0]) * f
+        self.pos[2] = self.takeoff[2] + (self.land_at[2] - self.takeoff[2]) * f
+        self.pos[1] = self.takeoff[1] + self.vy0 * t - 0.5 * GRAVITY * t * t
+        self.vy = self.vy0 - GRAVITY * t
+        self.phase_t = t
+        if self.phase_t >= self.air_dur - 1e-9:
+            self._land()
+        return used
+
     def update(self, dt: float) -> None:
-        self.phase_t += dt
         was = (self.pos[0], self.pos[2])
-        if self.phase == "ground":
-            # Running across the block, not standing on it -- and advanced by
-            # *distance covered at a speed*, never by a fraction of the phase's
-            # duration. That distinction is the whole of it: the duration is
-            # something a player can change mid-phase (jump ends it early,
-            # holding the block stretches it), and a position interpolated
-            # against a duration that moves underneath it moves with it. Jump
-            # used to snap the feet to the far edge in a single frame -- three
-            # and a half metres, two hundred metres a second -- and holding the
-            # block dragged the body *backwards* across it, because the
-            # denominator grew faster than the numerator.
-            self.run_s = min(self.run_len, self.run_s + self.ground_speed * dt)
-            f = self.run_s / self.run_len if self.run_len else 1.0
-            self.pos[0] = self.run_from[0] + (self.run_to[0] - self.run_from[0]) * f
-            self.pos[1] = self.run_from[1]
-            self.pos[2] = self.run_from[2] + (self.run_to[2] - self.run_from[2]) * f
-            self.vy = 0.0
-            if self.phase_t >= self.ground_dur:
-                self._begin_air()
-        else:
-            t = min(self.phase_t, self.air_dur)
-            f = t / self.air_dur
-            self.pos[0] = self.takeoff[0] + (self.land_at[0] - self.takeoff[0]) * f
-            self.pos[2] = self.takeoff[2] + (self.land_at[2] - self.takeoff[2]) * f
-            self.pos[1] = self.takeoff[1] + self.vy0 * t - 0.5 * GRAVITY * t * t
-            self.vy = self.vy0 - GRAVITY * t
-            if self.phase_t >= self.air_dur:
-                self._land()
+        # A frame is spent across as many phases as it reaches into. A landing
+        # or a take-off almost never falls on a frame boundary, and the old
+        # loop threw the remainder of the frame away at every one of them.
+        left = dt
+        for _ in range(8):
+            if left <= 1e-9:
+                break
+            left -= (self._step_ground(left) if self.phase == "ground"
+                     else self._step_air(left))
 
         moved = math.dist(was, (self.pos[0], self.pos[2]))
         self._speed = moved / dt if dt > 0.0 else 0.0
-        # Ground distance is what drives the walk cycle. Time would drive it
-        # too, right up until the bob carried on swinging in mid-air.
-        if self.phase == "ground":
-            self.stride += moved
 
         # Recycling a cloud shelf that has drifted behind the camera belongs
         # here and not in the draw, however naturally it falls out of the loop
@@ -1613,7 +1736,9 @@ class ParkourScene(Scene):
         self.driven_t = max(0.0, self.driven_t - dt)
         if not self.driven:
             self.steer = 0.0
-        self.land_dip = max(0.0, self.land_dip - dt * 5.0)
+            if self.hold_speed and self.phase == "ground":
+                self._hold(0.0)
+        self._settle(dt)
         self.swing = max(0.0, self.swing - dt * 2.6)
         self.mine = max(0.0, self.mine - dt * 2.2)
         self.place = max(0.0, self.place - dt * 1.6)
@@ -1669,6 +1794,24 @@ class ParkourScene(Scene):
         self.weather.draw(self.elapsed)
         self._draw_crosshair()
         self._draw_hud()
+
+    def _settle(self, dt: float) -> None:
+        """Advance everything the camera rides on that is not a position.
+
+        Three springs and an ease, and all four exist for the same reason:
+        each of them used to be a value switched between two constants at a
+        phase boundary, and a whole-frame step in the eye, the lens or the bob
+        is read as a jolt however correct the frames either side of it are.
+        """
+        # A damped spring, integrated semi-implicitly so a stiff one cannot
+        # wind itself up at a long frame.
+        acc = -DIP_W * DIP_W * self.dip - 2.0 * DIP_ZETA * DIP_W * self.dip_v
+        self.dip_v += acc * dt
+        self.dip += self.dip_v * dt
+        want_foot = 1.0 if self.phase == "ground" else 0.0
+        self.foot += (want_foot - self.foot) * min(1.0, dt * FOOT_EASE)
+        want_fov = FOV + FOV_GAIN * max(0.0, self._speed - RUN_SPEED)
+        self.fov += (want_fov - self.fov) * min(1.0, dt * FOV_EASE)
 
     def _look(self, dt: float) -> None:
         """Turn the head toward where the run is going.
@@ -1730,17 +1873,22 @@ class ParkourScene(Scene):
         self._roll += (want_roll - self._roll) * min(1.0, dt * 9.0)
 
     def _aim_camera(self, x: float, y: float, z: float) -> None:
-        # landing dip with a small overshoot, and the walk bob on top of it
-        dip = self.land_dip ** 1.4 * 0.17 - math.sin(self.land_dip * math.pi) * 0.02
         # Vanilla's bob is a figure of eight: the head rises twice per stride
         # and swings side to side once. Driven by distance covered, so it
-        # stops dead when the feet leave the ground instead of swimming on.
+        # stops dead when the feet leave the ground instead of swimming on --
+        # and faded rather than switched, so leaving the ground does not put a
+        # five-centimetre step in the eye.
         step = self.stride * STRIDE_RATE
-        bob_y = abs(math.sin(step)) * 0.055 if self.phase == "ground" else 0.0
-        sway = math.sin(step * 0.5) * 0.045 if self.phase == "ground" else 0.0
+        # ``sin^2``, which is ``|sin|`` with the corner taken off it. The head
+        # rises twice a stride either way, but ``|sin|`` reverses the eye's
+        # velocity in a single frame at the bottom of every step -- six times
+        # a second at sprint pace, and the largest jolt left in the camera
+        # once the landing and the lens had been smoothed.
+        bob_y = (0.5 - 0.5 * math.cos(2.0 * step)) * 0.055 * self.foot
+        sway = math.sin(step * 0.5) * 0.045 * self.foot
 
         cam = self.camera
-        eye_y = y + EYE - dip + bob_y
+        eye_y = y + EYE - self.dip + bob_y
         # the sway is across the direction of travel, which is what a head
         # rolling over alternate feet actually does
         cam.position = (x + math.cos(self.yaw) * sway, eye_y,
@@ -1753,7 +1901,7 @@ class ParkourScene(Scene):
         # roll: tilt the up vector about the view direction
         fx, fz = math.sin(self.yaw), -math.cos(self.yaw)
         cam.up = (math.sin(self._roll) * -fz, math.cos(self._roll), math.sin(self._roll) * fx)
-        cam.fovy = FOV + (2.0 if self.phase == "air" else 0.0)
+        cam.fovy = self.fov
 
     def _horizon_y(self) -> int:
         """Screen row the sea's horizon falls on, this frame.
@@ -2186,8 +2334,6 @@ STEER = 0.5
 #: Blocks ahead of the player a steer may not touch. They are committed: the
 #: one being landed on, and the one after it.
 STEER_KEEP = 2
-#: Longest a player may hold a block before the beat resumes.
-HOLD_MAX = 1.6
 #: How long a key press keeps the scene in the player's hands.
 DRIVEN_HOLD = 0.6
 #: Shortest a ground phase may be. Below a few frames the run-up stops being
@@ -2224,6 +2370,41 @@ HAND = 0.76
 #: course that turns at all walks out of the picture. Widened until a bend
 #: stays on screen; past about here the block under the lens starts to smear.
 FOV = 76.0
+#: Degrees of extra field of view per metre a second over sprint pace, and how
+#: fast the lens gets there.
+#:
+#: This used to be two degrees while the phase was ``air`` and none otherwise,
+#: which is a *step* at every take-off and every landing -- eight a second, and
+#: a whole-frame zoom is about the most visible thing a camera can do. Hung off
+#: the speed instead it says the same thing (you are moving fastest in flight)
+#: and says it continuously, because the speed itself is continuous now.
+FOV_GAIN = 1.4
+FOV_EASE = 6.0
+#: The landing dip, as a spring the impact kicks rather than a number set to
+#: one and decayed. The old form dropped the eye 0.17 m in a single frame --
+#: ten metres a second of camera, on every landing -- and that snap is what
+#: reads as the body clicking into the block. Given the body's own downward
+#: speed at the moment its feet stop, the eye keeps going and is brought back
+#: by the legs: the camera's velocity is then *continuous* through a landing,
+#: which is what the knees are for.
+#: The stiffness is set by the frame clock and not by taste: a spring whose
+#: damping term is comparable to 1/dt kills the eye's velocity inside a single
+#: frame, which is the hard stop it was meant to replace wearing a spring's
+#: clothes. At 13 rad/s the follow-through lasts three or four frames, which is
+#: the shortest a person reads as a knee rather than as a cut.
+DIP_W = 13.0
+DIP_ZETA = 1.0
+#: How much of the impact the legs pass on to the head. All of it would be
+#: exactly continuous and dip the lens 13 cm on an ordinary hop, twice a
+#: second; none of it is vanilla, which stops the camera dead. Three fifths
+#: halves the jolt against vanilla's and keeps the dip under 8 cm.
+DIP_KEEP = 0.6
+#: Fastest impact the legs will pass on. A twelve-block drop should not put the
+#: lens through the floor.
+DIP_CAP = 9.0
+#: How fast the walk bob fades in and out. It used to switch, which put a
+#: five-centimetre step in the eye at every take-off.
+FOOT_EASE = 9.0
 
 
 def _ramped(rng, easy, hard, difficulty: float):
@@ -2280,13 +2461,28 @@ def _standing_cells(blk: dict, y: int, cells=None) -> frozenset:
                      for ox in range(-sp, sp + 1) for oz in range(-sp, sp + 1))
 
 
+def _samples(frm, to) -> int:
+    """How many points a path of this length is tested at.
+
+    By *distance*, not a fixed count, and the difference is a body's width. A
+    fixed nine put consecutive tests 0.6 m apart on a five-metre hop -- exactly
+    the width of the thing being tested, so a shoulder could pass either side
+    of a sample and through a lintel in between. It got worse the moment the
+    arcs grew: measured, the body came 0.155 m inside a piece of scenery it
+    had been checked against, against 0.039 before.
+    """
+    span = math.dist(frm, to)
+    return max(ARC_SAMPLES, min(48, int(span / 0.2) + 1))
+
+
 def _arc_points(frm, to) -> list[tuple[float, float, float]]:
     """Where the feet are, sampled along a hop. Used to keep scenery out of
     the way of a body that is already committed to flying through it."""
     dur, vy0 = flight(frm, to)
+    n = _samples(frm, to)
     out = []
-    for i in range(ARC_SAMPLES + 1):
-        f = i / ARC_SAMPLES
+    for i in range(n + 1):
+        f = i / n
         t = dur * f
         out.append((frm[0] + (to[0] - frm[0]) * f,
                     frm[1] + vy0 * t - 0.5 * GRAVITY * t * t,
@@ -2296,10 +2492,11 @@ def _arc_points(frm, to) -> list[tuple[float, float, float]]:
 
 def _line_points(frm, to) -> list[tuple[float, float, float]]:
     """A straight run, sampled the same way an arc is."""
-    return [(frm[0] + (to[0] - frm[0]) * i / ARC_SAMPLES,
-             frm[1] + (to[1] - frm[1]) * i / ARC_SAMPLES,
-             frm[2] + (to[2] - frm[2]) * i / ARC_SAMPLES)
-            for i in range(ARC_SAMPLES + 1)]
+    n = _samples(frm, to)
+    return [(frm[0] + (to[0] - frm[0]) * i / n,
+             frm[1] + (to[1] - frm[1]) * i / n,
+             frm[2] + (to[2] - frm[2]) * i / n)
+            for i in range(n + 1)]
 
 
 def _span_piece(kind: str, blk: dict, arc, local, style: str) -> list[dict]:
@@ -2497,10 +2694,44 @@ def flight(frm, to) -> tuple[float, float]:
     Whether the take-off it asks for is one a body actually has is a separate
     question, and :meth:`ParkourScene._fits` is where it gets asked -- no hop
     outside ``VY_MIN..VY_MAX`` is ever laid down.
+
+    **What changed, and why the paragraph above is now only half true.** There
+    is one jump impulse in this game, and a player uses all of it every single
+    time -- what they choose is how fast they are *running* when they use it.
+    Holding the horizontal speed at a constant instead put the whole of that
+    choice into the arc, so a two-metre hop came out as a 0.28 m skip against
+    vanilla's 1.25, and a run of skips is most of what reads as bot-like
+    however smooth it is. So the speed is picked first now: the fastest
+    approach that still lands the full impulse on the far end, floored at a
+    jog, because a body that walks up to every gap is a body that stops. Short
+    hops slow down and arc properly, long ones are unchanged at a sprint, and
+    the ground run either side absorbs the difference -- which is the part
+    that could not be done before :class:`GroundRun` existed, and the reason
+    this was tried once, measured as floating, and reverted.
     """
     dist = math.dist((frm[0], frm[2]), (to[0], to[2]))
-    dur = max(1e-4, dist / AIR_SPEED)
-    return dur, (to[1] - frm[1]) / dur + 0.5 * GRAVITY * dur
+    rise = to[1] - frm[1]
+    disc = VY_MAX * VY_MAX - 2.0 * GRAVITY * rise
+    speed = AIR_SPEED
+    if disc > 0.0:
+        full = (VY_MAX + math.sqrt(disc)) / GRAVITY
+        want = dist / full
+        if APPROACH_MIN <= want <= AIR_SPEED:
+            # Returned as the impulse itself rather than as a duration the
+            # impulse is recovered from: ``_fits`` refuses anything over
+            # ``VY_MAX``, and a round trip through a division puts the answer
+            # on the wrong side of that by a part in 10^16 often enough to
+            # matter.
+            return full, VY_MAX
+        speed = min(AIR_SPEED, max(APPROACH_MIN, want))
+    dur = max(1e-4, dist / speed)
+    return dur, rise / dur + 0.5 * GRAVITY * dur
+
+
+def flight_speed(frm, to) -> float:
+    """How fast the body is travelling over the ground during that hop."""
+    dist = math.dist((frm[0], frm[2]), (to[0], to[2]))
+    return dist / flight(frm, to)[0]
 
 
 def hop_span(rise: int) -> tuple[float, float]:
