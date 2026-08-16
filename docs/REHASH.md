@@ -12,8 +12,8 @@ constitution a level satisfies. This document changed that constitution.
 
 | | before | after |
 |---|---|---|
-| missed jumps that walk back into the course | **87.9%** | **0.1%** (6 of 8,484) |
-| levels with one | all of them | **3 of 85 visits** |
+| missed jumps that walk back into the course | **87.9%** | **1 of 8,484** |
+| levels with one | all of them | **1 of 85 visits** |
 | landings resting on the terrace | 15.9 a level (80%) | **2.4 a level (12%)** |
 | a level walked end to end, no jumps | 2 of 24 | **0 of 55**, 34% mean |
 | landmarks framed at 25° / 40° | 55% / 30% | **68% / 63%** |
@@ -90,10 +90,10 @@ runs × 240–260 landings):
 
 | | before | after |
 |---|---|---|
-| missed jumps that are a **shortcut** | **87.9%** | **0.1%** (6 of 8,484) |
+| missed jumps that are a **shortcut** | **87.9%** | **1 of 8,484** |
 | — back to the apron | 5.1% | 33.3% |
 | — dead | 7.0% | **66.6%** |
-| levels with at least one shortcut | **71 of 71** | **3 of 85 visits** |
+| levels with at least one shortcut | **71 of 71** | **1 of 85 visits** |
 | landings standing on the terrace | 80.2%, 15.9 a level | **12%, 2.4 a level** |
 | air under a landing | median **0** blocks | median **3** |
 
@@ -208,7 +208,15 @@ stand, and the terrace is untouched.
    stops short of the passage, so a fall through the doorway carries on down
    instead of landing in it. Worth 4.5 points of re-entry and 1.6 points of
    unchecked placement on its own, and it took landmarks framed at 40° from
-   30% of levels to 63%.
+   30% of levels to 63%. **A structure may not leave a ledge beside a
+   landing** either: two cells of wall come out where the two landings outside
+   a raised gate touch it, and the *small* landmark — reserved when the
+   section came over the horizon, long before the course knew where its
+   landings would be — skips any cell the ``noclimb`` ring has since claimed.
+   Between them those were five of the last six missed jumps in the tower that
+   walked back onto the course, every one of them a body landing on a hoodoo's
+   shoulder or a totem's post beside the landing it had just left. It costs
+   nothing that shows: landmarks framed at 25° went 68% → 80%.
 6. **`noclimb`: nothing may be built in the ring beside a landing, between the
    terrace and the landing's own height.** Terrain dressing was three quarters
    of what was left once the designs were raised — the landings were out of
@@ -314,7 +322,7 @@ AST pass plus an instant design checker has beaten hand-editing.
 
 | | |
 |---|---|
-| `reentry_probe` | shortcut **6 missed jumps in 8,484**, three level visits of 85, apron 2.2 a level |
+| `reentry_probe` | shortcut **one missed jump in 8,484**, one level visit of 85, apron 2.2 a level |
 | `tower_probe` | design 100% legal on paper, **94.9%** placed as authored, designed content **56%** of the course |
 | `spiral_probe --plan tower` | twice-claimed 0, off-lattice 0, unchecked **0.41%**, cone-alone walkability **0 m** |
 | `bypass_probe` | **34%** mean, **0 of 55** levels walkable end to end |
@@ -338,9 +346,14 @@ AST pass plus an instant design checker has beaten hand-editing.
   the recovery chain: a level cruising two blocks up with a rise of eight
   spends seven landings on a staircase, and a staircase against the wall at
   the end of a level is where the stuck landings were.
-- **Six missed jumps in 8,484 still walk back onto the course**, over three
-  level visits in eighty-five: THE GATE four, THE BALCONIES one, WART FIELDS
-  one. `reentry_probe --levels --only NAME` names it,
+- **One missed jump in 8,484 still walks back onto the course**, and it is a
+  fall onto the *lower step of the same staircase* -- the body misses the jump
+  from tread 21 to tread 22 of a generated exit stair and comes down on tread
+  20, which is under the arc because the stair weaves. That is what a
+  staircase is, in this engine and in the reference map, and engineering it
+  away means widening the weave on the one machinery path that is already
+  delicate. The honest fix is the open item above it: a level that tops out on
+  its own does not get a generated staircase at all. `reentry_probe --levels --only NAME` names it,
   and the way to see it is the throwaway path-printer the rest of this pass
   used -- a forward walk from the fall cells with parent pointers, printing
   what each step stands on. Every one of the seven causes found in this pass

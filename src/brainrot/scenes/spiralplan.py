@@ -4441,6 +4441,23 @@ class Course:
                 cross = self._gate_crossing(at, y, gate[1], lift)
                 if cross is None:
                     continue            # a gate with no way in is a wall
+                if lift:
+                    # **A doorway is jumped into, not stepped into.** The two
+                    # landings outside a raised gate sit against the
+                    # structure's own face, and a wall cell level with one of
+                    # them is a ledge a fall can stand on and step across --
+                    # measured as five of the last six missed jumps in the
+                    # tower that walked back onto the course, all of them a
+                    # body landing on a hoodoo's shoulder or a totem's post
+                    # beside the landing it had just left. Two cells of wall
+                    # come out; the void has been cutting cells out of these
+                    # blueprints all along.
+                    beside = {(c[0] + dx, c[1] + dy, c[2] + dz)
+                              for c in cross
+                              for dx in (-1, 0, 1) for dz in (-1, 0, 1)
+                              for dy in (-1, 0)
+                              if (dx, dz) != (0, 0)}
+                    placed = [(c, s) for c, s in placed if c not in beside]
             held = {c for c, _ in placed}
             if cross is not None:
                 # The passage is held too, and held *against everyone*: it is
@@ -4527,7 +4544,17 @@ class Course:
             self._hold_cells -= set(cross[1])
         seen: set[tuple[int, int, int]] = set()
         for cell, style in placed:
-            if cell in seen:
+            if cell in seen or cell in self.noclimb:
+                # **Not a ledge beside a landing.** The structure was reserved
+                # when the section came over the horizon, long before the
+                # course knew where its own landings would be, so a cell of it
+                # can end up level with one and a block to the side -- which is
+                # somewhere a fall stands and steps back on. Measured, the
+                # small landmark painted beside the course was five of the last
+                # six missed jumps in the tower that walked back onto it. The
+                # structure loses a cell or two; the doorway-cutting ``void``
+                # has been doing exactly that to these blueprints all along,
+                # and ``noclimb`` is empty on the generated tower.
                 continue
             seen.add(cell)
             self.write(cell, style)

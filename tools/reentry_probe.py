@@ -504,12 +504,12 @@ def main() -> int:
         if args.only:
             rows = [r for r in rows if args.only.upper() in r["theme"].upper()]
         print(f"  {'lvl':>4} {'place':16} {'land':>4} {'short':>6} "
-              f"{'floor':>6} {'drops':>6} {'climb':>6}")
+              f"{'floor':>6} {'apron':>6} {'drops':>6} {'climb':>6}")
         for r in rows[:args.top]:
             print(f"  {r['level']:>4} {r['theme'][:16]:16} "
                   f"{r['landings']:>4} {r['shortcut']:>6} "
-                  f"{r['floor_contact']:>6} {r['drops']:>6} "
-                  f"{r['climb']:>+6.1f}")
+                  f"{r['floor_contact']:>6} {r['apron_all']:>6} "
+                  f"{r['drops']:>6} {r['climb']:>+6.1f}")
     return 0
 
 
