@@ -39,3 +39,34 @@ def ensure_window(width: int = W, height: int = H):
         rl.SetWindowSize(width, height)
         _window.width, _window.height = width, height
     return _window
+
+
+_software = None
+
+
+def software_rasteriser() -> bool:
+    """Whether the raylib underneath is the software build.
+
+    Asked of the binary that is actually loaded rather than of the installed
+    distributions: ``raylib-software`` is installed *over* ``raylib`` with
+    ``--force-reinstall --no-deps``, so both names are present afterwards and
+    only the shared object says which one won.
+
+    It matters because the two are not equivalent about *depth*. RLSW does not
+    honour the depth mask, so the guards that stop a translucent draw stamping
+    depth cannot be measured on it -- and CI runs on nothing else.
+    """
+    global _software
+    if _software is None:
+        import pathlib
+        import raylib
+
+        _software = False
+        folder = pathlib.Path(raylib.__file__).parent
+        for shared in folder.glob("_raylib_cffi*"):
+            try:
+                _software = b"RLSW" in shared.read_bytes()
+            except OSError:
+                _software = False
+            break
+    return _software

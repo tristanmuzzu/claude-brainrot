@@ -280,33 +280,41 @@ def test_the_tower_draws_all_the_way_through_several_levels() -> None:
     this is the belt to that pair of braces.
     """
     from brainrot.engine import scene as scene_api
-    from brainrot.engine.window import HeadlessWindow
     from brainrot.config import Config
     from brainrot.palette import generate as generate_palette
     from brainrot.rng import Seed
+    from conftest import ensure_window
 
+    # The *shared* window, at whatever size it already is. Two rules, and this
+    # test used to break both. There is one raylib window per process, and
+    # this was the only drawing test that opened a second one -- and then
+    # closed it, out from under every test that ran after. And the shared one
+    # must not be *resized*: the software rasteriser allocates its framebuffer
+    # at `InitWindow` and `SetWindowSize` does not reallocate it, so drawing
+    # at the new size walks off the end of the old buffer. Neither shows on a
+    # GPU build, which is why this suite was green on the development machine
+    # and died on CI -- a segfault or an abort about a thousand frames later,
+    # inside whichever raylib call touched the heap next. It was reported
+    # against `GetWorldToScreen` in the spiral's haze band, which has nothing
+    # to do with it.
+    window = ensure_window()
     cfg = Config()
-    cfg.width, cfg.height = 180, 320
-    window = HeadlessWindow()
-    window.create(cfg)
-    try:
-        for run in (4, 17):
-            seed = Seed.for_run(run)
-            ctx = scene_api.SceneContext(cfg.width, cfg.height,
-                                         generate_palette(seed), seed)
-            scene = scene_api.build("tower", ctx)
-            for frame in range(900):
-                scene.update(1 / 60)
-                scene.elapsed += 1 / 60
-                if frame % 45 == 0:
-                    # Drawn *along the way* and not once at the end. The
-                    # failure this guards against is a block the renderer
-                    # cannot draw, and it only fires on the frame that block
-                    # comes into view -- a single draw at the end would sample
-                    # one such frame out of nine hundred.
-                    window.present(scene.draw)
-    finally:
-        window.destroy()
+    cfg.width, cfg.height = window.width, window.height
+    for run in (4, 17):
+        seed = Seed.for_run(run)
+        ctx = scene_api.SceneContext(cfg.width, cfg.height,
+                                     generate_palette(seed), seed)
+        scene = scene_api.build("tower", ctx)
+        for frame in range(900):
+            scene.update(1 / 60)
+            scene.elapsed += 1 / 60
+            if frame % 45 == 0:
+                # Drawn *along the way* and not once at the end. The failure
+                # this guards against is a block the renderer cannot draw, and
+                # it only fires on the frame that block comes into view -- a
+                # single draw at the end would sample one such frame out of
+                # nine hundred.
+                window.present(scene.draw)
 
 
 def test_every_level_is_reached_and_left() -> None:

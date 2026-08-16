@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from conftest import ensure_window
+from conftest import ensure_window, software_rasteriser
 
 from brainrot import assets
 from brainrot.engine import rl, textures, voxel
@@ -125,6 +125,11 @@ def test_block_model_builds_with_texture() -> None:
     assert voxel.block_model("test-red", (200, 40, 40), seed=3) is model
 
 
+@pytest.mark.skipif(
+    software_rasteriser(),
+    reason="RLSW honours neither the depth mask nor alpha blending, so the "
+           "thing under test cannot be observed on it; the guard it covers "
+           "is a GPU-side one and is exercised on a GPU build")
 def test_a_batched_plane_is_drawn_before_the_models_above_it() -> None:
     """raylib has two draw paths and they do not run in call order.
 
@@ -160,6 +165,11 @@ def test_a_batched_plane_is_drawn_before_the_models_above_it() -> None:
     assert tuple(raw[i:i + 3]) == ground, "the ground lost the depth test"
 
 
+@pytest.mark.skipif(
+    software_rasteriser(),
+    reason="RLSW honours neither the depth mask nor alpha blending, so the "
+           "thing under test cannot be observed on it; the guard it covers "
+           "is a GPU-side one and is exercised on a GPU build")
 def test_an_emissive_draw_does_not_hide_what_is_behind_it() -> None:
     """A blend mode says how a fragment is combined, not whether it is recorded.
 

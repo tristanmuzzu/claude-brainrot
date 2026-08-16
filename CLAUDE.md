@@ -1297,6 +1297,28 @@ long jumps you need a different motion model, not a bigger number.
 
 ## Landmines that cost hours — do not relearn these
 
+- **The software rasteriser is not the GPU build, and where it differs is
+  exactly where this project has guards.** RLSW (raylib 6.0's software
+  renderer, which is what `raylib-software` installs and what CI runs on)
+  honours **neither the depth mask nor alpha blending** — so the two tests that
+  hold `no_depth_write` and the rlgl batch-order fix cannot be observed on it
+  and are skipped there (`conftest.software_rasteriser`, which reads the marker
+  out of the loaded `.so` rather than trusting the installed distribution list:
+  `raylib-software` is force-installed *over* `raylib`, so both names are
+  present afterwards and only the binary says which won). "colours/output match
+  the GPU build" was true of frames and is not true of depth.
+- **Do not resize the shared test window, and never open a second one.** RLSW
+  allocates its framebuffer at `InitWindow` and `SetWindowSize` does not
+  reallocate it, so a draw at the new size runs off the end of the old buffer.
+  `test_tower` did both — its own 180x320 window, then `destroy()` on it — and
+  the whole suite was green here and *dead on CI on both platforms*: a
+  segfault or a glibc abort about a thousand frames later, reported against
+  `GetWorldToScreen` in the spiral's haze band, which has nothing to do with
+  it. Every drawing test goes through `conftest.ensure_window()` at the size it
+  already is. This is the general shape: **a heap-corrupting bug is reported
+  wherever the heap is next touched**, so the named frame is evidence about
+  timing and not about cause.
+
 - **Two descriptions of one surface will disagree, and the disagreement is
   invisible in both directions.** `emit_layer` drew the core's flutes a cell
   proud of `core_r` and `rock` had never heard of them, so twenty-eight of the
