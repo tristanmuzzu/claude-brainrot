@@ -23,7 +23,7 @@ resurrections.)
 
 **Now verified on real Windows hardware with a GPU**, which turned up several
 things the software-rasteriser cloud sessions could not have seen — see
-"Landmines" below. 641 passed, 34 skipped, including a Win32 suite that
+"Landmines" below. 647 passed, 34 skipped, including a Win32 suite that
 exercises the real window API.
 
 The runner has a real collision model. Obstacles carry hitboxes derived from
@@ -897,15 +897,22 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
-0000. **The sideways hop between two roofs happens 0.75 times a minute**, and
-   it should be several. The machinery is right -- ``ground_to``, the height
-   gate on ``surface_at``, the pin that covers the mount's flight -- and what
-   limits it is opportunity: a flanking train is three or four cars against a
-   crossing window of half a second, so ``_roof_across`` finds the far roof
-   gone by the time it asks. Longer flanks, or a flank laid *against* the
-   chain rather than at random offsets, is the next thing to try. Do not hand
-   the decision to the lane search instead: measured, that wanders onto the
-   flank and off it and costs eight seconds of roof a minute.
+0000. ~~The sideways hop between two roofs happens 0.75 times a minute~~
+   **Done, and the guess in this entry was half right.** Laying the flank
+   *against* the chain was indeed the fix -- 3.62 crossings a minute now, and
+   `runner_probe` counts them rather than anybody estimating from the code.
+   What the entry did not say is that mirroring alone makes it *worse*:
+   `_roof_across` crosses only for coins the far lane has and this one has
+   not, so two identical trails are worth the same and the body correctly
+   holds its lane. The coin road has to change lanes at every gap. See "The
+   speed has no top".
+0000b. **Dead air is 4.0%, against 0.7-2.2% before this pass.** Two causes and
+   both are the run ending: the two or three seconds of `blind` running before
+   a wreck, in which nothing is planned and so nothing is counted as an
+   action, and the restart's own first seconds. Neither is idle *track* --
+   the frames are full of train -- so the honest fix is probably to teach the
+   probe that a blind stretch is not dead air rather than to change the scene.
+   Check that before tuning anything.
 000. **The runner reports no surviving plan nine times as often as it used
    to** -- 1,789 over 60 runs x 180 s against 192 before convoys, or 1.7% of
    re-solves against 0.18%. It is a warning counter and not a contact: the
@@ -1386,7 +1393,161 @@ Three engine facts came out of it, and all three were found by rendering:
   where there had been none, and not one frame spent on a moving roof --
   because the crossing is decided by coins and the coins had been left
   behind. The ``drift`` argument on ``_add_train`` and the yaw that goes with
-  it are kept, because they are the correct half of it.
+  it are kept, because they are the correct half of it. (**Both halves are
+  built now** -- see the next section.)
+
+## The speed has no top, and the run ends when it outruns its sight (2026-08-17)
+
+The owner's fourth pass on this scene, and the sharpest: *it taps out at a
+certain speed pretty quickly while it's still quite easy; at the max speed you
+reach after about two minutes it's not that great; the trains coming at you
+should be moving and shouldn't just be standing still for a lot of them; you
+should be able to get on them if you're already on a train; and there should
+not really be a big cap on the speed -- it should keep going quicker and
+quicker until essentially the guy fails, and then it starts again.*
+
+**Every one of those was true, and the last pass's own notes were wrong about
+why.** Measured before touching anything, six runs of five minutes: 24.9 m/s at
+one minute, 26.5 at two, 27.4 at three, and **one wreck in thirty minutes of
+running**. The compounding was linear -- 1.6 m/s per further minute -- which is
+an acceleration that shrinks as a fraction of the run, so the curve flattens
+exactly where it is supposed to be getting frightening.
+
+`tools/speed_probe.py` is the new tool and it is the one that made this
+actionable: it buckets **every frame by the speed it was drawn at**, so the
+scene's behaviour at speed is a reading rather than a belief. Three beliefs
+this file held did not survive it:
+
+- **"The collision model starts producing wrecks at around 26 m/s"** -- no. The
+  32-36 m/s band had **zero** contacts over 276 seconds, and the 28-32 band was
+  cleaner per second than the 24-28 one the scene actually spent its life in.
+- **"The track cannot be laid fast enough to stay solvable"** was written here
+  as the reason a run ends and was not true of anything in the scene. Every
+  move is sized in metres and every reservation is derived from the move, so
+  the track simply *thins out* to match the speed. With the creep compounding
+  and every density dial at maximum, a run reached **143 m/s** and was still
+  solving.
+- **The reservations were sized off a fixed `TOP_KIN`**, so past that speed
+  they understate what a move costs. They come off `lead_speed` now -- the
+  speed the body will be doing when it reaches the far end of the spawn
+  horizon, which is where the track is actually being laid.
+
+The shape of the answer:
+
+| | before | after |
+|---|---|---|
+| speed at 15 / 30 / 60 / 90 s | 19.8 / 24.1 / 24.9 / 25.4 | **24.1 / 30.9 / 38.5 / 47.9** |
+| run life (median) | never | **108 s** (106-119) |
+| speed at the wreck | n/a | **43-59 m/s** |
+| oncoming trains a minute | 4.5 | **8.6** |
+| trains that are moving | 12% | **23%** (oncoming 8.6 + shunting 5.2 a minute) |
+| roof-to-roof crossings a minute | ~0.75 (estimated, never measured) | **3.62** |
+| mounts a minute | 3.9 | **5.0** |
+| seconds on a roof a minute | 8.9 | **10.9** |
+| actions a minute | 44.8 | **49.6** |
+| body inside an obstacle, pinned, 24 x 120 s | 1 frame, 0.034 m | **5 frames, 0.011 m** |
+
+**`TOP_SPEED` is 30 rather than 24, and that is a measurement rather than
+nerve** -- the guaranteed range was extended to where the frame data said the
+model was still clean. `CREEP` is a *fraction* now (0.55 of the current speed
+per further minute, compounding, no limit).
+
+**What ends a run is `blind`, and it is a derived number, not a speed cap.** A
+plan is followed for `COMMIT_WINDOW` before being re-solved, so a horizon
+shorter than that is a plan that cannot be checked as far as it is acted on.
+Past that the runner stops planning and stops reflexing: it holds its lane and
+runs, and hits whatever is there within a second or two. 64 m of planning reach
+against a 1.2 s commitment is 53 m/s, reached at about a hundred seconds --
+which is why run life is so tight a band. The frame shows exactly what the rule
+says: things arrive out of the fog and are not dodged, and then a train fills
+the screen.
+
+Five things had to be true, and none was guessable:
+
+- **The planner may only reason about what it can see** (`sight`, the fog). It
+  was routing around trains eighty metres away in fog that ends at
+  eighty-eight, which is not the game the viewer is watching -- and it is why
+  nothing ever beat it.
+- **The horizon has to be derived from the sight, not given a figure of its
+  own.** A reach of 64 m was picked as "what 2.8 seconds was at the old top
+  speed"; asked as a hard bound it is a *reduction* at every speed the old
+  scene ran at, and measured that alone was five frames inside an obstacle
+  against one. It is one of three bounds now and the loosest wins.
+- **Verify sampling is a distance, not a time.** At 0.03 s the grid is 0.72 m
+  at 24 m/s and 1.2 m at 40, against a barrier-plus-body overlap of 1.4 m --
+  one sample inside the thing being checked. Half a metre, and it is worth
+  what it costs: 0.70 m was tried and read twelve grazes over forty-eight
+  minutes against five.
+- **`JET_LAND_CLEAR` was fourteen metres and had to be a number of seconds.**
+  It buys the planner time to have an answer again after a flight it did no
+  planning during -- and fourteen metres is 0.58 s at the old top speed and
+  0.28 s at the new one. The one deep contact left inside the guaranteed range
+  was exactly this: a body put back on the rails with a hurdle thirteen metres
+  in front of it and the take-off window already gone.
+- **Difficulty past the guaranteed range has to be asked for** (`pressure`,
+  zero inside it so nothing the collision tests hold is touched): tighter
+  rhythms, more lanes closed at once, a second sweeper, and `action_span`
+  falling to three fifths of what a move really needs so obstacles begin
+  arriving inside each other's answers.
+
+**The moving trains, both kinds.** Oncoming ones now come from the yard and
+from a convoy's run-up as well as the express (`_sweeper`, which is the
+express's arithmetic split out), and `_may_spawn_train` is asked **per lane** at
+placement rather than per set-piece -- as a global gate it refused most of the
+set-pieces that lay trains at all. And the line alongside a convoy *shunts*:
+the two reasons it was reverted last time are fixed rather than lived with --
+its coins carry the train's velocity (any entity may, not just a train), and
+its reservation covers the stretch it sweeps (`_drift_span`), claimed once for
+the whole line because per train each one's swept stretch refuses the next.
+`DRIFT_SPEED` is a sixth of the running speed, not a half: faster than that and
+the line has slid a whole train's length forward before the body arrives.
+
+**The flank mirrors the convoy, train for train, and is chained.** That is the
+answer to "you should be able to get on them if you're already on a train", and
+two things fall out of it: the crossing window is a whole train long instead of
+whatever overlap two lines of different pitch happen to share, and the flank is
+a *road* -- linked `behind` each other, its trains offer the same forward leap
+the ride lane does. **And the coin trail changes lanes at every gap**, with the
+arc over the gap laid on the line it changes *to*. Without that the mirroring
+backfires: `_roof_across` crosses only when the lane alongside has coins this
+one has not, so two full trails are worth the same and the body correctly never
+moves.
+
+Three things measured worse and are recorded so they are not re-derived:
+
+- **Standing a yard's shunting train still when its swept stretch will not fit**
+  rather than not laying it. It is a denser yard than the corridor was written
+  for, and it put the body inside something at the top of the guaranteed range.
+- **Three sweepers abreast at one meeting, to end a run on purpose.** It reads
+  beautifully on paper and it never once fired -- 60 attempts, 0 successes: a
+  sweeper's reservation is a hundred and sixty metres of its own lane, so the
+  ordinary sweeper laid first guarantees the all-three test fails. Offered
+  *instead of* the ordinary one it still failed on the surrounding track. The
+  code is gone; `blind` does the job honestly.
+- **Planning the whole 84 m the fog allows.** Costs mounts (5.75 a minute down
+  to 3.81) and seconds on a roof (12.5 down to 7.0), because `verify` is more
+  likely to find *something* wrong two seconds out and a plan carrying a mount
+  is the one thrown away for it.
+
+The speed table it all comes down to, 12 runs x 240 s, unpinned, every frame
+bucketed by the speed it was drawn at: **0 contacts below 28 m/s**, one to four
+grazes in each band from 28 to 52, and **60 of the 73 contacts in the 52-56
+band**, which is the blind phase. That is the design stated as a measurement --
+the scene is clean everywhere the runner can see, and everything that goes
+wrong goes wrong in the three per cent of the run where it cannot.
+
+**One trap in that probe, and it is the general shape of the thing.** Bucket a
+contact by the speed the *frame* is being drawn at and a handful of the deepest
+contacts in the scene file under the slowest band there is: a wreck is held for
+two seconds and the run that starts afterwards is back at `BASE_SPEED`. It
+reads as a scene that hurts itself at 16 m/s, which is the one speed it is most
+obviously fine at. Bucket by the speed the *contact* recorded.
+
+Frame cost went from 0.91 of the parkour scene to **1.32** (2.83 ms against
+parkour's 2.14, spiral 2.95, tower 3.15 in the same process). That is honest
+rather than a regression to chase: `frame_cost` settles for forty seconds, and
+forty seconds into a run is now 33 m/s rather than 24, with the entity count
+and the verify grid that go with it.
 
 ## Running along train roofs, and why it works now
 
@@ -1588,16 +1749,26 @@ long jumps you need a different motion model, not a bigger number.
   each other, the body inside an obstacle, plans with no answer), **pacing**
   (how often the runner is forced to act, the distribution of the idle
   stretches between those moments, the obstacle mix, the set-piece mix, and
-  the speed at 0/15/30/60 s), and **riding** (mounts and seconds on a roof per
-  minute, and "surface pops" — a body teleported upward by a surface, which is
-  what a badly built ramp looks like), plus **wrecks** and seconds spent
-  flying. `--safety-runs 60 --safety-seconds 180` is the full sweep the
-  collision model is held to, and the criterion there is now a *depth* rather
-  than a count -- nothing may reach `CRASH_DEPTH` while the run is inside the
-  guaranteed speed range, and a wreck past it is the scene working as intended
-  rather than a fault. Read that -- read that one before anything
-  else, and re-run the full sweep after touching the runner, because 4 runs x
-  40 s reads clean on faults that 60 x 180 finds.
+  the speed at 0/15/30/60/90 s), and **riding** (mounts, roof-to-roof
+  crossings and seconds on a roof per minute, what share of the trains laid
+  are actually moving, and "surface pops" — a body teleported upward by a
+  surface, which is what a badly built ramp looks like), plus **wrecks** and
+  seconds spent flying. `--safety-runs 60 --safety-seconds 180` is the full
+  sweep the collision model is held to; it **pins the creep off**, as
+  `tests/test_collision.py` does, so it speaks for the guaranteed range and
+  not for the deliberately-unsolvable end of a run. The criterion is a *depth*
+  rather than a count -- nothing may reach `CRASH_DEPTH` inside that range,
+  and a wreck past it is the scene working as intended. Read that one before
+  anything else, and re-run the full sweep after touching the runner, because
+  4 runs x 40 s reads clean on faults that 60 x 180 finds.
+- `python tools/speed_probe.py --runs 12 --seconds 240` is the other half, and
+  it is what made "it taps out at a low speed while it's still easy"
+  actionable: nothing is pinned, and **every frame is bucketed by the speed it
+  was drawn at**, so how long a run lasts, how fast it was going when it ended,
+  and whether anything actually breaks at a given speed are readings rather
+  than beliefs. Three beliefs recorded in this file did not survive it -- see
+  "The speed has no top". Run it after anything that touches the speed curve,
+  `pressure`, or the planner's horizon.
 - `python tools/flow_probe.py --scene all --runs 4 --seconds 25` is the
   parkour family's *motion* acceptance test, and the only thing that could
   make "it looks bot-like and rickety" actionable. It measures the derivative

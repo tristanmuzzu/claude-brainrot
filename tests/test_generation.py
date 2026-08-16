@@ -248,7 +248,12 @@ def test_runner_never_more_than_one_oncoming_train_per_lane() -> None:
             scene.elapsed += 1 / 60
             per_lane: dict[int, int] = {}
             for e in scene.entities:
-                if e["kind"] == "train" and e["vel"]:
+                # Coming the *other* way. A negative velocity is a train
+                # shunting the runner's own way, and a line of those nose to
+                # tail in one lane is the flank of a convoy -- deliberately
+                # several, and deliberately in one lane. This is about
+                # sweepers.
+                if e["kind"] == "train" and (e.get("vel") or 0.0) > 0.0:
                     per_lane[e["lane"]] = per_lane.get(e["lane"], 0) + 1
             assert not per_lane or max(per_lane.values()) <= 1, per_lane
 
@@ -282,7 +287,10 @@ def test_runner_dodges_oncoming_trains() -> None:
             scene.update(1 / 60)
             scene.elapsed += 1 / 60
             for e in scene.entities:
-                if e["kind"] == "train" and e["vel"]:
+                # Sweepers only: a train drifting the runner's own way is
+                # one it is meant to be *on*, and being in its lane at roof
+                # height is the whole of the sideways hop.
+                if e["kind"] == "train" and (e.get("vel") or 0.0) > 0.0:
                     length = e["cars"] * 5.1
                     if not -length + 1.0 < e["d"] < 1.0:
                         continue

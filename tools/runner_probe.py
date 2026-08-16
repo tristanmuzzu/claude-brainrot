@@ -107,8 +107,19 @@ def overlapping_pairs(boxes: list[tuple[dict, object]]):
 
 
 def safety(runs: int, seconds: float, warm: float) -> dict:
-    """Simulate real runs and count everything that should never happen."""
+    """Simulate real runs and count everything that should never happen.
+
+    **With the creep pinned off**, which is the whole meaning of the section.
+    The run no longer stops accelerating and past ``TOP_SPEED`` the track is
+    deliberately laid too dense to stay solvable -- so a sweep that lets the
+    speed run reports the scene's designed ending as a fault, and the longer
+    the sweep the worse it reads. Ninety seconds now reaches 46 m/s. Pinned,
+    this says the thing it was always for: inside the guaranteed range,
+    nothing is ever inside anything. ``tests/test_collision.py`` pins the same
+    knob for the same reason.
+    """
     frames = int(seconds / DT)
+    was, R.CREEP = R.CREEP, 0.0
     contacts = 0
     worst = 0.0
     worst_where = ""
@@ -141,6 +152,7 @@ def safety(runs: int, seconds: float, warm: float) -> dict:
         unsolvable += scene.unsolvable
         reflexes += scene.reflexes
         travel += scene.travel
+    R.CREEP = was
     return {"runs": runs, "seconds": seconds, "warm": warm,
             "body_contacts": contacts, "worst_penetration": worst,
             "worst_where": worst_where[:180],
@@ -171,11 +183,12 @@ def pacing(runs: int, seconds: float) -> dict:
     longest_gap = 0.0
     longest_where = ""
     speed_at: dict[str, list[float]] = {}
-    marks = [0.0, 15.0, 30.0, 60.0, 120.0, 180.0]
+    marks = [0.0, 15.0, 30.0, 60.0, 90.0, 120.0, 180.0]
     kinds = Counter()
     kind_windows: list[int] = []       # distinct obstacle kinds per 30 s
     segments = Counter()
     mounts = 0
+    crossings = 0
     ride_time = 0.0
     fly_time = 0.0
     crashes = 0
@@ -195,12 +208,20 @@ def pacing(runs: int, seconds: float) -> dict:
         wrecked = 0.0
         n_actions = 0
         window_kinds: dict[str, int] = {}
+        seen_crashes = 0
         for f in range(frames):
             if getattr(scene, "crash_t", -1.0) >= 0.0:
                 wrecked += DT
             scene.update(DT)
             scene.elapsed += DT
             now = scene.elapsed
+            # Every wreck, not the longest one. ``best_t`` is a HUD figure and
+            # reading it once per scene reports the best run as if it were the
+            # typical one -- which for "how long does a run last now" is the
+            # single most misleading thing in the table.
+            if getattr(scene, "crashes", 0) > seen_crashes:
+                seen_crashes = scene.crashes
+                run_lengths.append(getattr(scene, "run_t", 0.0))
             for m in marks:
                 if abs(now - m) < DT * 0.51 or (m == 0.0 and f == 0):
                     speed_at.setdefault(f"{m:.0f}s", []).append(scene.speed)
@@ -277,10 +298,9 @@ def pacing(runs: int, seconds: float) -> dict:
                       if k in R.SOLID_KINDS or k.startswith("train")
                       or k == "ramp"})
         mounts += getattr(scene, "mounts", 0)
+        crossings += getattr(scene, "crossings", 0)
         fly_time += getattr(scene, "fly_time", 0.0)
         crashes += getattr(scene, "crashes", 0)
-        if getattr(scene, "crashes", 0):
-            run_lengths.append(getattr(scene, "best_t", 0.0))
         ride_time += getattr(scene, "ride_time", 0.0)
     # Coins are everywhere by design, and counting them swamps the mix. What a
     # viewer sees as variety is the things that make the runner move.
@@ -294,6 +314,16 @@ def pacing(runs: int, seconds: float) -> dict:
             "segments": dict(segments.most_common()),
             "segments_per_minute": {k: v / minutes for k, v in segments.items()},
             "mounts_per_minute": mounts / minutes,
+            "crossings_per_minute": crossings / minutes,
+            # What fraction of the trains laid down are actually going
+            # somewhere. The owner's note was that too many of them stand
+            # still, and nothing here could answer it: the mix counted them
+            # by kind and "train-parked" was simply the biggest number in the
+            # table with nothing to compare it against.
+            "moving_train_share": (
+                (kinds.get("train-oncoming", 0) + kinds.get("train-drifting", 0))
+                / max(1, sum(v for k, v in kinds.items()
+                             if k.startswith("train")))),
             "fly_seconds_per_minute": fly_time / minutes,
             "crashes": crashes,
             "mean_run_seconds": (sum(run_lengths) / len(run_lengths)
@@ -383,7 +413,8 @@ def framing() -> dict:
 
 def report(saf: dict, pac: dict, frm: dict) -> str:
     out = []
-    out.append(f"== safety ({saf['runs']} runs x {saf['seconds']:.0f}s"
+    out.append(f"== safety ({saf['runs']} runs x {saf['seconds']:.0f}s, "
+               f"inside the guaranteed range"
                f"{', warmed to top speed' if saf['warm'] else ''}) ==")
     out.append(f"  body inside an obstacle : {saf['body_contacts']} frames, "
                f"worst {saf['worst_penetration']:.3f} m")
@@ -427,10 +458,14 @@ def report(saf: dict, pac: dict, frm: dict) -> str:
                                           key=lambda kv: -kv[1])))
     out.append(f"== riding a train roof ==")
     out.append(f"  mounts per minute      : {pac['mounts_per_minute']:.2f}")
+    out.append("  roof-to-roof crossings : "
+               f"{pac['crossings_per_minute']:.2f} / min")
+    out.append(f"  trains that move       : "
+               f"{pac['moving_train_share'] * 100:.0f}% of those laid")
     out.append(f"  seconds flying / min   : {pac['fly_seconds_per_minute']:.2f}")
     out.append(f"  wrecks                 : {pac['crashes']}"
                + ("" if pac['crashes'] == 0 else
-                  f", longest run {pac['mean_run_seconds']:.0f}s"))
+                  f", mean run {pac['mean_run_seconds']:.0f}s"))
     out.append(f"  seconds on a roof / min: {pac['ride_seconds_per_minute']:.2f}")
     out.append(f"  surface pops           : {pac['surface_pops']} "
                f"(worst {pac['worst_pop']:.3f} m in a frame)")

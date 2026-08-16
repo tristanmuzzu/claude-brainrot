@@ -84,18 +84,34 @@ FOG_FAR = 88.0
 #: the track cannot be laid fast enough to stay solvable, the body hits
 #: something, and the run ends and begins again. That failure is the point
 #: rather than a defect -- see :meth:`RunnerScene._crash`.
-BASE_SPEED = 15.0
-TOP_SPEED = 24.0
-RAMP_SECONDS = 28.0
-#: Metres a second added for every further minute survived, without limit.
-#: 1.6 doubles the top speed at about eleven minutes. Measured, the collision
-#: model starts producing wrecks at around 26 m/s, so this is what sets how
-#: long a run lives: first wrecks land between two and four minutes, which is
-#: past all but the longest thinking turns and short enough that a strip left
-#: up for an afternoon visibly falls over. Raising it is the cheap way to make
-#: runs shorter; making them *longer* means making the planner good at 40 m/s,
-#: which is a different piece of work.
-CREEP = 1.6
+#:
+#: The guaranteed end moved 24 -> 30 on a measurement rather than on nerve.
+#: Four runs of seven minutes each, every frame bucketed by the speed it was
+#: doing: **zero** contacts in the 32-36 m/s band over 276 seconds, and the
+#: 28-32 band cleaner per second than the 24-28 one the scene actually spent
+#: its life in. Nothing about this model breaks at speed, because every move is
+#: sized in metres and every reservation is derived from the move -- so the
+#: track simply thins out to match, which is precisely the "still quite easy at
+#: the top" the owner reported. Making it harder is ``pressure`` below; making
+#: it faster is the compounding creep.
+BASE_SPEED = 16.0
+TOP_SPEED = 30.0
+RAMP_SECONDS = 26.0
+#: How much faster the run gets for every further minute survived, as a
+#: fraction of the speed it is *already* doing. Compounding, and that is the
+#: whole of the difference: a fixed number of metres a second per minute is an
+#: acceleration that shrinks as a fraction of the run, so the curve flattens
+#: exactly where it is supposed to be getting frightening. Measured over
+#: thirty minutes of running on the old figure of 1.6 m/s a minute: 24.9 m/s
+#: at one minute, 26.5 at two, 27.4 at three, and one wreck in the lot. The
+#: run was, in the owner's words, capping out at a low speed while still quite
+#: easy, and it was.
+#:
+#: 0.55 doubles the speed every eighty seconds. There is no limit and no
+#: intention of one -- see :meth:`RunnerScene._crash` for what ends a run, and
+#: the note on ``VIEW_AHEAD`` for what actually stops the runner, which is
+#: that it eventually outruns its own sight.
+CREEP = 0.55
 # -- power-ups --------------------------------------------------------------
 #: name -> (seconds it lasts, the colour it is drawn and glowed in).
 #:
@@ -121,8 +137,19 @@ JET_ALT = 5.4
 #: rearranging itself rather than as anything the runner did.
 #: Track that has to be clear ahead for the jetpack to come down, on top of
 #: the fall itself, and how long it will hold out for one.
-JET_LAND_CLEAR = 14.0
+#: ...in *seconds* of track, not metres. It was 14 m, which is 0.58 s at the
+#: speed this scene used to top out at and 0.28 s at the speed it reaches
+#: now -- and the thing the clearance is really buying is time for the planner
+#: to have an answer again, because it has had none for the whole flight. The
+#: one deep contact left inside the guaranteed range was exactly this: a body
+#: put back on the rails with a hurdle thirteen metres in front of it, the
+#: take-off window already gone, and nothing booked. Sized in seconds it
+#: cannot come back as the run gets faster.
+JET_LAND_CLEAR = 0.58
+#: How long it will hold out for a good landing, and the least it will settle
+#: for once it has run out of patience: one re-solve plus a take-off.
 JET_WAIT_MAX = 2.2
+JET_LAND_MIN = 0.36
 MAGNET_REACH = 14.0
 MAGNET_PULL = 7.0
 #: How much taller a jump gets on the sneakers -- and *only* taller. The span
@@ -168,20 +195,46 @@ CHAR_SCALE = 0.95
 #: How far ahead the planner reasons, and how often it re-solves. The horizon
 #: has to outlast the longest commitment (a jump) with room to see the far
 #: side of it; re-solving faster than the world changes just burns CPU.
+#:
+#: A *ceiling* now rather than the figure. Everything else in this scene is
+#: sized in metres and this was the one thing left in seconds, which is the
+#: same mistake the pre-planner trigger distance made in the other direction:
+#: obstacles are spaced in metres, so a horizon fixed in seconds sees a
+#: different amount of *content* at every speed. Held at 2.8 s it reaches 96 m
+#: at 34 m/s -- past the spawn horizon, so the planner reasons about track that
+#: does not exist yet and is blind exactly where it has least time to react.
+#: See ``plan_horizon``.
 PLAN_HORIZON = 2.8
-#: Resolution of the plan. At top speed a step is how far the world moves
-#: between decisions, so it has to stay well under the depth of the thinnest
-#: obstacle -- a 0.4 m hurdle crossed at 15.5 m/s is gone in 0.026 s.
+#: How much track the planner reasons over. The horizon is this at speed, and
+#: ``PLAN_HORIZON`` at the bottom of the range where this would be longer than
+#: the ceiling. 64 m is a little under what the sight allows, and the slack is
+#: not waste: measured, planning the whole 84 m the fog gives costs mounts
+#: (5.75 a minute down to 3.81) and seconds on a roof (12.5 down to 7.0),
+#: because ``verify`` is more likely to find *something* wrong two seconds out
+#: and a plan carrying a mount is the one that gets thrown away for it.
+PLAN_REACH = 64.0
+#: Resolution of the plan, as a ceiling in seconds and as the sample spacing
+#: in metres that actually decides it. It has to stay well under the depth of
+#: the thinnest obstacle plus the body's own -- a 0.4 m hurdle against a body
+#: half a metre deep is 1.4 m of overlap, and two or three samples inside that
+#: is the difference between a verified plan and a lucky one. Held at 0.03 s
+#: it is 0.72 m at 24 m/s and 1.2 m at 40, which is coarser than the thing
+#: being checked. Half a metre, and it is worth what it costs: 0.70 was tried
+#: and read twelve grazes over forty-eight minutes of running against five.
 PLAN_STEP = 0.03
+VERIFY_SPAN = 0.50
 #: Resolution of the *lane* search, which is coarser on purpose. Lanes change
 #: on the scale of a quarter-second; solving them at the collision grid's
 #: resolution costs four times the work for a decision that cannot use it,
 #: and the lane DP was comfortably the most expensive thing in the scene.
 LANE_STEP = 0.06
+LANE_STEP_SPAN = 1.4
 PLAN_EVERY = 0.10
-#: How much further than the planning horizon a *train* is worth seeing, as a
-#: multiple of it. See ``_threats``.
-TRAIN_SIGHT = 1.8
+#: How much track further than the planner's own reach a *train* is worth
+#: seeing. In metres, and bounded by what is actually spawned: a threat past
+#: the spawn horizon is not a threat the scene knows about, so asking for one
+#: only means the approach shadow stops working at speed. See ``_threats``.
+TRAIN_SIGHT_M = 88.0
 #: Rounds of "solve, check, mark what failed as unavoidable, solve again".
 PLAN_ATTEMPTS = 5
 #: How far into a plan counts as committed. Trouble past this is left to the
@@ -300,7 +353,16 @@ FLANK_CHANCE = 0.7
 #: it is overtaken rather than chased -- a train pulling away is one the body
 #: can never reach, and one going the same speed never arrives anywhere.
 DRIFT_CHANCE = 0.55
-DRIFT_SPEED = (0.30, 0.55)
+#: Slow, and that is a change: at 0.30-0.55 of the running speed a line laid
+#: beside a parked convoy has slid a whole train's length forward by the time
+#: the body reaches it, which undoes the mirroring the crossing depends on. A
+#: sixth of the running speed still reads as moving -- what says so is the
+#: relative motion against the parked line beside it, not the absolute figure.
+DRIFT_SPEED = (0.10, 0.22)
+#: How often a convoy also gets a train coming the other way down its run-up.
+SWEEP_APPROACH = 0.6
+#: How much of a yard's stock is shunting rather than parked.
+YARD_DRIFT = 0.45
 #: How near the middle of a ramp's lane the body has to be for the slope to
 #: pick it up. Much tighter than the ramp is wide, and deliberately: a body
 #: still crossing when it clips the edge of a ramp is frozen there by the rule
@@ -511,6 +573,12 @@ class RunnerScene(Scene):
         self.ride_time = 0.0
         self.fly_time = 0.0
         self.mounts = 0
+        #: Times the body stepped from one train's roof onto the one beside
+        #: it. Counted separately from ``mounts`` because it is a different
+        #: move with a different mechanism, and because nothing measured it:
+        #: the standing note said it happened 0.75 times a minute and that
+        #: figure came from reading ``_roof_across`` rather than from the run.
+        self.crossings = 0
 
         # -- runner state ------------------------------------------------
         #: Position, velocity and what the body is currently committed to.
@@ -583,17 +651,157 @@ class RunnerScene(Scene):
     # with every metre a second added and a reservation sized for 24 m/s is a
     # pair of obstacles the body meets inside one move at 40.
 
+    @staticmethod
+    def speed_at(run_t: float) -> float:
+        """How fast the run is at ``run_t`` seconds in.
+
+        One description of the curve, because generation needs to ask it about
+        a moment the body has not reached yet -- see :attr:`lead_speed`.
+        """
+        ramped = (BASE_SPEED + (TOP_SPEED - BASE_SPEED)
+                  * min(1.0, max(0.0, run_t) / RAMP_SECONDS))
+        past = max(0.0, run_t - RAMP_SECONDS) / 60.0
+        return ramped * (1.0 + CREEP) ** past
+
+    @property
+    def lead_speed(self) -> float:
+        """The speed the body will be doing when it gets to the far end of the
+        spawn horizon -- which is where everything is being laid.
+
+        Generation happens a whole view-length ahead of a run that only ever
+        accelerates, so sizing a reservation against the speed *now* under-sizes
+        it by however much the run gains in the meantime. That was harmless
+        while the creep added a metre and a half a minute and is not once it
+        compounds: at 40 m/s the ninety-six metres ahead are two and a half
+        seconds, and two and a half seconds is a couple of metres a second.
+        """
+        return self.speed_at(self.run_t + VIEW_AHEAD / max(1.0, self.speed))
+
+    @property
+    def lead_kin(self) -> plan.Kinematics:
+        return plan.Kinematics.for_speed(self.lead_speed)
+
+    @property
+    def pressure(self) -> float:
+        """How far past the guaranteed range this run has got, 0 to 1.
+
+        Nothing about the motion model breaks at speed: every move is sized in
+        metres, so the track thins out to match and a run at 34 m/s is no
+        harder than one at 24 -- measured, and it is exactly the "still quite
+        easy at the top" this pass exists to answer. Difficulty past the
+        guaranteed range therefore has to be *asked for*, and this is the dial:
+        tighter rhythms, more lanes closed at once, more trains coming the
+        other way. Zero inside the guaranteed range, so nothing the collision
+        tests hold is touched by it.
+
+        How hard it has to pull was measured rather than guessed. With the
+        compounding creep and nothing else, three runs reached **a hundred
+        metres a second** and wrecked at 80-100 -- eleven contacts in ten
+        minutes of running at speeds where the fog is under a second away.
+        That is not a run failing, it is a run nobody can watch. The wall has
+        to arrive while the picture still reads, so this saturates at 1.6 times
+        the guaranteed top, which is about ninety seconds in.
+        """
+        return max(0.0, min(1.0, (self.speed - TOP_SPEED) / (0.6 * TOP_SPEED)))
+
     @property
     def action_span(self) -> float:
-        return max(ACTION_SPAN, self.kin.roll_time * self.speed)
+        """The stretch of track one move commits the body to -- and, past the
+        guaranteed range, deliberately less of it than the move really takes.
+
+        This is where a run ends, and it took three measured attempts to find
+        out that it had to be here. The scene reserves a whole move's worth of
+        track around every obstacle that demands one, and it refuses to close
+        all three lanes at once, so *the track is solvable by construction at
+        any speed* -- which is why a run with the speed compounding and every
+        density dial at maximum still reached 165 m/s. "The track cannot be
+        laid fast enough to stay solvable" was written in this file as the
+        reason a run ends and was not true of anything in it.
+
+        It is true now. At the top of the dial a move gets three fifths of the
+        track it needs, so obstacles start arriving inside each other's
+        answers, and a rhythm eventually turns up that has none. Zero effect
+        inside the guaranteed range, where ``pressure`` is zero and the
+        collision tests hold.
+        """
+        span = max(ACTION_SPAN, self.lead_kin.roll_time * self.lead_speed)
+        return span * (1.0 - 0.4 * self.pressure)
 
     @property
     def hurdle_pitch(self) -> float:
-        return 2.0 * self.action_span + 1.2
+        # Two whole moves apart at the bottom, closing on one and a half at
+        # the top of the pressure dial. A move still finishes before the next
+        # begins -- that is what ``action_span`` is -- but the run-up stops
+        # being a stroll.
+        return (2.0 - 0.65 * self.pressure) * self.action_span + 1.2
 
     @property
     def train_pad(self) -> float:
-        return max(TRAIN_PAD, 2.0 * self.kin.lane_time * self.speed + 1.0)
+        return max(TRAIN_PAD,
+                   2.0 * self.lead_kin.lane_time * self.lead_speed + 1.0)
+
+    # -- how far ahead the planner reasons, at the speed it is reasoning at --
+
+    @property
+    def blind(self) -> bool:
+        """Is the fog closer than the runner's own commitment?
+
+        A plan is followed for ``COMMIT_WINDOW`` before it is re-solved, so a
+        horizon shorter than that is a plan that cannot be checked as far as
+        it is acted on. Past this the runner stops planning and stops
+        reflexing -- it holds its lane and runs, and hits whatever is there,
+        which it will be within a second or two.
+
+        This is the end of a run and it is a derived number, not a speed cap:
+        84 m of fog against a 1.2 s commitment is 70 m/s. Everything else in
+        the scene is solvable by construction and the planner is better than
+        any speed the curve reaches -- measured, a run reached 143 m/s, where
+        the fog is half a second away, still solving. The honest statement is
+        that a body cannot answer what it cannot see, and the frame shows
+        exactly that: things arrive out of the fog and are not dodged.
+        """
+        return self.plan_horizon < COMMIT_WINDOW
+
+    @property
+    def sight(self) -> float:
+        """How far down the track the runner is allowed to reason about.
+
+        The fog, and that is the whole argument. A planner that routes around
+        a train it cannot see is not solving the game the viewer is watching,
+        and this scene's planner was doing exactly that -- so nothing ever
+        beat it. Four runs of four minutes with the speed compounding and the
+        density turned up: it reached **133 m/s** and wrecked three times out
+        of four past 110, where the fog is under a second away and the picture
+        is a smear. The failure the owner asked for cannot come from a body
+        that outruns its own physics, because none of the physics is in
+        seconds; it comes from a body that outruns its own *sight*, which is a
+        thing that happens at a speed you can still watch.
+        """
+        return min(FOG_FAR, VIEW_AHEAD - 2.0 * ROW)
+
+    @property
+    def plan_horizon(self) -> float:
+        """As far as the runner can see, and never more than ``PLAN_HORIZON``.
+
+        No floor under it, deliberately. A floor is a promise that the planner
+        always gets the time its longest commitment needs, and the whole point
+        of tying this to the fog is that eventually it does not.
+
+        Bounded by ``PLAN_REACH`` as well, and that is not the same bound: the
+        fog is what the runner may *know about*, and the reach is how much of
+        it is worth solving. See ``PLAN_REACH`` for why more is worse.
+        """
+        return min(PLAN_HORIZON, self.sight / max(1.0, self.speed),
+                   max(PLAN_REACH / max(1.0, self.speed),
+                       0.5 * self.sight / max(1.0, self.speed)))
+
+    @property
+    def plan_step(self) -> float:
+        return min(PLAN_STEP, max(0.006, VERIFY_SPAN / max(1.0, self.speed)))
+
+    @property
+    def lane_step(self) -> float:
+        return min(LANE_STEP, max(0.02, LANE_STEP_SPAN / max(1.0, self.speed)))
 
     # -- motion, surfaced for the scene and the tests ---------------------
 
@@ -739,7 +947,7 @@ class RunnerScene(Scene):
         already sweeping -- which the ledger cannot say, because a sweeper's
         reservation is deliberately shorter than its path.
         """
-        return not any(e["kind"] == "train" and e["vel"]
+        return not any(e["kind"] == "train" and (e.get("vel") or 0.0) > 0.0
                        and (lane is None or e["lane"] == lane)
                        for e in self.entities)
 
@@ -750,7 +958,9 @@ class RunnerScene(Scene):
         self.entities.append(e)
         kind = e["kind"]
         if kind == "train":
-            kind = "train-oncoming" if e["vel"] else "train-parked"
+            vel = e.get("vel") or 0.0
+            kind = ("train-oncoming" if vel > 0.0
+                    else "train-drifting" if vel < 0.0 else "train-parked")
         self.spawned[kind] = self.spawned.get(kind, 0) + 1
         return e
 
@@ -844,7 +1054,17 @@ class RunnerScene(Scene):
     def _add_train(self, p: float, lane: int, cars: int, rng,
                    oncoming: bool = False, ride: bool = False,
                    sweep: float = 0.0, pad: float | None = None,
-                   drift: float = 0.0) -> dict | None:
+                   drift: float = 0.0, forward: float | None = None
+                   ) -> dict | None:
+        # A sweeper's reservation is deliberately shorter than its path, so the
+        # ledger cannot say "something is already crossing this lane" -- that
+        # is the one question it cannot answer and the reason this check
+        # exists. Asked per *lane* here rather than per set-piece: a train
+        # stays in its own lane, and with sweepers now coming from the yard and
+        # the convoy as well as the express, a global gate refused most of the
+        # set-pieces that lay trains at all.
+        if not self._may_spawn_train(lane):
+            return None
         a, b = self._train_span(p, cars)
         if pad is None:
             pad = self.train_pad
@@ -854,7 +1074,27 @@ class RunnerScene(Scene):
         # the two meet, and reserving the whole ninety-metre view instead --
         # which is what this did first -- means the lane is never empty enough
         # and the set-piece declines nine times out of ten.
-        span = ((a - sweep, b) if oncoming else (a - pad, b + pad))
+        if oncoming:
+            span = (a - sweep, b)
+        elif drift:
+            # A train going the runner's own way, slower, leaves the stretch
+            # its own length covers -- so what it reserves is the track it
+            # will have moved *through* by the time the body has passed its
+            # tail. This is the half of "a moving train alongside" that was
+            # got wrong the first time, and reserving its length alone is a
+            # train that quietly slides into the next set-piece's corridor.
+            #
+            # ``forward`` overrides it for a *line* of trains moving together:
+            # each one's swept stretch covers the one in front of it, so asked
+            # per train the second of them is refused by the first's own
+            # reservation and a mirrored line comes out one train long. The
+            # caller reserves the swept stretch once for the whole line
+            # instead.
+            span = (a - pad, b + pad
+                    + (self._drift_span(a, b, drift) if forward is None
+                       else forward))
+        else:
+            span = (a - pad, b + pad)
         if self._clash(lane, *span, BODY_PAD, soft_ok=oncoming):
             return None
         # Even a moving train stays in its own lane; what makes it different is
@@ -869,12 +1109,29 @@ class RunnerScene(Scene):
                           "color": rng.choice(self.train_liveries),
                           "ride": ride, "ramp": None, "behind": None}, p)
 
+    def _drift_span(self, a: float, b: float, drift: float) -> float:
+        """How much further down the track a drifting train ends up.
+
+        Measured to the moment the body has passed its tail, which is when it
+        stops being able to matter: after that it is behind the camera and the
+        track it moves onto has already been run over.
+        """
+        closing = max(1e-6, self.speed - drift)
+        return drift * (max(0.0, b - self.travel)) / closing
+
     def _add_coins(self, p: float, n: float, lane: int, rng,
-                   base: float = 0.55, arc: float = 0.0) -> None:
+                   base: float = 0.55, arc: float = 0.0,
+                   vel: float = 0.0) -> None:
         count = max(2, int(n))
         for i in range(count):
             y = base + (arc * math.sin(math.pi * i / (count - 1)) if arc else 0.0)
-            self._add({"kind": "coin", "lane": lane, "y": y, "taken": False},
+            # ``vel`` rides the coin along with whatever it is sitting on. A
+            # coin on a moving train's roof that stays where it was laid is a
+            # coin the train drives out from under, and since the sideways hop
+            # is decided entirely by which roof has coins on it, that is a
+            # crossing that never happens.
+            self._add({"kind": "coin", "lane": lane, "y": y, "taken": False,
+                       "vel": vel},
                       p + (i - count / 2) * COIN_PITCH)
 
     # -- set-pieces --------------------------------------------------------
@@ -1021,7 +1278,7 @@ class RunnerScene(Scene):
                 placed += 1
                 self._add_coins(p, 5, lane, rng, arc=1.35)
             for ln in (0, 1, 2):
-                if ln != lane and rng.random() < 0.7:
+                if ln != lane and rng.random() < 0.7 + 0.3 * self.pressure:
                     self._add_barrier(p, ln)
             p += self.hurdle_pitch
         return rows if placed else 0
@@ -1066,7 +1323,8 @@ class RunnerScene(Scene):
         # three times in a row with nothing to decide, which is the other half
         # of the note this was rebuilt on.
         while p < end:
-            if placed < TUNNEL_BOARDS and self._add_hoarding(p):
+            boards = TUNNEL_BOARDS + int(self.pressure > 0.5)
+            if placed < boards and self._add_hoarding(p):
                 placed += 1
                 self._add_coins(p, 6, lane, rng, base=0.42)
             else:
@@ -1089,8 +1347,6 @@ class RunnerScene(Scene):
         writing it down, so it can close everything else and still promise a
         way through.
         """
-        if not self._may_spawn_train(None):
-            return 0
         # The weave is decided in full *first*, and only then are the trains
         # laid against it. The other order looks equivalent and is not: a
         # train is three to five rows long, so one placed beside the corridor
@@ -1113,16 +1369,42 @@ class RunnerScene(Scene):
         laid = 0
         for r in range(row0, row0 + used - 1):
             for ln in (0, 1, 2):
-                if rng.random() > 0.38:
+                if rng.random() > 0.38 + 0.3 * self.pressure:
                     continue
                 cars = rng.randint(2, 4)
                 p = r * ROW + ROW * 0.5
-                if not self._corridor_avoids(ln, *self._train_span(p, cars),
-                                             row0, row0 + used):
+                a, b = self._train_span(p, cars)
+                # Some of this stock is *shunting*, not parked. A yard is
+                # where the owner's "they shouldn't just be standing still"
+                # bites hardest -- it is the set-piece that lays the most
+                # trains by a factor of two -- and one moving slowly down a
+                # lane the corridor weaves past is the whole picture the
+                # reference has and this did not. The corridor has to stay
+                # clear of the track it *sweeps*, not just of where it starts.
+                drift = (self.speed * rng.uniform(*DRIFT_SPEED)
+                         if rng.random() < YARD_DRIFT else 0.0)
+                # The corridor has to stay clear of the track it *sweeps*, not
+                # just of where it starts -- and a train whose sweep will not
+                # fit is not laid at all. Standing it still instead was tried,
+                # on the reasoning that a parked train is better than no
+                # train: it is a denser yard than the one the corridor was
+                # written for, and it put the body inside something at the top
+                # of the guaranteed range.
+                reach = b + (self._drift_span(a, b, drift) if drift else 0.0)
+                if not self._corridor_avoids(ln, a, reach, row0, row0 + used):
                     continue
-                if self._add_train(p, ln, cars, rng):
+                if self._add_train(p, ln, cars, rng, drift=drift):
                     laid += 1
-        return used if laid else 0
+        if not laid:
+            return 0
+        # ...and one of them coming the other way, down whichever lane the
+        # weave has left alone at the moment they pass. A yard of nothing but
+        # parked stock is the picture this scene was already criticised for.
+        meet = (row0 + used * 0.5) * ROW
+        free = [ln for ln in (0, 1, 2) if self._lane_clear(int(meet // ROW)) != ln]
+        if free:
+            self._sweeper(meet, free, rng)
+        return used
 
     def _corridor_avoids(self, lane: int, a: float, b: float,
                          row0: int, row1: int) -> bool:
@@ -1170,7 +1452,6 @@ class RunnerScene(Scene):
         lane = self._lane_clear(row0 - 1) if row0 else 1
         self._walk_corridor(row0, rows, lane)
         self._add_coins(row0 * ROW + ROW, rows * 3, lane, rng)
-        laid = 0
         # Two, and their meetings well apart. Three put a sweeper in both
         # lanes the corridor is not in at once, and a hurdle in the corridor
         # then leaves the body a lane change with nowhere legal to arrive --
@@ -1190,22 +1471,25 @@ class RunnerScene(Scene):
         # Both candidate lanes tried, not one picked blind. During a convoy
         # one of the two is the flank -- full of parked trains -- so a coin
         # flip declines the whole set-piece half the time, and the express is
-        # the only place an oncoming train comes from.
-        cars = rng.randint(3, 5)
+        # the only place an oncoming train comes from -- it is not any more:
+        # the yard and the convoy's run-up each carry one now, which is where
+        # the count went from 4.5 a minute to what the owner asked for without
+        # putting a second sweeper in the one set-piece measured not to take
+        # one. See :meth:`_sweeper`.
         meet = (row0 + rows * 0.45) * ROW
-        vel = self.speed * ONCOMING_RATIO
-        closing = self.speed + vel
-        # where it has to start so that it arrives there when the runner does
-        p = self.travel + (meet - self.travel) * closing / self.speed
-        a, b = self._train_span(p, cars)
-        for far in rng.sample([ln for ln in (0, 1, 2) if ln != lane], 2):
-            if self._add_train(p, far, cars, rng, oncoming=True,
-                               sweep=a - meet + self._sweep_span(vel)) is None:
-                continue
-            laid += 1
-            break
-        if not laid:
+        far = [ln for ln in (0, 1, 2) if ln != lane]
+        if not self._sweeper(meet, far, rng):
             return 0
+        # ...and a second one, late in the run and only then. One in each of
+        # the two lanes the corridor is not in leaves exactly one lane free at
+        # any moment, so a hurdle in the corridor makes that lane compulsory
+        # and the runner walks into the side of a train. That was measured
+        # inside the guaranteed range and it is why this is not simply on --
+        # but past the guaranteed range an unanswerable stretch of track is
+        # what the run is *for*, and this is the cheapest way to build one out
+        # of things the viewer can see coming.
+        if self.pressure > 0.45:
+            self._sweeper((row0 + rows * 0.8) * ROW, far, rng)
         # Hurdles ahead of the meeting, in every lane -- the corridor included,
         # where they are a jump rather than a dodge. Left out of it they cost a
         # runner that stays in the corridor nothing, and this set-piece was
@@ -1226,6 +1510,32 @@ class RunnerScene(Scene):
                 self._add_barrier(q, ln)
                 q += self.hurdle_pitch
         return rows
+
+    def _sweeper(self, meet: float, lanes, rng, cars: int | None = None) -> bool:
+        """One train the other way, solved to meet the runner at ``meet``.
+
+        Split out of the express because the express is no longer the only
+        place one comes from. The owner's note was that the trains coming at
+        you should be *moving* and that too many of them stand still, and with
+        one sweeper per express set-piece that was 4.5 oncoming a minute
+        against 32 parked. A convoy and a yard can each carry one as well, and
+        the arithmetic is the same in all three: it closes at twice the running
+        speed, and generation happens a whole view-length ahead, so a train
+        dropped at the far end of a set-piece passes the runner several rows
+        *before* that set-piece begins. Where it will meet the body is the
+        thing to solve for; where to put it follows.
+        """
+        cars = cars or rng.randint(3, 5)
+        vel = self.speed * ONCOMING_RATIO
+        closing = self.speed + vel
+        p = self.travel + (meet - self.travel) * closing / self.speed
+        a, _b = self._train_span(p, cars)
+        choices = list(lanes)
+        for ln in rng.sample(choices, len(choices)):
+            if self._add_train(p, ln, cars, rng, oncoming=True,
+                               sweep=a - meet + self._sweep_span(vel)) is not None:
+                return True
+        return False
 
     def _sweep_span(self, vel: float) -> float:
         """How much track past the meeting an oncoming train has to have clear.
@@ -1278,9 +1588,9 @@ class RunnerScene(Scene):
         ordinary obstacle in a lane the corridor does not need, and the bail
         lane is empty by construction.
         """
-        if not self._may_spawn_train(None):
-            return 0
         lane = self._lane_clear(row0 - 1) if row0 else 1
+        if not self._may_spawn_train(lane):
+            return 0
         p_ramp = row0 * ROW + APPROACH_RUN
         p_lip = p_ramp + RAMP_LIP
         nose = self._boxes["train_cab"].x1
@@ -1310,6 +1620,26 @@ class RunnerScene(Scene):
         if used > rows + CONVOY_SLACK:
             return 0
         end = chain[-1][3]
+        # The second line, and whether it moves, are decided here rather than
+        # after the convoy is down -- because a line that drifts forward ends
+        # up past the stretch this set-piece owns, and everything from the
+        # clash check to the bail lane's reservation is asked about that
+        # stretch. Decided afterwards, the moving line slides out of its own
+        # set-piece and into the next one's corridor.
+        flank = self._flank_lane(lane, rng)
+        #: Which trains of the chain got a train beside them. A coin trail
+        #: that changes lanes onto a train that was refused is a crossing into
+        #: thin air.
+        side_at: set[int] = set()
+        drift = (self.speed * rng.uniform(*DRIFT_SPEED)
+                 if flank is not None and rng.random() < DRIFT_CHANCE else 0.0)
+        if drift:
+            stretch = (stretch[0],
+                       stretch[1] + self._drift_span(chain[0][2], end, drift))
+            used = int(math.ceil((stretch[1] - row0 * ROW) / ROW))
+            if used > rows + CONVOY_SLACK:
+                drift = 0.0
+                stretch, used = measure()
         if self._clash(ANY_LANE, *stretch, BODY_PAD) or self._over_clash(*stretch):
             return 0
         if not self._mount_reaches(MOUNT_GAP, chain[0][3] - chain[0][2],
@@ -1357,50 +1687,60 @@ class RunnerScene(Scene):
         # *between* the ride lane and the lane the runner bails into when the
         # mount is refused: that lane has to stay empty by construction, and it
         # is no use if the way to it is through a train.
-        flank = self._flank_lane(lane, rng)
         if flank is not None:
-            # The line alongside is parked. A *moving* one -- the same way the
-            # runner is going and slower, so it is overtaken and can be
-            # stepped onto -- was built and measured and is not here, and the
-            # reason is worth keeping: a train that moves along the track
-            # leaves the stretch its reservation covers, and the coins on its
-            # roof stay where they were laid. Both are fixable and neither is
-            # one line. Measured as built: mean trains crossed per ride 4.12
-            # -> 2.90, three contacts where there had been none, and not one
-            # frame spent on a moving roof, because ``_roof_across`` crosses
-            # for coins and the coins had been left behind. The ``drift``
-            # argument on ``_add_train`` and the yaw that goes with it are
-            # kept, because they are the correct half.
-            drift = 0.0
-            q = chain[0][2] + rng.uniform(2.0, 7.0)
-            while q + nose < end - 10.0:
-                cars = rng.randint(3, 4)
-                a2, b2 = self._train_span(q + nose, cars)
-                if b2 > end - 3.0:
-                    break
+            # **The second line mirrors the first**, train for train, rather
+            # than standing wherever a random offset put it. Two things come
+            # out of that and both were the thing holding the sideways hop
+            # down to 0.75 crossings a minute:
+            #
+            # * the crossing window is a whole train long instead of whatever
+            #   overlap two lines of different pitch happen to share -- three
+            #   or four cars against half a second was the measurement, and
+            #   ``_roof_across`` asks whether the far roof is there for the
+            #   *whole* crossing, so it kept finding it gone;
+            # * the flank is a road as well as a wall. Chained ``behind`` each
+            #   other, its trains offer the same forward leap the ride lane
+            #   does -- so a body that crosses is on a line it can keep
+            #   running down rather than on a dead end it has to come back off.
+            #
+            # And it *moves*, at a fraction of the running speed, so it is
+            # overtaken. That was built once and reverted, for two reasons
+            # that are both fixed here rather than lived with: its coins
+            # stayed where they were laid (they carry the train's velocity
+            # now, see ``_add_coins``) and its reservation covered the stretch
+            # it started on rather than the one it sweeps (``_drift_span``).
+            prev_side = None
+            for i, (p, cars, _a, _b) in enumerate(chain):
                 # Rideable, and that is the whole of the sideways hop: a body
                 # on the convoy's roof may cross onto a train standing beside
                 # it at the same height, which is the move the reference makes
                 # every few seconds and the one this scene had no way to
-                # express. There is no way *onto* one from the rails -- it
-                # carries neither a ramp nor a train in front of it -- so it
-                # stays an ordinary wall to a runner that never got up.
-                side_train = self._add_train(q + nose, flank, cars, rng,
-                                             ride=True, pad=0.0, drift=drift)
-                if side_train is not None:
-                    # Marked, because it is a road the body may cross *onto*
-                    # and not the road the corridor promises: the bail-lane
-                    # guarantee is about the convoy the runner is routed at.
-                    side_train["flank"] = True
-                # ...with its own coins on the roof, which is the *reason* to
-                # cross. Without them the sideways hop is a move with nothing
-                # on the other side of it, and a body with no reason to go
-                # holds its lane: measured, 0.67 crossings a minute against
-                # four times that once the far roof was worth something.
-                self._add_coins((a2 + b2) * 0.5, (b2 - a2) / COIN_PITCH * 0.75,
-                                flank, rng,
-                                base=self._boxes["train_cab"].y1 - RAIL_TOP + 0.55)
-                q = b2 + rng.uniform(5.0, 11.0)
+                # express. There is no way *onto* one from the rails -- the
+                # first of them carries neither a ramp nor a train in front of
+                # it -- so the line stays an ordinary wall to a runner that
+                # never got up.
+                side = self._add_train(p, flank, cars, rng, ride=True,
+                                       pad=0.0, drift=drift, forward=0.0)
+                if side is None:
+                    prev_side = None
+                    continue
+                # Marked, because it is a road the body may cross *onto* and
+                # not the road the corridor promises: the bail-lane guarantee
+                # is about the convoy the runner is routed at.
+                side["flank"] = True
+                if prev_side is not None:
+                    side["behind"] = prev_side
+                    others = [c for c in self.train_liveries
+                              if c != prev_side["color"]]
+                    if others:
+                        side["color"] = rng.choice(others)
+                prev_side = side
+                side_at.add(i)
+            # The track the whole line will have swept by the time the body is
+            # past it, claimed once. See ``forward`` above for why not per
+            # train.
+            if drift:
+                self._reserve(flank, chain[0][2] - ROW, stretch[1])
         # Hurdles down the lanes the convoy is not in. From the roof they cost
         # nothing and read as depth; on the ground they are the whole of what
         # a runner that did not get on has to do, and without them a convoy
@@ -1427,17 +1767,42 @@ class RunnerScene(Scene):
         for ln in (0, 1, 2):
             if ln != lane:
                 self._reserve(ln, stretch[0], stretch[1], soft=True)
-        # coins along the roof, which is also what tells a viewer it is a road
-        roof = self._boxes["train_cab"].y1 - RAIL_TOP
+        # One coming the other way down the approach, before the ramp. It is
+        # the *approach* and not the convoy on purpose: the bail lane has to
+        # be reachable for the whole ride, and a sweeper aimed at the middle
+        # of the convoy is a sweeper in the one lane the mount's refusal has
+        # to escape into. Aimed at the run-up it has swept past before the
+        # body is anywhere near the ramp, which is what a soft reservation
+        # means, and it puts a train across the frame at the moment the
+        # camera is looking down an empty approach.
+        if rng.random() < SWEEP_APPROACH:
+            self._sweeper(row0 * ROW + APPROACH_RUN * 0.35,
+                          [ln for ln in (0, 1, 2) if ln != lane], rng)
+        # Coins along the roofs, which is also what tells a viewer it is a
+        # road -- and **which roof they are on is the whole of the sideways
+        # hop**. ``_roof_across`` crosses when the lane alongside has coins
+        # this one has not, and nothing else; put a full trail down both lines
+        # of a mirrored canyon and the two are worth the same, so the body
+        # correctly never moves. The trail changes lanes at every gap instead,
+        # and the arc over that gap is laid on the line it is changing *to* --
+        # which is the reference's own way of saying "this is a jump and this
+        # is where it goes", now saying it sideways as well as forwards.
+        roof = self._boxes["train_cab"].y1 - RAIL_TOP + 0.55
         self._add_coins(row0 * ROW + ROW, 6, lane, rng)
+
+        def line(i: int) -> tuple[int, float]:
+            if flank is not None and i % 2 == 1 and i in side_at:
+                return flank, -drift
+            return lane, 0.0
+
         for i, (p, cars, a, b) in enumerate(chain):
-            self._add_coins((a + b) * 0.5, (b - a) / COIN_PITCH * 0.8, lane,
-                            rng, base=roof + 0.55)
+            ln, vel = line(i)
+            self._add_coins((a + b) * 0.5, (b - a) / COIN_PITCH * 0.8, ln,
+                            rng, base=roof, vel=vel)
             if i + 1 < len(chain):
-                # ...and an arc over the gap, which is the reference's own way
-                # of saying "this is a jump and this is where it goes".
-                self._add_coins(0.5 * (b + chain[i + 1][2]), 5, lane, rng,
-                                base=roof + 0.55, arc=1.5)
+                ln, vel = line(i + 1)
+                self._add_coins(0.5 * (b + chain[i + 1][2]), 5, ln, rng,
+                                base=roof, arc=1.5, vel=vel)
         return used
 
     def _flank_lane(self, lane: int, rng) -> int | None:
@@ -1448,7 +1813,10 @@ class RunnerScene(Scene):
         to the far side is through the middle. So a convoy in lane 1 may flank
         either side, and one in lane 0 or 2 may only flank the far side.
         """
-        if rng.random() >= FLANK_CHANCE:
+        # Always, once the run is past the guaranteed range: the canyon is
+        # what the reference looks like at speed, and it is also two lanes of
+        # the three shut, which is the pressure this scene needs.
+        if rng.random() >= FLANK_CHANCE + (1.0 - FLANK_CHANCE) * self.pressure:
             return None
         if lane == 1:
             return rng.choice((0, 2))
@@ -1540,8 +1908,8 @@ class RunnerScene(Scene):
         # A gantry is pure dressing: it is hung clear of the tallest thing the
         # runner can become on the rails. It is *not* clear of one on a train
         # roof, which is why it goes into the overhead ledger.
-        if srng.random() < 0.08 and not self._over_clash(row * ROW - 3.0,
-                                                        row * ROW + 3.0):
+        if srng.random() < 0.08 + 0.07 * self.pressure \
+                and not self._over_clash(row * ROW - 3.0, row * ROW + 3.0):
             self._add_gantry(row * ROW)
         for side in (-1, 1):
             crng = self.ctx.seed.stream(f"city{side}{row}")
@@ -1717,7 +2085,14 @@ class RunnerScene(Scene):
     def _threats(self) -> list[plan.Threat]:
         """Every obstacle inside the horizon, as lane/height/time facts."""
         out: list[plan.Threat] = []
-        reach = PLAN_HORIZON * (self.speed * 2.0) + 8.0
+        horizon = self.plan_horizon
+        # In metres, both of them, and capped by what has actually been
+        # spawned. Asked in seconds they grow past the spawn horizon as the run
+        # accelerates, and a threat beyond that is not one the scene knows
+        # about -- so the approach shadow the lane search leaves early on
+        # quietly stops working at exactly the speed it is most needed.
+        sight = min(TRAIN_SIGHT_M, self.sight)
+        reach = min(self.sight, max(sight, horizon * self.speed)) + 8.0
         for e, box in self._solids_near(reach):
             if self.riding and self._ride_top(e, e["d"], self.motion.x) > 0.0:
                 continue        # you cannot collide with what you stand on
@@ -1735,11 +2110,11 @@ class RunnerScene(Scene):
             # a train just *outside* the horizon lands the body squarely in
             # front of it. Held at the horizon's edge instead, it still casts
             # the approach shadow that makes the lane search leave early.
-            far = PLAN_HORIZON * (TRAIN_SIGHT if e["kind"] == "train" else 1.0)
-            if t1 <= 0.0 or t0 > far:
+            far = (sight / max(1.0, closing)) if e["kind"] == "train" else horizon
+            if t1 <= 0.0 or t0 > max(far, horizon):
                 continue
-            if t0 > PLAN_HORIZON:
-                t0 = PLAN_HORIZON - 1e-3
+            if t0 > horizon:
+                t0 = horizon - 1e-3
             lanes = tuple(ln for ln in plan.LANES
                           if box.x0 < self._lane_x(ln) + self.body.half_w
                           and box.x1 > self._lane_x(ln) - self.body.half_w)
@@ -1822,11 +2197,16 @@ class RunnerScene(Scene):
         """
         if not self._convoy_open(e):
             return None
-        speed = max(1e-6, self.speed)
         lead_box = self.solid_box(lead)
         if lead_box is None:
             return None
-        window = plan.solve_mount(-box.z1 / speed, -box.z0 / speed,
+        # Closing speed, not running speed: a train that is itself moving
+        # arrives at a different time from a parked one, and the leap is solved
+        # in seconds. Identical for a parked convoy, which is all there was
+        # when this was written.
+        closing = max(1e-6, self._closing_speed(e))
+        lead_closing = max(1e-6, self._closing_speed(lead))
+        window = plan.solve_mount(-box.z1 / closing, -box.z0 / closing,
                                   box.y1 - RAIL_TOP, lead_box.y1 - RAIL_TOP,
                                   self.kin, self.kin.clearance_margin)
         if window is None:
@@ -1834,14 +2214,16 @@ class RunnerScene(Scene):
         x = self._lane_x(e["lane"])
         first = last = None
         t = 0.0
-        while t <= PLAN_HORIZON:
-            if self._ride_top(lead, lead["d"] - speed * t, x) > 0.0:
+        step = self.plan_step
+        horizon = self.plan_horizon
+        while t <= horizon:
+            if self._ride_top(lead, lead["d"] - lead_closing * t, x) > 0.0:
                 if first is None:
                     first = t
                 last = t
             elif first is not None:
                 break
-            t += PLAN_STEP
+            t += step
         if last is None:
             return None
         latest = min(window[1], last)
@@ -1963,10 +2345,11 @@ class RunnerScene(Scene):
 
     def _corridor_lanes(self) -> list[int]:
         """The generator's clear lane at each step of the planning horizon."""
-        steps = max(1, int(math.ceil(PLAN_HORIZON / LANE_STEP)))
+        step = self.lane_step
+        steps = max(1, int(math.ceil(self.plan_horizon / step)))
         out = []
         for i in range(steps):
-            ahead = self.travel + self.speed * (i * LANE_STEP)
+            ahead = self.travel + self.speed * (i * step)
             out.append(self._lane_clear(int(ahead / ROW)))
         return out
 
@@ -1996,16 +2379,16 @@ class RunnerScene(Scene):
         if self.motion.ground <= 0.05 or not lane_plan.lanes:
             return
         here = self._roof_across()
-        speed = max(1e-6, self.speed)
         x = self._lane_x(here)
         t = 0.0
         i = 0
-        while i < len(lane_plan.lanes) and t <= PLAN_HORIZON:
+        step = lane_plan.step
+        while i < len(lane_plan.lanes) and t <= self.plan_horizon:
             if self.surface_at(t, x, self.motion.y) <= RAMP_LIP_H:
                 break
             lane_plan.lanes[i] = here
             i += 1
-            t += LANE_STEP
+            t += step
 
     # -- power-ups ---------------------------------------------------------
 
@@ -2130,17 +2513,19 @@ class RunnerScene(Scene):
         # -- eighty-eight metres of one clear lane is rare at this density, so
         # the jetpack never found anywhere to land and stayed up: 21.7 seconds
         # a minute of flying against the five and a half it lasts.
-        ahead = self.speed * fall + JET_LAND_CLEAR
+        ahead = self.speed * (fall + JET_LAND_CLEAR)
         if self.jet_t < JET_WAIT_MAX:
             for e, box in self._solids_near(ahead):
                 if box.x1 > self.x - self.body.half_w \
                         and box.x0 < self.x + self.body.half_w:
                     return False
             return True
-        # ...and past that, down on the first frame with room for the fall
-        # itself. Waiting for a better spot forever is worse than landing in
-        # a mediocre one: the planner gets the body back either way.
-        for e, box in self._solids_near(self.speed * fall + 3.0):
+        # ...and past that, down on the first frame with room for the fall and
+        # a take-off after it. Waiting for a better spot forever is worse than
+        # landing in a mediocre one: the planner gets the body back either
+        # way -- but "mediocre" has to still leave it a move, which three
+        # metres of track does not at fifty metres a second.
+        for e, box in self._solids_near(self.speed * (fall + JET_LAND_MIN)):
             if box.x1 > self.x - self.body.half_w \
                     and box.x0 < self.x + self.body.half_w:
                 return False
@@ -2319,7 +2704,8 @@ class RunnerScene(Scene):
 
     def _replan(self) -> None:
         threats = self._threats()
-        transit = max(1, int(round(self.kin.lane_time / LANE_STEP)))
+        horizon, lane_step = self.plan_horizon, self.lane_step
+        transit = max(1, int(round(self.kin.lane_time / lane_step)))
         # When the body next becomes available: mid-jump or mid-slide, it is
         # committed, and anything scheduled inside that window would simply be
         # dropped at execution time and never noticed.
@@ -2334,11 +2720,11 @@ class RunnerScene(Scene):
         #: down the convoy the body is standing on. See below.
         deferred = False
         for _ in range(PLAN_ATTEMPTS):
-            grid = plan.occupancy(threats, PLAN_HORIZON, LANE_STEP, corridor)
+            grid = plan.occupancy(threats, horizon, lane_step, corridor)
             # Plan onward from where the body is committed to arriving, not
             # from where it happens to be mid-slide.
             lane_plan = plan.choose_lanes(grid, self.motion.target_lane,
-                                          LANE_STEP, transit)
+                                          lane_step, transit)
             self._pin_while_raised(lane_plan)
             booked, unsolved = plan.schedule_vertical(
                 threats, lane_plan, self.body, self.kin, self._stand_y(),
@@ -2358,8 +2744,9 @@ class RunnerScene(Scene):
                 # land on, which is what makes the lane choice and the mount
                 # one decision rather than two that have to agree.
                 failure = plan.verify(self.motion, lane_plan, booked, threats,
-                                      self.body, self.kin, PLAN_HORIZON,
-                                      PLAN_STEP, RAIL_TOP, self.surface_at)
+                                      self.body, self.kin, horizon,
+                                      self.plan_step, RAIL_TOP,
+                                      self.surface_at)
                 if failure is None:
                     best = (float("inf"), lane_plan, booked)
                     break
@@ -2397,7 +2784,10 @@ class RunnerScene(Scene):
         #: actually be flown before the next re-solve. Non-zero here is the
         #: honest early warning that the generator is producing situations
         #: with no answer -- long before it shows up as a body inside a train.
-        if survives < COMMIT_WINDOW and not deferred:
+        # Against the horizon that was actually solved, not a constant: past
+        # about 70 m/s the fog is closer than ``COMMIT_WINDOW``, and a plan
+        # cannot survive longer than it was asked to reach.
+        if survives < min(COMMIT_WINDOW, 0.6 * horizon) and not deferred:
             self.unsolvable += 1
 
     # -- simulation -------------------------------------------------------
@@ -2417,9 +2807,7 @@ class RunnerScene(Scene):
         # ``run_t`` rather than ``elapsed``, because a run that ended in a
         # wreck starts again from a standing start and not from wherever the
         # scene's clock had got to.
-        self.speed = (BASE_SPEED + (TOP_SPEED - BASE_SPEED)
-                      * min(1.0, self.run_t / RAMP_SECONDS)
-                      + CREEP * max(0.0, self.run_t - RAMP_SECONDS) / 60.0)
+        self.speed = self.speed_at(self.run_t)
         # Moves are sized against the current speed, so they always span about
         # the same stretch of track. A jump in flight keeps the arc it left
         # the ground with -- which is also what makes the sneakers safe to
@@ -2446,8 +2834,16 @@ class RunnerScene(Scene):
 
         for e in self.entities:
             e["d"] -= step
-            if e["kind"] == "train" and e["vel"]:
-                e["d"] -= e["vel"] * dt
+            # Anything at all may carry a velocity of its own, not just a
+            # train. The coins on a moving train's roof are the reason: laid
+            # once and left on the track, a drifting train slides out from
+            # under its own coins -- and ``_roof_across`` crosses onto a roof
+            # *because* of the coins on it, so it stops crossing at all. That
+            # was the whole of why a moving train alongside was built once,
+            # measured worse and reverted.
+            vel = e.get("vel")
+            if vel:
+                e["d"] -= vel * dt
         # A train is only *at* its near end; the rest of it trails away behind
         # and has to stay drawn until the last car has gone past.
         self.entities = [e for e in self.entities
@@ -2470,14 +2866,14 @@ class RunnerScene(Scene):
                 self.motion.begin(action, self.kin)
         else:
             self._booked.clear()
-        if not self.driven and not self.flying \
+        if not self.driven and not self.flying and not self.blind \
                 and self.elapsed - self._plan_at >= PLAN_EVERY:
             self._plan_at = self.elapsed
             self._replan()
         # One pass over what is close enough to matter, shared by the reflex
         # and the contact check.
         near = self._solids_near(REFLEX_WINDOW * self.speed + 6.0)
-        if not self.driven and not self.flying:
+        if not self.driven and not self.flying and not self.blind:
             self._reflex(near)
 
         # While a person is driving, the lane they chose stands: feeding the
@@ -2487,6 +2883,8 @@ class RunnerScene(Scene):
                        max(0.0, self.elapsed - self._plan_at)))
         was_airborne = self.motion.airborne
         was_ground = self.motion.ground
+        was_lane = self.lane
+        was_riding = self.riding
         if self.flying:
             self._fly(dt, desired)
         else:
@@ -2508,6 +2906,8 @@ class RunnerScene(Scene):
             self.fly_time += dt
         if self.motion.ground > RAMP_LIP_H >= was_ground:
             self.mounts += 1
+        if was_riding and self.riding and self.lane != was_lane:
+            self.crossings += 1
         # A jump taken on the sneakers throws sparks off the heels, and the
         # feet keep a glow for as long as they last. The colour on the shoes
         # is honest and it is *small*: what a viewer reads at this size is
@@ -2882,7 +3282,8 @@ class RunnerScene(Scene):
                 # the lamp head hangs over the track; light it from there
                 glow_billboard(self.camera, e["x"] + (0.78 if e["yaw"] else -0.78),
                                4.05, -e["d"], 2.4, (255, 232, 170), 90)
-            elif e["kind"] == "train" and e["vel"] and pal.is_dark and e["d"] < 70:
+            elif e["kind"] == "train" and (e.get("vel") or 0.0) > 0.0 \
+                    and pal.is_dark and e["d"] < 70:
                 # oncoming headlights punching through the dark, on the nose --
                 # which faces us, so they sit at the near end of the hull
                 x_t = self._lane_x(e["lane"])
