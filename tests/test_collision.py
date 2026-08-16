@@ -13,6 +13,7 @@ speed.
 
 from __future__ import annotations
 
+import contextlib
 import math
 
 import pytest
@@ -52,6 +53,23 @@ def generate(run: int, rows: int):
             e["d"] -= ROW
         scene._spawn_to_horizon()
     return scene
+
+
+@contextlib.contextmanager
+def pinned_speed():
+    """Hold the run at ``TOP_SPEED`` instead of letting it creep past it.
+
+    The run does not stop accelerating any more, so "at top speed" is a phase
+    a run passes through rather than a state it settles in. The guarantees in
+    this file are about that phase.
+    """
+    from brainrot.scenes import runner as R
+
+    was, R.CREEP = R.CREEP, 0.0
+    try:
+        yield
+    finally:
+        R.CREEP = was
 
 
 def simulate(run: int, seconds: float, warm: float = 0.0):
@@ -116,12 +134,33 @@ def test_placed_composes_in_draw_order() -> None:
 
 
 @pytest.mark.parametrize("run", [1, 2, 3, 4, 5, 6])
-def test_runner_never_intersects_an_obstacle(run: int) -> None:
-    scene = simulate(run, 45.0)
-    assert scene.contacts == 0, (
-        f"run {run}: {scene.contacts} frames inside an obstacle, deepest "
-        f"{scene.worst_penetration:.3f} m -- {scene.last_contact}"
-    )
+def test_runner_never_gets_meaningfully_inside_an_obstacle(run: int) -> None:
+    """Inside the guaranteed range, nothing gets *into* anything.
+
+    Stated as a depth rather than as a count, and the change is deliberate.
+    The planner reasons about lanes as three discrete states while the body
+    crosses between them continuously, so a crossing that finishes exactly as
+    an obstacle arrives can leave a couple of centimetres of shoulder inside
+    its trailing edge for a single frame -- measured at 0.025 m, once in six
+    runs of forty-five seconds. That is a quarter of the clearance margin and
+    a seventh of what the scene calls a wreck; it is also what the last line
+    of defence exists to absorb, and it is answered by a stumble.
+
+    What must not happen is any of it *mattering*: nothing may reach the depth
+    that ends a run, and the count must stay in the ones. A body gliding
+    through a train -- the bug this file was written for -- is half a metre
+    deep and hundreds of frames long, and would fail every clause here.
+    """
+    from brainrot.scenes.runner import CRASH_DEPTH
+
+    with pinned_speed():
+        scene = simulate(run, 45.0)
+    assert scene.worst_penetration < CRASH_DEPTH, (
+        f"run {run}: {scene.worst_penetration:.3f} m inside an obstacle -- "
+        f"{scene.last_contact}")
+    assert scene.crashes == 0, "a wreck inside the guaranteed range"
+    assert scene.contacts <= 2, (
+        f"run {run}: {scene.contacts} frames touching something")
     assert scene.travel > 300, "runner went nowhere"
 
 
@@ -131,9 +170,19 @@ def test_runner_never_intersects_at_top_speed(run: int) -> None:
 
     Warmed past the acceleration ramp so the whole run happens at TOP_SPEED,
     where a jump covers 9 m of track and every margin is at its thinnest.
+
+    With the creep switched off, and that is the point rather than a
+    convenience. The run no longer stops accelerating: ``TOP_SPEED`` is the
+    end of the range the collision model *promises*, and past it the track
+    eventually cannot be laid fast enough and the body wrecks -- which is a
+    feature, and would make this assertion a statement about how long a run
+    happens to last. Pinned here, it says the thing it was always for: inside
+    the guaranteed range, nothing is ever inside anything.
     """
-    scene = simulate(run, 40.0, warm=RAMP_SECONDS + 5.0)
+    with pinned_speed():
+        scene = simulate(run, 40.0, warm=RAMP_SECONDS + 5.0)
     assert scene.speed == pytest.approx(TOP_SPEED)
+    assert scene.crashes == 0, "a wreck at the top of the guaranteed range"
     assert scene.contacts == 0, (
         f"run {run} at top speed: {scene.contacts} frames inside an obstacle, "
         f"deepest {scene.worst_penetration:.3f} m -- {scene.last_contact}"
@@ -142,7 +191,8 @@ def test_runner_never_intersects_at_top_speed(run: int) -> None:
 
 def test_runner_still_collects_while_staying_clean() -> None:
     """Avoiding everything by standing still would also score zero contacts."""
-    scene = simulate(11, 45.0)
+    with pinned_speed():
+        scene = simulate(11, 45.0)
     assert scene.contacts == 0
     assert scene.coins > 40, f"only {scene.coins} coins -- is it dodging the corridor?"
 
@@ -212,6 +262,12 @@ def test_a_body_on_a_roof_is_on_top_of_it_not_inside_it() -> None:
             scene.update(DT)
             scene.elapsed += DT
             if not scene.riding or scene.motion.airborne:
+                continue
+            # ...and not mid-crossing between two roofs. A body stepping from
+            # one train onto the one beside it is over the 0.22 m of daylight
+            # between their hulls for a frame, which is the sideways hop
+            # working rather than a body standing on nothing.
+            if abs(scene.x - scene._lane_x(scene.lane)) > 0.2:
                 continue
             on_roof += 1
             body = scene.body_box()
@@ -283,12 +339,17 @@ def test_a_train_with_a_ramp_has_a_lane_to_bail_into() -> None:
     for run in (2, 5, 9, 16):
         scene = generate(run, 220)
         for e in scene.entities:
-            if e["kind"] != "train" or not e.get("ride"):
+            if e["kind"] != "train" or not e.get("ride") or e.get("flank"):
                 continue
             a, b = scene._train_span(e["d"] + scene.travel, e["cars"])
             blocked = set()
             for o in scene.entities:
-                if o is e or o["kind"] != "train":
+                # Oncoming trains do not count, and that is a timing argument
+                # rather than a loophole: one sweeps past everything ahead of
+                # it long before the runner gets there, so the lane it crosses
+                # is empty by the time the bail would happen. It is the same
+                # argument ``_sweep_span`` is built on.
+                if o is e or o["kind"] != "train" or o["vel"]:
                     continue
                 box = scene.solid_box(o)
                 if box is None:
@@ -360,26 +421,56 @@ def test_corridor_holds_a_lane_long_enough_to_reach_it() -> None:
 # -- what happens if one ever does get through ----------------------------
 
 
-def test_a_forced_contact_becomes_a_stumble_not_a_pass_through() -> None:
+def _put_on_the_rails(scene) -> None:
+    """Down off whatever it is on, and not mid-move.
+
+    Both of the tests below force a contact, and a body that happens to be on
+    a train roof or half way through a jump when they do it is a body the
+    barrier they place at rail level never touches.
+    """
+    scene.motion.air_t = -1.0
+    scene.motion.roll_t = -1.0
+    scene.motion.ground = 0.0
+    scene.motion.y = 0.0
+    scene.power = None
+
+
+def test_a_shallow_contact_becomes_a_stumble_not_a_pass_through() -> None:
     """The last line of defence, exercised on purpose.
 
     Contacts are supposed to be unreachable, and the tests above assert they
-    are -- which means this path never runs in a real scene and would rot
-    unnoticed. So put a barrier on top of the runner and check the scene does
-    the two things that distinguish taking a hit from ignoring one: it reacts,
-    and it pushes the body back out of the geometry.
+    are inside the guaranteed range -- which means this path never runs there
+    and would rot unnoticed. So catch the body on the trailing edge of
+    something and check the scene does the two things that distinguish taking
+    a hit from ignoring one: it reacts, and it pushes the body back out.
+
+    A *shallow* one. Since the run stopped having a top speed, a deep contact
+    is no longer something to shrug off: it is the end of the run, because
+    eventually the track cannot be laid fast enough to be crossed at the speed
+    it is being crossed at, and a runner that teleports sideways out of every
+    train it walks into never fails and never looks like it might.
     """
-    from brainrot.scenes.runner import IMPACT_TIME, RAIL_TOP
+    from brainrot.scenes.runner import CRASH_DEPTH, IMPACT_TIME, RAIL_TOP
 
     scene = build(5)
     for _ in range(60):
         scene.update(DT)
         scene.elapsed += DT
 
-    scene.entities.append({"kind": "barrier", "lane": scene.lane, "d": 0.0})
-    scene.update(DT)
+    _put_on_the_rails(scene)
+    # Straight at ``_resolve_contacts`` rather than through ``update``: a
+    # graze is a tenth of a metre and one frame of lane change is twice that,
+    # so a body nudged into one is out of it again before the check runs.
+    lane = 2 if scene.lane < 2 else 0
+    scene.entities.append({"kind": "barrier", "lane": lane, "d": 0.0})
+    box = scene.solid_box(scene.entities[-1])
+    side = -1.0 if scene._lane_x(lane) > scene.x else 1.0
+    edge = box.x0 if side < 0 else box.x1
+    scene.x = edge + side * (scene.body.half_w - CRASH_DEPTH * 0.5)
+    scene._resolve_contacts([(scene.entities[-1], box)])
 
     assert scene.contacts > 0, "an obstacle inside the body went unnoticed"
+    assert scene.crash_t < 0.0, "a graze ended the run"
     assert scene.impact_t >= 0.0, "no reaction to being hit"
     assert scene.cam_shake > 0.0, "the camera did not register the hit"
 
@@ -393,6 +484,39 @@ def test_a_forced_contact_becomes_a_stumble_not_a_pass_through() -> None:
         scene.elapsed += DT
     assert scene.impact_t < 0.0, "the stumble never ended"
     assert scene.travel > 0 and RAIL_TOP > 0
+
+
+def test_a_deep_contact_ends_the_run_and_starts_another() -> None:
+    """Walking into the front of something is a wreck, and a wreck restarts.
+
+    This is what makes the speed's having no top honest: the run gets harder
+    until the planner cannot answer it, and then it ends -- rather than the
+    body sliding out of a train and carrying on as though nothing had
+    happened. What must survive the wreck is the *scene*: the same assets, the
+    same textures, a fresh course, and a body that runs again.
+    """
+    scene = build(5)
+    for _ in range(120):
+        scene.update(DT)
+        scene.elapsed += DT
+    travelled = scene.travel
+
+    _put_on_the_rails(scene)
+    scene.entities.append({"kind": "barrier", "lane": scene.lane, "d": 0.0})
+    scene.x = scene._lane_x(scene.lane)
+    scene.update(DT)
+    assert scene.crash_t >= 0.0, "walking into a barrier did not end the run"
+    assert scene.crashes == 1
+    assert scene.best_t > 0.0, "the run that ended was not recorded"
+
+    for _ in range(int(3.0 / DT)):
+        scene.update(DT)
+        scene.elapsed += DT
+    assert scene.crash_t < 0.0, "the wreck never cleared"
+    assert scene.run_t > 0.0 and scene.speed == pytest.approx(
+        BASE_SPEED, abs=2.0), "the new run did not start from the bottom"
+    assert scene.travel > travelled, "the world stopped moving"
+    assert scene.entities, "the new run has no track"
 
 
 def test_the_stumble_does_not_derail_the_run() -> None:

@@ -122,7 +122,14 @@ def test_the_run_resumes_on_its_own_afterwards() -> None:
 
 
 def test_driving_does_not_disable_the_contact_response() -> None:
-    """A player may crash. It still has to read as a hit, not a pass-through."""
+    """A player may crash. It still has to read as a hit.
+
+    And since the run stopped having a top speed, walking squarely into
+    something *is* the end of it -- for a person at the controls exactly as
+    for the autopilot. What this asserts is that the response is not
+    suppressed while somebody is driving, which it was written for; what it no
+    longer asserts is a push-out, because a wreck does not push out.
+    """
     scene = build(11)
     settle(scene, 2.0)
     # On the ground, explicitly. "Put a barrier on top of the runner" is only
@@ -135,11 +142,12 @@ def test_driving_does_not_disable_the_contact_response() -> None:
         scene.elapsed += DT
     scene.control(Intent(right=True))
     scene.entities.append({"kind": "barrier", "lane": scene.lane, "d": 0.0})
+    scene.x = scene._lane_x(scene.lane)
     scene.update(DT)
     assert scene.contacts > 0
     assert scene.impact_t >= 0.0
-    hit = scene.entities[-1]
-    assert scene.body_box().penetration(scene.solid_box(hit)) == 0.0
+    assert scene.crash_t >= 0.0, "a driven runner walked through a barrier"
+    assert scene.cam_shake > 0.0, "the camera did not register the hit"
 
 
 def test_the_overlay_needs_the_chord_but_a_demo_window_does_not() -> None:

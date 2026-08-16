@@ -177,6 +177,9 @@ def pacing(runs: int, seconds: float) -> dict:
     segments = Counter()
     mounts = 0
     ride_time = 0.0
+    fly_time = 0.0
+    crashes = 0
+    run_lengths: list[float] = []
     pops = 0
     worst_pop = 0.0
     for run in range(1, runs + 1):
@@ -188,9 +191,13 @@ def pacing(runs: int, seconds: float) -> dict:
         prev_target = scene.motion.target_lane
         last_action = 0.0
         ride_at_action = 0.0
+        fly_at_action = 0.0
+        wrecked = 0.0
         n_actions = 0
         window_kinds: dict[str, int] = {}
         for f in range(frames):
+            if getattr(scene, "crash_t", -1.0) >= 0.0:
+                wrecked += DT
             scene.update(DT)
             scene.elapsed += DT
             now = scene.elapsed
@@ -217,7 +224,13 @@ def pacing(runs: int, seconds: float) -> dict:
                 # least boring thing in the scene, so it does not count
                 # against the idle budget -- what this measures is stretches
                 # with nothing to do *and* nothing to look at.
-                idle = gap - (getattr(scene, "ride_time", 0.0) - ride_at_action)
+                # ...and neither does a wreck: the run ended, and the hold
+                # before the next one starts is the scene saying so rather
+                # than a stretch of nothing happening.
+                idle = (gap - (getattr(scene, "ride_time", 0.0) - ride_at_action)
+                        - (getattr(scene, "fly_time", 0.0) - fly_at_action)
+                        - wrecked)
+                wrecked = 0.0
                 if idle > DEAD_AIR:
                     dead_air += idle - DEAD_AIR
                 if idle > longest_gap:
@@ -225,6 +238,7 @@ def pacing(runs: int, seconds: float) -> dict:
                     longest_where = f"run={run} t={now:.1f}s"
                 last_action = now
                 ride_at_action = getattr(scene, "ride_time", 0.0)
+                fly_at_action = getattr(scene, "fly_time", 0.0)
             # A surface that rises under a body which is not jumping is a
             # runner being teleported upward. Running up a ramp is exactly
             # that, done slowly enough to look like running; anything more
@@ -232,7 +246,11 @@ def pacing(runs: int, seconds: float) -> dict:
             # ``was_air`` matters: the frame a mount lands on is a legal
             # 1.44 m rise, and counting it reports the feature working as if
             # it were the bug.
-            if not scene.motion.airborne and not was_air:
+            # ...and never while the jetpack has the body off the track: it
+            # climbs to altitude under its own power, which is a rise with no
+            # surface under it at all and exactly what this is looking for.
+            if not scene.motion.airborne and not was_air \
+                    and not getattr(scene, "flying", False):
                 rise = getattr(scene.motion, "ground", 0.0) - prev_ground
                 slope = (getattr(R, "RAMP_LIP_H", 1.0) * scene.speed * DT
                          / getattr(R, "RAMP_RUN", 3.0))
@@ -259,6 +277,10 @@ def pacing(runs: int, seconds: float) -> dict:
                       if k in R.SOLID_KINDS or k.startswith("train")
                       or k == "ramp"})
         mounts += getattr(scene, "mounts", 0)
+        fly_time += getattr(scene, "fly_time", 0.0)
+        crashes += getattr(scene, "crashes", 0)
+        if getattr(scene, "crashes", 0):
+            run_lengths.append(getattr(scene, "best_t", 0.0))
         ride_time += getattr(scene, "ride_time", 0.0)
     # Coins are everywhere by design, and counting them swamps the mix. What a
     # viewer sees as variety is the things that make the runner move.
@@ -272,6 +294,10 @@ def pacing(runs: int, seconds: float) -> dict:
             "segments": dict(segments.most_common()),
             "segments_per_minute": {k: v / minutes for k, v in segments.items()},
             "mounts_per_minute": mounts / minutes,
+            "fly_seconds_per_minute": fly_time / minutes,
+            "crashes": crashes,
+            "mean_run_seconds": (sum(run_lengths) / len(run_lengths)
+                                 if run_lengths else float("inf")),
             "ride_seconds_per_minute": ride_time / minutes,
             "surface_pops": pops, "worst_pop": worst_pop,
             "actions": dict(actions),
@@ -401,6 +427,10 @@ def report(saf: dict, pac: dict, frm: dict) -> str:
                                           key=lambda kv: -kv[1])))
     out.append(f"== riding a train roof ==")
     out.append(f"  mounts per minute      : {pac['mounts_per_minute']:.2f}")
+    out.append(f"  seconds flying / min   : {pac['fly_seconds_per_minute']:.2f}")
+    out.append(f"  wrecks                 : {pac['crashes']}"
+               + ("" if pac['crashes'] == 0 else
+                  f", longest run {pac['mean_run_seconds']:.0f}s"))
     out.append(f"  seconds on a roof / min: {pac['ride_seconds_per_minute']:.2f}")
     out.append(f"  surface pops           : {pac['surface_pops']} "
                f"(worst {pac['worst_pop']:.3f} m in a frame)")

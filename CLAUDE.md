@@ -897,6 +897,15 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
+0000. **The sideways hop between two roofs happens 0.75 times a minute**, and
+   it should be several. The machinery is right -- ``ground_to``, the height
+   gate on ``surface_at``, the pin that covers the mount's flight -- and what
+   limits it is opportunity: a flanking train is three or four cars against a
+   crossing window of half a second, so ``_roof_across`` finds the far roof
+   gone by the time it asks. Longer flanks, or a flank laid *against* the
+   chain rather than at random offsets, is the next thing to try. Do not hand
+   the decision to the lane search instead: measured, that wanders onto the
+   flank and off it and costs eight seconds of roof a minute.
 000. **The runner reports no surviving plan nine times as often as it used
    to** -- 1,789 over 60 runs x 180 s against 192 before convoys, or 1.7% of
    re-solves against 0.18%. It is a warning counter and not a contact: the
@@ -1200,6 +1209,111 @@ decision. And a longer `PLAN_HORIZON` of 3.4 s, which takes the no-answer
 count down to 1,152 and puts **six frames of the body inside a barrier**; 2.8
 stays.
 
+## The run never stops getting faster, and it can end (2026-08-16, later)
+
+The owner's second pass on this scene: it stalls at maximum speed after about
+a minute and needs to go much, much faster; oncoming trains are too rare and
+too slow; there are too many barriers and too many full-width ducks in a row;
+and there should be real power-ups. He also said, explicitly, that it is fine
+for the run to eventually outrun its own planner and fail -- "and then it
+starts again from scratch" -- as long as none of it costs more per frame.
+
+**The speed has no top.** ``TOP_SPEED`` is now the end of the *guaranteed*
+stretch rather than a ceiling: 15 -> 24 m/s in twenty-eight seconds, and then
+``CREEP`` adds 1.6 m/s per further minute without limit. Everything the
+collision model promises is promised up to 24; past it the track eventually
+cannot be laid fast enough to be crossed at the speed it is being crossed at,
+the body walks into something, and the run ends. Measured over twelve runs of
+five minutes, first wrecks land between one and four minutes -- past all but
+the longest thinking turns.
+
+- **A deep contact is a wreck, a shallow one is still a stumble**
+  (``CRASH_DEPTH``). Nothing else would work: a runner that teleports sideways
+  out of every train it walks into never fails and never looks like it might.
+- **A wreck restarts the run, not the scene.** ``_restart`` clears the course,
+  the ledgers and the body, and keeps the assets, the textures and the sky.
+  Two things it must also reset and did not at first: ``_first_row`` (the new
+  run starts hundreds of metres down the same track, so ``_lane_clear`` reads
+  a row that no longer exists) and the power in hand.
+- **The tests that say "nothing is ever inside anything" pin the creep off**
+  (``pinned_speed``). Otherwise they are statements about how long a run
+  happens to last.
+
+**Trains come at you, often and fast.** ``ONCOMING_RATIO`` is 1.0, so the pair
+close at twice the running speed against the old 1.55x combined, and there are
+two or three per express set-piece rather than one. What was stopping more of
+them was the *reservation*: a sweeper held every metre of lane it would cross,
+two hundred metres for a train twenty-five long, so the second never fitted.
+``_sweep_span`` is the fix and it is a visibility argument, not a spacing one:
+a train coming the other way passes a point ``d`` past the meeting while the
+runner is still ``d * (1 + v/w)`` short of it, so past ``FOG_FAR / (1 + v/w)``
+-- forty-four metres at equal speeds -- the pass happens inside the fog with
+nothing on screen to see it. Oncoming trains 1.7 -> 3.8 a minute.
+
+**Fewer barriers, and never a wall of them.** ``_add_barrier`` refuses to be
+the third lane of three, which is one guard in one place rather than a rule in
+every set-piece; the express staggers its rhythm by a third of a pitch per
+lane, because level with each other they are a wall with one hole in it and
+leaving a lane means arriving in another with a hurdle at the same distance.
+A tunnel lays at most two full-width hoardings and fills the rest with
+``lowbar`` -- the same board scaled to one lane, which is a thing to *dodge or
+duck* rather than a thing to obey, and which leaves the other two lanes free
+for a train. Barriers 58.5 -> 32.7 a minute; hoardings 3.3 -> 2.2.
+
+**Power-ups, and each one is a different verb.** ``POWERS``: a jetpack that
+takes the body off the track altogether for five and a half seconds, super
+sneakers that raise the arc of every jump, and a magnet that curves every coin
+in reach onto the body. About four a minute, and eight and a half seconds a
+minute are spent flying.
+
+- **The sneakers raise the apex and not the span**, and that is what makes
+  them safe rather than lucky: every reservation in the ledger is a stretch of
+  track a move commits the body to, laid down long before any power-up
+  existed, so a jump that suddenly covers a third more track is two obstacles
+  met inside one move.
+- **A gantry is scenery only if a jumping body clears it**, and the boots make
+  the body taller than the number that was derived from. ``GANTRY_Y`` comes
+  off the *boosted* apex now: four of the first five wrecks the crash mechanic
+  ever produced were a head through a sign bridge.
+- **A power-up that changes the physics has to throw away the schedule**
+  (``_repick``). A take-off booked under the boots and fired after they expire
+  is a jump a third shorter than the hurdle was measured against.
+- **The jetpack's timer running out is not the same as being able to come
+  down.** ``jet_wait`` holds it up until the lane below is clear for as long
+  as the fall takes; landing in the middle of a convoy is a run ended by
+  nobody's decision.
+- **Flying is not riding.** ``riding`` excludes it, and the probe counts the
+  two separately -- before that, every second of every flight was reported as
+  a second on a train roof and the roof figure read 23 a minute when it was 14.
+
+**And the body can cross from one roof to the one beside it.** The rule that
+freezes lateral movement while raised is what stops it stepping off a train,
+so the crossing is the exception it names: ``ground_to`` asks whether the far
+lane is a roof at this height *for the whole crossing*, and ``Motion.advance``
+allows it when the answer is yes. Three things had to be true, and the first
+two are one-line changes that each cost eight seconds of roof a minute when
+they were missing:
+
+- **A roof only holds up a body already on or above it** (``surface_at``'s
+  height gate). Without it a train is a surface to anything standing in its
+  lane, so a runner that walks into the side of one is lifted onto the roof.
+  A ramp is the exception, and the reason the rule is not simply "must be
+  above".
+- **The pin has to cover the mount's own flight.** It keyed on ``riding``,
+  which is false while the body is on the ramp's lip -- so for the length of
+  the leap the lane plan was free to point elsewhere and the first frame the
+  feet touched down the body slid off the side of the train it had just
+  landed on.
+- **The far roof needs a reason to be on it.** The crossing is decided by one
+  rule (``_roof_across``) rather than handed to the lane search, which wanders
+  onto a flank and back and into the gap between the two; and the flanking
+  trains carry their own coins, because a move with nothing on the other side
+  of it is one no player makes.
+
+Measured, 6 runs x 90 s: roof 14.3 s/min plus 8.4 s/min flying (38% of the run
+off the rails), 5.3 mounts a minute, dead air 2.7%, and **frame cost
+unchanged** -- runner 1.61 ms, 0.91 of parkour, the same as before any of this.
+
 ## Running along train roofs, and why it works now
 
 The signature Subway Surfers move. It was written once before, in the history
@@ -1402,9 +1516,12 @@ long jumps you need a different motion model, not a bigger number.
   stretches between those moments, the obstacle mix, the set-piece mix, and
   the speed at 0/15/30/60 s), and **riding** (mounts and seconds on a roof per
   minute, and "surface pops" — a body teleported upward by a surface, which is
-  what a badly built ramp looks like). `--safety-runs 60 --safety-seconds 180`
-  is the full sweep the collision model is held to, and **"body inside an
-  obstacle: 0 frames" is the criterion** -- read that one before anything
+  what a badly built ramp looks like), plus **wrecks** and seconds spent
+  flying. `--safety-runs 60 --safety-seconds 180` is the full sweep the
+  collision model is held to, and the criterion there is now a *depth* rather
+  than a count -- nothing may reach `CRASH_DEPTH` while the run is inside the
+  guaranteed speed range, and a wreck past it is the scene working as intended
+  rather than a fault. Read that -- read that one before anything
   else, and re-run the full sweep after touching the runner, because 4 runs x
   40 s reads clean on faults that 60 x 180 finds.
 - `python tools/flow_probe.py --scene all --runs 4 --seconds 25` is the

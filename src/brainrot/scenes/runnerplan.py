@@ -104,19 +104,28 @@ class Kinematics:
     clearance_margin: float = 0.09
 
     @classmethod
-    def for_speed(cls, speed: float) -> "Kinematics":
+    def for_speed(cls, speed: float, apex: float = 1.0,
+                  span: float = 1.0) -> "Kinematics":
         """Moves sized so each spans a fixed stretch of track.
 
         Given an air time T and a required apex A, gravity and launch speed
         follow: ``g = 8A/T^2`` and ``v0 = 4A/T``. So fixing how far a jump
         carries the runner fixes the whole arc, at any speed, with the apex
         preserved -- which is the only part of it a hurdle cares about.
+
+        ``apex`` and ``span`` scale the jump, and exist for the super
+        sneakers. Scaling them can only ever make an obstacle *easier*: every
+        take-off window the planner solves is solved against the kinematics of
+        the moment, and a jump in flight keeps the arc it left the ground with
+        (``Motion.air_kin``), so a power-up that expires mid-air does not edit
+        the trajectory underneath the body.
         """
         speed = max(1.0, speed)
-        air = min(0.78, max(0.34, JUMP_SPAN / speed))
+        peak = JUMP_APEX * apex
+        air = min(0.78 * span, max(0.34, JUMP_SPAN * span / speed))
         return cls(
-            gravity=8.0 * JUMP_APEX / (air * air),
-            jump_v0=4.0 * JUMP_APEX / air,
+            gravity=8.0 * peak / (air * air),
+            jump_v0=4.0 * peak / air,
             roll_time=min(1.05, max(0.46, ROLL_SPAN / speed)),
             lane_time=min(0.36, max(0.17, LANE_SPAN / speed)),
         )
@@ -287,7 +296,7 @@ class Motion:
         return True
 
     def advance(self, dt: float, kin: Kinematics, desired_lane: int,
-                ground_here: float = 0.0) -> None:
+                ground_here: float = 0.0, ground_to: float | None = None) -> None:
         """One step of motion under two commitments and one surface.
 
         Finish a crossing before reconsidering -- a body caught halfway by a
@@ -316,7 +325,14 @@ class Motion:
         # raised makes leaving a roof something that can only happen at the
         # *end* of the train, which is also what riding one looks like. The
         # crossing is not cancelled -- it resumes on landing.
-        if self.ground <= 0.0:
+        # ...unless the lane it is crossing to is a roof at the same height
+        # for the whole crossing, which is the sideways hop between two trains
+        # standing side by side. ``ground_to`` is that answer, asked of the
+        # world by the caller and asked *over the crossing* rather than at this
+        # instant, because a roof that runs out half way across is the fall the
+        # rule above exists to prevent.
+        across = ground_to is not None and ground_to >= self.ground - 0.05
+        if self.ground <= 0.0 or across:
             goal = lane_x(self.target_lane, self.spacing)
             rate = self.spacing / kin.lane_time
             if self.x < goal:
@@ -412,8 +428,13 @@ def verify(motion: Motion, lane_plan: "LanePlan", booked: list[tuple[float, str]
     for _ in range(steps):
         while queue and queue[0][0] <= t:
             sim.begin(queue.pop(0)[1], kin)
-        sim.advance(step, kin, lane_plan.lane_at(t),
-                    0.0 if ground is None else ground(t, sim.x))
+        want = lane_plan.lane_at(t)
+        gx = lane_x(want, sim.spacing)
+        sim.advance(step, kin, want,
+                    0.0 if ground is None else ground(t, sim.x, sim.y),
+                    None if ground is None
+                    else min(ground(t, gx, sim.y),
+                             ground(t + kin.lane_time, gx, sim.y)))
         t += step
         x0, x1, y0, y1 = sim.extent(body)
         y0 += surface

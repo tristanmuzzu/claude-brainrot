@@ -227,16 +227,30 @@ def test_runner_never_repeats_a_set_piece_back_to_back() -> None:
             assert a != b, f"run {run}: {a} twice running"
 
 
-def test_runner_never_more_than_one_oncoming_train() -> None:
-    """The live dodge can always answer one sweeping train; two can pin every
-    lane at once, so the generator must never allow it."""
+def test_runner_never_more_than_one_oncoming_train_per_lane() -> None:
+    """Two sweepers in one lane would pin it with no gap between them.
+
+    Across *different* lanes they are fine and now deliberately common: what
+    made the old rule "one anywhere" necessary was that a sweeper reserved its
+    whole approach -- two hundred metres of lane for a train twenty-five long
+    -- so a second one never fitted anyway. That reservation is now the short
+    stretch either side of the meeting (``RunnerScene._sweep_span``), because a
+    train coming the other way passes everything else long before the runner
+    reaches it and the only thing that matters is whether the pass is ever
+    seen. What the ledger still cannot say is "this lane has a sweeper in it",
+    since the reservation is deliberately shorter than the path -- so that one
+    rule stays, per lane.
+    """
     for run in (3, 11, 42):
         scene = build_runner(run)
         for _ in range(3600):
             scene.update(1 / 60)
             scene.elapsed += 1 / 60
-            oncoming = [e for e in scene.entities if e["kind"] == "train" and e["vel"]]
-            assert len(oncoming) <= 1
+            per_lane: dict[int, int] = {}
+            for e in scene.entities:
+                if e["kind"] == "train" and e["vel"]:
+                    per_lane[e["lane"]] = per_lane.get(e["lane"], 0) + 1
+            assert not per_lane or max(per_lane.values()) <= 1, per_lane
 
 
 def test_runner_autopilot_makes_progress_and_collects() -> None:
