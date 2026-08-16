@@ -34,6 +34,15 @@ across 60 seeds × 180 s of simulated running, at every speed. If you change
 anything in the runner, re-run that sweep — `tests/test_collision.py` covers
 the same ground in a form that fits in the suite.
 
+**Both families were reworked again on 2026-08-16**, on the owner's last two
+notes about them, and each has its own section below. The parkour body stopped
+clicking into every block it lands on -- see "The body stops clicking..." and
+`tools/flow_probe.py`. The runner became trains rather than barriers, with a
+speed range that opens where the old one finished -- see "The runner is a
+convoy" and the frame-level research behind it. Everything the two older
+passes below established still holds; those sections are the history of how
+the machinery got its shape.
+
 The runner had the same pass the parkour scene did (2026-08-11), for the same
 complaint — "a bit slow, doesn't feel natural, something missing for it to be
 actually entertaining" — and the same method: turn each complaint into a
@@ -81,6 +90,9 @@ touching anything in this scene; the first two rows are non-negotiable.
 | worst idle | 9.17 s | **7.48 s** |
 | dead air (idle over 3 s, riding excluded) | 5.8% | **1.8%** |
 | speed at 15 s / 30 s | 9.9 / 11.3 m/s | **13.3 / 16.1 m/s** |
+
+(Both columns are the 2026-08-11 pass, and every roof row in it was
+superseded on 2026-08-16 -- 17.3 seconds a roof a minute now, not 2.35.)
 | slides per minute | 4.6 | **4.5** |
 | mounts onto a train roof per minute | n/a | **1.84** |
 | median time to the first mount | n/a | **3.0 s** |
@@ -885,6 +897,20 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
+000. **The runner reports no surviving plan nine times as often as it used
+   to** -- 1,789 over 60 runs x 180 s against 192 before convoys, or 1.7% of
+   re-solves against 0.18%. It is a warning counter and not a contact: the
+   thing it warns about, the body inside something, is **zero** over that same
+   sweep, and reflex saves went *down* (525 -> 230) over 36% more track. Two
+   thirds of the reports arrive while the body is on a roof, and the
+   breakdown to start from is in `scratchpad`-style form: patch
+   `plan.verify` and `plan.schedule_vertical`, bucket by `(riding?, threat
+   kind, ride_link, hard)`, and the answer comes out in one twelve-run pass.
+   What is already known: the remaining "on the rails" cases are a convoy
+   whose ramp offer lapses while the body is squarely in its lane, which is a
+   cliff -- the whole chain goes from free to wall in one frame. Read the two
+   measured dead ends in "The runner is a convoy" before trying the obvious
+   fixes; both of them are worse.
 00. ~~Frame cost is the one criterion the rehash lost~~ **It was the
    machine.** Five rounds while the test suite ran in the background read
    tower 3.63 ms and tower/parkour 1.78, against the recorded 1.46; nine
@@ -1072,6 +1098,108 @@ touching any of it — the reasoning is there, this is the short list:
    above -- that was a quiet machine, and only the ratio survives the
    difference.
 
+## The runner is a convoy, and it opens where it used to finish (2026-08-16)
+
+The owner's note on this scene: what makes Subway Surfers good is that the
+longer you last the faster it gets and the *more trains* there are -- trains to
+run on, trains to jump between -- and it is rare to be looking at "a bunch of
+mediocre speed barriers". He asked for research on what high-speed play
+actually looks like, a run that starts quick, and a much higher top speed.
+
+**The research is frame-level, and it is the same method the tower used.** Two
+slices of a real five-million-point run (archive.org, `SubwaySurf_5011279pts_
+noHoverboards`, 612x1000 at 24 fps) -- one a minute in, one forty-five minutes
+in -- pulled with `ffmpeg -ss` straight off the URL, tiled a frame a second,
+and read. Footage stays out of the repository; the findings are these:
+
+- **At full speed roughly a third of the frames have the player up on the
+  trains**, and the frames that do come in runs of five to ten seconds. What
+  keeps them up there is leaping from one roof to the next.
+- **Nearly every frame has a train in it**, usually two or three lanes' worth:
+  the picture is a canyon of trains with a trough between them, not a train.
+- **Barriers exist and are the least of it.** Coin arcs over the gaps are how
+  the game says "this is a jump and this is where it lands".
+- **The speed curve**: distance rate (score rate over the multiplier, coins
+  netted out) was 16.7 units/s a minute in and 27.5 at the top -- about 1.65x,
+  and it takes tens of minutes to get there. A strip on screen for fifteen
+  seconds cannot spend that, so it opens near the top instead.
+
+Against that, this scene was the other way round: 48 barriers a minute against
+7.8 trains, one train per roof set-piece, **2.7 seconds a minute on a roof**.
+
+What changed, and the numbers over the same probe (12 runs x 120 s):
+
+| | before | after |
+|---|---|---|
+| seconds on a roof per minute | 2.7 | **17.3** (4.6% of the run -> **29%**) |
+| mounts per minute | 1.71 | **4.46** |
+| parked trains per minute | 5.5 | **35.0** |
+| speed at 0 / 15 / 30 s | 10.5 / 13.3 / 16.1 | **15.0 / 19.8 / 24.0** |
+| actions per minute | 48.3 | **55.7** |
+| dead air (idle over 3 s) | 2.2% | **0.7%** |
+| commonest set-piece | hurdles | **roofrun** |
+| body inside an obstacle, 60 x 180 s | 0 | **0** |
+
+- **A roof run is a convoy.** `_seg_roofrun` lays three to five trains nose to
+  tail with a 2.8-4.0 m gap between each pair, and `_hop_reaches` checks every
+  gap against the leap at *both* ends of the speed range before a car goes
+  down. A chain that gets three trains in and finds the fourth blocked is a
+  roof that ends over a wall, so the whole thing is accepted or refused as one
+  -- and a chain too long for the track it was offered drops trains off its own
+  tail rather than declining.
+- **The leap between two roofs is a window, not an instant** (`mount_to`). A
+  ramp's lip passes under the feet once; a body already at roof height and
+  already going the right way can leave any time from far enough back to clear
+  the gap up to the moment the roof runs out. An instant that happens to be
+  busy is a mount dropped, and a mount dropped while the body is up there is a
+  fall rather than a lane change.
+- **A second line of trains stands alongside** where a lane can be spared
+  (`_flank_lane`) -- the canyon. Never on the side *between* the ride lane and
+  the bail lane: from an outside lane the only way across is through the
+  middle, so a convoy in lane 0 may only flank in lane 2.
+- **Hurdles fill the lanes the convoy is not in.** From the roof they cost
+  nothing; on the ground they are the whole of what a runner that did not get
+  on has to do. Measured, that is where this scene's dead air lived -- the
+  roof run owned 48 of the 81 idle seconds in twelve minutes.
+- **Everything that reserves track is read off the top of the speed range.**
+  `Kinematics.for_speed` clamps the air time at 0.34 s, so past about 19 m/s a
+  move stops shrinking and starts covering more *track*: a slide is 11 m at 24
+  m/s against the nominal 8.4. `ACTION_SPAN` and `TRAIN_PAD` are computed from
+  `TOP_KIN` rather than typed, and `tests/test_collision.py` holds them there.
+
+Four things had to be true and **not one was guessable from the code**:
+
+- **A chain of trains in one lane is a hundred metres of wall to the lane
+  search**, so it left that lane long before the ramp and the mount it was
+  routing around was never offered at all. Measured: twelve mounts over four
+  runs with one train per set-piece, **none at all** with two to four. A convoy
+  is one decision, so `Threat.ride_ahead` says "road, but nothing to book yet"
+  while the head is still mountable, and the whole chain is a wall when it is
+  not.
+- **The leap has to be solved against the *track*, not the live body.**
+  Requiring the body to already be riding meant the planner booked the ramp
+  mount, rolled forward, watched itself fall into the first gap and threw the
+  mount away in favour of never getting on -- 105 verifications failed on a
+  train and no mount happened in four runs.
+- **...and it has to be refused to a body that is not up there** (`ride_link`).
+  Booked from the rails it is an ordinary jump with a *mount's* launch speed,
+  landing ten metres later on whatever is there: 151 frames inside something
+  over sixty runs, every one of them a 2.35 m apex off flat ground.
+- **Running off the end of the second roof inside one planning horizon is not
+  a plan with no answer.** Only one leap fits in a schedule at a time and the
+  horizon holds two or three gaps, so `verify` legitimately reports a fall it
+  will never take; the re-solve a tenth of a second later books it from closer
+  up. Counting those was every one of the 3,288 "no answer" reports the scene
+  picked up when convoys arrived.
+
+Two things measured *worse* and are worth not re-deriving. Pinning the lane
+plan for the whole horizon while riding (4,310 no-answer reports against 3,288
+for not pinning at all) -- the tail of that horizon is the runner back on the
+rails with the next set-piece in front of it, which is an ordinary lane
+decision. And a longer `PLAN_HORIZON` of 3.4 s, which takes the no-answer
+count down to 1,152 and puts **six frames of the body inside a barrier**; 2.8
+stays.
+
 ## Running along train roofs, and why it works now
 
 The signature Subway Surfers move. It was written once before, in the history
@@ -1098,6 +1226,9 @@ touching any of it:
   over a world that includes the train. If that fails, the existing machinery
   marks the threat hard, the search routes around it, and the bail lane is
   empty by construction. Both outcomes are safe; that is the whole trick.
+  (Since the convoy rebuild, `mount_at` is the *start* of a window and
+  `mount_to` its end -- a ramp's lip is still one instant, a roof-to-roof leap
+  is not. See "The runner is a convoy" below.)
 - **The offer has a deadline.** `_mount_at` withdraws it as soon as the body
   can no longer be squarely in the ramp's lane before the foot of the ramp —
   while there is still track in which to leave that lane. Offering it right up
@@ -1125,6 +1256,95 @@ over a metre deep, and dropping it the moment its centre crosses the far edge
 leaves the rear half hanging over a roof it is no longer standing on). The
 ramp additionally only picks a body up within `RAMP_GRIP` of its lane centre:
 you get onto a ramp by running at it, not by sideswiping it.
+
+## The body stops clicking into every block it lands on (2026-08-16)
+
+The owner's report on the parkour scenes -- the flat void one chiefly, and the
+tower with it because they share a body: the movement is clean, the jumps come
+soon after the landings, and it still reads bot-like. "He sort of clicks into
+something and sticks to whatever block he's on, and then a quarter of a second
+later he jumps off again." Every probe this project owns reads green on that
+scene, because every one of them measures *geometry* and the complaint is
+about the derivative of the camera.
+
+**`tools/flow_probe.py` measures nothing else**, and it is the acceptance test
+for this. Three families: cadence (how long the feet are down, what fraction
+of frames that is), continuity (the size of the one-frame change in speed, eye
+height, field of view and yaw -- eye on its **second** difference, because a
+camera falling with the body moves a tenth of a metre a frame and is perfectly
+smooth while a camera *dropped* the same distance is a jolt), and shape (the
+apex of each hop against the 1.25 m every vanilla jump reaches).
+
+It found four square waves and a stall, all of them a value switched between
+two constants at a phase boundary:
+
+- **Speed.** The body arrived at the arc's 7.1 m/s, was set to sprint pace for
+  the length of the block and set back -- two steps of a metre and a half a
+  second, four times a second. `parkourkit.GroundRun` is the fix: the crossing
+  is a braking-cruising-accelerating profile whose two ends are *by
+  construction* the speeds of the moves either side, so there is no step at any
+  landing or take-off for any material or any move. On a one-cell landing --
+  most of them -- there is no room to slow at all, so the body runs over the
+  block, which is what a player chaining jumps does and what nothing in this
+  project's motion could previously express. A ladder is now decelerated into
+  rather than snapped to.
+- **Field of view** stepped two degrees at every phase change; it is hung off
+  the speed and eased, which says the same thing continuously.
+- **The landing** dropped the eye 0.17 m in a single frame -- ten metres a
+  second of camera. It is a damped spring the impact kicks (`DIP_W`,
+  `DIP_KEEP`). The stiffness is set by the frame clock and not by taste: at 20
+  rad/s the damping term is comparable to 1/dt and kills the velocity inside
+  one frame, which is the hard stop it replaced wearing a spring's clothes.
+  13 rad/s gives three or four frames of follow-through.
+- **The walk bob** appeared and vanished whole, and was `|sin|`, whose corner
+  reverses the eye's velocity in one frame six times a second. Faded, and
+  `sin^2`.
+- **And a frame that reached across a phase boundary threw its remainder
+  away**, so the body stalled for a fraction of a frame twice per landing.
+  Both scene families sub-step now.
+
+Then the shape, which is the other half of "bot-like". **There is one jump
+impulse in this game and a player spends all of it every time; what they
+choose is how fast they are running when they use it.** Holding the horizontal
+speed constant put that whole choice into the arc, so a two-metre hop apexed
+at 0.28 m against vanilla's 1.25 -- a skip, and a run of skips. `parkour.
+flight` picks the fastest approach that still lands the whole impulse, floored
+at a vanilla sprint (`APPROACH_MIN`). **This was tried once before and
+reverted for floating**; what makes it work now is that the ground run either
+side absorbs the change. The gap tables lean high for the same reason: a hop
+at the top of what its rise allows is the one that apexes where vanilla does,
+and it is *faster* as well, because a longer hop at the same speed covers more
+ground per landing.
+
+Measured over the same runs (3 x 20 s), flat scene:
+
+| | before | after |
+|---|---|---|
+| one-frame speed steps over 1.2 m/s | 8.72% of frames | **0.00%** |
+| field-of-view steps over 0.2 deg | 5.39% | **0.07%** |
+| eye jolts over 0.03 m/frame^2 | 9.42% | **3.28%** |
+| slowest frame | 0.078 m/s | **5.47 m/s** |
+| mean hop apex | 0.53 m (43% of vanilla) | **0.90 m (72%)** |
+
+Tower and spiral get the same continuity work and keep their arcs, because
+those are 33 hand-authored levels plus head-hitters and shells solved against
+them: eye 2.2%, speed 0.05%, fov 0.9%, apex 57% and 69% of vanilla.
+
+Three things fell out that are worth knowing:
+
+- **The corridor check sampled a path at nine points however long it was** --
+  0.6 m apart on a long hop, which is the width of the body it was checking.
+  Taller arcs grazed scenery immediately (0.155 m inside a lintel); sampled
+  every 0.2 m it is 0.031 m, better than the 0.039 this started at.
+- **A lone soul-sand block no longer slows the body**, and that is arithmetic
+  rather than an oversight: a body that must be at the arc's speed at the far
+  edge cannot brake and re-accelerate inside 0.68 m. Multi-cell runs still
+  sag to the material's pace. What it replaced was a 0.27 s stall followed by
+  a snap back to 7.1, which is the reported defect.
+- **The residue inside a `Move` is untouched.** A ladder's step-in, rise and
+  step-off are separate legs at different speeds, so the discontinuity moved
+  *inside* the move rather than away: 0.05% of tower frames and 0.43% of
+  spiral ones. Grabbing a ladder genuinely is a stop.
 
 ## Known limit: how long a parkour jump can be
 
@@ -1183,7 +1403,21 @@ long jumps you need a different motion model, not a bigger number.
   the speed at 0/15/30/60 s), and **riding** (mounts and seconds on a roof per
   minute, and "surface pops" — a body teleported upward by a surface, which is
   what a badly built ramp looks like). `--safety-runs 60 --safety-seconds 180`
-  is the full sweep the collision model is held to.
+  is the full sweep the collision model is held to, and **"body inside an
+  obstacle: 0 frames" is the criterion** -- read that one before anything
+  else, and re-run the full sweep after touching the runner, because 4 runs x
+  40 s reads clean on faults that 60 x 180 finds.
+- `python tools/flow_probe.py --scene all --runs 4 --seconds 25` is the
+  parkour family's *motion* acceptance test, and the only thing that could
+  make "it looks bot-like and rickety" actionable. It measures the derivative
+  of the camera and nothing else: how long the feet are on the ground, the
+  one-frame change in ground speed, the one-frame **acceleration** of the eye
+  (a step in position and a smooth fall are the same first difference and
+  nothing else tells them apart), the field of view, the yaw, and the apex of
+  each hop against the 1.25 m every vanilla jump reaches. The take-off's own
+  step is counted separately and forgiven by name -- it is instant in the real
+  game too. Re-run it after touching anything in `parkour.py`, `spiral.py` or
+  `parkourkit.GroundRun`.
 - `python tools/level_review.py --level N --all` is **the** per-level tool and
   the one to reach for when a level is being designed rather than the tower.
   Four artefacts in `shots/review/lNN_slug/`: the game camera over the level
