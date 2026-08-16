@@ -316,10 +316,17 @@ band, and every orb the parkour generator hangs being collected.
 The 34 skips are platform suites: `tests/test_overlay_win32.py` only runs where
 `os.name` is `nt`, `tests/test_overlay_x11.py` only where there is a display. A
 green run on one platform therefore means less than the count suggests, which
-is why CI runs the whole suite on **both**, and then renders a frame of every
-scene on each — the scenes were developed on Linux and nothing about a
-generated world is platform-specific, but that is an argument rather than
-evidence, and the artifacts on each run are the evidence.
+is why CI runs the whole suite on **both** — 632 passing on each — and then
+renders a frame of every scene on each and keeps them as artifacts. The scenes
+were built while this project was being developed on Linux, and the render job
+is what says they work anywhere else: same seed, same software rasteriser, and
+the frames come back **pixel-identical** between the two platforms.
+
+What CI does *not* cover is the overlay window surgery itself. Both platform
+suites need a real desktop — the Win32 one skips on a runner as soon as raylib
+reports no native window handle, and the X11 one needs a display. Those are
+verified by hand on real machines, which is what "verified on Windows 11 and on
+Ubuntu 26.04" above means.
 
 Docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how the pieces fit and
 why, [`docs/HOOKS.md`](docs/HOOKS.md) for the hook layer specifically.
