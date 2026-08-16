@@ -83,14 +83,14 @@ from .parkourkit import GroundRun
 #: :func:`max_gap` puts the ceiling at three -- so the fours and fives here
 #: only ever come out at their full width when the rise that was drawn with
 #: them is a drop, and :func:`fit_gap` narrows them back when it is not.
-GAP_EASY = (2, 2, 3, 3, 3, 3, 4, 4, 4, 4)
-GAP_HARD = (3, 3, 3, 3, 4, 4, 4, 5, 5, 5)
+GAP_EASY = (3, 3, 3, 3, 4, 4, 4, 4, 4, 4)
+GAP_HARD = (4, 4, 4, 5, 5, 5, 5, 5, 6, 6)
 #: Rises pair with gaps because the physics ties them together: falling is the
 #: only thing that buys reach, so the hard table drops more often. It is also
 #: what keeps the long hops honest -- a five-block gap is only jumpable off a
 #: descent, and asking for one level just gets it narrowed back down.
 RISE_EASY = (-1, -1, 0, 0, 0, 0, 0, 0, 1, 1)
-RISE_HARD = (-2, -2, -1, -1, -1, 0, 0, 0, 1, 1)
+RISE_HARD = (-3, -2, -2, -2, -1, -1, -1, 0, 0, 1)
 #: Blocks laid before a run is at full difficulty. Roughly eighty hops, which
 #: at sprint pace is a little under a minute -- inside the length of a turn the
 #: overlay is actually on screen for.
@@ -146,7 +146,7 @@ WALK_SPEED = 4.317
 #: being a level jump's hang time -- get a lower arc rather than a slower
 #: approach, which is the one place this leaves vanilla and it is the right
 #: place: those are the hops a player takes without thinking.
-APPROACH_MIN = RUN_SPEED
+APPROACH_MIN = 6.40
 #: A hop is legal exactly when the take-off it needs is one a body has. Zero is
 #: stepping off an edge without jumping; :data:`JUMP_V` is the only jump there
 #: is. Everything the generator lays down is checked against this pair, which
@@ -203,7 +203,24 @@ FORMS = {"full": 1.0, "slab": 0.5, "wide": 1.0, "stair": 1.0}
 #: direction of travel. You land on the near edge of a block and take off from
 #: the far one -- which is what a run-up *is*, and what makes the gap the body
 #: actually clears bigger than the gap between block centres.
-EDGE = {"full": 0.34, "slab": 0.34, "stair": 0.34, "wide": 1.30}
+#:
+#: 0.38, and the whole of the difference is whether the classic four-block
+#: jump exists. The feet plant this far inside a landing's edge, so a four-block
+#: gap asks for ``5 - 2*EDGE`` -- 4.32 m at 0.34, which is past the 4.26 a full
+#: jump reaches at sprint speed, so ``fit_gap`` narrowed every level four back
+#: to a three and the longest level hop in the scene was 3.28 m. A body has to
+#: be *walking* to spend the whole jump impulse on 3.28 m, and walking is
+#: exactly what it looked like from inside. At 0.38 the four-block jump is
+#: 4.24 m: the full impulse at 7.07 m/s, which is a sprint jump and the move
+#: the game is famous for.
+#:
+#: The ceiling on this number is the *climb*, not the body. A hop that rises a
+#: block has 3.10 m of reach, and a two-block gap at 0.42 asks for 3.16 -- so
+#: at 0.42 no staircase in the scene is legal and every one of them silently
+#: declines. Vanilla stands with the feet 0.5 from the centre and the hitbox
+#: hanging 0.3 past the edge, so there is room here; there is just no *use*
+#: for it.
+EDGE = {"full": 0.38, "slab": 0.38, "stair": 0.38, "wide": 1.30}
 #: Half-footprint of a form, in cells: a wide platform is three by three.
 SPREAD = {"wide": 1}
 
@@ -531,7 +548,7 @@ class ParkourScene(Scene):
         for i in range(rng.randint(5, 8)):
             rise = rng.choice((0, 0, 0, -1))
             out.append(self._node(
-                gap=fit_gap(self._gap(rng, (2, 3, 3, 4), (3, 3, 4, 4)), rise),
+                gap=fit_gap(self._gap(rng, (3, 3, 3, 4), (4, 4, 4, 5)), rise),
                 rise=rise,
                 style=style if i % 2 else self.candy[i % 3],
                 form="slab",
@@ -562,7 +579,7 @@ class ParkourScene(Scene):
         for i in range(rng.randint(4, 6)):
             rise = rng.choice((0, 0, 0, -1))
             out.append(self._node(
-                gap=fit_gap(self._gap(rng, (2, 3, 3), (3, 3, 4)), rise),
+                gap=fit_gap(self._gap(rng, (3, 3, 3), (4, 4, 5)), rise),
                 rise=rise,
                 style=self.candy[i % 3], deco_style=style,
                 deco="lintel" if i % 2 else "hurdle",
@@ -602,7 +619,7 @@ class ParkourScene(Scene):
         out = []
         for i in range(rng.randint(3, 4)):
             drop = rng.randint(3, 5) if i == 0 else rng.randint(2, 4)
-            out.append(self._node(gap=fit_gap(self._gap(rng, (2, 3), (3, 4)), -drop),
+            out.append(self._node(gap=fit_gap(self._gap(rng, (3, 4), (4, 5)), -drop),
                                   rise=-drop,
                                   style="stone", deco="pillar", orbs=2))
         out.append(self._node(gap=2, rise=0, style="lantern", form="wide",
@@ -618,7 +635,7 @@ class ParkourScene(Scene):
         parkour.
         """
         swing = rng.uniform(0.34, 0.52)
-        gap = self._gap(rng, (2, 2, 3), (3, 3, 4))
+        gap = self._gap(rng, (3, 3, 3, 4), (4, 4, 5))
         return [self._node(gap=gap, rise=rng.choice((0, 0, 0, 1)),
                            style=self.candy[i % 3],
                            turn=swing if i % 2 else -swing,
@@ -638,10 +655,10 @@ class ParkourScene(Scene):
         """
         drop = rng.choice((-1, -1, -2))
         return [
-            self._node(gap=self._gap(rng, (2, 3), (3, 3)), rise=0,
+            self._node(gap=self._gap(rng, (3, 3), (3, 4)), rise=0,
                        style="quartz", form="wide", deco="lanterns"),
             self._node(gap=max_gap(drop), rise=drop, style="lantern", orbs=3),
-            self._node(gap=self._gap(rng, (2, 3), (3, 3)), rise=0,
+            self._node(gap=self._gap(rng, (3, 3), (3, 4)), rise=0,
                        style="quartz", form="wide", deco="lanterns", orbs=1),
         ]
 
@@ -668,17 +685,17 @@ class ParkourScene(Scene):
     def _seg_gate(self, rng) -> list[dict]:
         """Something to run *through* rather than only on."""
         return [
-            self._node(gap=self._gap(rng, (2, 3), (3, 4)), rise=0,
+            self._node(gap=self._gap(rng, (3, 4), (4, 5)), rise=0,
                        style="quartz"),
-            self._node(gap=self._gap(rng, (2, 3), (3, 4)), rise=0,
+            self._node(gap=self._gap(rng, (3, 4), (4, 5)), rise=0,
                        style="quartz", deco="gate", orbs=1),
-            self._node(gap=self._gap(rng, (2, 3), (3, 4)),
+            self._node(gap=self._gap(rng, (3, 4), (4, 5)),
                        rise=rng.choice((0, 0, -1)), style="quartz"),
         ]
 
     def _seg_lanternwalk(self, rng) -> list[dict]:
         """Torchlit stepping stones -- the night runs live for this."""
-        gap = self._gap(rng, (2, 3), (3, 3, 4))
+        gap = self._gap(rng, (3, 4), (4, 4, 5))
         return [self._node(gap=gap, rise=rng.choice((0, 0, 1, -1)),
                            style="lantern" if i % 2 else self.candy[i % 3],
                            deco="torch" if i % 2 == 0 else None,
@@ -697,8 +714,8 @@ class ParkourScene(Scene):
         out = []
         for i in range(rng.randint(5, 8)):
             rise = rng.choice((0, 0, 1, -1, -1))
-            out.append(self._node(gap=fit_gap(self._gap(rng, (2, 3, 3, 4),
-                                                        (3, 4, 4, 5)), rise),
+            out.append(self._node(gap=fit_gap(self._gap(rng, (3, 3, 4, 4),
+                                                        (4, 5, 5, 6)), rise),
                                   rise=rise,
                                   style=self.candy[i % 3] if i % 2 else style,
                                   deco_style=style,
@@ -717,7 +734,7 @@ class ParkourScene(Scene):
         """
         style = rng.choice(("stonebrick", "brick"))
         bend = rng.uniform(-0.08, 0.08)
-        gap = self._gap(rng, (2, 2, 3), (3, 3, 4))
+        gap = self._gap(rng, (3, 3, 3, 4), (4, 4, 5))
         return [self._node(gap=gap,
                            rise=rng.choice((0, 0, 1, -1)),
                            style=style, turn=bend,
