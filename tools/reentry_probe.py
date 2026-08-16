@@ -195,6 +195,40 @@ def reaches(course, lv, targets) -> set:
     return seen
 
 
+def furthest(course, lv, stand, entry) -> dict:
+    """cell -> the latest landing a body standing there could walk onto.
+
+    One reverse breadth-first search, seeded from the landings in descending
+    order, so a cell's first label is the highest-numbered landing that reaches
+    it. Entry-apron landings are not seeds: walking back onto the level's own
+    beginning is the outcome this whole rehash is *for*.
+    """
+    cone = course.cone
+    best: dict = {}
+    queue: deque = deque()
+    for j in range(len(stand) - 1, -1, -1):
+        cell = stand[j]
+        if cell is None or j in entry:
+            continue
+        if cell not in best:
+            best[cell] = j
+            queue.append(cell)
+        while queue:
+            x, y, z = queue.popleft()
+            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, nz = x + dx, z + dz
+                for ny in range(y - STEP_UP, y + DROP + 1):
+                    nb = (nx, ny, nz)
+                    if nb in best or not stands(course, nx, ny, nz):
+                        continue
+                    nu = cone.unwrap(nx, nz, ny)
+                    if not (lv.u0 - 0.02 <= nu <= lv.u1 + 0.02):
+                        continue
+                    best[nb] = j
+                    queue.append(nb)
+    return best
+
+
 # --------------------------------------------------------------------------
 # one level
 # --------------------------------------------------------------------------
@@ -302,20 +336,32 @@ def judge(course, lv, blocks: list[dict]) -> dict:
            if course.surface(blk) <= lv.y + 1.0 + 1e-6]
     entry = set(low[:ENTRY_MAX])
     out["apron_all"] = len(low)
-    above = [c for j, c in enumerate(stand) if c is not None and j not in entry]
-    back = reaches(course, lv, above)
+    # **How far along the course a fall can resume**, cell by cell. The
+    # landings are walked backwards from in descending order, so the first
+    # label a cell gets is the *latest* landing reachable from it, and one
+    # pass then answers a question that is really one per missed jump.
+    #
+    # Asking it per jump is what stops the level below reading as this level's
+    # course: its climb tops out one block over this terrace so its crossing
+    # can descend onto it, and its walk along the lip to that crossing is at
+    # the same height, so half a dozen of its landings lie about on this
+    # level's floor. They are all *before* anything that can be fallen from
+    # here. Walking back to something earlier than where you fell is not a
+    # shortcut; it is the long way round, which is the point.
+    best = furthest(course, lv, stand, entry)
     home = reaches(course, lv, [c for j, c in enumerate(stand)
                                 if c is not None and j in entry])
-    out["reentry_cells"] = len(back)
+    out["reentry_cells"] = len(best)
     out["apron"] = len(entry)
     for i, rest in falls:
         out["misses"] += 1
         if rest is None:
             out["dead"] += 1
-        elif rest in back:
+        elif best.get(rest, -1) >= i - 1:
             out["shortcut"] += 1
+            out["worst_reentry"] = max(out["worst_reentry"], best[rest])
             out["shortcut_at"].append(i)
-        elif rest in home:
+        elif rest in home or rest in best:
             out["to_start"] += 1
         else:
             out["dead"] += 1

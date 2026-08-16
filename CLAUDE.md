@@ -770,7 +770,8 @@ That is a **reachability** question, not a void question, and `docs/REHASH.md`
 is the whole record: the plan, what was built, what it measured, and the four
 things the probe itself had to get right before its number meant anything.
 `tools/reentry_probe.py` is the number. **87.9% of missed jumps walked back
-into the middle of the course; it is 2.0% now, on one level of thirty-three.**
+into the middle of the course; it is 0.6% now, on three level visits in
+eighty-four.**
 
 The shape, in one paragraph. A level is entered on its terrace, steps up off
 it once, and everything after that stands **at least two blocks over the
@@ -785,8 +786,8 @@ tower has had:
 
 | | before | after |
 |---|---|---|
-| missed jumps that re-enter the course | 87.9% | **2.0%** |
-| landings resting on the terrace | 15.9 a level | **3.3 a level** |
+| missed jumps that re-enter the course | 87.9% | **0.6%** |
+| landings resting on the terrace | 15.9 a level | **2.5 a level** |
 | a level walked end to end without jumping | 2 of 24 | **0 of 55** (34% mean) |
 | landmarks framed at 25 / 40 degrees | 55% / 30% | **68% / 63%** |
 | unchecked emergency placements | 0.31% | **0.64%** |
@@ -824,7 +825,13 @@ Seven engine changes, each found by measuring and not one by reading the code
   scenery beside them was a staircase;
 - **the exit starts from the deck.** Eighteen levels opened theirs with an
   absolute `lift`, which on a flying course is the whole level dropping back
-  down.
+  down;
+- **a relative chain that lost a block gets it back.** ``step_y`` is measured
+  from the landing before, so one refused node in the middle of a beat leaves
+  everything after it a block low -- and a block low is one block over the
+  terrace, which is the whole defect. ``_targets`` nudges such a landing up to
+  the deck when that is still a jump the body has. Re-entry 3.4% -> **0.6%**,
+  and the levels showing any nine -> three.
 
 **`breaks=0` is gone from the roster and that is a consequence, not a taste.**
 Nineteen levels had chosen no floor breaks because any break forced the lock
@@ -886,10 +893,13 @@ touching any of it — the reasoning is there, this is the short list:
    above it, where before the two were the same cells. Measure `emit_layer`
    and the dressing pass before changing anything, and read the note on a busy
    machine under item 5 -- only the ratio survives.
-0a. **One level of thirty-three still lets a fall back onto its course**, and
-   eight have an apron over the probe's cap of six -- more landings at terrace
+0a. **Three level visits in eighty-four still let a fall back onto the
+   course** (0.6% of missed jumps) -- more landings at terrace
    height than the geometry needs. `python tools/reentry_probe.py --levels
-   --only NAME` names them; `docs/REHASH.md` is the criterion.
+   --only NAME` names them; `docs/REHASH.md` is the criterion. Trace one with
+   a throwaway path-printer -- a forward walk from the fall cells with parent
+   pointers, printing what each step stands on -- because all six causes found
+   in this pass were invisible in the aggregate and obvious in one path.
 0. **The generated staircase is 16% of the exit climb**, and what is left of
    it is per-level authoring rather than an engine change -- see "What the
    exit climb is made of" above for the decomposition and the per-level

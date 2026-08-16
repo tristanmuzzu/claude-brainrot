@@ -12,14 +12,14 @@ constitution a level satisfies. This document changed that constitution.
 
 | | before | after |
 |---|---|---|
-| missed jumps that walk back into the course | **87.9%** | **2.0%** |
-| levels with one | all of them | **1 of 33** |
-| landings resting on the terrace | 15.9 a level (80%) | **3.3 a level (17%)** |
+| missed jumps that walk back into the course | **87.9%** | **0.6%** |
+| levels with one | all of them | **3 of 84 visits** |
+| landings resting on the terrace | 15.9 a level (80%) | **2.5 a level (13%)** |
 | a level walked end to end, no jumps | 2 of 24 | **0 of 55**, 34% mean |
 | landmarks framed at 25° / 40° | 55% / 30% | **68% / 63%** |
 | unchecked emergency placements | 0.31% | **0.64%** |
-| the design placed as authored | 97.9% | **95.6%** |
-| designed content, share of the course | 52% | **58%** |
+| the design placed as authored | 97.9% | **94.9%** |
+| designed content, share of the course | 52% | **56%** |
 | frame cost against `parkour` in one process | 1.46 | **1.78** |
 
 ---
@@ -90,11 +90,11 @@ runs × 240–260 landings):
 
 | | before | after |
 |---|---|---|
-| missed jumps that are a **shortcut** | **87.9%** | **2.0%** |
-| — back to the apron | 5.1% | 30.8% |
-| — dead | 7.0% | **67.2%** |
-| levels with at least one shortcut | **71 of 71** | **1 of 33** |
-| landings standing on the terrace | 80.2%, 15.9 a level | **17%, 3.3 a level** |
+| missed jumps that are a **shortcut** | **87.9%** | **0.6%** |
+| — back to the apron | 5.1% | 33.7% |
+| — dead | 7.0% | **65.7%** |
+| levels with at least one shortcut | **71 of 71** | **3 of 84 visits** |
+| landings standing on the terrace | 80.2%, 15.9 a level | **13%, 2.5 a level** |
 | air under a landing | median **0** blocks | median **2** |
 
 Two things follow, and they are the whole rebuild:
@@ -210,6 +210,14 @@ stand, and the terrace is untouched.
    on a flying course is the whole level dropping back down. They are written
    `step_y=0` now, and `_feat_ascent` prepends one +1 hop when a level is
    entered so late that its own beats never climbed.
+8. **A relative chain that lost a block gets it back.** `step_y` is measured
+   from the landing before, so one refused node in the middle of a beat leaves
+   every node after it a block low — and a block low is one block over the
+   terrace, which is the whole defect. `_targets` nudges such a landing up to
+   the deck *when that is still a jump the body has*, which is exactly when
+   the chain is one block down; the step after is back on the design's own
+   numbers. This one change took re-entry from 3.4% to **0.6%** and the levels
+   showing any from nine to three.
 
 **Two things on the plan's list turned out not to be needed.**
 `Course._walk_bridge` lays ground under a walk leg *at the walk's own height*,
@@ -251,6 +259,14 @@ answer that was measured before it was fixed:
   landing four blocks over the terrace can always walk *down* to it, and a
   symmetric flood then reports the terrace as able to walk back up. It is one
   reverse breadth-first search per level per target set.
+- **The question is per jump, not per level.** What a fall may not do is
+  resume the course *at or past where it fell from*; walking back to something
+  earlier is the long way round and is the point. Seeded from the landings in
+  descending order, one pass labels every cell with the latest landing it can
+  reach, which answers all of them at once. Without it the level below reads
+  as this level's course — its climb tops out one block over this terrace so
+  its crossing can descend onto it, and half a dozen of its landings lie about
+  on this floor.
 
 `tests/test_reentry.py` holds it against worlds small enough to check by hand:
 a course on a continuous floor must read all shortcut, the same course over
@@ -289,8 +305,8 @@ AST pass plus an instant design checker has beaten hand-editing.
 
 | | |
 |---|---|
-| `reentry_probe` | shortcut **2.0%**, 1 level of 33, apron 2.9 a level |
-| `tower_probe` | design 100% legal on paper, **95.6%** placed as authored, designed content **58%** of the course |
+| `reentry_probe` | shortcut **0.6%**, 3 level visits of 84, apron 2.5 a level |
+| `tower_probe` | design 100% legal on paper, **94.9%** placed as authored, designed content **56%** of the course |
 | `spiral_probe --plan tower` | twice-claimed 0, off-lattice 0, unchecked **0.64%**, cone-alone walkability **0 m** |
 | `bypass_probe` | **34%** mean, **0 of 55** levels walkable end to end |
 | `landmark_probe` | **68%** of levels at 25°, **63%** at 40°, 3.25 a minute |
@@ -305,9 +321,11 @@ AST pass plus an instant design checker has beaten hand-editing.
   the terrace is dressed *and* the course is a separate set of blocks above
   it, where before the two were the same cells. Measure `emit_layer` and the
   dressing pass before optimising anything.
-- **One level still has a shortcut** and eight levels have an apron over the
-  cap of six, which means more landings at terrace height than the geometry
-  needs. `reentry_probe --levels --only NAME` names them.
+- **Three level visits in eighty-four still have a shortcut**, at 0.6% of
+  missed jumps. `reentry_probe --levels --only NAME` names them; each is worth
+  tracing with the same throwaway path-printer the rest of this pass used,
+  because every one of the six causes found this way was invisible in the
+  aggregate.
 - **The move mix.** A flying course is hop-shaped and the exit staircase that
   carried the slides and climbs is mostly gone. Non-hop share is 16% on the
   tower against 6% on the generated spiral, so this is not urgent, but the

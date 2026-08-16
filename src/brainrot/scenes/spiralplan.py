@@ -3243,6 +3243,21 @@ class Course:
                     # after is back on whole numbers.
                     y = ifloor(prev_surface + node["step_y"]
                                - FORMS[form] + 1e-6)
+                    # **A relative chain that lost a block never gets it
+                    # back.** ``step_y`` is measured from the landing before,
+                    # so one refused node in the middle of a beat leaves every
+                    # node after it a block low -- and on this tower a block
+                    # low means one block over the terrace, which is a landing
+                    # a fall walks straight back onto. Nudged up to the deck
+                    # when that is still a jump the body has, which is exactly
+                    # when the chain is one block down; the step after is back
+                    # on the design's own numbers. Zero on the generated
+                    # tower, whose course runs on its terrace.
+                    if self.lift_floor and not node["cross"]:
+                        deck = self.cone.floor_at(cu) + self.lift_floor - 1
+                        if y < deck and (deck + FORMS[form]) - prev_surface \
+                                <= 1.0 + 1e-6:
+                            y = deck
                     if over_chasm and y + FORMS[form] < self._far_floor(cu):
                         continue
                     scored.append((math.hypot(x - ix, z - iz), x, y, z))
