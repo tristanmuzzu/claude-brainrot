@@ -1,0 +1,9 @@
+# The kit is binary and must survive a clone on a machine with
+# core.autocrlf=true. A .glb with CRLF injected into it loads as a corrupt
+# model, and the failure looks like a bad export rather than a bad checkout.
+*.glb   binary
+*.png   binary
+*.gif   binary
+
+# Everything else is text, checked out with the platform's own endings.
+* text=auto

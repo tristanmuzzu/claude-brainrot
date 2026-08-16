@@ -1,0 +1,74 @@
+name: tests
+
+# Both platforms, every push. The point of the Windows job is not the test
+# count -- it is that `tests/test_overlay_win32.py` only runs where `os.name`
+# is "nt", and that every scene added while this project was being developed
+# on Linux has to render there too. The smoke job below draws a real frame of
+# each one on each platform.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: pytest (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Swap in the software rasteriser
+        # No GPU and no display on a runner. The software build is
+        # pixel-compatible with the GPU one, which is what makes the
+        # determinism tests meaningful here.
+        run: pip install raylib-software --force-reinstall --no-deps
+      - name: pytest
+        run: pytest -q
+
+  smoke:
+    name: render (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install raylib-software --force-reinstall --no-deps
+      - name: Every scene draws a frame
+        shell: bash
+        env:
+          BRAINROT_HEADLESS: "1"
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          set -e
+          for scene in runner parkour spiral tower; do
+            echo "--- $scene"
+            brainrot shoot --scene "$scene" --seed 4712 --frames 90 --every 45 --out "shots/$scene"
+          done
+      - name: Keep the frames
+        uses: actions/upload-artifact@v4
+        with:
+          name: frames-${{ matrix.os }}
+          path: shots/
