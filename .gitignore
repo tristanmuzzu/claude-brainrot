@@ -12,3 +12,9 @@ shots/
 
 # Local overrides
 config.toml
+
+# Reference material: other people's footage and map data, kept locally
+# (see docs/reference/README.md for how to reproduce it).
+docs/reference/frames/
+docs/reference/sheets/
+docs/reference/data/

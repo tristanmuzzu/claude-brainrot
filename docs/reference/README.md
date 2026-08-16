@@ -4,7 +4,19 @@ Everything this project's spiral tower is measured against. It used to live in
 a session scratchpad under `/tmp`, which is a bad place for the only copy of
 the thing every design decision is justified by.
 
-## What is here
+> **The frames, contact sheets and map data are not in this repository.** They
+> are screenshots of other people's videos and a parse of somebody else's
+> Minecraft map, kept for measurement and not ours to redistribute. They are
+> git-ignored, so they sit in this directory on a machine that has built them
+> and are absent from a fresh clone. What *is* here is the findings —
+> `FRAME_FINDINGS.md`, `MAP_FINDINGS.md`, and `docs/RESEARCH.md` above — plus
+> the recipe below, which regenerates the lot from the public sources.
+>
+> Every number in those documents was read off the material described here.
+> Anything in `tools/mapdig/` or `tools/frame_probe.py` needs it present, and
+> those are development tools; nothing the overlay ships depends on it.
+
+## What it is (and where it goes when you rebuild it)
 
 - `frames/ps1/` — 47 frames of the Parkour Spiral 1 walkthrough, one per 15 s.
   **Shader-rendered** — see the provenance note below before comparing any
