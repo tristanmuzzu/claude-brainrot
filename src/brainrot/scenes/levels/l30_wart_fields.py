@@ -253,7 +253,9 @@ LEVEL = Level("WART FIELDS", "crimson", rise=6, gap=3.0, exit="stair",
               n("accent", arc=2.9, step_y=0, hug=3.2, kind="walk", spread=0,
                 pedestal=False, ceiling=3),
               n("magma", arc=3.2, step_y=1, hug=3.4, spread=0,
-                pedestal=False, moat=True, orbs=2)]),
+                pedestal=False, moat=True, orbs=2),
+              n("rock", arc=3.0, step_y=1, spread=0),
+              n("rock", arc=3.0, step_y=1, spread=0)]),
     # THE ROWS. The crop itself, and the drying shed cut into the
     # headwall at the end of it.
     #
@@ -282,12 +284,12 @@ LEVEL = Level("WART FIELDS", "crimson", rise=6, gap=3.0, exit="stair",
     # what survives whole over a jump is the rough one; and it is the
     # only enclosure in the level, because one shell is a pinch and three
     # in a row jam the lens on 10-21% of frames.
-    ("rows", [n("accent", arc=3.4, lift=3, hug=3.0, spread=2, ceiling=3,
+    ("rows", [n("accent", arc=3.4, lift=6, hug=3.0, spread=2, ceiling=3,
                 orbs=1),
-              n("sub", arc=2.9, lift=3, hug=3.2, kind="walk", spread=0,
+              n("sub", arc=2.9, lift=6, hug=3.2, kind="walk", spread=0,
                 ceiling=3, deco="lamp"),
               n("accent", arc=3.2, step_y=1, hug=2.9, spread=0, orbs=1),
-              n("rock", arc=4.4, lift=2, step_y=-1, hug=3.8, spread=0,
+              n("rock", arc=4.4, lift=6, step_y=-1, hug=3.8, spread=0,
                 pedestal=False, shell="cave", orbs=2)]),
     # THE BANK. Three nodes, and it is written knowing exactly what it
     # is: the placement table says a third beat lays **0.6 landings a
@@ -298,11 +300,11 @@ LEVEL = Level("WART FIELDS", "crimson", rise=6, gap=3.0, exit="stair",
     #
     # It carries no moat and no light, both of which used to be here and
     # are now in the first beat, where they are seen.
-    ("bank", [n("accent", arc=3.4, lift=3, hug=3.0, spread=2, ceiling=3,
+    ("bank", [n("accent", arc=3.4, lift=6, hug=3.0, spread=2, ceiling=3,
                 orbs=1),
-              n("sub", arc=2.9, lift=3, hug=3.2, kind="walk", spread=0,
+              n("sub", arc=2.9, lift=6, hug=3.2, kind="walk", spread=0,
                 ceiling=3, deco="lintel"),
-              n("rock", arc=4.4, lift=2, step_y=-1, hug=3.8, spread=0,
+              n("rock", arc=4.4, lift=6, step_y=0, hug=3.8, spread=0,
                 pedestal=False, orbs=2)]),
 ], filler=[
     # THE BEDS, repeated for as long as the terrace lasts, and this is
@@ -328,12 +330,12 @@ LEVEL = Level("WART FIELDS", "crimson", rise=6, gap=3.0, exit="stair",
     # a level jump across a reach of 2.77 -- and the same number is legal
     # at +1 and at -1, which is what it is asked from when machinery
     # lands between two laps.
-    ("beds", [n("accent", arc=3.4, lift=2, hug=3.0, spread=2, ceiling=3,
+    ("beds", [n("accent", arc=3.4, lift=6, hug=3.0, spread=2, ceiling=3,
                 orbs=1),
-              n("sub", arc=2.9, lift=2, hug=3.2, kind="walk", spread=0,
+              n("sub", arc=2.9, lift=6, hug=3.2, kind="walk", spread=0,
                 ceiling=3, deco="lamp"),
               n("accent", arc=3.2, step_y=1, hug=2.9, spread=0, orbs=1),
-              n("rock", arc=4.4, lift=2, step_y=-1, hug=3.6, spread=0,
+              n("rock", arc=4.4, lift=6, step_y=-1, hug=3.6, spread=0,
                 pedestal=False, orbs=1)]),
 ], exit_beats=[
     # THE HEADWALL. Seven landings up the retaining wall at the end of
@@ -379,14 +381,6 @@ LEVEL = Level("WART FIELDS", "crimson", rise=6, gap=3.0, exit="stair",
       orbs=1),
     n("sub", arc=2.9, step_y=0, hug=3.2, kind="walk", spread=0,
       confine=True, ceiling=3, deco="lintel"),
-    n("rock", arc=2.9, step_y=1, hug=2.8, spread=0, confine=True,
-      ceiling=3),
-    n("accent", arc=2.9, step_y=1, hug=3.3, spread=0, confine=True,
-      ceiling=3, orbs=1),
-    n("rock", arc=2.9, step_y=1, hug=2.8, spread=0, confine=True,
-      ceiling=3),
-    n("accent", arc=2.9, step_y=1, hug=3.4, spread=0, confine=True,
-      ceiling=3, orbs=1),
     n("glow", arc=3.0, step_y=1, hug=4.2, spread=0, pedestal=False,
       deco="lamp", orbs=2),
 ])

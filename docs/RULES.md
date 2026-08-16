@@ -22,6 +22,12 @@ to eight blocks higher. You get in off the level below's exit climb and out by
 your own. Eighty to a hundred metres of arc, and a filler beat that repeats if
 the terrace outlasts the script.
 
+**The course does not stand on that terrace; it flies over it.** One landing —
+the level's first — is on the ground, and everything after it is at least two
+blocks up, because a body steps up one and a landing at one is a landing a
+fall walks back onto. See §3, THE DECK RULE, which outranks most of what
+follows, and `docs/REHASH.md`, which is why.
+
 ### **A level is nine to twelve landings, and two to five of them are yours**
 
 Measured over 8 runs on all twenty levels, counting what actually gets laid.
@@ -292,10 +298,34 @@ This is failure (1), and it is a property of the **floor**, not of the jumps.
 If there is continuous ground under a beat, the parkour on top of it is
 decoration and reads as decoration however good the jumps are.
 
+> ### THE DECK RULE, and it outranks everything else in this section
+>
+> **Only a level's first landing may stand within one block of its terrace.
+> Everything after it is at least two blocks up.** A body steps up one, so a
+> landing at one is a landing a fall walks straight back onto — and a jump you
+> can walk back to is a jump that cost nothing to miss. `Level.deck` is where
+> the script and the filler leave the body, `tools/level_climb.py` prints it,
+> `tower_probe --design-only` refuses a design that breaks it, and
+> `tools/reentry_probe.py` is the number it is held to: **0.6% of missed jumps
+> may walk back onto the course.** The whole argument, and the seven engine
+> changes that carry it, are in `docs/REHASH.md`.
+>
+> The terrace does not go away and is not thinned: it stays fully themed and
+> fully dressed, and it is what the course flies over and what a fall lands
+> on. That is the half of this tower the owner likes.
+
 **Hard-ish rule, measured:** a level must come in at **≤ 55% covered by a
 no-jump walker, and must never be walkable end to end.** The real map measures
-46% mean and 0 of 43 legs passable. Printed by `level_review --report` under
-`CAN IT BE WALKED`, and tower-wide by `tools/bypass_probe.py`.
+46% mean and 0 of 43 legs passable; this tower measures **34% and 0 of 54**
+since the deck rule, because the course is not on the floor to be walked
+between. Printed by `level_review --report` under `CAN IT BE WALKED`, and
+tower-wide by `tools/bypass_probe.py`.
+
+**`breaks=0` is no longer a trade.** Nineteen levels had chosen no floor
+breaks because any break forced the lock and the lock cost one to three
+landings. A course three blocks up flies over a break, so the lock is skipped
+and breaks are free obstacles: the roster is at three or four everywhere, and
+that alone took a no-jump walker from 70% of a level to 48%.
 
 **But the reference does not achieve that by breaking a continuous ledge**, and
 this is the part worth getting right. Read frame by frame, it does two things:
@@ -386,12 +416,12 @@ the last thing before the seam is the way out.
 > The exit is the highest thing in the level, and nothing after it goes down.
 > Keep the drop after a level's high point under three blocks.
 
-### A level goes down as well as up
+### A level goes down as well as up — but never more than three blocks
 
 Measured on the real map: **36 of 43 legs descend somewhere, and 22 dip below
 their own starting checkpoint.** A leg travels eleven blocks vertically to gain
-four — a ratio of **3.36 to 1**. Every level in this tower is a monotonic
-climb, and that alone makes them feel like a corridor rather than a place.
+four — a ratio of **3.36 to 1**. A tower of monotonic climbs feels like a
+corridor rather than a place.
 
 The reference does not *jump* down — 2 of 122 jumps drop more than one block.
 It **falls off an edge**, which costs nothing and needs no jump at all. In this
@@ -399,8 +429,17 @@ vocabulary that is a lower `lift` on the next landing, a `step_y` descent, a
 drop into a pit or a channel and a climb back out. Use it: it is free variety,
 free exposure, and it is how you get a view back down over where you have been.
 
-**Design rule.** A level descends somewhere. Net rise across the level is the
-frozen `rise`, but the *path* need not be monotonic and should not be.
+**Design rule.** A level descends somewhere, by **at most three blocks at a
+time and never below the deck**. A drop of four or more is the deck coming
+back down to meet the terrace, and the landing at the bottom of it is one a
+fall can walk to. `tower_probe --design-only` refuses both. The level ends
+higher than it began; the *path* between need not be monotonic and should not
+be.
+
+**The filler holds its height.** It repeats, so anything it gains it gives
+back at the seam where it loops — the one descent nobody writes and everybody
+ships. Put the level's character in its materials, its verbs and its lids, and
+put the climb in the script.
 
 **The corridor.** `band` is the level's own width, core face to rim: 7.5 is a
 gallery whose walls press in, 13.0 is a court. Both are levels; a tower where
@@ -1035,9 +1074,11 @@ the only one that actually decides.
 
 ```bash
 python tools/tower_probe.py --design-only            # 0.2 s, after every edit
+python tools/level_climb.py "THE LEVEL"              # instant: what it does vertically
 python tools/level_review.py --level N --all         # ~25 s: sheet, blueprint, seam, numbers
 python tools/level_review.py --level N --outside     # Blender, the shape of the place
-python -m pytest tests/test_tower.py -q              # ~36 s, the tower-wide invariants
+python tools/reentry_probe.py --levels --only NAME   # ~11 s: can a fall walk back on
+python -m pytest tests/test_tower.py -q              # ~45 s, the tower-wide invariants
 ```
 
 A level is done when **all** of these hold:
@@ -1052,8 +1093,11 @@ A level is done when **all** of these hold:
 | a threshold: light + complete material change at the first beat | yes |
 | exit by a climb | only if the climb is the level's idea — about 1 level in 5 |
 | drop after the level's own high point | under 3 blocks, and none after the exit |
+| every landing but the first | **at least two blocks over the terrace** |
+| the filler | ends at the height it began |
+| a fall walking back onto the course | **none** (`reentry_probe --only NAME`) |
 | the route painted wherever the ground is wide | yes |
-| the level descends somewhere | not a monotonic climb |
+| the level descends somewhere | not a monotonic climb, at most 3 at a time |
 | distinct materials named | ≥ 6 across roles, nodes and props |
 | covered by a no-jump walker | ≤ 55% mean, never end to end |
 | designed content | ≥ 45% of the level's landings (the rest is the exit climb and machinery) |

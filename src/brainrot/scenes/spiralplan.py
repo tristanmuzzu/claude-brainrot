@@ -3118,7 +3118,16 @@ class Course:
             # that cannot be argued with later -- and dropping the body to the
             # floor here undoes a level's whole climb and leaves a landing a
             # fall walks back onto. A flat hop is no less safe than a drop.
-            cy = max(cy, ifloor(self.surface(prev)) - 1)
+            #
+            # ...unless up there is inside something. Unchecked does not mean
+            # unchecked *twice*: a cell in the ceiling slab or in the core is a
+            # landing the next node cannot leave either, and that is how one
+            # emergency becomes a run of three. Measured, allowing the drop
+            # back to the floor in exactly that case is the difference between
+            # a cascade and a single landing.
+            high = max(cy, ifloor(self.surface(prev)) - 1)
+            if not any(self.blocked((cx, high + h, cz)) for h in (0, 1, 2)):
+                cy = high
         # A tuple is truthy whether or not it is (0, 0), so this cannot be
         # written as ``step or (1, 0)`` -- which is what it said until ruff
         # pointed out that the fallback was unreachable. A zero step gives a

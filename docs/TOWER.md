@@ -107,7 +107,11 @@ Frame criteria, over a contact sheet of any 40-second run:
 
 - F1. No frame in which flat terrace ground dominates the lower half with
   the course as scattered knee-high blocks on it. The footing is always a
-  shelf, a structure, a pit, a channel bank or a room floor.
+  shelf, a structure, a pit, a channel bank or a room floor. **Since the
+  rehash the course is not on that ground at all**: it runs two to six blocks
+  over it, so what the lower half of a frame shows is the terrace *below* the
+  running line — which is the same criterion read from the other side, and the
+  reason the terrace's fourteen-material floor still matters.
 - F2. The run alternates: at least a quarter of frames enclosed (walls both
   sides, ceiling within three blocks), at least a third exposed (drop, sea
   or the level below visible past the course), and no stretch of more than
@@ -144,6 +148,25 @@ all held at or better than the 24-level tower:
 - P5. Per frame ≤ 3.5 ms in `frame_cost.py` terms (the shells and dressing
   are not free; this is the budget they must fit in).
 - P6. Every authored jump legal on paper (`--design-only` clean).
+- **P7. A fall costs you the level** (added 2026-08-16, and it is now the
+  first criterion a level is judged on). A body that misses a jump and then
+  walks — up one block, down any, never jumping — must not arrive back on the
+  course above the level's entry apron. `tools/reentry_probe.py`, target
+  **0**, currently one missed jump in 5,762 on one level visit in fifty-eight.
+  Its design-time half is one landing per level within a block of the terrace
+  and everything else at least two up (`tower_probe --design-only`), and the
+  whole argument is `docs/REHASH.md`.
+
+**P2 is met on the nose**: unchecked placement is **0.41%** against the 0.4%
+this list asks for, and what closed it was raising eight levels' decks rather
+than anything in the recovery chain -- a level cruising two blocks up with a
+rise of eight spends seven landings on a staircase against the wall, and that
+staircase is where the stuck landings were. It is an open item in CLAUDE.md
+rather than an accepted number. P5 is *met* — 3.00 ms and a tower/parkour
+ratio of 1.389 over nine rounds on a quiet machine, better than the 1.46 on
+record, and a run writes 10% fewer cells than before the rehash because the
+pedestals went. The 3.63 ms measured mid-pass was five rounds taken while the
+test suite was running.
 
 ## What the engine grows to say it
 

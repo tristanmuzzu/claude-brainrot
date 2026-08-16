@@ -222,7 +222,11 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
                n("magma", arc=5.2, lift=2, step_y=-2, form="slime", hug=3.8,
                  pedestal=False, moat=True, orbs=2),
                n("accent", arc=3.6, step_y=2, kind="bounce", hug=3.2,
-                 spread=1, pedestal=False, orbs=3)]),
+                 spread=1, pedestal=False, orbs=3),
+               n("rock", arc=3.0, step_y=1, spread=0),
+               n("rock", arc=3.0, step_y=1, spread=0),
+               n("rock", arc=3.0, step_y=1, spread=0),
+               n("rock", arc=3.0, step_y=1, spread=0)]),
     # THE SOFFIT. The quiet beat and the level's only enclosure -- a
     # two-metre pinch and not a room, which is what the reference
     # actually does: fully enclosed 6.1% of the way, an enclosed run
@@ -259,13 +263,13 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
     # wants terrain under it cannot be laid over a hole. What it costs
     # is one basalt column, and the crust's own cap, the ash bank's cap
     # every lap and the whole flight of the exit still stand on theirs.
-    ("soffit", [n("blackstone", arc=4.0, lift=2, hug=3.0, spread=2,
+    ("soffit", [n("blackstone", arc=4.0, lift=6, hug=3.0, spread=2,
                   ceiling=2, pedestal=False, orbs=1),
                 n("soulsand", arc=2.9, step_y=0, hug=2.8, kind="walk",
                   pedestal=False, ceiling=3, deco="lintel"),
                 n("accent", arc=3.2, step_y=1, hug=3.4, pedestal=False,
                   orbs=1),
-                n("netherrack", arc=4.4, lift=2, step_y=-1, hug=3.8,
+                n("netherrack", arc=4.4, lift=6, step_y=-1, hug=3.8,
                   pedestal=False, shell="cave", orbs=2)]),
 ], filler=[
     # THE ASH BANK, and this is what the level mostly *is*, because the
@@ -312,7 +316,7 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
     # of terrain under it cannot be laid over a hole. The cap keeps its
     # pedestal because that pedestal is the flue -- one lit vent a lap,
     # and it stands where the ground is.
-    ("ashbank", [n("netherrack", arc=3.4, lift=2, hug=3.2, spread=2,
+    ("ashbank", [n("netherrack", arc=3.4, lift=6, hug=3.2, spread=2,
                    ceiling=2, pedestal=False, orbs=1),
                  n("soulsand", arc=2.9, step_y=0, hug=3.0, kind="walk",
                    pedestal=False, ceiling=3),
@@ -377,14 +381,6 @@ LEVEL = Level("BASALT FLUES", "nether", rise=6, gap=2.8, exit="stair",
       orbs=1),
     n("blackstone", arc=2.9, step_y=0, hug=2.8, kind="walk", spread=0,
       confine=True, ceiling=3, deco="lintel"),
-    n("accent", arc=2.9, step_y=1, hug=2.6, spread=0, confine=True,
-      ceiling=3),
-    n("blackstone", arc=2.9, step_y=1, hug=3.2, spread=0, confine=True,
-      ceiling=3, orbs=1),
-    n("accent", arc=2.9, step_y=1, hug=3.8, spread=0, confine=True,
-      ceiling=3),
-    n("blackstone", arc=2.9, step_y=1, hug=3.0, spread=0, confine=True,
-      ceiling=3, orbs=1),
     n("glow", arc=3.0, step_y=1, hug=4.2, spread=0, pedestal=False,
       deco="lamp", orbs=2),
 ])

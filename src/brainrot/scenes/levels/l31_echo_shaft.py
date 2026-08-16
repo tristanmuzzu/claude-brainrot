@@ -226,7 +226,11 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="stair",
                    n("rock", arc=4.9, lift=2, step_y=-1, hug=4.4, spread=1,
                      pedestal=False, moat=True, orbs=2),
                    n("accent", arc=3.2, step_y=1, hug=4.0, pedestal=False,
-                     orbs=1)]),
+                     orbs=1),
+                   n("rock", arc=3.0, step_y=1, spread=0),
+                   n("rock", arc=3.0, step_y=1, spread=0),
+                   n("rock", arc=3.0, step_y=1, spread=0),
+                   n("rock", arc=3.0, step_y=1, spread=0)]),
     # THE DRIP. The level's one interior, and it is a **two-metre pinch**
     # rather than a room: a deepslate boulder standing in the third pool
     # at the foot of the shaft, and a bay bitten into the cliff beside it,
@@ -250,7 +254,7 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="stair",
     # a jump is a roof with a hole in the middle of it -- and at lift 1
     # because ``_shell`` skips any wall column with nothing under it, so
     # a bay written higher is a roof with open sides, which is not a bay.
-    ("drip", [n("rock", arc=3.4, lift=2, hug=3.4, spread=1, moat=True,
+    ("drip", [n("rock", arc=3.4, lift=6, hug=3.4, spread=1, moat=True,
                 ceiling=2, orbs=1),
               n("accent", arc=2.9, step_y=0, hug=3.4, kind="walk",
                 pedestal=False, shell="cave", ceiling=3, deco="lamp",
@@ -313,7 +317,7 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="stair",
     # what a filler ever loses is there: it is the last ledge at 2 back
     # onto the opener at 2, level across 3.4, which is the same jump the
     # opener is written for.
-    ("ledges", [n("accent", arc=3.4, lift=2, hug=3.6, spread=1,
+    ("ledges", [n("accent", arc=3.4, lift=6, hug=3.6, spread=1,
                   ceiling=2, orbs=1),
                 n("ground", arc=2.9, step_y=0, hug=3.6, kind="walk",
                   ceiling=3),
@@ -323,7 +327,7 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="stair",
                   pedestal=False, ceiling=3),
                 n("glow", arc=3.0, step_y=1, hug=3.0, pedestal=False,
                   deco="lamp", ceiling=2, orbs=1),
-                n("accent", arc=4.4, lift=2, step_y=-2, hug=3.8, pedestal=False,
+                n("accent", arc=4.4, lift=6, step_y=-2, hug=3.8, pedestal=False,
                   orbs=2)]),
 ], exit_beats=[
     # THE CUT STAIR. Eight treads winding up the inside of the shaft
@@ -386,11 +390,6 @@ LEVEL = Level("ECHO SHAFT", "deepdark", rise=8, gap=2.6, exit="stair",
     # invisible, which is the arrangement worth avoiding.
     n("accent", arc=3.2, step_y=0, hug=3.0, spread=2, confine=True,
       deco="lamp", ceiling=3, orbs=1),
-    n("deepslate", arc=3.0, step_y=1, hug=3.2, spread=0, ceiling=2, orbs=1),
-    n("calcite", arc=3.0, step_y=1, hug=3.2, spread=0, ceiling=2),
-    n("glow", arc=3.0, step_y=1, hug=3.2, spread=0, deco="lamp",
-      ceiling=2, orbs=1),
-    n("calcite", arc=3.0, step_y=1, hug=3.4, spread=0, ceiling=2),
     n("deepslate", arc=3.0, step_y=1, hug=3.4, spread=0, ceiling=2, orbs=1),
     n("calcite", arc=3.0, step_y=1, hug=3.4, spread=0, ceiling=2),
     n("glow", arc=3.0, step_y=1, hug=3.6, spread=0, deco="lamp",

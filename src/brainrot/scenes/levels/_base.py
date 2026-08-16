@@ -106,7 +106,7 @@ class Level:
                     form = spec.get("form", "full")
                     lift = 0 if form == "floor" else spec.get("lift", 1)
                     surf = lift + FORMS.get(form, 1.0)
-        self.deck = max(1, int(round(surf - 1.0)))
+        self.deck = max(1, round(surf - 1.0))
 
 
 # ---------------------------------------------------------------------------

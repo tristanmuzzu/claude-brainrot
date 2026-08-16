@@ -177,7 +177,10 @@ LEVEL = Level("THE SILENCE", "deepdark", rise=8, gap=3.0, exit="bubble",
     ("sill", [n("glow", arc=3.2, lift=1, spread=1, deco="lamp",
                 moat=True, orbs=1),
               n("accent", arc=2.4, lift=2, kind="walk", spread=0,
-                pedestal=False, ceiling=3, orbs=1)]),
+                pedestal=False, ceiling=3, orbs=1),
+              n("rock", arc=3.0, step_y=1, spread=0),
+              n("rock", arc=3.0, step_y=1, spread=0),
+              n("rock", arc=3.0, step_y=1, spread=0)]),
     # THE TRESTLES, and this is the level: up the camp's own staging to
     # the lit deck head and straight off the front of it into the pit.
     #
@@ -213,11 +216,11 @@ LEVEL = Level("THE SILENCE", "deepdark", rise=8, gap=3.0, exit="bubble",
     # is. It does **not** go to lift 0: that is the terrace's own top
     # cell, solid, and a ``step_y`` descent onto it is refused with the
     # rest of the beat abandoned behind it.
-    ("trestles", [n("accent", arc=3.4, lift=2, spread=1, orbs=1),
+    ("trestles", [n("accent", arc=3.4, lift=5, spread=1, orbs=1),
                   n("oak", arc=3.2, step_y=1, spread=0, ceiling=2),
                   n("glow", arc=3.2, step_y=1, spread=0, pedestal=False,
                     deco="lamp", orbs=1),
-                  n("rock", arc=4.9, lift=2, step_y=-2, spread=1, pedestal=False,
+                  n("rock", arc=4.9, lift=5, step_y=-2, spread=1, pedestal=False,
                     moat=True, orbs=2)]),
     # THE ADIT. The bore itself: a stone standing in the black water at
     # the bottom of the pit, and a two-metre pinch in the cliff walked
@@ -252,7 +255,7 @@ LEVEL = Level("THE SILENCE", "deepdark", rise=8, gap=3.0, exit="bubble",
     # being pulled past the ground rather than the plinth failing to
     # stand. The keyword stays because a stone in flood water should not
     # have a plinth under it anyway, but it is not what did the work.
-    ("adit", [n("rock", arc=3.4, lift=2, spread=1, moat=True, ceiling=2,
+    ("adit", [n("rock", arc=3.4, lift=5, spread=1, moat=True, ceiling=2,
                 pedestal=False, orbs=1),
               n("ground", arc=2.4, step_y=0, kind="walk", spread=0,
                 pedestal=False, shell="cave", ceiling=3, orbs=1)]),
@@ -262,7 +265,7 @@ LEVEL = Level("THE SILENCE", "deepdark", rise=8, gap=3.0, exit="bubble",
     # in three. Two nodes, both of which say the same thing the exit is
     # about to say -- iron sheeting and a timber post, standing above
     # the sculk.
-    ("collar", [n("blackstone", arc=3.4, lift=2, spread=1, ceiling=2),
+    ("collar", [n("blackstone", arc=3.4, lift=5, spread=1, ceiling=2),
                 n("iron", arc=3.2, step_y=1, spread=0, pedestal=False,
                   deco="post", orbs=2)]),
 ], filler=[
@@ -319,7 +322,7 @@ LEVEL = Level("THE SILENCE", "deepdark", rise=8, gap=3.0, exit="bubble",
     # against 3.12-5.56, the same number as every other way into this
     # beat, which is why the opener could be lengthened without the loop
     # coming apart.
-    ("campline", [n("accent", arc=4.4, lift=3, spread=1, orbs=1),
+    ("campline", [n("accent", arc=4.4, lift=6, spread=1, orbs=1),
                   n("ground", arc=2.4, step_y=0, kind="walk", spread=0,
                     ceiling=3, deco="lamp"),
                   n("rock", arc=3.2, step_y=1, spread=0, pedestal=False,
@@ -403,7 +406,7 @@ LEVEL = Level("THE SILENCE", "deepdark", rise=8, gap=3.0, exit="bubble",
     # way out of its own idea.
     n("glow", arc=3.2, step_y=0, hug=2.9, spread=2, confine=True,
       deco="lamp", ceiling=3, orbs=1),
-    n("rock", arc=2.4, step_y=5, kind="bubble", hug=2.4, pedestal=True,
+    n("rock", arc=2.4, step_y=2, kind="bubble", hug=2.4, pedestal=True,
       pedestal_style="blackstone", spread=0, orbs=2),
     n("iron", arc=3.2, step_y=1, hug=3.6, spread=0, pedestal=False,
       deco="lamp", ceiling=3, orbs=2),

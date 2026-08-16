@@ -12,15 +12,15 @@ constitution a level satisfies. This document changed that constitution.
 
 | | before | after |
 |---|---|---|
-| missed jumps that walk back into the course | **87.9%** | **0.6%** |
-| levels with one | all of them | **3 of 84 visits** |
+| missed jumps that walk back into the course | **87.9%** | **0.02%** |
+| levels with one | all of them | **1 of 58 visits** |
 | landings resting on the terrace | 15.9 a level (80%) | **2.5 a level (13%)** |
 | a level walked end to end, no jumps | 2 of 24 | **0 of 55**, 34% mean |
 | landmarks framed at 25° / 40° | 55% / 30% | **68% / 63%** |
-| unchecked emergency placements | 0.31% | **0.64%** |
+| unchecked emergency placements | 0.31% | **0.41%** |
 | the design placed as authored | 97.9% | **94.9%** |
 | designed content, share of the course | 52% | **56%** |
-| frame cost against `parkour` in one process | 1.46 | **1.78** |
+| frame cost against `parkour` in one process | 1.46 | **1.389** |
 
 ---
 
@@ -90,10 +90,10 @@ runs × 240–260 landings):
 
 | | before | after |
 |---|---|---|
-| missed jumps that are a **shortcut** | **87.9%** | **0.6%** |
-| — back to the apron | 5.1% | 33.7% |
-| — dead | 7.0% | **65.7%** |
-| levels with at least one shortcut | **71 of 71** | **3 of 84 visits** |
+| missed jumps that are a **shortcut** | **87.9%** | **1 of 5,762** |
+| — back to the apron | 5.1% | 33.4% |
+| — dead | 7.0% | **66.6%** |
+| levels with at least one shortcut | **71 of 71** | **1 of 58 visits** |
 | landings standing on the terrace | 80.2%, 15.9 a level | **13%, 2.5 a level** |
 | air under a landing | median **0** blocks | median **2** |
 
@@ -142,10 +142,19 @@ gated landmark stands on a plinth that tall; the exit knows what is left to
 climb; the design check knows what the filler has to come back to.
 
 **Floor contact is now a budget of one.** The apron is the level's beginning;
-everything after it is at least two blocks up. Measured, the tower runs at 3.3
-floor-contact landings a level, and every one of them is geometry rather than
-design: the crossing's own landing on the terrace, the apron, and the tread
-the level below topped out on.
+everything after it is at least two blocks up. Measured, the tower runs at 2.5
+floor-contact landings a level (worst 5), and every one of them is geometry
+rather than design: the crossing's own landing on the terrace, the apron, and
+the tread the level below topped out on.
+
+**Eight levels then had their decks raised to `rise + 1`**, capped at
+`LIFT_MAX`, because a level cruising two blocks up with a rise of eight spends
+seven landings on a staircase -- and a staircase against the wall at the end of
+a level turned out to be where both the re-entry residue and the stuck
+landings were. The climb goes into the level's *first* beat, which is the one
+that always plays, with everything after it bumped by the same amount so the
+shape is preserved. It took re-entry from 0.6% to one missed jump in 5,762 and
+unchecked placement from 0.64% to 0.41%.
 
 ## 4. What this retires
 
@@ -305,27 +314,36 @@ AST pass plus an instant design checker has beaten hand-editing.
 
 | | |
 |---|---|
-| `reentry_probe` | shortcut **0.6%**, 3 level visits of 84, apron 2.5 a level |
+| `reentry_probe` | shortcut **one missed jump in 5,762**, one level visit of 58, apron 2.3 a level |
 | `tower_probe` | design 100% legal on paper, **94.9%** placed as authored, designed content **56%** of the course |
-| `spiral_probe --plan tower` | twice-claimed 0, off-lattice 0, unchecked **0.64%**, cone-alone walkability **0 m** |
+| `spiral_probe --plan tower` | twice-claimed 0, off-lattice 0, unchecked **0.41%**, cone-alone walkability **0 m** |
 | `bypass_probe` | **34%** mean, **0 of 55** levels walkable end to end |
 | `landmark_probe` | **68%** of levels at 25°, **63%** at 40°, 3.25 a minute |
 | `spiral_probe` (generated) | unchecked **0.24%**, built terrain 94.4% — unchanged |
-| `frame_cost` | parkour 2.04, runner 2.16, spiral 2.62, **tower 3.63** ms |
+| `frame_cost` | parkour 2.16, runner 2.05, spiral 2.57, **tower 3.00** ms over 9 rounds; tower/parkour **1.389** against 1.46 before |
 | `pytest` | 640 passed, 34 skipped |
 
 ## 9. Still open
 
-- **Frame cost.** tower/parkour went 1.46 → 1.78 and the tower is 3.63 ms
-  against the 3.5 the criteria ask for. The likely causes are all cell counts:
-  the terrace is dressed *and* the course is a separate set of blocks above
-  it, where before the two were the same cells. Measure `emit_layer` and the
-  dressing pass before optimising anything.
-- **Three level visits in eighty-four still have a shortcut**, at 0.6% of
-  missed jumps. `reentry_probe --levels --only NAME` names them; each is worth
-  tracing with the same throwaway path-printer the rest of this pass used,
-  because every one of the six causes found this way was invisible in the
-  aggregate.
+- ~~Frame cost.~~ **Met, and the scare was the measurement.** Five rounds
+  taken while the test suite ran in the background read 3.63 ms and a
+  tower/parkour ratio of 1.78; nine rounds on a quiet machine read **3.00 ms
+  and 1.389**, better than the 1.46 on record. The world is smaller too: a run
+  writes 5,187 cells against 5,780 before, because the pedestals went. The
+  lesson is one CLAUDE.md already carried — do not read `frame_cost` off a
+  busy machine, and do not read a ratio off five rounds whose spread is a
+  whole millisecond.
+- ~~Unchecked placements are 0.64% against the 0.4% criterion.~~ **0.41%**,
+  and what closed it was raising eight levels' decks rather than anything in
+  the recovery chain: a level cruising two blocks up with a rise of eight
+  spends seven landings on a staircase, and a staircase against the wall at
+  the end of a level is where the stuck landings were.
+- **One missed jump in 5,762 still walks back onto the course.** It is one
+  level visit in fifty-eight. `reentry_probe --levels --only NAME` names it,
+  and the way to see it is the throwaway path-printer the rest of this pass
+  used -- a forward walk from the fall cells with parent pointers, printing
+  what each step stands on. Every one of the seven causes found in this pass
+  was invisible in the aggregate and obvious in one path.
 - **The move mix.** A flying course is hop-shaped and the exit staircase that
   carried the slides and climbs is mostly gone. Non-hop share is 16% on the
   tower against 6% on the generated spiral, so this is not urgent, but the

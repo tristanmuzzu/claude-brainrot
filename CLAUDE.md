@@ -770,8 +770,8 @@ That is a **reachability** question, not a void question, and `docs/REHASH.md`
 is the whole record: the plan, what was built, what it measured, and the four
 things the probe itself had to get right before its number meant anything.
 `tools/reentry_probe.py` is the number. **87.9% of missed jumps walked back
-into the middle of the course; it is 0.6% now, on three level visits in
-eighty-four.**
+into the middle of the course; it is **one missed jump in 5,762** now, on one
+level visit in fifty-eight.**
 
 The shape, in one paragraph. A level is entered on its terrace, steps up off
 it once, and everything after that stands **at least two blocks over the
@@ -786,11 +786,11 @@ tower has had:
 
 | | before | after |
 |---|---|---|
-| missed jumps that re-enter the course | 87.9% | **0.6%** |
+| missed jumps that re-enter the course | 87.9% | **0.02%** |
 | landings resting on the terrace | 15.9 a level | **2.5 a level** |
 | a level walked end to end without jumping | 2 of 24 | **0 of 55** (34% mean) |
 | landmarks framed at 25 / 40 degrees | 55% / 30% | **68% / 63%** |
-| unchecked emergency placements | 0.31% | **0.64%** |
+| unchecked emergency placements | 0.31% | **0.41%** |
 
 **`Level.deck` is the new number every part of the machinery aims at**: how
 high over its own terrace a level's course cruises, computed in
@@ -885,16 +885,18 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
-00. **Frame cost is the one criterion the rehash lost.** tower/parkour went
-   1.46 -> **1.78** in one process (parkour 2.04, runner 2.16, spiral 2.62,
-   tower 3.63 ms), against the 3.5 ms the tower's criteria ask for. Nothing
-   was optimised for it and the likely cause is cell count rather than draw
-   order: the terrace is dressed *and* the course is a separate set of blocks
-   above it, where before the two were the same cells. Measure `emit_layer`
-   and the dressing pass before changing anything, and read the note on a busy
-   machine under item 5 -- only the ratio survives.
-0a. **Three level visits in eighty-four still let a fall back onto the
-   course** (0.6% of missed jumps) -- more landings at terrace
+00. ~~Frame cost is the one criterion the rehash lost~~ **It was the
+   machine.** Five rounds while the test suite ran in the background read
+   tower 3.63 ms and tower/parkour 1.78, against the recorded 1.46; nine
+   rounds on a quiet machine read **tower 3.00 ms and 1.389**, which is better
+   than the record and inside the 3.5 ms the criteria ask for. The world got
+   *smaller*, which is the other half of the answer -- a tower run writes 5,187
+   cells against 5,780 before the rehash, because the pedestals went. The
+   lesson is the one already written under item 5 and it cost an hour anyway:
+   **do not read `frame_cost` off a busy machine, and do not read a ratio off
+   five rounds when the spread is 1.0 ms.**
+0a. **One level visit in fifty-eight still lets a fall back onto the
+   course** (one missed jump in 5,762) -- more landings at terrace
    height than the geometry needs. `python tools/reentry_probe.py --levels
    --only NAME` names them; `docs/REHASH.md` is the criterion. Trace one with
    a throwaway path-printer -- a forward walk from the fall cells with parent
