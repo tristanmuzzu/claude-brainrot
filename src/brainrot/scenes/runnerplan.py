@@ -126,6 +126,11 @@ class Kinematics:
         return 2.0 * self.jump_v0 / self.gravity
 
     @property
+    def mount_air_time(self) -> float:
+        """A mount leaves harder than a hurdle jump, so it is up for longer."""
+        return 2.0 * self.mount_v0 / self.gravity
+
+    @property
     def jump_apex(self) -> float:
         return self.jump_v0 ** 2 / (2.0 * self.gravity)
 
@@ -457,6 +462,32 @@ class Threat:
     #: and it is the *whole* of what the planner needs to know about riding.
     #: The scene solves it; ``verify`` is what decides whether it survives.
     mount_at: float | None = None
+    #: ...and the last moment it still works. A ramp is one instant -- the lip
+    #: passes under the feet once -- but the leap from one train's roof to the
+    #: next one's is not: the body is already at roof height and already going
+    #: the right way, so any take-off from far enough back to clear the gap up
+    #: to the moment the roof runs out will do. Left at None it means the same
+    #: single instant ``mount_at`` always did.
+    mount_to: float | None = None
+    #: This train is further down a convoy the body is about to get onto: it
+    #: is a road rather than a wall, but not one there is anything to *book*
+    #: yet -- the take-off that crosses onto it is offered by the roof in front
+    #: of it, once the body is up there.
+    #:
+    #: Without this distinction a chain of trains in one lane is a hundred
+    #: metres of wall to the lane search, so it leaves that lane long before
+    #: the ramp -- and the mount it was routing around never gets offered.
+    #: Measured: twelve mounts over four runs with one train per set-piece,
+    #: none at all with two to four.
+    ride_ahead: bool = False
+    #: The take-off this train offers is a leap from the roof of the one in
+    #: front of it, so it is only a real offer if the body is going to *be* up
+    #: there. Booked without that it is an ordinary jump with a mount's launch
+    #: speed, taken from the rails, landing ten metres later on whatever
+    #: happens to be there -- which is exactly how it was measured going
+    #: wrong: 151 frames inside something over sixty runs, and every one of
+    #: them a body that had leapt off flat ground with a 2.35 m apex.
+    ride_link: bool = False
 
     @property
     def duration(self) -> float:
@@ -585,7 +616,7 @@ def occupancy(threats: list[Threat], horizon: float, step: float,
                     grid[lane][i] += preference
     approach_steps = max(1, int(APPROACH / step))
     for th in threats:
-        if th.mount_at is not None and not th.hard:
+        if (th.mount_at is not None or th.ride_ahead) and not th.hard:
             # A train with a way onto it is not a wall, it is a road. Charging
             # it the ordinary obstacle cost would make the search treat the
             # signature move of the genre as damage to be routed around; a
@@ -763,6 +794,7 @@ def solve_roll(threat: Threat, kin: Kinematics,
 def schedule_vertical(threats: list[Threat], plan: LanePlan, body: Body,
                       kin: Kinematics, surface: float = 0.0,
                       not_before: float = 0.0, late: float = 0.0,
+                      riding: bool = False,
                       ) -> tuple[list[tuple[float, str]], list[Threat]]:
     """Walk the chosen lane path and book a jump or roll for what it meets.
 
@@ -775,6 +807,8 @@ def schedule_vertical(threats: list[Threat], plan: LanePlan, body: Body,
     """
     booked: list[tuple[float, str]] = []
     unsolved: list[Threat] = []
+    #: Whether the body is up on a roof by this point in the schedule.
+    up = riding
     # busy windows, so two actions cannot be scheduled on top of each other
     busy: list[tuple[float, float]] = [(-math.inf, not_before)] if not_before > 0 else []
 
@@ -790,7 +824,11 @@ def schedule_vertical(threats: list[Threat], plan: LanePlan, body: Body,
 
     relevant = []
     for th in threats:
-        if th.hard or th.t_exit <= 0.0:
+        # ``ride_ahead`` is a lane-search fact and nothing else: there is no
+        # take-off to book for a train two roofs further down a convoy, and
+        # classifying it would only ever come back "hard" and undo the whole
+        # point of the flag.
+        if th.hard or th.ride_ahead or th.t_exit <= 0.0:
             continue
         mid = 0.5 * (th.t_enter + th.t_exit)
         if plan.lane_at(max(0.0, mid)) in th.lanes:
@@ -800,19 +838,33 @@ def schedule_vertical(threats: list[Threat], plan: LanePlan, body: Body,
         if action == "clear":
             continue
         if action == "mount":
-            # The one moment this can happen is the moment the body leaves the
-            # ramp's lip: earlier it is still climbing and lower than the arc
-            # was solved for, later there is no ramp under it. So there is no
-            # window to search -- either the body is free then, or the mount is
-            # off and the lane search is told to route around the train.
-            start = th.mount_at
-            length = kin.jump_air_time
-            if start < not_before or any(a < start + length and b > start
-                                         for a, b in busy):
+            # Off a ramp there is one moment this can happen: the moment the
+            # body leaves the lip. Earlier it is still climbing and lower than
+            # the arc was solved for, later there is no ramp under it. Off a
+            # train roof onto the next train's there is a window instead, and
+            # the difference matters -- a single instant that happens to be
+            # busy is a mount dropped, and a mount dropped while the body is
+            # already up on a roof is a fall into the gap rather than a lane
+            # change.
+            if th.ride_link and not up:
+                # A leap between two roofs is only available to a body that is
+                # on the first of them. The convoy is walked in order, so "the
+                # mount onto the head of it is booked earlier in this same
+                # schedule" is exactly the condition -- and if it was not, the
+                # train is something to route around like any other.
                 unsolved.append(th)
                 continue
-            busy.append((start, start + length))
-            booked.append((start, "mount"))
+            start = th.mount_at
+            latest = th.mount_to if th.mount_to is not None else start
+            length = kin.mount_air_time
+            lower = max(start, not_before)
+            found = earliest_free(lower, length)
+            if found is None or found > latest:
+                unsolved.append(th)
+                continue
+            busy.append((found, found + length))
+            booked.append((found, "mount"))
+            up = True
             continue
         if action == "jump":
             window = solve_jump(th, body, kin, surface, late)

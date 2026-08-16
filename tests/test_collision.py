@@ -263,24 +263,48 @@ def test_the_ramp_numbers_are_the_ramp_asset() -> None:
 
 def test_a_train_with_a_ramp_has_a_lane_to_bail_into() -> None:
     """The lane choice and the mount are one decision, which means the answer
-    to "the mount does not work" has to already exist. It is the adjacent
-    lane, and a roof set-piece leaves it empty for its whole length."""
+    to "the mount does not work" has to already exist.
+
+    It is a lane the body can actually *get to*, and that is the whole of the
+    statement now that a convoy stands a second line of trains alongside
+    itself. "Nothing beside a ridden train", which is what this used to
+    assert, forbids the canyon the reference runs down at speed; what it was
+    really protecting is that one lane stays free over the whole length **and
+    that nothing solid stands between the ride lane and it**. From an outside
+    lane the only way across is through the middle, so a convoy in lane 0 may
+    only put its flank in lane 2 -- and that rule lives in
+    ``RunnerScene._flank_lane``, with this as the check on it.
+
+    Trains only. A hurdle beside a convoy is something the body jumps, not
+    something it has to be elsewhere for, and the lanes either side of a
+    convoy are deliberately full of them: a runner that did not get on has to
+    have something to do.
+    """
     for run in (2, 5, 9, 16):
         scene = generate(run, 220)
         for e in scene.entities:
             if e["kind"] != "train" or not e.get("ride"):
                 continue
             a, b = scene._train_span(e["d"] + scene.travel, e["cars"])
-            others = [o for o in scene.entities
-                      if o is not e and o["kind"] in SOLID_KINDS
-                      and o.get("lane") != e["lane"]]
-            for o in others:
+            blocked = set()
+            for o in scene.entities:
+                if o is e or o["kind"] != "train":
+                    continue
                 box = scene.solid_box(o)
                 if box is None:
                     continue
                 lo, hi = -box.z1 + scene.travel, -box.z0 + scene.travel
-                assert hi < a or lo > b, (
-                    f"run {run}: {o['kind']} beside a train being ridden")
+                if hi >= a and lo <= b:
+                    blocked.add(o.get("lane"))
+            ride = e["lane"]
+            bail = [ln for ln in (0, 1, 2)
+                    if ln != ride and ln not in blocked
+                    and not any(mid in blocked
+                                for mid in range(min(ln, ride) + 1,
+                                                 max(ln, ride)))]
+            assert bail, (
+                f"run {run}: a ridden train in lane {ride} with trains in "
+                f"{sorted(blocked)} and nowhere to bail to")
 
 
 def test_a_ridden_train_is_the_only_one_the_corridor_runs_into() -> None:
@@ -428,10 +452,32 @@ def test_every_obstacle_is_clearable_at_every_speed(speed: float) -> None:
 
 
 def test_a_jump_covers_about_the_same_track_at_any_speed() -> None:
-    """Moves scale with speed; that is what keeps them usable at the top."""
-    spans = [plan.Kinematics.for_speed(v).jump_air_time * v
-             for v in (BASE_SPEED, 11.0, 13.0, TOP_SPEED)]
-    assert max(spans) - min(spans) < 1.0, spans
+    """Moves scale with speed; that is what keeps them usable at the top.
+
+    Up to a point, and the point is a floor on how *brief* a move may be:
+    ``for_speed`` clamps the air time at 0.34 s, because below that a jump is
+    a twitch nobody reads as one. Past about 19 m/s the clamp binds and the
+    same jump starts covering more track with every metre a second added --
+    8.2 m at the top of this range against the nominal 6.4.
+
+    So the statement is in two halves. Below the clamp the span is constant;
+    above it, it grows -- and everything that reserves track for a move has to
+    be sized from the *top* of the range rather than from the nominal figure,
+    which is what ``RunnerScene.ACTION_SPAN`` and ``TRAIN_PAD`` are and why
+    they are computed rather than typed.
+    """
+    from brainrot.scenes.runner import ACTION_SPAN, TRAIN_PAD
+
+    unclamped = [plan.Kinematics.for_speed(v).jump_air_time * v
+                 for v in (BASE_SPEED, 16.0, 18.0)]
+    assert max(unclamped) - min(unclamped) < 1.0, unclamped
+    at_top = plan.Kinematics.for_speed(TOP_SPEED).jump_air_time * TOP_SPEED
+    assert at_top >= max(unclamped) - 1e-9, at_top
+    top = plan.Kinematics.for_speed(TOP_SPEED)
+    assert ACTION_SPAN >= top.roll_time * TOP_SPEED - 1e-9, (
+        "a slide at top speed covers more track than the ledger reserves")
+    assert TRAIN_PAD >= 2.0 * top.lane_time * TOP_SPEED, (
+        "two lane changes at top speed do not fit beside a train")
 
 
 def test_solvers_refuse_what_they_cannot_do() -> None:

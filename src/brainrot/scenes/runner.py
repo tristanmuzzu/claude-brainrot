@@ -58,9 +58,28 @@ FOG_FAR = 88.0
 #: bottom third of its own speed range: 8.5 m/s at the start, 11.3 by thirty
 #: seconds, and the interesting part of the curve reserved for a run nobody
 #: ever saw. It starts quick now and gets quick fast.
-BASE_SPEED = 10.5
-TOP_SPEED = 18.0
-RAMP_SECONDS = 40.0
+#:
+#: Then 10.5 to 18 over forty seconds turned out to be the same mistake one
+#: notch along. Read off the reference -- a five-million-point run of the real
+#: game, score rate against the clock -- the distance rate at the top is about
+#: 1.65 times what it is a minute in, and the top is where a watched run
+#: should live. What a strip cannot afford is the *approach* to it: this one
+#: opens where the old one finished and reaches a speed the old one had no
+#: name for, in under half a minute.
+#:
+#: Everything downstream is sized in metres rather than seconds precisely so
+#: this could be raised without re-deriving it -- see
+#: :meth:`plan.Kinematics.for_speed`. What does not survive untouched are the
+#: two clamps in there: past about 19 m/s a jump stops shrinking and starts
+#: covering more *track*, so the spans below are read off the top of the range
+#: rather than off the nominal figures.
+BASE_SPEED = 15.0
+TOP_SPEED = 24.0
+RAMP_SECONDS = 28.0
+#: The runner's capabilities at the fastest it will ever go. Everything that
+#: reserves track for a move is sized from this, because a move's *span* is
+#: longest there -- 12.4 m of slide against the nominal 8.4.
+TOP_KIN = plan.Kinematics.for_speed(TOP_SPEED)
 
 RAIL_TOP = 0.30               # y of the surface the runner runs on
 CHAR_SCALE = 0.95
@@ -114,7 +133,14 @@ COIN_PITCH = 0.9
 #: to stand in for this and could not see across a set-piece boundary: two
 #: hurdles a row apart either side of one put the runner's feet through the
 #: second while it was still coming down off the first.
-ACTION_SPAN = plan.ROLL_SPAN
+#:
+#: Read off the top of the speed range rather than from ``plan.ROLL_SPAN``,
+#: which is the span a slide covers only while ``for_speed`` is still able to
+#: shorten it. Past 18 m/s the roll clamps at 0.46 s and starts covering more
+#: track with every metre a second added, so the nominal figure understates
+#: the reservation by half at the top of this range -- and an understated
+#: reservation is two obstacles the body meets inside one move.
+ACTION_SPAN = max(plan.ROLL_SPAN, TOP_KIN.roll_time * TOP_SPEED)
 #: Track between two hurdles in a rhythm. Twice the commitment, and a little
 #: over, so the run-up is never a scramble.
 HURDLE_PITCH = 2.0 * ACTION_SPAN + 1.2
@@ -150,6 +176,36 @@ MOUNT_GAP = 4.4
 #: the train, for the fall off the back to land in.
 APPROACH_RUN = 13.0
 DISMOUNT_RUN = 7.0
+#: A convoy: how many trains are chained one behind the next, how many cars
+#: each is, and the gap left between two of them.
+#:
+#: This is the shape the whole set-piece was missing. It laid one train, rode
+#: it for the twenty-odd metres it was long -- a second and a bit at speed --
+#: and put the runner back on the rails, which measured as 2.7 seconds on a
+#: roof per minute. Read off the reference at full speed, roughly a third of
+#: the frames have the player up on the trains, and the way they stay up there
+#: is by jumping from one roof to the next. So the trains come in a line now,
+#: and the gaps between them are the point rather than a flaw: a chain of four
+#: is sixty metres of elevated running and three leaps to keep it.
+CONVOY_TRAINS = (3, 5)
+CONVOY_CARS = (3, 5)
+#: How much longer than the rows it was offered a convoy may run before it
+#: starts dropping trains off its own tail.
+CONVOY_SLACK = 8
+ROOF_GAP = (2.8, 4.0)
+#: Slack a roof-to-roof leap must have over the gap it crosses, on top of the
+#: body's own depth. Not a margin for error -- the arc is solved -- but the
+#: track the take-off is taken *before* the roof ends, which is what stops the
+#: leap being a step off the last centimetre of it.
+HOP_MARGIN = 2.6
+#: How far before the roof runs out the leap is taken, as a fraction of its
+#: own air time. Later looks better and lands further onto the next roof; too
+#: late and one frame of rounding is a fall into the gap.
+HOP_LEAD = 0.38
+#: How often a convoy stands a second line of trains alongside it -- the
+#: canyon the reference runs down at speed rather than a single train in an
+#: empty yard.
+FLANK_CHANCE = 0.7
 #: How near the middle of a ramp's lane the body has to be for the slope to
 #: pick it up. Much tighter than the ramp is wide, and deliberately: a body
 #: still crossing when it clips the edge of a ramp is frozen there by the rule
@@ -180,14 +236,22 @@ RIDE_REACH = 70.0
 #: table. See ``_begin_segment``: what gets watched is the first few seconds.
 OPENING_ROOFRUN = 0.62
 
+#: Reweighted against the reference rather than against taste. At full speed
+#: the real game is trains: a third of the frames have the player up on one,
+#: nearly every frame has one in it, and the plain jump-or-duck barrier is the
+#: *least* of what is going on. This scene was the other way round -- 48
+#: barriers a minute against 7.8 trains, and 2.7 seconds a minute spent on a
+#: roof -- which is the "a bunch of mediocre speed barriers" the owner named.
+#: So the roof run is the commonest set-piece there is now, the yard is second,
+#: and the two barrier set-pieces between them are worth less than either.
 SEGMENT_TABLE = (
-    ("cruise", 2, 3, 0.7),
-    ("hurdles", 5, 8, 2.2),
-    ("slalom", 6, 9, 2.0),
-    ("tunnel", 5, 8, 1.6),
-    ("yard", 9, 14, 1.9),
-    ("express", 8, 11, 1.5),
-    ("roofrun", 12, 16, 1.8),
+    ("cruise", 2, 3, 0.5),
+    ("hurdles", 5, 8, 1.2),
+    ("slalom", 6, 9, 1.3),
+    ("tunnel", 5, 8, 1.0),
+    ("yard", 9, 14, 2.4),
+    ("express", 8, 11, 0.9),
+    ("roofrun", 14, 22, 5.0),
 )
 
 #: Minimum rows between two obstacles that demand a move. One move must be
@@ -212,8 +276,9 @@ IMPACT_TIME = 0.75
 #: different lanes are never merely *adjacent*. Back to back with a small gap
 #: still squeezes the runner: it has to be out of the first lane and into a
 #: third before the second arrives, and one lane change at top speed already
-#: costs four metres of track.
-TRAIN_PAD = 8.0
+#: costs four and a half metres of track. Derived from that rather than typed
+#: in, for the same reason ``ACTION_SPAN`` is.
+TRAIN_PAD = max(8.0, 2.0 * TOP_KIN.lane_time * TOP_SPEED + 1.0)
 
 
 @register("runner")
@@ -526,16 +591,17 @@ class RunnerScene(Scene):
 
     def _add_train(self, p: float, lane: int, cars: int, rng,
                    oncoming: bool = False, ride: bool = False,
-                   sweep: float = 0.0) -> dict | None:
+                   sweep: float = 0.0, pad: float | None = None) -> dict | None:
         a, b = self._train_span(p, cars)
+        if pad is None:
+            pad = TRAIN_PAD
         # A moving train sweeps the track between here and the runner, so it
         # reserves that stretch rather than its own length. ``sweep`` is how
         # much: the set-piece that lays it knows how far it will get before
         # the two meet, and reserving the whole ninety-metre view instead --
         # which is what this did first -- means the lane is never empty enough
         # and the set-piece declines nine times out of ten.
-        span = ((a - sweep, b) if oncoming
-                else (a - TRAIN_PAD, b + TRAIN_PAD))
+        span = ((a - sweep, b) if oncoming else (a - pad, b + pad))
         if self._clash(lane, *span, BODY_PAD):
             return None
         # Even a moving train stays in its own lane; what makes it different is
@@ -547,7 +613,7 @@ class RunnerScene(Scene):
         return self._add({"kind": "train", "lane": lane, "cars": cars,
                           "vel": (self.speed * 0.55 + 4.5) if oncoming else 0.0,
                           "color": rng.choice(self.train_liveries),
-                          "ride": ride, "ramp": None}, p)
+                          "ride": ride, "ramp": None, "behind": None}, p)
 
     def _add_coins(self, p: float, n: float, lane: int, rng,
                    base: float = 0.55, arc: float = 0.0) -> None:
@@ -890,36 +956,142 @@ class RunnerScene(Scene):
         if not self._may_spawn_train():
             return 0
         lane = self._lane_clear(row0 - 1) if row0 else 1
-        cars = rng.randint(4, 6)
         p_ramp = row0 * ROW + APPROACH_RUN
         p_lip = p_ramp + RAMP_LIP
-        p_train = p_lip + MOUNT_GAP + self._boxes["train_cab"].x1
-        a, b = self._train_span(p_train, cars)
-        stretch = (row0 * ROW, b + DISMOUNT_RUN + ROW)
-        used = int(math.ceil((stretch[1] - row0 * ROW) / ROW))
-        if used > rows + 4:
+        nose = self._boxes["train_cab"].x1
+        # Laid out on paper first, and the whole convoy accepted or refused as
+        # one. A chain that gets three trains in and finds the fourth blocked
+        # is a roof that ends over a wall.
+        chain: list[tuple[float, int, float, float]] = []
+        p = p_lip + MOUNT_GAP + nose
+        for i in range(rng.randint(*CONVOY_TRAINS)):
+            cars = rng.randint(*CONVOY_CARS)
+            a, b = self._train_span(p, cars)
+            chain.append((p, cars, a, b))
+            p = b + rng.uniform(*ROOF_GAP) + nose
+
+        def measure() -> tuple[tuple[float, float], int]:
+            span = (row0 * ROW, chain[-1][3] + DISMOUNT_RUN + ROW)
+            return span, int(math.ceil((span[1] - row0 * ROW) / ROW))
+
+        stretch, used = measure()
+        # Too long for the stretch it was given: drop trains off the end
+        # rather than declining. A convoy of two is still a convoy, and
+        # refusing outright is how the signature move ends up rare -- the
+        # length is drawn before the track it has to fit in is known.
+        while used > rows + CONVOY_SLACK and len(chain) > 1:
+            chain.pop()
+            stretch, used = measure()
+        if used > rows + CONVOY_SLACK:
             return 0
+        end = chain[-1][3]
         if self._clash(ANY_LANE, *stretch, BODY_PAD) or self._over_clash(*stretch):
             return 0
-        if not self._mount_reaches(MOUNT_GAP, b - a, cars):
+        if not self._mount_reaches(MOUNT_GAP, chain[0][3] - chain[0][2],
+                                   chain[0][1]):
             return 0
-        train = self._add_train(p_train, lane, cars, rng, ride=True)
-        if train is None:
+        # Every gap in the chain has to be one the leap crosses at *both* ends
+        # of the speed range, for the same reason the mount does: a roof that
+        # ends short of a jump the body has is not a hard puzzle, it is a fall.
+        if any(not self._hop_reaches(chain[i][2] - chain[i - 1][3])
+               for i in range(1, len(chain))):
             return 0
-        ramp = self._add({"kind": "ramp", "lane": lane}, p_ramp)
-        train["ramp"] = ramp
-        # The ramp is a floor, not a wall, so it takes no lane reservation of
-        # its own -- but nothing may share the stretch it climbs.
-        ramp_box = self._boxes["ramp"]
-        self._reserve(lane, p_ramp - ramp_box.z1, p_ramp - ramp_box.z0)
+        prev = None
+        for i, (p, cars, a, b) in enumerate(chain):
+            train = self._add_train(p, lane, cars, rng, ride=True, pad=0.0)
+            if train is None:                       # pre-checked; belt and braces
+                return 0
+            if prev is None:
+                ramp = self._add({"kind": "ramp", "lane": lane}, p_ramp)
+                train["ramp"] = ramp
+            else:
+                train["behind"] = prev
+            prev = train
+        # ...and the ride lane held for the whole convoy, gaps included, only
+        # now that the trains are down. Reserved *first* it refuses its own
+        # trains -- each one asks the ledger before it is placed -- and the
+        # set-piece then rewinds every time, which is a roof run that never
+        # once appeared in a hundred and twenty seconds of running.
+        self._reserve(lane, stretch[0], stretch[1])
         self._over.append(stretch)
         self._walk_corridor(row0, used, lane)
+        # A second line of trains alongside, which is what the reference looks
+        # like at speed -- a canyon rather than a train. Never on the side
+        # *between* the ride lane and the lane the runner bails into when the
+        # mount is refused: that lane has to stay empty by construction, and it
+        # is no use if the way to it is through a train.
+        flank = self._flank_lane(lane, rng)
+        if flank is not None:
+            q = chain[0][2] + rng.uniform(2.0, 7.0)
+            while q + nose < end - 10.0:
+                cars = rng.randint(2, 3)
+                a2, b2 = self._train_span(q + nose, cars)
+                if b2 > end - 3.0:
+                    break
+                self._add_train(q + nose, flank, cars, rng, pad=0.0)
+                q = b2 + rng.uniform(5.0, 11.0)
+        # Hurdles down the lanes the convoy is not in. From the roof they cost
+        # nothing and read as depth; on the ground they are the whole of what
+        # a runner that did not get on has to do, and without them a convoy
+        # nobody mounted is a hundred metres of empty track. Measured, that is
+        # where this scene's dead air lives: the roof run owned 48 of the 81
+        # idle seconds in twelve minutes of running.
+        #
+        # Barriers rather than anything solid, and that distinction is what
+        # makes it safe: the bail lane has to stay *reachable*, not empty, and
+        # a hurdle is something the body jumps rather than something it has to
+        # be elsewhere for. ``_add_barrier`` refuses the flank lane by itself,
+        # because the ledger already has trains in it.
+        q = chain[0][2] + HURDLE_PITCH
+        while q < end - ROW:
+            for ln in (0, 1, 2):
+                if ln != lane:
+                    self._add_barrier(q, ln)
+            q += HURDLE_PITCH
         # coins along the roof, which is also what tells a viewer it is a road
         roof = self._boxes["train_cab"].y1 - RAIL_TOP
         self._add_coins(row0 * ROW + ROW, 6, lane, rng)
-        self._add_coins((a + b) * 0.5, (b - a) / COIN_PITCH * 0.8, lane, rng,
-                        base=roof + 0.55)
+        for i, (p, cars, a, b) in enumerate(chain):
+            self._add_coins((a + b) * 0.5, (b - a) / COIN_PITCH * 0.8, lane,
+                            rng, base=roof + 0.55)
+            if i + 1 < len(chain):
+                # ...and an arc over the gap, which is the reference's own way
+                # of saying "this is a jump and this is where it goes".
+                self._add_coins(0.5 * (b + chain[i + 1][2]), 5, lane, rng,
+                                base=roof + 0.55, arc=1.5)
         return used
+
+    def _flank_lane(self, lane: int, rng) -> int | None:
+        """Which lane a convoy may stand a second line of trains in.
+
+        The bail lane -- the one the lane search escapes into when the mount is
+        refused -- has to be reachable, and from an outside lane the only way
+        to the far side is through the middle. So a convoy in lane 1 may flank
+        either side, and one in lane 0 or 2 may only flank the far side.
+        """
+        if rng.random() >= FLANK_CHANCE:
+            return None
+        if lane == 1:
+            return rng.choice((0, 2))
+        return 2 if lane == 0 else 0
+
+    def _hop_reaches(self, gap: float) -> bool:
+        """Does the leap off one roof land on the next one, at every speed?
+
+        The leap is the mount arc, so its air time is fixed and its *span* is
+        that time at whatever the body is running -- shortest at the bottom of
+        the speed range, which is the end that decides. The body has to clear
+        the gap and have its whole depth on the far roof, with the lead the
+        take-off is taken with still to pay for.
+        """
+        if gap <= 0.0:
+            return False
+        for speed in (BASE_SPEED, TOP_SPEED):
+            kin = plan.Kinematics.for_speed(speed)
+            span = 2.0 * kin.mount_v0 / kin.gravity * speed
+            if span < gap + 2.0 * self.body.half_d + HOP_MARGIN:
+                return False
+        return True
 
     def _mount_reaches(self, gap: float, roof_len: float, cars: int) -> bool:
         """Does the leap off the lip land on the roof, at every running speed?
@@ -1128,11 +1300,15 @@ class RunnerScene(Scene):
                           and box.x1 > self._lane_x(ln) - self.body.half_w)
             if not lanes:
                 continue
+            mw = self._mount_window(e, box)
+            link = e.get("behind") is not None
             th = plan.Threat(e["kind"], lanes, box.y0, box.y1,
                              max(0.0, t0), t1, x0=box.x0, x1=box.x1, ref=e,
-                             mount_at=self._mount_at(e, box))
+                             mount_at=mw[0] if mw else None,
+                             mount_to=mw[1] if mw else None, ride_link=link,
+                             ride_ahead=mw is None and self._convoy_open(e))
             action = plan.classify(th, self.body, self.kin, self._stand_y())
-            if action == "mount":
+            if action == "mount" or th.ride_ahead:
                 out.append(th)
                 continue
             if action == "roll":
@@ -1147,7 +1323,103 @@ class RunnerScene(Scene):
             out.append(th)
         return out
 
-    def _mount_at(self, e: dict, box: AABB) -> float | None:
+    def _convoy_open(self, e: dict) -> bool:
+        """Is this train part of a convoy the body is on, or about to get on?
+
+        A convoy is one decision. Every gap in it was checked against the leap
+        at both ends of the speed range before a single car was laid, so if the
+        body gets onto the first train the whole chain is a road -- and if it
+        does not, the whole chain is a wall and the lane search bails into the
+        lane the set-piece left empty for exactly that. What there is no way to
+        say without this is the middle case, which is the common one: standing
+        on the rails, looking at a hundred metres of train in the lane with the
+        ramp in front of it. Charged as a wall, the search leaves that lane
+        before it ever reaches the ramp, and the mount it was avoiding is
+        never offered at all.
+        """
+        node = e.get("behind")
+        for _ in range(len(self.entities)):
+            if node is None:
+                return False
+            if self._ride_top(node, node["d"], self.motion.x) > 0.0:
+                return True                 # standing on it now
+            if node.get("ramp") is not None:
+                box = self.solid_box(node)
+                return box is not None and self._ramp_mount_at(node, box) is not None
+            node = node.get("behind")
+        return False
+
+    def _roof_hop(self, e: dict, box: AABB, lead: dict
+                  ) -> tuple[float, float] | None:
+        """When to leap from ``lead``'s roof onto this train's, as a window.
+
+        Unlike a ramp, which is one instant, this is a stretch of time: the
+        body is already at roof height and already going the right way, so any
+        take-off far enough back to clear the gap and early enough to still
+        have roof under the feet will do. Returning the window rather than an
+        instant is what makes a busy scheduler a late leap instead of a fall.
+
+        The stretch the roof being left is actually underfoot for is asked of
+        :meth:`_ride_top` rather than derived from the train's length, because
+        that is the function the body itself obeys -- a roof that holds the
+        body until its *back* has left is not the same as one that holds it
+        until its centre has, and a leap solved against the wrong one of those
+        is short by most of a body.
+
+        Asked of the *track* and not of the live body: the whole convoy has to
+        be plannable before the body is on any of it, or the planner books the
+        ramp mount, rolls forward, watches itself fall into the first gap, and
+        throws the mount away in favour of never getting on at all. Which is
+        exactly what it did -- 105 verifications failed on a train, and not one
+        mount happened in four runs.
+        """
+        if not self._convoy_open(e):
+            return None
+        speed = max(1e-6, self.speed)
+        lead_box = self.solid_box(lead)
+        if lead_box is None:
+            return None
+        window = plan.solve_mount(-box.z1 / speed, -box.z0 / speed,
+                                  box.y1 - RAIL_TOP, lead_box.y1 - RAIL_TOP,
+                                  self.kin, self.kin.clearance_margin)
+        if window is None:
+            return None
+        x = self._lane_x(e["lane"])
+        first = last = None
+        t = 0.0
+        while t <= PLAN_HORIZON:
+            if self._ride_top(lead, lead["d"] - speed * t, x) > 0.0:
+                if first is None:
+                    first = t
+                last = t
+            elif first is not None:
+                break
+            t += PLAN_STEP
+        if last is None:
+            return None
+        latest = min(window[1], last)
+        earliest = max(window[0], first, latest - HOP_LEAD * self.kin.mount_air_time)
+        if earliest > latest:
+            return None
+        return (earliest, latest)
+
+    def _mount_window(self, e: dict, box: AABB) -> tuple[float, float] | None:
+        """Every take-off that gets the body onto this train, or None.
+
+        Two ways up: off a ramp standing in front of it, which is one instant,
+        or off the roof of the train it is chained behind, which is a stretch
+        of time. Both come back in the same shape so that nothing downstream
+        has to know which happened.
+        """
+        if e["kind"] != "train":
+            return None
+        lead = e.get("behind")
+        if lead is not None:
+            return self._roof_hop(e, box, lead)
+        t = self._ramp_mount_at(e, box)
+        return None if t is None else (t, t)
+
+    def _ramp_mount_at(self, e: dict, box: AABB) -> float | None:
         """When to leave this train's ramp, if the leap works from here.
 
         There is exactly one moment: when the ramp's lip passes under the
@@ -1157,7 +1429,7 @@ class RunnerScene(Scene):
         -- at which point the train is an ordinary obstacle again, and the
         lane search is told so by the same field being None.
         """
-        ramp = e.get("ramp") if e["kind"] == "train" else None
+        ramp = e.get("ramp")
         if ramp is None or self.riding:
             return None
         speed = max(1e-6, self.speed)
@@ -1251,6 +1523,37 @@ class RunnerScene(Scene):
             out.append(self._lane_clear(int(ahead / ROW)))
         return out
 
+    def _pin_while_raised(self, lane_plan) -> None:
+        """Hold the lane for as long as the body is up on something.
+
+        ``Motion.advance`` freezes lateral movement while the body is raised
+        -- that is the rule that stops it stepping sideways off a train roof
+        -- so a lane change planned for the middle of a ride is one the body
+        cannot make, and every threat scheduled against the lane it was
+        supposed to be in by then goes unanswered. Measured over sixty runs of
+        three minutes: 3,288 reports of no surviving plan against the 192 this
+        scene had before convoys existed, and three fifths of them arrived
+        while the body was on a roof.
+
+        Only for as long as the ride lasts. Pinning the whole horizon was
+        worse than not pinning at all (4,310): the tail of it is the runner
+        back on the rails with the next set-piece in front of it, and that is
+        a lane decision like any other.
+        """
+        if not self.riding or not lane_plan.lanes:
+            return
+        here = self.lane
+        speed = max(1e-6, self.speed)
+        x = self._lane_x(here)
+        t = 0.0
+        i = 0
+        while i < len(lane_plan.lanes) and t <= PLAN_HORIZON:
+            if self.surface_at(t, x) <= RAMP_LIP_H:
+                break
+            lane_plan.lanes[i] = here
+            i += 1
+            t += LANE_STEP
+
     def _replan(self) -> None:
         threats = self._threats()
         transit = max(1, int(round(self.kin.lane_time / LANE_STEP)))
@@ -1264,15 +1567,27 @@ class RunnerScene(Scene):
         # later attempt is only better if marking something unavoidable
         # actually helped, and often it does not.
         best = (-1.0, self._lane_plan, [])
+        #: Set when the only thing the plan could not answer is a leap further
+        #: down the convoy the body is standing on. See below.
+        deferred = False
         for _ in range(PLAN_ATTEMPTS):
             grid = plan.occupancy(threats, PLAN_HORIZON, LANE_STEP, corridor)
             # Plan onward from where the body is committed to arriving, not
             # from where it happens to be mid-slide.
             lane_plan = plan.choose_lanes(grid, self.motion.target_lane,
                                           LANE_STEP, transit)
+            self._pin_while_raised(lane_plan)
             booked, unsolved = plan.schedule_vertical(
                 threats, lane_plan, self.body, self.kin, self._stand_y(),
-                busy_until, self._dt)
+                busy_until, self._dt, self.riding)
+            # A leap onto a roof three trains further down the convoy that
+            # will not fit in this horizon is not a plan that failed: it is a
+            # decision that is not due yet, and the re-solve a tenth of a
+            # second from now will make it from closer up. Counting those as
+            # unsolved stopped the plan being verified at all for the whole
+            # length of every convoy.
+            if self.riding:
+                unsolved = [th for th in unsolved if not th.ride_link]
             if not unsolved:
                 # The two halves of the plan are each self-consistent; that is
                 # not the same as the body surviving them together. Run it --
@@ -1285,14 +1600,32 @@ class RunnerScene(Scene):
                 if failure is None:
                     best = (float("inf"), lane_plan, booked)
                     break
+                if self.riding and failure[0].ride_link:
+                    # The body ran off the end of the *second* roof in the
+                    # rolled-forward world, because only one leap fits in a
+                    # schedule at a time and the horizon holds two or three
+                    # gaps. That is not a plan with no answer, it is a
+                    # decision the re-solve a tenth of a second from now will
+                    # make from closer up -- and the leap it will book is one
+                    # the generator checked against the physics before it laid
+                    # the convoy down. Take the plan and stop counting it as a
+                    # failure; every one of the 3,288 "no answer" reports this
+                    # scene picked up when convoys arrived was this.
+                    best = (float("inf"), lane_plan, booked)
+                    deferred = True
+                    break
                 unsolved = [failure[0]]
                 if failure[1] > best[0]:
                     best = (failure[1], lane_plan, booked)
             elif best[0] < 0.0:
                 best = (0.0, lane_plan, booked)
             # Whatever the plan could not answer becomes something to route
-            # around rather than something to walk into.
+            # around rather than something to walk into -- except the rest of
+            # the convoy the body is currently standing on, which there is no
+            # routing around: it is the floor.
             for th in unsolved:
+                if self.riding and th.ride_link:
+                    continue
                 th.hard = True
         survives, lane_plan, booked = best
         self._lane_plan = lane_plan
@@ -1301,7 +1634,7 @@ class RunnerScene(Scene):
         #: actually be flown before the next re-solve. Non-zero here is the
         #: honest early warning that the generator is producing situations
         #: with no answer -- long before it shows up as a body inside a train.
-        if survives < COMMIT_WINDOW:
+        if survives < COMMIT_WINDOW and not deferred:
             self.unsolvable += 1
 
     # -- simulation -------------------------------------------------------
@@ -1375,8 +1708,12 @@ class RunnerScene(Scene):
                             self.surface_at(0.0, self.motion.x))
         if was_airborne and not self.motion.airborne:
             self.cam_shake = 0.5 if self.motion.ground <= was_ground else 0.35
-        # "Riding" means a train roof, not the ramp on the way up to one.
-        if self.riding and not self.motion.airborne:
+        # "Riding" means a train roof, not the ramp on the way up to one --
+        # and the leap from one roof to the next counts, because the body's
+        # standing height through it is the roof it left. Excluding the air
+        # was the old reading and it undercounted a convoy by a third: the
+        # gaps are the part of a roof run the viewer is watching.
+        if self.riding:
             self.ride_time += dt
         if self.motion.ground > RAMP_LIP_H >= was_ground:
             self.mounts += 1
@@ -1430,9 +1767,12 @@ class RunnerScene(Scene):
                                          self.body.half_d, closing)
             if t1 <= 0.0 or t0 > REFLEX_WINDOW:
                 continue
+            mw = self._mount_window(e, box)
             th = plan.Threat(e["kind"], (self.lane,), box.y0, box.y1,
                              max(0.0, t0), t1, x0=box.x0, x1=box.x1, ref=e,
-                             mount_at=self._mount_at(e, box))
+                             mount_at=mw[0] if mw else None,
+                             mount_to=mw[1] if mw else None,
+                             ride_link=e.get("behind") is not None)
             action = plan.classify(th, self.body, self.kin, self._stand_y())
             if action == "mount":
                 # The last chance to get onto a train the plan meant to ride.
@@ -1440,7 +1780,12 @@ class RunnerScene(Scene):
                 # from the *lip's* height, so leaving even a tenth of a second
                 # early leaves from 40 cm lower down the slope and arrives
                 # through the side of the roof rather than on top of it.
-                if th.mount_at <= self._dt:
+                # ...and never off flat ground. A roof-to-roof leap offered
+                # to a body that is not on the first roof is a jump with a
+                # mount's launch speed taken from the rails, and it lands ten
+                # metres later on whatever is there.
+                if th.mount_at <= self._dt and not (th.ride_link
+                                                    and not self.riding):
                     self.motion.begin("mount", self.kin)
                     self.reflexes += 1
                     return
