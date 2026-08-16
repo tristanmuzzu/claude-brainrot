@@ -94,7 +94,7 @@ git clone https://github.com/tristanmuzzu/claude-brainrot
 cd claude-brainrot
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install .
 
 brainrot install        # hooks, plus the gnome-shell extension
 brainrot extension load # load it into the running shell (or just log out and in)
@@ -113,7 +113,7 @@ git clone https://github.com/tristanmuzzu/claude-brainrot
 cd claude-brainrot
 py -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -e .
+pip install .
 
 brainrot install        # writes hooks into ~/.claude/settings.json
 brainrot run            # long-lived; leave it running

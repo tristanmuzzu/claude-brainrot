@@ -5,6 +5,6 @@
 #: 36 ms to answer, on every `import brainrot`, for a string that changes
 #: about once a month. This project counts milliseconds -- the hook shim exists
 #: in the shape it does to save exactly that kind of time.
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = ["__version__"]

@@ -1,0 +1,101 @@
+name: release
+
+# Publishes to PyPI when a v* tag is pushed.
+#
+# There is no API token anywhere in this repository and there should never be
+# one. PyPI's Trusted Publishing hands the job a short-lived OpenID Connect
+# credential instead, minted for this repo, this workflow file and this
+# environment -- which is why `id-token: write` below is load-bearing and why
+# the `pypi` environment name has to match the one configured on PyPI.
+#
+# One-time setup on PyPI (Your projects -> claude-brainrot -> Publishing, or
+# "pending publisher" if the name has never been uploaded):
+#
+#   Owner:            tristanmuzzu
+#   Repository:       claude-brainrot
+#   Workflow name:    release.yml
+#   Environment:      pypi
+#
+# Then release with:
+#
+#   git tag v0.3.0 && git push origin v0.3.0
+#
+# The tag must match the version in pyproject.toml; the build job fails first
+# if it does not, because a tag that disagrees with the metadata publishes the
+# wrong version under the right name and cannot be taken back -- PyPI does not
+# allow re-uploading a version, even after a delete.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build and check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+
+      - name: The tag must agree with pyproject
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -e
+          version=$(python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          tag="${GITHUB_REF_NAME#v}"
+          echo "pyproject: $version    tag: $tag"
+          test "$version" = "$tag"
+
+      - name: Metadata must render on PyPI
+        # The long description is the README, and PyPI rejects an upload whose
+        # markup it cannot render -- after the artifacts are built, which is
+        # the worst moment to find out.
+        run: twine check dist/*
+
+      - name: The wheel must contain the kit and the extension
+        # A wheel that builds cleanly and ships no models installs fine and
+        # fails at the first scene. Both of these come from package-data globs,
+        # which are exactly the kind of thing that silently stops matching.
+        run: |
+          python - <<'PY'
+          import pathlib, sys, zipfile
+          wheel = next(pathlib.Path("dist").glob("*.whl"))
+          names = zipfile.ZipFile(wheel).namelist()
+          glb = [n for n in names if n.endswith(".glb")]
+          ext = [n for n in names if "/extension/" in n]
+          metrics = [n for n in names if n.endswith("assets/data/metrics.json")]
+          print(f"{wheel.name}: {len(glb)} models, {len(ext)} extension files, "
+                f"metrics.json {'present' if metrics else 'MISSING'}")
+          if len(glb) < 40 or not ext or not metrics:
+              sys.exit("wheel is missing packaged data")
+          PY
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: publish to PyPI
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/claude-brainrot
+    permissions:
+      id-token: write        # mints the Trusted Publishing credential
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@v1.14.2
