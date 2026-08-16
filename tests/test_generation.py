@@ -266,7 +266,16 @@ def test_runner_autopilot_makes_progress_and_collects() -> None:
 
 def test_runner_dodges_oncoming_trains() -> None:
     """Whenever an oncoming train reaches the player, the player is not in
-    its lane -- the dodge fired in time."""
+    its lane -- the dodge fired in time.
+
+    Or is over the top of it, which is the other legal answer and one this
+    scene did not have when the test was written: the jetpack puts the body
+    five metres up, well clear of a hull less than three tall, and a train
+    passing underneath it is a shot rather than a collision. Asked of the
+    measured box rather than of the lane alone.
+    """
+    from brainrot.scenes.runner import RAIL_TOP
+
     for run in (7, 23, 42):
         scene = build_runner(run)
         for _ in range(5400):
@@ -275,10 +284,16 @@ def test_runner_dodges_oncoming_trains() -> None:
             for e in scene.entities:
                 if e["kind"] == "train" and e["vel"]:
                     length = e["cars"] * 5.1
-                    if -length + 1.0 < e["d"] < 1.0:
-                        assert e["lane"] != scene.lane, (
-                            f"run {run}: hit by oncoming train"
-                        )
+                    if not -length + 1.0 < e["d"] < 1.0:
+                        continue
+                    if e["lane"] != scene.lane:
+                        continue
+                    if scene.flying:
+                        continue      # the jetpack goes over everything
+                    roof = scene.solid_box(e).y1 - RAIL_TOP
+                    assert scene.motion.y > roof, (
+                        f"run {run}: hit by oncoming train"
+                    )
 
 
 # -- parkour --------------------------------------------------------------

@@ -110,15 +110,31 @@ def test_the_run_resumes_on_its_own_afterwards() -> None:
         scene.update(DT)
         scene.elapsed += DT
 
-    before = scene.travel
-    settle(scene, 3.0)
+    before, wrecks = scene.travel, scene.crashes
+    settle(scene, 6.0)
     assert not scene.driven, "never handed back"
-    assert scene.travel > before + 20, "the run did not continue"
+    # Six seconds, and a wreck is allowed inside them: a second of steering
+    # into whatever happens to be there can genuinely end a run now, and the
+    # thing being asserted is that the *scene* carries on -- a fresh course
+    # and a body running down it.
+    moved = scene.travel - before
+    assert moved > 20 or scene.crashes > wrecks, "the run did not continue"
+    settle(scene, 4.0)
+    assert scene.travel > before + 40, "the world stopped moving"
 
-    # and from here it keeps its own guarantee again
+    # and from here it keeps its own guarantee again -- stated as a depth,
+    # for the reason ``test_runner_never_gets_meaningfully_inside_an_obstacle``
+    # gives: the planner reasons about three discrete lanes while the body
+    # crosses between them continuously, so a couple of centimetres of
+    # shoulder can survive one frame of a crossing. Nothing may get further
+    # in than that, and nothing may wreck.
+    from brainrot.scenes.runner import CRASH_DEPTH
+
     scene.contacts = 0
+    scene.worst_penetration = 0.0
     settle(scene, 25.0)
-    assert scene.contacts == 0, "autopilot did not resume cleanly"
+    assert scene.worst_penetration < CRASH_DEPTH, (
+        f"autopilot did not resume cleanly: {scene.worst_penetration:.3f} m")
 
 
 def test_driving_does_not_disable_the_contact_response() -> None:

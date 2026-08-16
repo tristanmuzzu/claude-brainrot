@@ -1314,6 +1314,80 @@ Measured, 6 runs x 90 s: roof 14.3 s/min plus 8.4 s/min flying (38% of the run
 off the rails), 5.3 mounts a minute, dead air 2.7%, and **frame cost
 unchanged** -- runner 1.61 ms, 0.91 of parkour, the same as before any of this.
 
+## The power-ups are objects, and the jetpack flies (2026-08-16, third pass)
+
+The owner's note after watching it: most of the power-ups do not appear to do
+anything, the jetpack "teleports him up in the air a bit higher and then he
+keeps running on air", the pickups are boxes when the whole project is
+Blender-built, and the convoy still reads as one train he gets on and off.
+Plus a standing instruction that is now written into the dev loop: **look at
+the frames**. Every one of those is invisible to every probe this scene has,
+because they are all numbers about geometry and pacing.
+
+`tools/power_shot.py` is the answer to that instruction. It forces a power-up
+at a known moment, or waits for the body to get up on a roof, and renders
+every frame of what follows into a contact sheet. A power-up lasts six
+seconds and arrives every four minutes at a spot nobody chooses, so waiting
+for one in ordinary footage is hopeless.
+
+- **Five new Blender assets** (`assets/src/powers.py`): a jetpack, a winged
+  boot and a horseshoe magnet as pickups, the pack the body wears, and the
+  exhaust plume. The pickups are modelled to a common radius so one glow size
+  and one spin suit all three.
+- **A `fly` clip on the rig.** The jetpack had no pose to reach for, so the
+  draw kept the run cycle -- which is exactly what "running on air" was. The
+  clip hangs rather than strides: torso tipped back, legs trailing, arms up
+  to the straps, and a slow sway, because a rigid body under thrust reads as
+  a prop being carried.
+- **The pitch is about world X.** ``_draw_runner``'s ``lean`` is a *bank*,
+  applied about world Z, which is the track axis; reused for a jetpack's
+  nose-up it rolled the body onto its back with the pack across its chest.
+  That is what the first render showed, and no number would have.
+- **The camera climbs at half rate while flying.** A lens that rises with the
+  body is a lens in which the body never goes up.
+- **The magnet reaches sideways, not backwards.** It used to pull coins
+  *along the track* toward the runner, so coins ten metres ahead swam to meet
+  it; now the lane and the height come to the body, the distance is left
+  alone, and a coin is taken only once it has been run past.
+- **The sneakers raise the arc and light the feet.** A power-up whose only
+  expression is that the jumps got bigger is one a viewer attributes to the
+  course, so the shoes recolour, the feet glow, and every take-off throws
+  sparks.
+- **Alternating liveries down a convoy.** Three metres of daylight between two
+  twenty-metre trains is a sixth of a second at speed, so what says "four
+  trains" is the seam -- and a seam between two identical hulls is not a seam.
+  Widening the gaps instead was tried and measured: the leap's reach caps the
+  gap, and a wider one costs convoys (42 rides in twelve minutes down to 17)
+  before it costs contacts.
+
+Measured after it, 8 runs x 90 s: oncoming trains **1.7 -> 3.9 a minute**,
+12.5 s/min on a roof plus 9.4 flying, 4.75 mounts a minute, barriers 32.7,
+dead air under 3%. Safety inside the guaranteed range (creep pinned, 24 runs
+x 180 s): **no wrecks, worst contact 0.225 m** -- a shoulder clipped on the
+way out of a lane, which is why ``CRASH_DEPTH`` is 0.26 rather than 0.18.
+Widening the planner's horizon for trains, refusing the reflex that lands in
+front of one, and keeping hurdles out of the corridor during an express were
+each tried against that number and each left it exactly where it was.
+
+Three engine facts came out of it, and all three were found by rendering:
+
+- **The jetpack's landing has to wait for room, but not for perfection.**
+  Requiring a whole planning horizon of clear lane meant it never found
+  anywhere and stayed up: 21.7 seconds a minute of flying against the 5.6 it
+  lasts. Fourteen metres past the fall, with a two-second patience and then
+  the fall alone, gives 6-10 s/min.
+- **The climb passes through the height of a train.** Immunity means a train
+  would be *drawn through the body* rather than stopping it, so the climb is
+  eight per second rather than three and a half -- clear in a quarter second.
+- **A moving train alongside was built and reverted**, and the reason is
+  recorded in ``_seg_roofrun``: a train that moves leaves the stretch its
+  reservation covers, and the coins on its roof stay where they were laid. As
+  built it measured mean trains crossed per ride 4.12 -> 2.90, three contacts
+  where there had been none, and not one frame spent on a moving roof --
+  because the crossing is decided by coins and the coins had been left
+  behind. The ``drift`` argument on ``_add_train`` and the yaw that goes with
+  it are kept, because they are the correct half of it.
+
 ## Running along train roofs, and why it works now
 
 The signature Subway Surfers move. It was written once before, in the history

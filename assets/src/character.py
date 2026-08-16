@@ -205,7 +205,40 @@ def roll_pose(pose, t01):
     swing(pose, "farm.R", 74 * c)
 
 
+def fly_pose(pose, t01):
+    """Hanging under a jetpack: the one pose that is not a running body.
+
+    The reason it exists at all is that without it the jetpack read as the
+    runner being teleported upward and continuing to sprint on thin air --
+    which is exactly what it was, because ``draw`` had no clip to reach for
+    but the run cycle. Three things make it read as flight instead: the torso
+    tips *back* against the thrust, the legs trail rather than cycle, and the
+    arms come up to the straps. The small sway is deliberate and slow -- a
+    perfectly rigid body under thrust looks like a prop being carried.
+    """
+    sway = math.sin(t01 * math.tau)
+    bob = math.sin(t01 * math.tau * 2.0)
+    # Tipped back, holding on. The rig's swings are world-axis, so this is a
+    # lean about the same axis a run's forward pitch uses, with the sign
+    # reversed.
+    swing(pose, "spine", -7 + 3.0 * sway)
+    swing(pose, "head", 6 - 2.0 * sway)
+    # Arms up and out to the harness straps, elbows folded.
+    swing(pose, "arm.L", -104 + 5.0 * sway, side_deg=22)
+    swing(pose, "arm.R", -104 - 5.0 * sway, side_deg=-22)
+    swing(pose, "farm.L", 62)
+    swing(pose, "farm.R", 62)
+    # Legs trailing and loose, one a little lower than the other so the
+    # silhouette is not symmetrical.
+    swing(pose, "leg.L", -22 + 6.0 * sway)
+    swing(pose, "shin.L", 34 - 5.0 * sway)
+    swing(pose, "leg.R", -14 - 6.0 * sway)
+    swing(pose, "shin.R", 46 + 5.0 * sway)
+    lift(pose, "root", up=0.05 * bob)
+
+
 record_action(rig, "run", 24, run_pose, step=1)
+record_action(rig, "fly", 24, fly_pose, step=1)
 record_action(rig, "jump", 22, jump_pose)
 record_action(rig, "roll", 22, roll_pose)
 

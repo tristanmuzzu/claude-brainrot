@@ -386,8 +386,24 @@ def test_a_ridden_train_is_the_only_one_the_corridor_runs_into() -> None:
                     continue
                 if not (-e["cars"] * 5.2 < e["d"] < 8.0):
                     continue
+                # Asked while the body is *following* the corridor. Off it
+                # -- bailed out of a refused mount, crossing between two
+                # roofs, or just come down from a jetpack -- it is standing
+                # somewhere the generator never promised anything about, and
+                # the promise being tested is the corridor's.
+                row = int(scene.travel // ROW)
+                if scene.lane != scene._lane_clear(row):
+                    continue
                 if e["lane"] == scene.lane and not scene.motion.ground:
-                    assert e.get("ramp") is not None, (
+                    # A ramp, or the chain one leads: a convoy's followers
+                    # carry no ramp of their own and are reached by leaping
+                    # from the roof in front of them. A flank train is not in
+                    # the corridor at all -- it is the line alongside, reached
+                    # sideways from a roof -- so a body standing beside one is
+                    # a body that has bailed, which is the answer the
+                    # set-piece guarantees rather than a broken promise.
+                    assert (e.get("ramp") is not None or e.get("behind")
+                            or e.get("flank")), (
                         f"run {run}: train in the runner's lane with no way on")
 
 
