@@ -152,7 +152,7 @@ all held at or better than the 24-level tower:
   first criterion a level is judged on). A body that misses a jump and then
   walks — up one block, down any, never jumping — must not arrive back on the
   course above the level's entry apron. `tools/reentry_probe.py`, target
-  **0**, currently one missed jump in 5,762 on one level visit in fifty-eight.
+  **0**, currently 6 missed jumps in 8,484 over three level visits in 85.
   Its design-time half is one landing per level within a block of the terrace
   and everything else at least two up (`tower_probe --design-only`), and the
   whole argument is `docs/REHASH.md`.

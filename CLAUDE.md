@@ -770,8 +770,8 @@ That is a **reachability** question, not a void question, and `docs/REHASH.md`
 is the whole record: the plan, what was built, what it measured, and the four
 things the probe itself had to get right before its number meant anything.
 `tools/reentry_probe.py` is the number. **87.9% of missed jumps walked back
-into the middle of the course; it is **one missed jump in 5,762** now, on one
-level visit in fifty-eight.**
+into the middle of the course; it is **6 in 8,484** now, over three level
+visits in eighty-five.**
 
 The shape, in one paragraph. A level is entered on its terrace, steps up off
 it once, and everything after that stands **at least two blocks over the
@@ -786,8 +786,8 @@ tower has had:
 
 | | before | after |
 |---|---|---|
-| missed jumps that re-enter the course | 87.9% | **0.02%** |
-| landings resting on the terrace | 15.9 a level | **2.5 a level** |
+| missed jumps that re-enter the course | 87.9% | **0.1%** |
+| landings resting on the terrace | 15.9 a level | **2.4 a level** |
 | a level walked end to end without jumping | 2 of 24 | **0 of 55** (34% mean) |
 | landmarks framed at 25 / 40 degrees | 55% / 30% | **68% / 63%** |
 | unchecked emergency placements | 0.31% | **0.41%** |
@@ -895,8 +895,9 @@ touching any of it — the reasoning is there, this is the short list:
    lesson is the one already written under item 5 and it cost an hour anyway:
    **do not read `frame_cost` off a busy machine, and do not read a ratio off
    five rounds when the spread is 1.0 ms.**
-0a. **One level visit in fifty-eight still lets a fall back onto the
-   course** (one missed jump in 5,762) -- more landings at terrace
+0a. **Three level visits in eighty-five still let a fall back onto the
+   course** (6 missed jumps in 8,484: THE GATE four, THE BALCONIES one, WART
+   FIELDS one) -- more landings at terrace
    height than the geometry needs. `python tools/reentry_probe.py --levels
    --only NAME` names them; `docs/REHASH.md` is the criterion. Trace one with
    a throwaway path-printer -- a forward walk from the fall cells with parent

@@ -12,9 +12,9 @@ constitution a level satisfies. This document changed that constitution.
 
 | | before | after |
 |---|---|---|
-| missed jumps that walk back into the course | **87.9%** | **0.02%** |
-| levels with one | all of them | **1 of 58 visits** |
-| landings resting on the terrace | 15.9 a level (80%) | **2.5 a level (13%)** |
+| missed jumps that walk back into the course | **87.9%** | **0.1%** (6 of 8,484) |
+| levels with one | all of them | **3 of 85 visits** |
+| landings resting on the terrace | 15.9 a level (80%) | **2.4 a level (12%)** |
 | a level walked end to end, no jumps | 2 of 24 | **0 of 55**, 34% mean |
 | landmarks framed at 25° / 40° | 55% / 30% | **68% / 63%** |
 | unchecked emergency placements | 0.31% | **0.41%** |
@@ -90,12 +90,12 @@ runs × 240–260 landings):
 
 | | before | after |
 |---|---|---|
-| missed jumps that are a **shortcut** | **87.9%** | **1 of 5,762** |
-| — back to the apron | 5.1% | 33.4% |
+| missed jumps that are a **shortcut** | **87.9%** | **0.1%** (6 of 8,484) |
+| — back to the apron | 5.1% | 33.3% |
 | — dead | 7.0% | **66.6%** |
-| levels with at least one shortcut | **71 of 71** | **1 of 58 visits** |
-| landings standing on the terrace | 80.2%, 15.9 a level | **13%, 2.5 a level** |
-| air under a landing | median **0** blocks | median **2** |
+| levels with at least one shortcut | **71 of 71** | **3 of 85 visits** |
+| landings standing on the terrace | 80.2%, 15.9 a level | **12%, 2.4 a level** |
+| air under a landing | median **0** blocks | median **3** |
 
 Two things follow, and they are the whole rebuild:
 
@@ -314,7 +314,7 @@ AST pass plus an instant design checker has beaten hand-editing.
 
 | | |
 |---|---|
-| `reentry_probe` | shortcut **one missed jump in 5,762**, one level visit of 58, apron 2.3 a level |
+| `reentry_probe` | shortcut **6 missed jumps in 8,484**, three level visits of 85, apron 2.2 a level |
 | `tower_probe` | design 100% legal on paper, **94.9%** placed as authored, designed content **56%** of the course |
 | `spiral_probe --plan tower` | twice-claimed 0, off-lattice 0, unchecked **0.41%**, cone-alone walkability **0 m** |
 | `bypass_probe` | **34%** mean, **0 of 55** levels walkable end to end |
@@ -338,8 +338,9 @@ AST pass plus an instant design checker has beaten hand-editing.
   the recovery chain: a level cruising two blocks up with a rise of eight
   spends seven landings on a staircase, and a staircase against the wall at
   the end of a level is where the stuck landings were.
-- **One missed jump in 5,762 still walks back onto the course.** It is one
-  level visit in fifty-eight. `reentry_probe --levels --only NAME` names it,
+- **Six missed jumps in 8,484 still walk back onto the course**, over three
+  level visits in eighty-five: THE GATE four, THE BALCONIES one, WART FIELDS
+  one. `reentry_probe --levels --only NAME` names it,
   and the way to see it is the throwaway path-printer the rest of this pass
   used -- a forward walk from the fall cells with parent pointers, printing
   what each step stands on. Every one of the seven causes found in this pass
