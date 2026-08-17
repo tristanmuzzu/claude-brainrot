@@ -360,6 +360,22 @@ class Motion:
                 self.air_t = 0.0                   # walked off an edge
                 self.air_kin = kin
                 self.air_v0 = 0.0
+                # ...and whatever crossing was outstanding is cancelled, not
+                # resumed on landing. A lane change decided up on a roof was
+                # decided about the roofs: two trains standing side by side
+                # are one step apart up there and a solid wall down here, and
+                # the rule above freezes the body's x for the whole fall -- so
+                # the crossing arrives *after* the world it was chosen in has
+                # gone. Measured, that one thing is two thirds of every frame
+                # the runner spends inside an obstacle: the body drops off the
+                # back of a convoy, lands beside the line that was flanking
+                # it, and walks straight into its side for a second and a half
+                # while the push-out holds it there.
+                #
+                # Nothing is lost by cancelling. The planner re-solves a tenth
+                # of a second later and will ask again if it still wants the
+                # lane, this time knowing the body is on the rails.
+                self.target_lane = self.lane()
             self.y = self.ground
         if self.rolling:
             self.roll_t += dt

@@ -96,7 +96,7 @@ FOG_FAR = 88.0
 #: it faster is the compounding creep.
 BASE_SPEED = 16.0
 TOP_SPEED = 30.0
-RAMP_SECONDS = 26.0
+RAMP_SECONDS = 22.0
 #: How much faster the run gets for every further minute survived, as a
 #: fraction of the speed it is *already* doing. Compounding, and that is the
 #: whole of the difference: a fixed number of metres a second per minute is an
@@ -107,11 +107,19 @@ RAMP_SECONDS = 26.0
 #: run was, in the owner's words, capping out at a low speed while still quite
 #: easy, and it was.
 #:
-#: 0.55 doubles the speed every eighty seconds. There is no limit and no
-#: intention of one -- see :meth:`RunnerScene._crash` for what ends a run, and
-#: the note on ``VIEW_AHEAD`` for what actually stops the runner, which is
-#: that it eventually outruns its own sight.
-CREEP = 0.55
+#: 0.12 a minute, and the figure is *solved* rather than chosen. What ends a
+#: run is ``blind``, and the speed that happens at is fixed by the planner
+#: rather than by this: ``PLAN_REACH / COMMIT_WINDOW``, 64 m against 1.2 s,
+#: which is 53.3 m/s. So the creep is whatever takes the curve from the top of
+#: the guaranteed range to there in the time a run is wanted to last --
+#: ``TOP_SPEED * (1 + CREEP) ** ((t - RAMP_SECONDS) / 60) = 53.3``.
+#:
+#: At 0.55 that was a hundred and eight seconds, and the owner asked for five
+#: minutes. 0.12 gives about five and a half, and the curve still never stops:
+#: 30 m/s at twenty-two seconds, 32 at a minute, 36 at two, 45 at four, and
+#: the wall a little past five. Raising it shortens runs and nothing else --
+#: it does not make the top faster, because the top is the wall.
+CREEP = 0.12
 # -- power-ups --------------------------------------------------------------
 #: name -> (seconds it lasts, the colour it is drawn and glowed in).
 #:

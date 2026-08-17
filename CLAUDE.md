@@ -31,8 +31,8 @@ the assets' own measured geometry (`assets/measure.py` → `metrics.json`), and
 `scenes/runnerplan.py` plans lanes and take-offs *in time* and then verifies
 the plan by simulating it before committing. **Do not read the old "zero
 interpenetration across 60 seeds × 180 s" claim that stood here: it lapsed, and
-it was measured again on 2026-08-17.** The sweep reads 135 frames inside an
-obstacle over three hours of simulated running, worst 0.742 m, against 303 and
+it was measured again on 2026-08-17.** The sweep reads 42 frames inside an
+obstacle over three hours of simulated running, worst 0.534 m, against 303 and
 0.452 m on the commit before — twice now this file has carried a clean sheet
 for a guarantee that had quietly stopped holding, which is the argument for
 re-running the sweep rather than reading the number. Both residues are
@@ -913,18 +913,16 @@ touching any of it — the reasoning is there, this is the short list:
    not, so two identical trails are worth the same and the body correctly
    holds its lane. The coin road has to change lanes at every gap. See "The
    speed has no top".
-0000a. **A body crossing between roofs sometimes grinds along a train's
-   side**, 0.225 m deep, for a second and a half -- held there by
-   `_resolve_contacts`' push-out, which is why it is ninety frames rather than
-   one. That is two thirds of everything the 60 x 180 sweep finds. It is a
-   crossing whose far lane had a train but not a *roof* under the body at that
-   instant; `Motion.advance`'s `across` is decided from two samples of
-   `surface_at` (now and one lane-time from now) and the crossing is what
-   happens in between. Start by sampling the crossing rather than its ends,
-   and confirm with `hit_probe`-style per-frame dumps -- the aggregate says
-   ninety contacts and the truth is one. The other, rarer class is three lanes
-   of train at once (0.742 m, once in three hours; the commit before this one
-   had the same class at 0.452 m).
+0000a. ~~A body crossing between roofs grinds along a train's side~~ **Fixed,
+   and it was never a crossing.** It was a fall off the back of a convoy
+   carrying a lane change decided on the roof; see "The speed has no top".
+   135 -> 42 frames. **What is left is 42 over three hours, worst 0.534 m**,
+   and the deep one is the same shape with the contact happening in the air
+   rather than after landing -- the cancel in `Motion.advance` fires when the
+   body walks off an edge, and by then the fall is already committed to an x
+   the world has moved under. Next thing to try: refuse the *offer* rather
+   than the arrival, i.e. do not let `_roof_across` pick a lane whose surface
+   ends before the current roof does.
 0000b. **Dead air is 4.0%, against 0.7-2.2% before this pass.** Two causes and
    both are the run ending: the two or three seconds of `blind` running before
    a wreck, in which nothing is planned and so nothing is counted as an
@@ -1456,8 +1454,8 @@ The shape of the answer:
 | | before | after |
 |---|---|---|
 | speed at 15 / 30 / 60 / 90 s | 19.8 / 24.1 / 24.9 / 25.4 | **24.1 / 30.9 / 38.5 / 47.9** |
-| run life (median) | never | **108 s** (106-119) |
-| speed at the wreck | n/a | **43-59 m/s** |
+| run life (median) | never | **328 s** (69-348) |
+| speed at the wreck | n/a | **33-56 m/s** |
 | oncoming trains a minute | 4.5 | **8.6** |
 | trains that are moving | 12% | **23%** (oncoming 8.6 + shunting 5.2 a minute) |
 | roof-to-roof crossings a minute | ~0.75 (estimated, never measured) | **3.62** |
@@ -1476,8 +1474,11 @@ plan is followed for `COMMIT_WINDOW` before being re-solved, so a horizon
 shorter than that is a plan that cannot be checked as far as it is acted on.
 Past that the runner stops planning and stops reflexing: it holds its lane and
 runs, and hits whatever is there within a second or two. 64 m of planning reach
-against a 1.2 s commitment is 53 m/s, reached at about a hundred seconds --
-which is why run life is so tight a band. The frame shows exactly what the rule
+against a 1.2 s commitment is 53 m/s. **That speed, and not the creep, is what
+sets how long a run lasts** -- so `CREEP` is solved backwards from it rather
+than chosen: 0.55 a minute put the wall at 108 seconds, the owner asked for
+five, and 0.12 gives five and a half. Raising the creep shortens runs and does
+not make the top faster, because the top is the wall. The frame shows exactly what the rule
 says: things arrive out of the fog and are not dodged, and then a train fills
 the screen.
 
@@ -1557,7 +1558,7 @@ wrong goes wrong in the three per cent of the run where it cannot.
 
 **The full-size sweep says something the small one cannot, and what it says is
 that the headline number in this file had lapsed again.** 60 runs x 180 s with
-the creep pinned reads **135 frames inside an obstacle, worst 0.742 m** -- and
+the creep pinned reads **42 frames inside an obstacle, worst 0.534 m** -- and
 the same sweep on the commit before this one reads **303 frames, worst
 0.452 m**, against the "0, worst 0.000" recorded for it. So this pass roughly
 halves the count over 17% more track a run and a guaranteed range six metres a
@@ -1567,13 +1568,25 @@ things follow and both are worth keeping:
 - **24 x 120 is not a substitute for 60 x 180 on this scene.** The small sweep
   read five grazes at 0.011 m for the same code. The file already warned about
   this and it was still nearly missed.
-- **The residue is two classes, not many.** About ninety of the frames are one
-  event repeated: a body at roof height crossing into a lane whose train it
-  then grinds along the side of for a second and a half at 0.225 m, held there
-  by the push-out. The single deep one (0.742 m, once in three hours of
-  running) is three lanes of train with the body in the middle -- the same
-  class the old commit's 0.452 m event was. Neither is speed: held at 24 m/s
-  the same code reads *284* frames, so this is orthogonal to the curve.
+- **Two thirds of it was one bug, and it was not the one the aggregate named.**
+  The count read 135 and the shape looked like a roof-to-roof crossing gone
+  wrong. Traced frame by frame it is not a crossing at all: the body **falls
+  off the back of a convoy still carrying a lane change decided up on the
+  roof**. Two trains side by side are one step apart at roof height and a
+  solid wall on the ground, the fall freezes the body's x for its whole
+  duration, and the crossing then arrives after the world it was chosen in has
+  gone -- so the body lands beside the flanking line and walks into its side
+  for a second and a half while the push-out holds it there. `Motion.advance`
+  cancels the crossing when the body walks off an edge; nothing is lost,
+  because the planner re-solves a tenth of a second later. **135 -> 42
+  frames.** The lesson is the one this project keeps relearning: ninety
+  contacts in an aggregate can be one event, and only a per-frame dump says
+  which.
+- **What is left is 42 frames over three hours, worst 0.534 m**, and it is not
+  speed: held at 24 m/s the same code reads *284*, so this is orthogonal to
+  the curve. The deep one is the same shape again -- a body coming down off a
+  roof beside a train -- but with the contact happening while it is still in
+  the air, which the cancel above does not reach.
 
 **One trap in that probe, and it is the general shape of the thing.** Bucket a
 contact by the speed the *frame* is being drawn at and a handful of the deepest
