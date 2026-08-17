@@ -148,7 +148,11 @@ def safety(runs: int, seconds: float, warm: float) -> dict:
         contacts += scene.contacts
         if scene.worst_penetration > worst:
             worst = scene.worst_penetration
-            worst_where = f"run={run} {scene.last_contact}"
+            # ``deepest_contact``, not ``last_contact``: the run carries on
+            # after its worst moment, so printing the last one labels the
+            # headline number with a different, usually trivial, event -- and
+            # every attempt to chase it starts by looking at the wrong frame.
+            worst_where = f"run={run} {scene.deepest_contact}"
         unsolvable += scene.unsolvable
         reflexes += scene.reflexes
         travel += scene.travel

@@ -596,6 +596,10 @@ class RunnerScene(Scene):
         self.contacts = 0
         self.worst_penetration = 0.0
         self.last_contact: dict | None = None
+        #: ...and the worst one, which is a different frame. Probes report the
+        #: deepest penetration as the headline and then print ``last_contact``
+        #: beside it, which is whatever happened to be touched most recently.
+        self.deepest_contact: dict | None = None
         self.unsolvable = 0
         self.reflexes = 0
         #: counts down while a person is at the controls; the planner stands
@@ -3095,6 +3099,7 @@ class RunnerScene(Scene):
             if depth <= CONTACT_EPS:
                 continue
             self.contacts += 1
+            deepest = depth > self.worst_penetration
             self.worst_penetration = max(self.worst_penetration, depth)
             #: what was hit, captured before the push-out moves anything
             self.last_contact = {
@@ -3104,6 +3109,8 @@ class RunnerScene(Scene):
                 "airborne": self.airborne, "roll_t": self.roll_t,
                 "speed": self.speed, "box": box, "body": body,
             }
+            if deepest:
+                self.deepest_contact = self.last_contact
             # A shallow one is a stumble: a trailing edge caught on the way
             # out of a lane, which the pose and the camera say and the run
             # survives. Anything deeper is walking into the front of
