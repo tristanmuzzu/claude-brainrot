@@ -26,9 +26,9 @@ from brainrot.rng import Seed
 from brainrot.scenes.runner import ROW as RUNNER_ROW
 from brainrot.scenes.runner import SEGMENT_TABLE as RUNNER_SEGMENTS
 from brainrot.scenes.parkour import (
-    AIR_MAX, AIR_MIN, AIR_SPEED, APPROACH_MIN, BAND, COURSE_ALT, EDGE, FORMS,
-    GRAVITY, HEADROOM, MIN_HOP, RAMP_BLOCKS, SEGMENT_TABLE, VY_MAX, VY_MIN,
-    fit_gap, flight, hop_span, max_gap)
+    AIR_MAX, AIR_MIN, AIR_SPEED, BAND, COURSE_ALT, EDGE, FORMS, GRAVITY,
+    HEADROOM, IMPULSE_MIN, MIN_HOP, RAMP_BLOCKS, SEGMENT_TABLE, VY_MAX,
+    VY_MIN, fit_gap, flight, hop_span, max_gap)
 
 
 def context(run: int) -> scene_api.SceneContext:
@@ -506,18 +506,20 @@ def test_parkour_jumps_stay_physical(run: int) -> None:
     through the side of the block rather than onto it.
 
     Horizontal speed is checked too, and the statement is the motion model
-    itself: a player has **one** jump impulse and spends all of it every time,
-    so what they choose is how fast they are running when they use it. Every
-    hop is therefore one of exactly three things -- a sprint jump at the top
-    speed a body has, a slower approach that lands the *whole* impulse on the
-    far end, or, on a gap short enough that even a sprint would overshoot a
-    full jump, a lower arc taken at the floor speed. Nothing in between, and
-    nothing outside.
+    itself: a player has **one** jump impulse, spends all of it every time,
+    and is at sprint pace when they do. So every hop in the scene is the same
+    move -- the sprint jump -- and what varies is only how far it has to go.
+    A short gap is answered by taking off a little earlier and landing further
+    onto the block (:func:`_hop_points`), never by jumping more gently, so the
+    impulse never falls below :data:`IMPULSE_MIN` of the one there is.
 
-    The version this replaces asserted a *constant* horizontal speed, which
-    put the whole of the player's choice into the arc: a two-metre hop came
-    out apexing at 0.28 m against vanilla's 1.25, and a run of those is a run
-    of skips.
+    Two earlier versions of this test are worth remembering, because each was
+    a motion model that measured wrong. Asserting a *constant* speed put the
+    whole of the player's choice into the arc, and a two-metre hop came out
+    apexing at 0.28 m against vanilla's 1.25. Allowing a slower approach
+    fixed the arc and cost the sprint: the median hop in the scene was then
+    crossed at 6.4 m/s, and a body that creeps up to two thirds of its jumps
+    is not one anybody is playing.
     """
     scene = grow_parkour(run)
     for i, (a, b) in enumerate(zip(scene.blocks, scene.blocks[1:])):
@@ -532,13 +534,13 @@ def test_parkour_jumps_stay_physical(run: int) -> None:
             f"{where}: still rising after {dur:.3f} s, apex at "
             f"{vy0 / GRAVITY:.3f} s -- it arrives through the side")
         speed = gap / dur
-        assert APPROACH_MIN - 1e-6 <= speed <= AIR_SPEED + 1e-6, (
-            f"{where}: crossed at {speed:.2f} m/s")
-        assert (abs(speed - AIR_SPEED) < 1e-6
-                or abs(vy0 - VY_MAX) < 1e-6
-                or abs(speed - APPROACH_MIN) < 1e-6), (
-            f"{where}: crossed at {speed:.2f} m/s taking off at {vy0:.2f} m/s "
-            "-- neither a sprint, nor the whole impulse, nor the floor")
+        assert abs(speed - AIR_SPEED) < 1e-6, (
+            f"{where}: crossed at {speed:.2f} m/s, and the only speed a body "
+            "leaves the ground at is the sprint jump's")
+        assert vy0 >= IMPULSE_MIN * VY_MAX - 1e-6, (
+            f"{where}: takes off at {vy0:.2f} m/s, which is "
+            f"{vy0 / VY_MAX * 100:.0f}% of the one jump the game has -- a hop, "
+            "not a jump")
         # and the arc genuinely ends on the surface it was solved for
         landed = frm[1] + vy0 * dur - 0.5 * GRAVITY * dur * dur
         assert landed == pytest.approx(to[1], abs=1e-6)
@@ -712,11 +714,18 @@ def test_parkour_an_early_take_off_moves_the_orbs_with_it() -> None:
     This asserts that path is genuinely exercised -- it was dead code until the
     teleport above was fixed, because the early take-off used to happen from
     the far edge either way.
+
+    The key is held down rather than tapped every seventh frame, and that is a
+    consequence of the impulse floor rather than a convenience: a landing's
+    run-up is now a couple of frames on most blocks, because a hop short of
+    the full jump's reach spends the difference on leaving early. A key
+    pressed every seventh frame arrives after the body has already gone on
+    three landings in four.
     """
     scene = build_parkour(11)
     moved = total = 0
     for i in range(3600):
-        scene.control(Intent(jump=i % 7 == 0))
+        scene.control(Intent(jump=True))
         nominal = (scene._takeoff_point(scene.blocks[scene.jump_index])
                    if scene.phase == "ground" else None)
         was = scene.phase
@@ -895,40 +904,60 @@ def flights_of(scene) -> list[float]:
     return out
 
 
+#: The set-pieces the ramp weights *up*: narrow landings, things to duck
+#: under, tight turns and drops. Named here rather than derived from
+#: ``SEGMENT_RAMP`` so the test states what it means by harder.
+HARD_SEGMENTS = {"squeeze", "slabs", "zigzag", "spiral", "chasm", "descent"}
+
+
 def test_parkour_gets_harder_as_a_run_goes_on() -> None:
     """The ramp, stated as the property rather than as the constants.
 
     A course that is as hard after four minutes as after four seconds has no
     shape, and every real infinite-parkour server ramps. The mechanism is two
-    tables per set-piece and a coin weighted by ``difficulty`` -- but what has
-    to be true is only this: the hops late in a run are longer than the hops
-    early in it, by enough to see.
+    tables per set-piece and a coin weighted by ``difficulty``.
 
-    Asserted on the **mean**, and not on the median or the maximum. A maximum
-    moves the moment one lucky chasm turns up and says nothing about what the
-    run generally feels like. A median is worse than that here and it is worth
-    saying why, because it has now cost this project time twice: a hop length
-    is one of a handful of discrete values -- a whole number of cells, less two
-    edges -- so the median snaps from one mode to the next and sits there
-    while the distribution underneath it moves. Measured across three separate
-    widenings of the gap tables it read *exactly* 3.24 m early and 3.62 m late
-    every time, to four significant figures, while the mean went 3.18 -> 3.49.
+    **What "harder" is measured on changed with the impulse floor, and it had
+    to.** It used to be hop length, and hop length can no longer carry it: one
+    jump impulse at one speed puts a hard ceiling 4.26 m away, the lattice
+    offers a level hop of exactly 3.24 or 4.24 m, and every gap a hard table
+    asks for past that is narrowed straight back to the ceiling. Measured, the
+    mean hop reads 4.11 m early and 4.13 m late and no weighting of the tables
+    moves it, because both ends are already against the ceiling.
 
-    The margin is smaller than it used to be, and that is a consequence rather
-    than a slackening. The floor came up: the shortest hop the scene lays is
-    now a jump taken at 6.4 m/s rather than a shuffle, and one jump impulse
-    puts a hard ceiling four and a quarter metres away. A ramp inside those two
-    is a tenth, not a half -- and the rest of what "harder" means lives in
-    which set-pieces get chosen (``SEGMENT_RAMP``) and in how far they drop.
+    What does ramp is *which of those two* a run gets -- the share of hops
+    spending the whole impulse rather than nine tenths of it -- and which
+    set-pieces it is asked to do them in. Both are what a viewer actually
+    reads, and both move by half again over a run.
     """
-    early: list[float] = []
-    late: list[float] = []
+    def sample(rows):
+        full = sum(1 for _, vy0, _ in rows if vy0 > VY_MAX - 1e-6)
+        hard = sum(1 for _, _, seg in rows if seg in HARD_SEGMENTS)
+        return (statistics.fmean(d for d, _, _ in rows),
+                full / len(rows), hard / len(rows))
+
+    early: list[tuple[float, float, str]] = []
+    late: list[tuple[float, float, str]] = []
     for run in range(1, 13):
         scene = grow_parkour(run, 260)
-        for i, d in enumerate(flights_of(scene)):
-            (early if i < RAMP_BLOCKS // 2 else late).append(d)
-    lo, hi = statistics.fmean(early), statistics.fmean(late)
-    assert hi > lo * 1.07, f"the ramp is flat: {lo:.2f} m early, {hi:.2f} m late"
+        blocks = scene.blocks
+        for i, (a, b) in enumerate(zip(blocks, blocks[1:])):
+            frm, to = scene._takeoff_point(a), scene._land_point(b)
+            d = math.dist((frm[0], frm[2]), (to[0], to[2]))
+            row = (d, flight(frm, to)[1], b["segment"])
+            (early if i < RAMP_BLOCKS // 2 else late).append(row)
+
+    lo_d, lo_full, lo_hard = sample(early)
+    hi_d, hi_full, hi_hard = sample(late)
+    assert hi_full > lo_full + 0.15, (
+        f"the ramp is flat: {lo_full:.0%} of the early hops spend the whole "
+        f"impulse against {hi_full:.0%} of the late ones")
+    assert hi_hard > lo_hard + 0.10, (
+        f"the set-pieces do not ramp: {lo_hard:.0%} hard early, "
+        f"{hi_hard:.0%} late")
+    # and the hops do not get *shorter*, which is the way a ramp can fail
+    # while both of the above still read green
+    assert hi_d >= lo_d - 1e-9, f"{lo_d:.2f} m early, {hi_d:.2f} m late"
     # ...and it has to stop ramping, or a long enough run walks off the end of
     # what a body can do and every candidate starts getting rejected.
     assert grow_parkour(4, 400).difficulty == 1.0

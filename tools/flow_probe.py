@@ -148,6 +148,7 @@ def measure(name: str, runs: int, seconds: float) -> dict:
         peak = scene.pos[1]
         launch = scene.pos[1]
         since_launch = 99
+        prev_landed = getattr(scene, "landings", None)
         for _ in range(frames):
             scene.update(DT)
             # ``elapsed`` is the scene's on some scenes and not on others, and
@@ -198,16 +199,42 @@ def measure(name: str, runs: int, seconds: float) -> dict:
 
             if phase_air:
                 peak = max(peak, scene.pos[1])
-            if now_air != phase_air:
+            # A landing is read off the scene's own count of them, not off the
+            # phase changing between two frames. The feet are down for a tenth
+            # of the time they are up, and on a one-cell landing that is now
+            # routinely *shorter than a frame*: watching the phase, the probe
+            # missed those landings entirely, merged the two hops either side
+            # into one air phase, and measured that phase's apex against the
+            # wrong block. It read 88% of a vanilla jump for a scene whose
+            # take-offs measure 97% of the impulse.
+            landed = getattr(scene, "landings", None)
+            if landed is not None and landed != prev_landed:
+                prev_landed = landed
+                if phase_air:
+                    airs.append(elapsed - phase_t0)
+                    apex.append(peak - launch)
+                landings += 1
+                # Whether the body is still down at the end of this frame is
+                # what ``now_air`` says; either way the next hop starts from
+                # the surface just landed on -- read off the scene rather than
+                # off the body, which by the end of such a frame is already
+                # back in the air and a jump impulse higher.
+                launch = peak = getattr(scene, "land_y", scene.pos[1])
+                phase_air = now_air
+                phase_t0 = elapsed
+            elif now_air != phase_air:
                 dur = elapsed - phase_t0
                 if phase_air:
                     airs.append(dur)
                     apex.append(peak - launch)
-                    landings += 1
+                    if landed is None:
+                        landings += 1
                 else:
                     ground.append(dur)
-                    launch = scene.pos[1]
-                    peak = scene.pos[1]
+                    # The surface, not the body: a frame that reaches across a
+                    # take-off has the body a fraction of a jump up it already,
+                    # and measuring the apex from there loses 0.08 m of it.
+                    launch = peak = getattr(scene, "land_y", scene.pos[1])
                 phase_air = now_air
                 phase_t0 = elapsed
             if not now_air:

@@ -259,6 +259,71 @@ def hop_move(frm, to, speed: float = AIR_SPEED, kind: str = "hop") -> Move:
     return Move(kind, [arc_leg(frm, to, speed)])
 
 
+#: The shortest run a landing keeps for itself once the hop off it has taken
+#: what it needs to leave early. Two or three ticks.
+MIN_RUN = 0.12
+#: ...and the furthest back a take-off may be pulled. A block is one cell and
+#: a terrace landing is at most two, so anything past this is not a run-up.
+MAX_BACK = 1.2
+
+
+def spend_impulse(frm, to, step, form: str, prev_land=None,
+                  speed: float = AIR_SPEED, vy_max: float = VY_MAX):
+    """Move a hop's two ends so that it spends the whole jump impulse.
+
+    There is one jump in this game and a player uses all of it every time; a
+    pair of points closer together than that jump's own reach can only be
+    flown by not jumping properly, and :func:`arc_leg` solving the take-off
+    from the endpoints is exactly that. Measured on the tower, the mean hop
+    apexed 0.77 m against vanilla's 1.25 -- two thirds of a jump, four times a
+    second, which is a *hop* and reads as bouncing.
+
+    So the shortfall is spent on the geometry instead, in the order a player
+    spends it: land further into the block (bounded at its middle, so the
+    landing stays on the near half of its own footprint and the take-off
+    point, which may be in any direction and is not known yet, is always still
+    ahead of it), then leave a little earlier along the run-up behind.
+
+    Nothing here moves a *cell*: both ends stay inside the two blocks the hop
+    already joined, so every reservation, every clearance and every walk the
+    course does in whole cells is untouched. It also cannot lengthen a hop
+    past the full jump -- ``short`` is what is missing from one -- so a hop
+    that was legal stays legal.
+    """
+    ux, uz = unit(*step) if step[0] or step[1] else (0.0, 0.0)
+    if not (ux or uz):
+        return frm, to
+    short = _reach(vy_max, to[1] - frm[1], speed) \
+        - math.dist((frm[0], frm[2]), (to[0], to[2]))
+    if short > 1e-6:
+        m = max(abs(ux), abs(uz)) or 1.0
+        deep = min(short, EDGE.get(form, 0.34) / m)
+        to = (to[0] + ux * deep, to[1], to[2] + uz * deep)
+        short -= deep
+    if short > 1e-6 and prev_land is not None:
+        rx, rz = prev_land[0] - frm[0], prev_land[2] - frm[2]
+        run = math.hypot(rx, rz)
+        # The run-up has to *be* one: behind the take-off, on the block, and no
+        # longer than a block is. Not every move ends on the landing it is
+        # aimed at -- a ladder tops out at its column, a bubble column at the
+        # cell above it -- so the point this walks back toward is occasionally
+        # metres away and in an unrelated direction. Unguarded, one such pair
+        # produced a "hop" of 26.76 m across an eight-block *climb*, which the
+        # move checks then let through because it was an emergency placement.
+        if run > 1e-6 and (rx * -ux + rz * -uz) / run > 0.2:
+            back = min(short, max(0.0, run - MIN_RUN), MAX_BACK)
+            if back > 0.0:
+                frm = (frm[0] + rx / run * back, frm[1],
+                       frm[2] + rz / run * back)
+    return frm, to
+
+
+def _reach(vy0: float, rise: float, speed: float = AIR_SPEED) -> float:
+    """How far a hop leaving at ``vy0`` and climbing ``rise`` gets."""
+    disc = vy0 * vy0 - 2.0 * GRAVITY * rise
+    return 0.0 if disc < 0.0 else speed * (vy0 + math.sqrt(disc)) / GRAVITY
+
+
 def hop_span(rise: float, speed: float = AIR_SPEED,
              vy_max: float = VY_MAX) -> tuple[float, float]:
     """Shortest and longest hop a body can make for a change in height.

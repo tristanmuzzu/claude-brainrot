@@ -79,11 +79,19 @@ from .parkourkit import GroundRun
 #: and it is *faster* as well, because a longer hop at the same speed covers
 #: more ground for the same landing.
 #:
-#: A level gap of four is not on either table because it cannot be jumped --
-#: :func:`max_gap` puts the ceiling at three -- so the fours and fives here
-#: only ever come out at their full width when the rise that was drawn with
-#: them is a drop, and :func:`fit_gap` narrows them back when it is not.
-GAP_EASY = (3, 3, 3, 3, 4, 4, 4, 4, 4, 4)
+#: A level gap of four is the sprint jump itself and a level five cannot be
+#: jumped at all, so the fives and sixes here only ever come out at their full
+#: width when the rise drawn with them is a drop, and :func:`fit_gap` narrows
+#: them back when it is not.
+#:
+#: The easy table leans to three now and it is the *only* place a ramp in hop
+#: length can still live. Every hop is a full-impulse sprint jump, so the
+#: reach of one is fixed by its rise: a level three is 3.24 m taken at ninety
+#: per cent of the impulse, a level four is the whole 4.24, and there is
+#: nothing in between and nothing beyond. Weighted to fours at both ends -- as
+#: this table was when the impulse floor arrived -- the mean hop read 4.14 m
+#: early and 4.12 m late, which is not a ramp at all.
+GAP_EASY = (3, 3, 3, 3, 3, 3, 4, 4)
 GAP_HARD = (4, 4, 4, 5, 5, 5, 5, 5, 6, 6)
 #: Rises pair with gaps because the physics ties them together: falling is the
 #: only thing that buys reach, so the hard table drops more often. It is also
@@ -137,16 +145,35 @@ AIR_SPEED = 7.10
 #: Vanilla walk. What holding the block down does: you cross it slower, you do
 #: not stand still.
 WALK_SPEED = 4.317
-#: Slowest a body will approach a jump. A short gap taken with the full jump
-#: impulse is a *precision jump* and is done at a walk in the real game -- but
-#: a strip that walks up to every two-metre gap is a strip that stops, so the
-#: floor is vanilla's sprint: the body is never slower than a player running
-#: flat out, it simply stops getting the sprint-jump's forward impulse on the
-#: gaps that do not need it. Hops shorter than ``RUN_SPEED * 0.6 m`` -- 0.6 s
-#: being a level jump's hang time -- get a lower arc rather than a slower
-#: approach, which is the one place this leaves vanilla and it is the right
-#: place: those are the hops a player takes without thinking.
-APPROACH_MIN = 6.40
+#: The least of the one jump impulse a hop in this scene is allowed to spend.
+#:
+#: This is the number the whole "it does not feel like a Minecraft jump" note
+#: came down to. There is exactly one jump in the game and a player spends all
+#: of it every time; what varies is the gap, and a gap shorter than the jump's
+#: own reach is answered by landing further onto the block -- not by jumping
+#: less hard. Solving each hop's take-off from its endpoints did the opposite:
+#: two thirds of every hop came out at 60-85% of the impulse, apexing 0.5-0.9 m
+#: against vanilla's 1.25, which is a *hop* and not a jump, and a run of them
+#: is what reads as bouncing.
+#:
+#: It is enforced through :func:`hop_span`, whose ``lo`` is now the same
+#: formula as its ``hi`` with a smaller impulse in it, so every gap the
+#: generator can ask for is one a real jump lands on. 0.90 admits the level
+#: three-block gap alongside the four; 0.95 leaves only the four, and a course
+#: of nothing but its longest jump has nothing to show you.
+IMPULSE_MIN = 0.90
+#: How much of a hop's shortfall against the full jump's reach the *geometry*
+#: gives back, in metres, before the impulse has to come down for it. The
+#: sources are the two a player uses: land deeper into the block, and leave
+#: the one behind a little earlier. Both are bounded by a block's own size --
+#: see :func:`_hop_points` -- so this is the conservative figure for the
+#: one-cell landing that most of the course is made of, and it is what
+#: :func:`hop_span` budgets with.
+ABSORB = 0.60
+#: The shortest run a landing keeps for itself once the hop out of it has
+#: taken what it needs. Two or three ticks: enough to be a landing rather than
+#: a bounce, and no more than vanilla gives you on a one-block platform.
+MIN_RUN = 0.12
 #: A hop is legal exactly when the take-off it needs is one a body has. Zero is
 #: stepping off an edge without jumping; :data:`JUMP_V` is the only jump there
 #: is. Everything the generator lays down is checked against this pair, which
@@ -333,6 +360,12 @@ class ParkourScene(Scene):
         # stationary -- that beat is what made this read as a slideshow of
         # camera positions rather than as somebody running.
         self.jump_index = 0           # block we are standing on
+        #: Landings since the run began, and the one count of them that only
+        #: ever goes up: ``jump_index`` is walked back whenever the course
+        #: drops blocks off its tail. A probe cannot segment hops by watching
+        #: the phase flip -- a landing between two jumps is now routinely
+        #: shorter than a frame -- so it watches this instead.
+        self.landings = 0
         self.phase = "ground"
         self.phase_t = 0.0
         self.ground_dur = 0.2
@@ -910,7 +943,14 @@ class ParkourScene(Scene):
         # next, so it is written here rather than when prev was laid down --
         # and only now can its own scenery be checked against the run across it
         # and the hop out of it, neither of which existed when it was built.
+        # Both ends of the hop are stored rather than recomputed, because
+        # ``_hop_points`` moves them off the edges to keep the arc a full jump
+        # and every later reader -- the orbs, the clearance, the run-up, the
+        # live take-off -- has to be looking at the same two points.
         prev["out"] = (sx, sz)
+        prev["launch"], blk["land"] = _hop_points(
+            prev, self._land_point(prev), (sx, sz), form,
+            blk["x"], self.surface(blk), blk["z"])
         self._clear_deco_path(prev, self._land_point(blk))
         arc = _arc_points(self._takeoff_point(prev), self._land_point(blk))
         if node["deco"]:
@@ -983,13 +1023,22 @@ class ParkourScene(Scene):
                           for cx, cy, cz in cells
                           for h in range(1, HEADROOM + 1)):
             return False
-        frm = _takeoff_of(prev, (sx, sz))
-        to = _land_of(bx, by + FORMS[form], bz, form, (sx, sz))
+        frm, to = _hop_points(prev, self._land_point(prev), (sx, sz), form,
+                              bx, by + FORMS[form], bz)
         d = math.dist((frm[0], frm[2]), (to[0], to[2]))
         if d < MIN_HOP:
             return False
         dur, vy0 = flight(frm, to)
         if not (VY_MIN <= vy0 <= VY_MAX and AIR_MIN <= dur <= AIR_MAX):
+            return False
+        # ...and it has to be a *jump*. ``hop_span`` keeps the gap tables
+        # honest, but the lattice answers a three-cell request with anything
+        # from 2.4 to 4.3 cells, so the floor is asked for again here against
+        # the two points the body will actually use. A landing the arc reaches
+        # without spending the impulse is the skip this scene was sent back
+        # for; the candidate is refused and the next one along is nearly
+        # always a cell further out.
+        if vy0 < IMPULSE_MIN * VY_MAX:
             return False
         # You have to be on the way *down* when you arrive. A hop that is still
         # rising as it reaches its target has come up through the side of it --
@@ -1078,21 +1127,37 @@ class ParkourScene(Scene):
             # on a course running diagonally that lands them within a hand's
             # breadth of a post sitting at the middle of the corner cell --
             # which is where the body was found standing inside the scenery.
+            #
+            # In *world* cells, not rotated ones, and that is a fix rather
+            # than a shortcut: a three-by-three platform occupies the cells
+            # -1..1 whichever way the course runs through it, so a corner
+            # taken as ``side`` across plus ``fwd`` along lands two cells out
+            # on a diagonal heading -- off the platform entirely, and 2.6 m
+            # out once the bias is on it. That is a whole cell past the
+            # footprint, and with the course now laying three- and four-cell
+            # steps it reaches into the *next block*: two posts a sweep were
+            # measured standing 0.21 m inside one.
             lit = kind == "lanterns"
-            for side in (-1, 1):
-                for fwd in (-1, 1):
-                    out.append(local(side, fwd, 1, 0.22, 1.0, 0.22, "wood",
-                                     bias=CORNER))
+            for cx in (-1, 1):
+                for cz in (-1, 1):
+                    def corner(dy: float, sx: float, sy: float, sz: float,
+                               style: str, glow: bool = False,
+                               _cx=cx, _cz=cz) -> dict:
+                        return {"dx": _cx * CORNER, "dz": _cz * CORNER,
+                                "dy": dy, "sx": sx, "sy": sy, "sz": sz,
+                                "kind": kind, "style": style, "glow": glow,
+                                "loose": False, "born": -1e9}
+
+                    out.append(corner(1, 0.22, 1.0, 0.22, "wood"))
                     if lit:
                         # sitting ON the post, not sunk into it: at 1.7 the
                         # lantern ate the top 0.3 m of the post it stood on
-                        out.append(local(side, fwd, 2, 0.34, 0.34, 0.34,
-                                         "lantern", glow=True, bias=CORNER))
+                        out.append(corner(2, 0.34, 0.34, 0.34, "lantern",
+                                          glow=True))
                     else:
                         # a fence cap, not a grey knob: a stone cube on a wood
                         # post reads as a mushroom from every angle
-                        out.append(local(side, fwd, 2, 0.4, 0.16, 0.4, "wood",
-                                         bias=CORNER))
+                        out.append(corner(2, 0.4, 0.16, 0.4, "wood"))
         elif kind == "torch":
             # A wall torch on the side of the block, which is where a torch
             # goes in the game. On *top* it cannot go: the body crosses the
@@ -1210,24 +1275,36 @@ class ParkourScene(Scene):
         return (blk["x"], self.surface(blk), blk["z"])
 
     def _land_point(self, blk: dict) -> tuple[float, float, float]:
-        """Where the feet touch down: the near edge, on the way in.
+        """Where the feet touch down.
 
         A player does not arrive in the middle of a block and stop. They catch
         the near edge and carry on across it, and the gap they actually cleared
         is therefore wider than the gap between the two block centres by the
         width of two edges. Making this the landing point rather than a random
         offset is what gives every block a run-up to take off from.
+
+        The near edge is the *nominal* point and what a max-length jump gets;
+        a shorter gap lands further in, because that is how a player at sprint
+        pace answers one. :func:`_hop_points` decides how much further and
+        writes it here when the block is laid.
         """
+        got = blk.get("land")
+        if got is not None:
+            return got
         return _land_of(blk["x"], self.surface(blk), blk["z"],
                         blk["form"], blk["step"])
 
     def _takeoff_point(self, blk: dict) -> tuple[float, float, float]:
-        """Where the feet leave: the far edge, on the way out.
+        """Where the feet leave: the far edge, on the way out, less whatever
+        the hop out of here needed to leave early for.
 
         Falls back to the incoming direction when nothing has been generated
         beyond this block yet, which only happens for the very last block of
         the live course and is corrected the moment the next one is laid.
         """
+        got = blk.get("launch")
+        if got is not None:
+            return got
         return _takeoff_of(blk, blk.get("out") or blk["step"])
 
     def body_box(self) -> AABB:
@@ -1389,15 +1466,26 @@ class ParkourScene(Scene):
 
     def _land(self) -> None:
         self.jump_index += 1
+        self.landings += 1
+        #: Height of the surface just landed on. A landing can be over inside
+        #: one frame, so a probe that reads the body's height afterwards reads
+        #: it already airborne; this is the number it wanted.
+        self.land_y = self.land_at[1]
         self.stand = list(self.land_at)
         self.pos = list(self.stand)
         self.phase = "ground"
         self.phase_t = 0.0
         # The eye carries the body's downward speed into the legs rather than
-        # being dropped a fixed distance. Capped, and only ever added to what
-        # the spring is already doing, so two landings close together do not
-        # cancel.
-        self.dip_v = max(self.dip_v, DIP_KEEP * min(DIP_CAP, abs(self.vy)))
+        # being dropped a fixed distance -- but only the part of it that is
+        # more than an ordinary jump arrives with. Every hop lands at about
+        # the impulse it left with, so a dip taken off the raw speed fired on
+        # every single landing, twice a second, and vanilla dips the lens on
+        # none of them. Above that it is a *fall*, and a fall is exactly when
+        # a person's legs give: the dip now says how far you dropped rather
+        # than that you landed. Capped, and only ever added to what the spring
+        # is already doing, so two landings close together do not cancel.
+        self.dip_v = max(self.dip_v, DIP_KEEP
+                         * min(DIP_CAP, max(0.0, abs(self.vy) - DIP_FREE)))
         self.vy = 0.0
         self._speed = RUN_SPEED
         self.swing = 1.0
@@ -1827,7 +1915,14 @@ class ParkourScene(Scene):
         self.dip += self.dip_v * dt
         want_foot = 1.0 if self.phase == "ground" else 0.0
         self.foot += (want_foot - self.foot) * min(1.0, dt * FOOT_EASE)
-        want_fov = FOV + FOV_GAIN * max(0.0, self._speed - RUN_SPEED)
+        # Off the *state*, not off the instantaneous speed. Vanilla's sprint
+        # boost is a flag: it comes on when you sprint and stays there. Hung
+        # off the speed it became a pulse instead, because the body genuinely
+        # is faster in the air than across a block -- two degrees in and out
+        # twice a second, a lens breathing in step with the jumps, and a good
+        # part of what "it bounces" was.
+        cruise = self.hold_speed or AIR_SPEED
+        want_fov = FOV + FOV_GAIN * max(0.0, cruise - RUN_SPEED)
         self.fov += (want_fov - self.fov) * min(1.0, dt * FOV_EASE)
 
     def _look(self, dt: float) -> None:
@@ -1875,8 +1970,14 @@ class ParkourScene(Scene):
         want_pitch = math.atan2(self.pos[1] + EYE - (aim[1] + EYE * 0.95),
                                 max(3.4, flat))
         # A body in the air looks where it is going: falling drops the gaze,
-        # rising lifts it, on top of wherever the target already is.
-        want_pitch -= max(-0.22, min(0.30, self.vy * 0.030))
+        # rising lifts it, on top of wherever the target already is. Gently,
+        # and that is the point of the number: a jump swings ``vy`` from +8.4
+        # to -8.4, so at the 0.030 this used to be the view pitched twenty-
+        # seven degrees over every hop -- on top of the body's own 1.25 m of
+        # rise, twice a second. Vanilla does not move the view at all when you
+        # jump. Seven degrees reads as a glance and stays out of the way of
+        # what the body is actually doing.
+        want_pitch -= max(-0.09, min(0.12, self.vy * 0.012))
         self.pitch += _wrap(max(-0.16, min(0.55, want_pitch)) - self.pitch) \
             * min(1.0, rate * 0.8)
 
@@ -2411,14 +2512,18 @@ FOV_EASE = 6.0
 #: the shortest a person reads as a knee rather than as a cut.
 DIP_W = 13.0
 DIP_ZETA = 1.0
-#: How much of the impact the legs pass on to the head. All of it would be
-#: exactly continuous and dip the lens 13 cm on an ordinary hop, twice a
-#: second; none of it is vanilla, which stops the camera dead. Three fifths
-#: halves the jolt against vanilla's and keeps the dip under 8 cm.
+#: How much of the impact the legs pass on to the head.
 DIP_KEEP = 0.6
-#: Fastest impact the legs will pass on. A twelve-block drop should not put the
-#: lens through the floor.
-DIP_CAP = 9.0
+#: The impact an ordinary jump lands with, which costs the lens nothing. A hop
+#: comes down at about the speed it went up at, so *every* landing used to dip
+#: the eye 8 cm -- twice a second, on a camera that vanilla holds perfectly
+#: still. Measuring the dip from here instead means it fires when the body has
+#: actually fallen further than it jumped, which is the only time a person's
+#: legs give at all.
+DIP_FREE = JUMP_V
+#: Fastest impact past that the legs will pass on. A twelve-block drop should
+#: not put the lens through the floor.
+DIP_CAP = 6.0
 #: How fast the walk bob fades in and out. It used to switch, which put a
 #: five-centimetre step in the eye at every take-off.
 FOOT_EASE = 9.0
@@ -2644,6 +2749,48 @@ def _land_of(x: float, surface: float, z: float, form: str,
     return (x - ox, surface, z - oz)
 
 
+def _hop_points(prev: dict, prev_land, step: tuple[int, int], form: str,
+                bx: float, surface: float, bz: float):
+    """Where the feet leave ``prev`` and touch down on the next block.
+
+    Nominally the far edge of one and the near edge of the other, which is
+    what gives every block a run-up -- but that pair also *decides the arc*,
+    and a pair that comes out shorter than the jump's own reach can only be
+    flown by not jumping properly. There is one impulse in this game. So the
+    shortfall is spent on the geometry instead, in the order a player spends
+    it:
+
+    * **land deeper.** A short gap is met by carrying on into the block rather
+      than catching its lip. Bounded at the block's middle, so the landing is
+      always on the near half of its own footprint and the take-off point --
+      which is not known yet, and may be in any direction once the course
+      turns -- is always still ahead of it.
+    * **leave earlier.** Whatever is left comes off the run-up behind, along
+      the line the body is actually running, down to :data:`MIN_RUN`.
+
+    Both are bounded by a block's own size, so a gap far under the reach still
+    arrives with some shortfall on it -- which is why :func:`hop_span` refuses
+    to lay one in the first place.
+    """
+    ux, uz = _unit(step)
+    frm = _takeoff_of(prev, step)
+    to = _land_of(bx, surface, bz, form, step)
+    short = reach(VY_MAX, to[1] - frm[1]) \
+        - math.dist((frm[0], frm[2]), (to[0], to[2]))
+    if short > 1e-6:
+        m = max(abs(ux), abs(uz)) or 1.0
+        deep = min(short, EDGE[form] / m)
+        to = (to[0] + ux * deep, to[1], to[2] + uz * deep)
+        short -= deep
+    if short > 1e-6:
+        rx, rz = prev_land[0] - frm[0], prev_land[2] - frm[2]
+        run = math.hypot(rx, rz)
+        back = min(short, max(0.0, run - MIN_RUN))
+        if back > 0.0:
+            frm = (frm[0] + rx / run * back, frm[1], frm[2] + rz / run * back)
+    return frm, to
+
+
 _OFFSETS: dict[tuple[float, int], list[tuple[int, int]]] = {}
 
 
@@ -2712,37 +2859,29 @@ def flight(frm, to) -> tuple[float, float]:
     question, and :meth:`ParkourScene._fits` is where it gets asked -- no hop
     outside ``VY_MIN..VY_MAX`` is ever laid down.
 
-    **What changed, and why the paragraph above is now only half true.** There
-    is one jump impulse in this game, and a player uses all of it every single
-    time -- what they choose is how fast they are *running* when they use it.
-    Holding the horizontal speed at a constant instead put the whole of that
-    choice into the arc, so a two-metre hop came out as a 0.28 m skip against
-    vanilla's 1.25, and a run of skips is most of what reads as bot-like
-    however smooth it is. So the speed is picked first now: the fastest
-    approach that still lands the full impulse on the far end, floored at a
-    jog, because a body that walks up to every gap is a body that stops. Short
-    hops slow down and arc properly, long ones are unchanged at a sprint, and
-    the ground run either side absorbs the difference -- which is the part
-    that could not be done before :class:`GroundRun` existed, and the reason
-    this was tried once, measured as floating, and reverted.
+    **Slowing the approach was tried and it is not what a player does.** For a
+    while the speed was solved first -- the fastest approach that still spent
+    the whole impulse -- which arcs a short hop properly at the cost of the
+    body creeping up to it at 6.4 m/s. Measured over twelve runs that was the
+    median hop, so the scene spent most of its life below sprint pace for the
+    benefit of gaps that should not have been there in the first place. A
+    player at full sprint meets a short gap by *landing further onto the far
+    block*, and that is where the shortfall goes now: :func:`_hop_points`
+    spends it on the geometry before this function ever sees the endpoints,
+    and :func:`hop_span` refuses to lay a gap whose remainder would take the
+    impulse below :data:`IMPULSE_MIN`. So the speed here is the sprint jump's,
+    always, and the arc is the vanilla one to within a tenth of its impulse.
     """
     dist = math.dist((frm[0], frm[2]), (to[0], to[2]))
     rise = to[1] - frm[1]
-    disc = VY_MAX * VY_MAX - 2.0 * GRAVITY * rise
-    speed = AIR_SPEED
-    if disc > 0.0:
-        full = (VY_MAX + math.sqrt(disc)) / GRAVITY
-        want = dist / full
-        if APPROACH_MIN <= want <= AIR_SPEED:
-            # Returned as the impulse itself rather than as a duration the
-            # impulse is recovered from: ``_fits`` refuses anything over
-            # ``VY_MAX``, and a round trip through a division puts the answer
-            # on the wrong side of that by a part in 10^16 often enough to
-            # matter.
-            return full, VY_MAX
-        speed = min(AIR_SPEED, max(APPROACH_MIN, want))
-    dur = max(1e-4, dist / speed)
-    return dur, rise / dur + 0.5 * GRAVITY * dur
+    dur = max(1e-4, dist / AIR_SPEED)
+    vy0 = rise / dur + 0.5 * GRAVITY * dur
+    # A hop laid at exactly the full jump's reach solves to ``VY_MAX`` plus or
+    # minus a part in 10^16, and ``_fits`` refuses anything over it. Clamp the
+    # rounding rather than losing the scene's commonest jump to it.
+    if VY_MAX < vy0 <= VY_MAX + 1e-6:
+        vy0 = VY_MAX
+    return dur, vy0
 
 
 def flight_speed(frm, to) -> float:
@@ -2751,32 +2890,50 @@ def flight_speed(frm, to) -> float:
     return dist / flight(frm, to)[0]
 
 
+def reach(vy0: float, rise: float) -> float:
+    """How far a hop that leaves at ``vy0`` and climbs ``rise`` gets.
+
+    Its flight time is the descending root of ``rise = vy0*t - g*t^2/2`` and
+    the reach is that time at sprint speed -- so this is one function for both
+    ends of :func:`hop_span`, which differ only in how much of the impulse is
+    being spent. Zero when there is no root: nothing rises two blocks, here or
+    in the game.
+    """
+    disc = vy0 * vy0 - 2.0 * GRAVITY * rise
+    return 0.0 if disc < 0.0 else AIR_SPEED * (vy0 + math.sqrt(disc)) / GRAVITY
+
+
 def hop_span(rise: int) -> tuple[float, float]:
     """Shortest and longest hop a body can make for a given change in height.
 
     Both ends fall out of the same two facts -- one jump impulse, one constant
     horizontal speed -- and neither is a number anybody chose:
 
-    * **Longest** is the full jump. Its flight time is the descending root of
-      ``rise = JUMP_V*t - g*t^2/2``, and the reach is that time at sprint
-      speed. A level hop makes 4.3 m; dropping buys more, because falling
-      takes longer and the body does not slow down while it does. Rising two
-      blocks has no solution at all, which is why nothing here can express it.
-    * **Shortest** is where the hop stops making sense in the other direction,
-      and the two directions stop for different reasons. A *climb* has to be
-      past its apex when it arrives -- land while still rising and the body has
-      come up through the side of the block rather than onto it -- which is
-      ``t >= sqrt(2*rise/g)``. A *drop* has to leave the ground properly rather
-      than be thrown off it, so its take-off has to clear ``VY_MIN``, which is
-      the larger root of ``g t^2 / 2 - VY_MIN t + rise = 0``.
+    * **Longest** is the full jump: ``reach(VY_MAX, rise)``. A level hop makes
+      4.3 m; dropping buys more, because falling takes longer and the body does
+      not slow down while it does. Rising two blocks has no solution at all,
+      which is why nothing here can express it.
+    * **Shortest** is the *same jump with ninety per cent of its impulse*, less
+      what the geometry can give back (:data:`ABSORB`). This is the floor that
+      keeps every jump in the scene a jump. Solving a short gap by taking off
+      more gently is the one thing a Minecraft player cannot do, and it was
+      what made two thirds of the course apex at half of vanilla; a short gap
+      is answered by landing deeper instead, and where even that will not cover
+      it the gap is simply not laid.
+
+    Two older floors are folded in and both still bind somewhere. A *climb* has
+    to be past its apex when it arrives -- land while still rising and the body
+    has come up through the side of the block -- which is ``t >= sqrt(2*rise/g)``.
+    A *drop* has to leave the ground properly rather than be thrown off it, so
+    its take-off has to clear ``VY_MIN``.
     """
     if rise >= 0:
         lo = AIR_SPEED * math.sqrt(2.0 * rise / GRAVITY)
     else:
         lo = AIR_SPEED * (VY_MIN + math.sqrt(VY_MIN * VY_MIN
                                              - 2.0 * GRAVITY * rise)) / GRAVITY
-    disc = VY_MAX * VY_MAX - 2.0 * GRAVITY * rise
-    hi = 0.0 if disc < 0.0 else AIR_SPEED * (VY_MAX + math.sqrt(disc)) / GRAVITY
+    hi = reach(VY_MAX, rise)
+    lo = max(lo, reach(IMPULSE_MIN * VY_MAX, rise) - ABSORB)
     return max(MIN_HOP, lo), hi
 
 

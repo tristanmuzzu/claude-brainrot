@@ -112,6 +112,7 @@ from .parkourkit import (  # noqa: F401
     line_cells,
     line_leg,
     quantise,
+    spend_impulse,
     standing_cells,
     takeoff_point,
     unit,
@@ -2589,16 +2590,25 @@ class Course:
                 "lift": lift, "born": -1e9,
                 "deco": [], "soft": [], "orbs": [], "move": None,
                 "path": (), "unchecked": False, "impact": 0.0, "exact": False,
-                "pedestal": (), "footing": (), "ceiling": ()}
+                "pedestal": (), "footing": (), "ceiling": (),
+                #: Where the feet really leave and land, written at commit
+                #: from the move itself. ``None`` means the block's own edges.
+                "launch": None, "land": None}
 
     def surface(self, blk: dict) -> float:
         return blk["y"] + FORMS[blk["form"]]
 
     def land_point(self, blk: dict):
+        got = blk.get("land")
+        if got is not None:
+            return got
         return land_point(blk["x"], self.surface(blk), blk["z"], blk["form"],
                           blk["step"])
 
     def takeoff_point(self, blk: dict):
+        got = blk.get("launch")
+        if got is not None:
+            return got
         return takeoff_point(blk["x"], self.surface(blk), blk["z"],
                              blk["form"], blk["out"] or blk["step"])
 
@@ -3360,22 +3370,39 @@ class Course:
                 at = tuple(here[i] + (gone[i] - here[i]) * f for i in range(3))
                 if not self._body_fits(at, own):
                     return self._no("body does not fit leaving")
-        built = self._move_for(prev, node, cx, cy, cz, form, step, pedestal)
-        if built is None:
-            return self._no("no move: " + node["kind"])
-        move, soft = built
+        # The move is solved twice at most: once spending the whole jump
+        # impulse (:func:`spend_impulse`, which lands deeper and leaves
+        # earlier so a short gap is still a real jump), and if the arc that
+        # buys will not fit under this level's lids and shells, once with the
+        # arc the two edges alone give. A higher arc is worth having and it is
+        # not worth a refusal: measured, insisting on it cost 2.3 points of
+        # design fidelity, and falling back costs none of it.
+        move = soft = lid = None
         bridge = ()
-        lid = self._ceiling_cells(prev, node, move)
-        if lid is None:
-            return self._no("head-hitter will not fit")
-        exempt = standing_cells(prev) | standing_cells(
-            {"x": cx, "y": cy, "z": cz, "form": form})
-        exempt |= set(soft)
-        if not self._path_clear(
-                move, exempt,
-                footprint(prev["x"], prev["y"], prev["z"], prev["form"]),
-                tuple(pedestal) + lid):
-            return self._no("path blocked")
+        why = None
+        for spend in (True, False):
+            built = self._move_for(prev, node, cx, cy, cz, form, step,
+                                   pedestal, spend=spend)
+            if built is None:
+                return self._no("no move: " + node["kind"])
+            move, soft = built
+            lid = self._ceiling_cells(prev, node, move)
+            if lid is None:
+                why = "head-hitter will not fit"
+                continue
+            exempt = standing_cells(prev) | standing_cells(
+                {"x": cx, "y": cy, "z": cz, "form": form})
+            exempt |= set(soft)
+            if not self._path_clear(
+                    move, exempt,
+                    footprint(prev["x"], prev["y"], prev["z"], prev["form"]),
+                    tuple(pedestal) + lid):
+                why = "path blocked"
+                continue
+            why = None
+            break
+        if why is not None:
+            return self._no(why)
         if move.kind == "walk":
             # A walk is the one verb the body crosses on its feet, and until
             # this existed nothing asked whether there was anything under
@@ -3603,7 +3630,7 @@ class Course:
     # -- the move vocabulary -----------------------------------------------
 
     def _move_for(self, prev: dict, node: dict, cx: int, cy: int, cz: int,
-                  form: str, step, pedestal):
+                  form: str, step, pedestal, spend: bool = True):
         """The move that gets from ``prev`` to this cell, or ``None``.
 
         Every kind answers the same question -- is this a thing a body can
@@ -3617,6 +3644,15 @@ class Course:
         to = land_point(cx, cy + FORMS[form], cz, form, step)
         if kind in ("hop", "slide"):
             speed = ICE_AIR if kind == "slide" else AIR_SPEED
+            # Every jump is the whole impulse; a gap shorter than that jump's
+            # reach is met by landing deeper into the block and leaving a
+            # little earlier, not by jumping more gently. Both ends stay
+            # inside the cells the hop already joined, so nothing the course
+            # reserves, checks or walks in whole cells changes -- see
+            # ``parkourkit.spend_impulse``.
+            if spend:
+                frm, to = spend_impulse(frm, to, step, form,
+                                        self.land_point(prev), speed)
             leg = arc_leg(frm, to, speed)
             if math.dist((frm[0], frm[2]), (to[0], to[2])) < MIN_HOP:
                 return None
@@ -3784,6 +3820,15 @@ class Course:
                           theme=theme.name, lift=node["lift"])
         prev["out"] = got["step"]
         prev["move"] = got["move"]
+        # Where the feet actually leave and land, which is the move's own two
+        # ends: a hop that spends its whole impulse across a short gap takes
+        # off a little before the edge and touches down a little past the lip.
+        # Everything downstream -- the run corridor below, the orbs, the
+        # renderer's own body -- has to read the same two points the arc was
+        # solved between, or the body flies an arc the world was not checked
+        # against.
+        prev["launch"] = got["move"].frm
+        blk["land"] = got["move"].to
         # A move belongs to the block it *leaves*, so the emergency answer's
         # label has to be written back one block.
         prev["unchecked"] = node.get("label") == "stuck"

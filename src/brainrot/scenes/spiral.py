@@ -52,7 +52,15 @@ FOV_EASE = 6.0
 DIP_W = 13.0
 DIP_ZETA = 1.0
 DIP_KEEP = 0.6
-DIP_CAP = 9.0
+#: The impact an ordinary jump lands with, which costs the lens nothing, and
+#: the fastest fall past it the legs will pass on. See ``parkour.DIP_FREE``.
+DIP_FREE = tp.JUMP_V
+DIP_CAP = 6.0
+#: How fast the peak-hold on the running speed bleeds away, in m/s per second.
+#: A second and a half from a sprint down to a walk: long enough that the
+#: air/ground alternation never reaches the lens, short enough that stepping
+#: onto soul sand still says so.
+PACE_FALL = 2.0
 FOOT_EASE = 9.0
 #: How far a piece of furniture is still drawn, and how far out of the camera's
 #: own direction. The strip is portrait with about fifty degrees of horizontal
@@ -214,6 +222,7 @@ class SpiralScene(Scene):
 
         # -- the body ------------------------------------------------------
         self.index = 0
+        self.landings = 0
         self.phase = "ground"
         self.phase_t = 0.0
         blk = self.course.blocks[0]
@@ -228,6 +237,7 @@ class SpiralScene(Scene):
         #: how fast it is getting there. See :data:`DIP_W`.
         self.dip = 0.0
         self.dip_v = 0.0
+        self._pace = tp.RUN_SPEED
         #: How much of the walk bob is showing, 0..1. Eased, never switched.
         self.foot = 1.0
         #: Field of view, eased toward what the speed asks for.
@@ -438,11 +448,21 @@ class SpiralScene(Scene):
 
     def _land(self) -> None:
         self.index += 1
+        #: Only ever up, unlike ``index``, which is walked back as the course
+        #: drops blocks off its tail. Probes segment hops by this.
+        self.landings += 1
         blk = self._block()
         self.pos = list(self.course.land_point(blk))
+        #: Height of the surface just landed on -- see the flat scene's.
+        self.land_y = self.pos[1]
         # The eye carries the body's downward speed into the legs rather than
         # being dropped a fixed distance in one frame.
-        self.dip_v = max(self.dip_v, DIP_KEEP * min(DIP_CAP, abs(self.vy)))
+        # Only the part of the impact that is more than an ordinary jump
+        # arrives with -- see the flat scene's ``DIP_FREE``. A hop lands at
+        # about the speed it left at, so measured off the raw speed this fired
+        # on every landing, twice a second, on a camera vanilla holds still.
+        self.dip_v = max(self.dip_v, DIP_KEEP
+                         * min(DIP_CAP, max(0.0, abs(self.vy) - DIP_FREE)))
         self.swing = 1.0
         self.burst.spawn(self.pos[0], self.pos[1] - 0.1, self.pos[2],
                          self._colour(self._style_of(blk)),
@@ -727,7 +747,11 @@ class SpiralScene(Scene):
         if self.phase == "move" and self.move.kind in ("climb", "bubble"):
             want -= 0.42
         else:
-            want -= max(-0.22, min(0.30, self.vy * 0.028))
+            # Gently: a jump swings ``vy`` from +8.4 to -8.4, so at the 0.028
+            # this used to be the view pitched twenty-five degrees over every
+            # hop, on top of the body's own rise, twice a second. Vanilla does
+            # not move the view when you jump at all.
+            want -= max(-0.09, min(0.12, self.vy * 0.012))
         # And a touch further down than the next landing, always. The drop is
         # the entire point of a tower and it is underneath you; a camera
         # levelled at the next block spends the run looking at sky.
@@ -751,7 +775,16 @@ class SpiralScene(Scene):
         self.dip += self.dip_v * dt
         want_foot = 1.0 if self.phase == "ground" else 0.0
         self.foot += (want_foot - self.foot) * min(1.0, dt * FOOT_EASE)
-        want_fov = FOV + FOV_GAIN * max(0.0, self.speed - tp.RUN_SPEED)
+        # Off a peak-hold of the speed rather than the speed itself. The body
+        # genuinely is faster in the air than across a block, so hung off the
+        # instantaneous figure the lens zoomed in and out twice a second in
+        # step with the jumps -- a lens breathing on the beat is a good part of
+        # what reads as bouncing. Held and bled off slowly, an ordinary run
+        # holds one field of view and only the *materials* move it: soul sand
+        # and cobweb still narrow the lens, because being slow for a second is
+        # what they are for.
+        self._pace = max(self.speed, self._pace - dt * PACE_FALL)
+        want_fov = FOV + FOV_GAIN * max(0.0, self._pace - tp.RUN_SPEED)
         self.fov += (want_fov - self.fov) * min(1.0, dt * FOV_EASE)
 
     def _aim_camera(self) -> None:

@@ -41,6 +41,13 @@ re-run `--safety-runs 60 --safety-seconds 180`; `tests/test_collision.py`
 covers the same ground in a form that fits in the suite, and 24 × 120 does
 *not* — it reads five grazes at 0.011 m for the same code.
 
+**Every jump in the parkour family is a full-impulse sprint jump since
+2026-08-18** -- the note was that the jumping felt like a hop or a bounce
+rather than a Minecraft jump, and it measured as one: the median hop was taken
+at 6.4 m/s and apexed at two thirds of vanilla. See "Every jump is the jump"
+for the mechanism, the numbers and the three camera pumps that came out with
+it.
+
 **Both families were reworked again on 2026-08-16**, on the owner's last two
 notes about them, and each has its own section below. The parkour body stopped
 clicking into every block it lands on -- see "The body stops clicking..." and
@@ -904,6 +911,21 @@ touching any of it — the reasoning is there, this is the short list:
 
 ## Still outstanding
 
+00000. **ROPE BRIDGE grew a re-entry, once.** The impulse pass re-rolls which
+   candidates place, and over fourteen runs the tower reads 10 shortcut
+   re-entries on one level visit of 146 against 2 on two visits before it
+   (`tools/reentry_probe.py --runs 14 --levels`). It is not systematic -- the
+   level is clean on its other visits -- but the criterion in `docs/REHASH.md`
+   is zero and this is the one number that went the wrong way. `--only "ROPE
+   BRIDGE"` plus the throwaway path-printer described under item 0a is the way
+   in.
+00000a. **One unchecked emergency placed a 26.76 m "hop".** `_emergency` aims
+   at the far side of a chasm when the body is stranded over one, and nothing
+   checks the move it implies, so `tower_probe`'s designed-jump maximum reads
+   26.76 m where every checked jump is under 7. One landing in 2,600 and the
+   escape hatch is deliberate, but a body crossing a quarter of the tower in
+   one frame is visible if it lands in shot.
+
 0000. ~~The sideways hop between two roofs happens 0.75 times a minute~~
    **Done, and the guess in this entry was half right.** Laying the flank
    *against* the chain was indeed the fix -- 3.62 crossings a minute now, and
@@ -1747,6 +1769,101 @@ Three things fell out that are worth knowing:
   *inside* the move rather than away: 0.05% of tower frames and 0.43% of
   spiral ones. Grabbing a ladder genuinely is a stop.
 
+## Every jump is the jump (2026-08-18)
+
+The owner on the flat sky-parkour scene: the jumping feels off -- "less like a
+Minecraft jump from the physics and more like a higher hop or bounce", not
+quick, not clean, no stakes. Every probe read green, because the two things
+wrong were a **motion model** and a **camera** and the probes measured
+geometry and pacing.
+
+**In vanilla there is one jump impulse, a player spends all of it every time,
+and they are at sprint pace when they do.** What varies is the gap: a short
+one is answered by taking off a little early and landing further onto the
+block, never by jumping more gently. This scene did the opposite. Measured
+before touching anything, over twelve runs: the **median hop was crossed at
+6.40 m/s** -- the approach floor, not the sprint -- and the mean hop apexed at
+**0.81 m against vanilla's 1.25**, with only 35% of hops spending the whole
+impulse. A run of two-thirds-height arcs at nine tenths of sprint pace is
+exactly "a higher hop or bounce".
+
+Four changes, and the first three are one idea:
+
+- **`hop_span`'s floor is now its ceiling with a smaller impulse in it**
+  (`IMPULSE_MIN = 0.90`, less what the geometry can give back). Every gap the
+  generator can ask for is one a real jump lands on; below that it is simply
+  not laid.
+- **`_hop_points` spends the shortfall on the geometry.** Land deeper into the
+  block first (bounded at its middle, so the landing stays on the near half of
+  its own footprint and the take-off -- which is in an unknown direction until
+  the next block exists -- is always still ahead of it), then leave earlier
+  along the run-up behind, down to `MIN_RUN`. Both ends stay inside the two
+  blocks the hop already joined, so nothing that reasons in whole cells
+  changes. The two points are *stored* (`blk["land"]`, `prev["launch"]`),
+  because the orbs, the clearance check, the run-up and the live take-off all
+  have to read the same pair the arc was solved between.
+- **`flight` is a sprint, always.** The `APPROACH_MIN` slow-approach branch is
+  gone -- it fixed the arc and cost the run.
+- **The camera stops pumping.** Three of them, all vanilla-facing: the landing
+  dip is measured from `DIP_FREE` (an ordinary hop lands at about the speed it
+  left at, so a dip taken off the raw speed fired on *every* landing, twice a
+  second, on a camera vanilla holds perfectly still -- now it only fires when
+  the body has fallen further than it jumped); the field of view comes off the
+  sprint *state* rather than the instantaneous speed, which was a two-degree
+  zoom in and out on the beat of the jumps; and the gaze's lean with `vy` went
+  from 0.030 to 0.012, because at 0.030 the view pitched twenty-seven degrees
+  over every hop on top of the body's own 1.25 m of rise.
+
+| flat scene | before | after |
+|---|---|---|
+| mean hop apex vs vanilla's 1.25 m | 65% | **94-96%** |
+| median hop apex | 0.87 m | **1.25 m** |
+| median ground speed | 6.40 m/s | **7.10 m/s** (sprint, every hop) |
+| hops spending the whole impulse | 35% | **74%** |
+| median hop | 3.62 m | **4.26 m** |
+| one-frame field-of-view steps | med 0.017 deg | **0.000** |
+| obstacles inside each other / body inside one / emergency hops | 0 | **0** |
+
+The same idea is in the kernel for the tower and the generated spiral
+(`parkourkit.spend_impulse`), where the levels are *authored* and their cells
+must not move -- so it moves only where the feet plant inside them, and
+`_attempt` solves each move **twice**: once spending the whole impulse, and if
+that arc will not fit under the level's lids and shells, once with the arc the
+two edges alone give. Insisting on it cost 2.3 points of design fidelity;
+falling back costs 0.3. Tower apex 62% -> **74%** of vanilla, spiral 74% ->
+**87%**, fidelity 94.8% -> **94.5%**, unchecked placements **0.17%**,
+walkability 0 m, no-jump run 47%, walk probe unchanged.
+
+Four things worth not relearning:
+
+- **The ramp cannot live in hop length any more, and that is arithmetic.** One
+  impulse at one speed puts the ceiling 4.26 m away and the lattice offers a
+  level hop of exactly 3.24 or 4.24 m, so every "harder" gap is narrowed
+  straight back to the ceiling: the mean hop reads 4.11 m early and 4.13 m
+  late whatever the tables say. What ramps now is *which of the two* a run
+  gets (44% -> 73% at the full impulse) and which set-pieces it does them in
+  (41% -> 60% hard), and `test_parkour_gets_harder_as_a_run_goes_on` asserts
+  those instead.
+- **`flow_probe` was under-reading the apex by 0.08 m**, and the bug is the
+  general shape: it took the launch height off the *body* at the take-off
+  frame, and a frame that reaches across a take-off has the body already a
+  fraction of a jump up. Scenes now publish `land_y` and a monotonic
+  `landings` counter, and the probe reads both -- the counter because a
+  landing between two jumps is now routinely shorter than a frame, and
+  watching the phase flip merged the two hops either side into one.
+- **A lantern post stood 2.6 cells out from its platform on a diagonal
+  heading.** A three-by-three platform occupies cells -1..1 in *world* axes
+  whichever way the course runs through it, so a corner taken as "one across
+  plus one along" lands two cells out on a diagonal -- off the platform, and
+  2.6 m out once the corner bias is on it. Latent for months; wider gaps made
+  the next block land in that cell and it measured as two interpenetrations a
+  sweep.
+- **A run-up has to *be* one.** `spend_impulse` walks the take-off back toward
+  the previous landing, and not every move ends on the landing it is aimed at
+  -- a ladder tops out at its column. Unguarded, one such pair produced a
+  "hop" of 26.76 m across an eight-block climb, which the checks then let
+  through because it was the module's one unchecked emergency placement.
+
 ## Known limit: how long a parkour jump can be
 
 There is one jump impulse and one horizontal speed, so the furthest a hop can
@@ -1830,8 +1947,13 @@ long jumps you need a different motion model, not a bigger number.
   nothing else tells them apart), the field of view, the yaw, and the apex of
   each hop against the 1.25 m every vanilla jump reaches. The take-off's own
   step is counted separately and forgiven by name -- it is instant in the real
-  game too. Re-run it after touching anything in `parkour.py`, `spiral.py` or
-  `parkourkit.GroundRun`.
+  game too. Re-run it after touching anything in `parkour.py`, `spiral.py`,
+  `parkourkit.GroundRun` or `parkourkit.spend_impulse`. **The apex row is the
+  one to read for "does it feel like a Minecraft jump"**, and it is trustworthy
+  only since 2026-08-18: it segments hops by the scene's own `landings` counter
+  and takes each launch height from `land_y`, because a landing is now often
+  shorter than a frame and a frame that reaches across a take-off has the body
+  already part of a jump up.
 - `python tools/level_review.py --level N --all` is **the** per-level tool and
   the one to reach for when a level is being designed rather than the tower.
   Four artefacts in `shots/review/lNN_slug/`: the game camera over the level
