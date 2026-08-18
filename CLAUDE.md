@@ -1860,6 +1860,34 @@ player is jumping even higher". He was right, and the arc was not the problem
 
 The body's own arc is untouched by all three: apex still 96% of vanilla.
 
+**Two of those three were then reverted, watched live, for a reason worth
+keeping.** With the eye lagged and the aim held, the scene read as *"being
+transported along a set path and speed from one block to the next"* -- which
+is what it had become: a rigid parabola chain, a head that does not react, and
+no impact anywhere in the frame. So:
+
+- **The eye is rigid again.** Vanilla's is. Damping it takes the camera off
+  the body, and a camera that is not on the body is a dolly.
+- **The head tracks the next landing again**, at the ordinary rate. Freezing
+  it through the flight fixes the doubling and costs more than it buys.
+- **What actually fixes the doubling is measuring the wanted pitch from the
+  *surface the feet left* rather than from the body** (`self.stand[1]`, and
+  the tower's `land_y`). The aim is four metres away and the body rises 1.25 m
+  over it, so measured off the arc the pitch swings against the jump. Off the
+  block it does not swing at all, and the head is still free to turn. Pitch
+  swing per hop **10.1 deg -> 8.8**, eye swing back to **100%** of the body's.
+- **And every landing gets a small dip again** (`DIP_BASE`, about 2.5 cm of
+  eye against the 8 cm that read as bouncing). Zero was the other half of the
+  rail: with the feet down for a tenth of a second and no dip, *nothing in the
+  frame marks a landing*.
+
+The tower had its own note from the same watch -- the camera shifting to the
+next block on impact felt agitated -- and that is the flick: a landing there
+is a tenth of a second and the next move starts out of it, so at a rate of
+`5 + 22*flick^2` the head snapped onto the next block within four frames of
+touchdown, four times a second. `5 + 10*flick^2` decaying at 4.0: yaw p99 per
+frame **8.4 deg -> 7.4**, worst **46 -> 25.6**.
+
 Four things worth not relearning:
 
 - **The ramp cannot live in hop length any more, and that is arithmetic.** One

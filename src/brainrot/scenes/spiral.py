@@ -56,6 +56,8 @@ DIP_KEEP = 0.6
 #: the fastest fall past it the legs will pass on. See ``parkour.DIP_FREE``.
 DIP_FREE = tp.JUMP_V
 DIP_CAP = 6.0
+#: What every landing is worth regardless -- the beat. See the flat scene's.
+DIP_BASE = 1.6
 #: How fast the peak-hold on the running speed bleeds away, in m/s per second.
 #: A second and a half from a sprint down to a walk: long enough that the
 #: air/ground alternation never reaches the lens, short enough that stepping
@@ -238,6 +240,9 @@ class SpiralScene(Scene):
         self.dip = 0.0
         self.dip_v = 0.0
         self._pace = tp.RUN_SPEED
+        #: Height of the surface last landed on -- see ``_land``. Initialised
+        #: here because ``_look`` reads it on the first frame.
+        self.land_y = self.pos[1]
         #: How much of the walk bob is showing, 0..1. Eased, never switched.
         self.foot = 1.0
         #: Field of view, eased toward what the speed asks for.
@@ -461,8 +466,8 @@ class SpiralScene(Scene):
         # arrives with -- see the flat scene's ``DIP_FREE``. A hop lands at
         # about the speed it left at, so measured off the raw speed this fired
         # on every landing, twice a second, on a camera vanilla holds still.
-        self.dip_v = max(self.dip_v, DIP_KEEP
-                         * min(DIP_CAP, max(0.0, abs(self.vy) - DIP_FREE)))
+        self.dip_v = max(self.dip_v, DIP_KEEP * (
+            DIP_BASE + min(DIP_CAP, max(0.0, abs(self.vy) - DIP_FREE))))
         self.swing = 1.0
         self.burst.spawn(self.pos[0], self.pos[1] - 0.1, self.pos[2],
                          self._colour(self._style_of(blk)),
@@ -734,12 +739,23 @@ class SpiralScene(Scene):
             aim[0] += (x + x / r * RIDE_LOOK - aim[0]) * RIDE_OUT
             aim[2] += (z + z / r * RIDE_LOOK - aim[2]) * RIDE_OUT
 
-        self._flick = max(0.0, self._flick - dt * 5.5)
-        rate = min(1.0, (5.0 + 22.0 * self._flick ** 2) * dt)
+        # The flick, and it is half what it was. A landing here is a tenth of
+        # a second and the next move begins straight out of it, so at 22 the
+        # head snapped onto the next block within four frames of the feet
+        # touching down -- four times a second, which reads as an agitated
+        # player rather than a decisive one. Softer and decaying more slowly
+        # is still a flick and not a drift: the turn is committed at take-off
+        # and mostly done a third of a second later.
+        self._flick = max(0.0, self._flick - dt * 4.0)
+        rate = min(1.0, (5.0 + 10.0 * self._flick ** 2) * dt)
         self.yaw += _wrap(math.atan2(aim[0] - x, -(aim[2] - z)) - self.yaw) * rate
 
         flat = math.hypot(aim[0] - x, aim[2] - z)
-        want = math.atan2(self.pos[1] + tp.EYE - (aim[1] + tp.EYE * 0.95),
+        # From the surface the feet left rather than from the body: measured
+        # off the arc, the wanted pitch swings against the jump and the world
+        # pitches about twice as far as the body does. See the flat scene's
+        # ``_look`` for the whole of it.
+        want = math.atan2(self.land_y + tp.EYE - (aim[1] + tp.EYE * 0.95),
                           max(3.2, flat))
         # Riding something looks *up* it. A ladder or a bubble column is the
         # one moment in the run with time to spare, and spending it looking at
@@ -756,6 +772,14 @@ class SpiralScene(Scene):
         # the entire point of a tower and it is underneath you; a camera
         # levelled at the next block spends the run looking at sky.
         want += PITCH_BIAS
+        # And the head is nearly still while the feet are off the ground on a
+        # *ballistic* move. The aim is a landing a few metres away and the eye
+        # rises over a metre above it, so chasing it mid-flight pitches the
+        # view down on the way up and back up on the way down -- against the
+        # body, so the world swings about twice as far as the jump does. A
+        # climb or a bubble ride is exempt: those are seconds long, the body
+        # is pinned to the wall, and the camera has real work to do (see
+        # ``RIDE_OUT``).
         self.pitch += _wrap(max(-0.62, min(0.62, want)) - self.pitch) * rate * 0.8
 
         roll = math.sin(self.stride * STRIDE_RATE) * 0.035 \
