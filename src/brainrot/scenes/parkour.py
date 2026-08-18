@@ -171,9 +171,16 @@ IMPULSE_MIN = 0.90
 #: :func:`hop_span` budgets with.
 ABSORB = 0.60
 #: The shortest run a landing keeps for itself once the hop out of it has
-#: taken what it needs. Two or three ticks: enough to be a landing rather than
-#: a bounce, and no more than vanilla gives you on a one-block platform.
-MIN_RUN = 0.12
+#: taken what it needs.
+#:
+#: 0.35 and not the 0.12 this started at, and the difference is a *beat*. At
+#: 0.12 the feet were down for two frames in thirty: the body was airborne 93%
+#: of the time and a correct 1.25 m arc back to back with no gap between them
+#: reads as pogo-ing rather than as running. Landings that cannot buy their
+#: impulse within what is left are simply refused, and the generator answers
+#: with a wider gap -- which is the right trade twice over, because a longer
+#: hop is a *slower* rhythm as well as a fuller jump.
+MIN_RUN = 0.35
 #: A hop is legal exactly when the take-off it needs is one a body has. Zero is
 #: stepping off an edge without jumping; :data:`JUMP_V` is the only jump there
 #: is. Everything the generator lays down is checked against this pair, which
@@ -389,6 +396,8 @@ class ParkourScene(Scene):
         self.foot = 1.0
         #: Field of view, eased toward what the speed asks for.
         self.fov = FOV
+        #: Where the eye actually is, which lags the body -- see ``EYE_EASE``.
+        self.eye = self.pos[1] + EYE
         #: Cruise speed a held duck is asking for, 0 when nobody is holding one.
         self.hold_speed = 0.0
         self.distance = 0.0
@@ -1915,6 +1924,11 @@ class ParkourScene(Scene):
         self.dip += self.dip_v * dt
         want_foot = 1.0 if self.phase == "ground" else 0.0
         self.foot += (want_foot - self.foot) * min(1.0, dt * FOOT_EASE)
+        # The neck: a first-order lag on the eye's height, and the only reason
+        # it is not a spring is that a spring stiff enough to keep up here
+        # sits at the frequency a run of hops arrives at and would *amplify*
+        # what it is meant to take off.
+        self.eye += (self.pos[1] + EYE - self.eye) * min(1.0, dt * EYE_EASE)
         # Off the *state*, not off the instantaneous speed. Vanilla's sprint
         # boost is a flag: it comes on when you sprint and stays there. Hung
         # off the speed it became a pulse instead, because the body genuinely
@@ -1978,8 +1992,19 @@ class ParkourScene(Scene):
         # jump. Seven degrees reads as a glance and stays out of the way of
         # what the body is actually doing.
         want_pitch -= max(-0.09, min(0.12, self.vy * 0.012))
+        # **And the head barely moves at all while the feet are off the
+        # ground**, which is the single largest thing that made a correct
+        # 1.25 m arc read as bouncing higher than it is. The aim point is a
+        # landing four metres away and the eye rises a metre and a quarter
+        # over it: chasing that aim mid-flight swings the view seventeen
+        # degrees *down* on the way up and back up on the way down, in
+        # opposition to the body, so the world pitches twice as far as the
+        # jump. A player does not touch the mouse during a jump. The aim is
+        # committed at take-off and the rest of the arc is flown looking
+        # where it was pointed.
+        aim_rate = rate * 0.8 if self.phase == "ground" else rate * AIR_AIM
         self.pitch += _wrap(max(-0.16, min(0.55, want_pitch)) - self.pitch) \
-            * min(1.0, rate * 0.8)
+            * min(1.0, aim_rate)
 
         # Roll comes off the walk cycle, not off the turn. Vanilla's own view
         # bobbing tilts the camera in step with the feet and does not tilt at
@@ -2006,7 +2031,14 @@ class ParkourScene(Scene):
         sway = math.sin(step * 0.5) * 0.045 * self.foot
 
         cam = self.camera
-        eye_y = y + EYE - self.dip + bob_y
+        # The eye lags the body's own vertical a little -- the neck, in effect.
+        # The arc is vanilla's and stays vanilla's; what this takes off is
+        # about a fifth of its *amplitude* at the frequency a run of hops
+        # arrives at, and it rounds the corner at the apex and at the landing.
+        # Rigidly attached, a correct jump reads as a higher one than it is,
+        # because 1.25 m of camera every six tenths of a second is the whole
+        # of what the eye has to look at in a strip this narrow.
+        eye_y = self.eye - self.dip + bob_y
         # the sway is across the direction of travel, which is what a head
         # rolling over alternate feet actually does
         cam.position = (x + math.cos(self.yaw) * sway, eye_y,
@@ -2527,6 +2559,16 @@ DIP_CAP = 6.0
 #: How fast the walk bob fades in and out. It used to switch, which put a
 #: five-centimetre step in the eye at every take-off.
 FOOT_EASE = 9.0
+#: How hard the eye follows the body's own height, per second. A run of hops
+#: arrives at about 1.6 Hz, so at 12 the eye keeps four fifths of the arc's
+#: amplitude and loses the corners: the jump is still vanilla's, and the
+#: camera stops reporting every centimetre of it. Higher and it is rigid
+#: again; much lower and the body visibly outruns its own head.
+EYE_EASE = 12.0
+#: How much of the aim rate survives while the feet are off the ground. The
+#: view is committed at take-off and held, which is what a player's hand
+#: does -- see the note in ``_look``.
+AIR_AIM = 0.18
 
 
 def _ramped(rng, easy, hard, difficulty: float):

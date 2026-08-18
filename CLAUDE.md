@@ -1834,6 +1834,32 @@ falling back costs 0.3. Tower apex 62% -> **74%** of vanilla, spiral 74% ->
 **87%**, fidelity 94.8% -> **94.5%**, unchecked placements **0.17%**,
 walkability 0 m, no-jump run 47%, walk probe unchanged.
 
+**And then it read as jumping *too* high, which was the camera reporting the
+arc twice.** The owner watched the first version live: "it feels like the
+player is jumping even higher". He was right, and the arc was not the problem
+-- three things multiplied it:
+
+- **The view chased the landing mid-flight.** The aim point is a block four
+  metres away and the eye rises 1.25 m over it, so tracking that aim pitches
+  the view seventeen degrees *down* on the way up and back up on the way down
+  -- against the body, so the world pitches about twice as far as the jump
+  does. A player does not touch the mouse during a jump: the aim is committed
+  at take-off and held (`AIR_AIM`). Pitch swing per hop **10.1 deg -> 4.4**.
+- **The eye was rigidly bolted to the body.** A neck is not. A first-order lag
+  (`EYE_EASE = 12`, deliberately *not* a spring -- a spring stiff enough to
+  keep up sits at the 1.6 Hz a run of hops arrives at and would amplify what
+  it is meant to take off) keeps four fifths of the arc and loses the corners
+  at the apex and the landing. Eye swing **100% -> 79%** of the body's.
+- **The ground beat had vanished.** `MIN_RUN` was 0.12, so the feet were down
+  for two frames in thirty and the body was airborne 93% of the time: correct
+  arcs back to back with nothing between them are a pogo stick. At 0.35 a
+  landing that cannot buy its impulse inside what is left is refused and the
+  generator answers with a wider gap, which is the right trade twice -- a
+  longer hop is a slower rhythm as well as a fuller jump. Frames on the ground
+  **6.7% -> 10%**, eye jolts over the pop threshold **2.97% -> 1.31%**.
+
+The body's own arc is untouched by all three: apex still 96% of vanilla.
+
 Four things worth not relearning:
 
 - **The ramp cannot live in hop length any more, and that is arithmetic.** One
