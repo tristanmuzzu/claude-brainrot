@@ -131,11 +131,29 @@ BELOW_FOG = 0.55           # extra fog on the world far below
 # before the next one. Constant speed with a beat you never quite stop for is
 # the difference between a run and a slideshow.
 
-#: 0.08 blocks/tick^2 with vanilla's drag applied, so a jump apexes at the
-#: familiar 1.25 blocks and nothing can ever step up two.
-GRAVITY = 28.0
-#: 0.42 blocks/tick: the only jump impulse the game has.
-JUMP_V = 8.4
+#: How flat the arc is against vanilla's, and the one number in this block
+#: that is not the game's.
+#:
+#: It scales the jump impulse and gravity *together*, and that is what makes
+#: it safe to turn: hang time is ``2*v/g`` and reach is that time at sprint
+#: speed, so both are unchanged, while the apex is ``v^2/2g`` and comes down
+#: in proportion. Every span the generator computes, every gap table, every
+#: run-up and the whole rhythm of the scene stay exactly where they were --
+#: the arc simply sits lower under the same timing. At 0.86 a level hop
+#: apexes at 1.08 m rather than 1.26.
+#:
+#: Set by eye, on the owner's note that the arc was "a tiny bit off" once
+#: everything else was right, and it is the only place this scene knowingly
+#: leaves vanilla's numbers. Worth knowing why the obvious alternatives are
+#: worse: dropping ``JUMP_V`` alone shortens the jump's reach, which makes the
+#: four-block gap illegal and pulls the whole course back to threes; raising
+#: ``AIR_SPEED`` alone flattens the arc by making the body outrun it, which
+#: changes the pace of everything.
+ARC = 0.86
+#: 0.08 blocks/tick^2 with vanilla's drag applied, flattened by :data:`ARC`.
+GRAVITY = 28.0 * ARC
+#: 0.42 blocks/tick: the only jump impulse the game has, flattened to match.
+JUMP_V = 8.4 * ARC
 #: Vanilla sprint, and what the player crosses a block at.
 RUN_SPEED = 5.612
 #: Sprinting adds a forward impulse on the tick you jump, which is the entire
@@ -192,7 +210,7 @@ MIN_RUN = 0.35
 #: leaves the ground is therefore already falling while the body is still over
 #: the block it left, and the camera dips through the platform's own outer
 #: cube. A tenth of vanilla's jump is enough to be clear before that happens.
-VY_MIN = 1.6
+VY_MIN = 1.6 * ARC
 VY_MAX = JUMP_V
 #: Hang time bounds, derived from the above rather than chosen: a level hop at
 #: full jump is 0.6 s, and the longest fall the band allows is under 1.3 s.
@@ -1045,7 +1063,7 @@ class ParkourScene(Scene):
         # without spending the impulse is the skip this scene was sent back
         # for; the candidate is refused and the next one along is nearly
         # always a cell further out.
-        if vy0 < IMPULSE_MIN * VY_MAX:
+        if d + 1e-6 < hop_span(by + FORMS[form] - frm[1])[0]:
             return False
         # You have to be on the way *down* when you arrive. A hop that is still
         # rising as it reaches its target has come up through the side of it --
@@ -2969,7 +2987,16 @@ def hop_span(rise: int) -> tuple[float, float]:
                                              - 2.0 * GRAVITY * rise)) / GRAVITY
     hi = reach(VY_MAX, rise)
     lo = max(lo, reach(IMPULSE_MIN * VY_MAX, rise) - ABSORB)
-    return max(MIN_HOP, lo), hi
+    # ...but the floor may never ask for more than the lattice can offer at
+    # this rise, or the window is empty and ``fit_gap`` has nothing to return.
+    # It bites at the bottom of the range: a five-block drop reaches 7.18 m,
+    # the impulse floor wants 6.28, and the only gaps either side of that are
+    # 6.24 and 7.24. A hop that long is not a shuffle whatever its take-off
+    # was -- a body dropping five blocks steps off rather than jumping, here
+    # and in the game -- so the floor gives way to the geometry.
+    widest = max((g + 1 - 2 * EDGE["full"] for g in range(1, 9)
+                  if g + 1 - 2 * EDGE["full"] <= hi), default=hi)
+    return max(MIN_HOP, min(lo, widest)), hi
 
 
 def fit_gap(gap: int, rise: int) -> int:

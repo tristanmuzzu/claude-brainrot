@@ -1888,6 +1888,30 @@ is a tenth of a second and the next move starts out of it, so at a rate of
 touchdown, four times a second. `5 + 10*flick^2` decaying at 4.0: yaw p99 per
 frame **8.4 deg -> 7.4**, worst **46 -> 25.6**.
 
+**And the arc sits 14% under vanilla's, on purpose** (`parkour.ARC = 0.86`,
+flat scene only). Watched again with everything else right, the owner's note
+was that the arc was still "a tiny bit off"; this is the only place the scene
+knowingly leaves the game's numbers. It scales the impulse and gravity
+*together*, which is what makes it a safe knob: hang time is `2v/g` and reach
+is that time at sprint speed, so both are unchanged and every span, gap table
+and run-up in the generator stays exactly where it was -- only the apex, which
+is `v^2/2g`, comes down. A level hop apexes at 1.08 m rather than 1.26. The
+two obvious alternatives are both worse: dropping `JUMP_V` alone shortens the
+reach, which makes the four-block gap illegal and pulls the whole course back
+to threes, and raising `AIR_SPEED` alone flattens the arc by outrunning it,
+which changes the pace of everything.
+
+One consequence, and it is the good kind. A flatter arc means a descent needs
+even less of the impulse, so the floor stated as "ninety per cent of a jump"
+started refusing hops nobody would call short -- and at a five-block drop it
+emptied `hop_span`'s window entirely, because the lattice offers 6.24 m and
+7.24 m either side of a floor of 6.28. The floor is now clamped to the widest
+hop the lattice can actually offer at that rise, and both the generator and
+the test state it as a *distance* (`hop_span`'s ``lo``) rather than as an
+impulse fraction. Measured over 24 runs: mean impulse 97% of a jump, minimum
+72% -- and the minimum is a one-block descent, where a real player steps off
+rather than jumping at all.
+
 Four things worth not relearning:
 
 - **The ramp cannot live in hop length any more, and that is arithmetic.** One
