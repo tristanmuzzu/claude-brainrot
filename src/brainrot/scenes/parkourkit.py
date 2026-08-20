@@ -140,12 +140,38 @@ SPREAD = {"wide": 1}
 #: Forms a move may launch from with more than the jump impulse.
 SPRINGY = frozenset(("slime",))
 
-#: How many points a path is sampled at when it is checked against the world.
-#: The body is 0.6 m wide and the longest move is a little over seven, so
-#: seventeen samples put consecutive tests about 0.2 m apart -- inside the body
-#: rather than beside it, which is what stops a shoulder slipping through a
-#: buttress between two samples.
+#: The fewest points a path is ever sampled at when it is checked against the
+#: world, and a floor rather than the figure: see :data:`ARC_STEP`.
 ARC_SAMPLES = 17
+
+#: ...and the spacing that actually decides it, in metres.
+#:
+#: This used to be seventeen samples flat, with a note claiming they came out
+#: 0.2 m apart. They did not. :meth:`Move.points` samples evenly in *time*, so
+#: seventeen of them are 0.2 m apart only on a move that is both short and
+#: single-speed -- and a move is neither of those whenever it matters. Measured
+#: over 1,950 committed moves of the hand-built tower, the largest gap between
+#: consecutive samples had a median of 0.27 m, a 99th percentile of 0.68 and a
+#: **worst of 1.13** -- wider than a cell, so a whole block could sit between
+#: two tests. Two shapes produce it: a long descending hop, which is seven and
+#: a half metres of path against seventeen points, and any move with legs at
+#: different speeds -- a ladder's step-in, ride and step-off share the sample
+#: budget in proportion to their *durations*, so the slow ride takes nearly all
+#: of them and the two fast walks take none.
+#:
+#: The consequence is not that the check is wrong where it looks. It is that
+#: the same points are what ``Course._commit`` reserves as ``pathcells``, so a
+#: cell the arc passes through but no sample lands in is never reserved, and
+#: terrain painted afterwards is free to fill it. That is the owner's report:
+#: *many jumps look impossible because there are blocks in the way, and the
+#: player just passes through them.*
+#:
+#: 0.3 and not 0.2 because the body is 0.6 m wide and rounds to whole cells:
+#: two samples 0.3 apart have overlapping bodies and cannot skip a cell, while
+#: 0.2 costs half as many samples again on the hottest function in the module
+#: for nothing measurable. Short moves are unaffected -- seventeen samples
+#: already cover 5.1 m at this spacing.
+ARC_STEP = 0.3
 
 
 # ---------------------------------------------------------------------------
@@ -184,11 +210,31 @@ class Move:
             t -= leg["dur"]
         return self.to
 
-    def points(self, samples: int = ARC_SAMPLES) -> list[tuple[float, float, float]]:
-        """The path, sampled evenly in time. What everything checks against."""
+    def points(self, samples: int = ARC_SAMPLES,
+               step: float = ARC_STEP) -> list[tuple[float, float, float]]:
+        """The path, sampled no coarser than ``step`` metres. What everything
+        checks against, and what ``Course._commit`` reserves.
+
+        Per *leg*, because the legs of one move run at different speeds and a
+        budget shared out by duration gives a slow ride nearly all of it and a
+        fast walk none. Each leg's count comes from a closed-form bound on how
+        fast the body is moving anywhere in it -- horizontal speed is constant
+        by construction and the vertical term is worst at one end of a
+        ballistic leg -- so this is one multiply per leg rather than a
+        subdivide-and-measure loop on the hottest path in the module.
+
+        ``samples`` survives as a floor, so nothing that was sampled finely
+        before is sampled less finely now.
+        """
         if self.dur <= 0.0:
             return [self.frm, self.to]
-        return [self.at(self.dur * i / samples) for i in range(samples + 1)]
+        out = [self.frm]
+        floor = max(1, samples // max(1, len(self.legs)))
+        for leg in self.legs:
+            n = max(floor, _leg_steps(leg, step))
+            for i in range(1, n + 1):
+                out.append(_leg_at(leg, leg["dur"] * i / n))
+        return out
 
     def rise(self) -> float:
         return self.to[1] - self.frm[1]
@@ -205,6 +251,25 @@ class Move:
         changes pace in the one frame it touches down.
         """
         return _leg_speed(self.legs[-1])
+
+
+def _leg_steps(leg: dict, step: float) -> int:
+    """How many sub-steps this leg needs to be sampled no coarser than ``step``.
+
+    The bound rather than the true arc length, and generously: horizontal
+    speed is constant on both leg kinds, and the vertical speed of a ballistic
+    leg is largest at one of its two ends, so the fastest the body ever moves
+    inside the leg is ``hypot(horizontal, max(|vy| at either end))``. Time it
+    at that speed and no sub-step can be longer than ``step``.
+    """
+    dur = leg["dur"]
+    frm, to = leg["frm"], leg["to"]
+    flat = math.dist((frm[0], frm[2]), (to[0], to[2])) / max(1e-6, dur)
+    if leg["kind"] == "arc":
+        vy = max(abs(leg["vy0"]), abs(leg["vy0"] - GRAVITY * dur))
+    else:
+        vy = abs(to[1] - frm[1]) / max(1e-6, dur)
+    return max(1, int(math.ceil(dur * math.hypot(flat, vy) / step)))
 
 
 def _leg_speed(leg: dict) -> float:

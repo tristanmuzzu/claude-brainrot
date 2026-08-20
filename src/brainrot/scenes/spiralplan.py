@@ -2244,6 +2244,16 @@ FEATURE_SLACK = 4.0
 #: slab for a ceiling before it has anywhere to jump to.
 LIFT_MAX = 6
 
+#: The highest over its take-off a head-hitter may be lifted to clear the
+#: runner's head, in cells. Three is where a lid is *written*; it rises from
+#: there so the body does not go through it (:meth:`Course._ceiling_cells`),
+#: and past five it is no longer a beam you duck under, it is the roof of the
+#: room -- which the level would have asked for with a ``shell``. Refused
+#: rather than built, so a level author who wants a lid over a climbing jump
+#: sees it missing in ``tools/tower_probe.py`` instead of seeing it drawn
+#: through the runner.
+LID_MAX = 5
+
 #: Kinds whose rise is bounded by one jump impulse. Everything else in the
 #: vocabulary exists precisely because it is not.
 BALLISTIC = frozenset(("hop", "slide", "walk"))
@@ -2278,6 +2288,19 @@ CROSS_MAX_ARC = 6.05 + 0.4 + 0.34
 #: cell is a metre across and a body 0.6 wide, so anything coarser than this
 #: can step over a one-cell hole without ever standing in it.
 WALK_SAMPLE = 0.2
+
+#: How much of a half-block walk is the step up onto the landing, in metres.
+#: The rest is flat. A walk that ramps its whole length cannot have ground
+#: built under it -- see :meth:`Course._move_for` -- so the rise is pushed into
+#: the last stretch, which is over the landing's own footprint.
+#:
+#: 0.45, and the bound is arithmetic rather than taste. A body is 0.6 m wide
+#: and a landing is one cell, so the cells the boots straddle include the
+#: landing's own only while the body's centre is within about half a metre of
+#: it; begin the rise further back and the first raised samples are over the
+#: *neighbouring* cell, which is air. Measured:
+#: ``test_a_walk_never_crosses_air`` refuses 0.7 and passes 0.45.
+STEP_UP = 0.45
 
 #: Ground materials a body moves across at something other than sprint pace.
 SURFACE_SPEED = {
@@ -2420,6 +2443,11 @@ class Course:
         #: Landings spent walking to the lip for one crossing. Bounded, and
         #: the bound is the termination argument: each one advances ``u``.
         self._cross_walks = 0
+        #: Times a climb out of a level was abandoned because the body was
+        #: already standing on the next level. See :meth:`_ascent_done`; it is
+        #: the counter behind the owner's "it climbs all the way up and then
+        #: jumps back down again, over and over".
+        self.overruns = 0
         self.laid = 0
         #: Landings that fell through to the one unchecked answer. Held near
         #: zero by the probe; it is the only hop in the module nothing verified.
@@ -2679,6 +2707,11 @@ class Course:
             if lv.landmark and lv.index not in self._hold_tried:
                 self._hold_tried.add(lv.index)
                 self._reserve_landmark(lv)
+        if self._pending and self._ascent_done():
+            # **The climb out is over the moment the body is standing on the
+            # next level**, however it got there. See :meth:`_ascent_done`.
+            self.overruns += 1
+            self._pending = []
         if not self._pending:
             self._plan_feature()
         prev = self.blocks[-1]
@@ -2758,6 +2791,53 @@ class Course:
         self.u = self.u_of(blk)
         self._paint_behind()
         return blk
+
+    def _ascent_done(self) -> bool:
+        """Is the climb out of a level finished because the body already left?
+
+        The exit climb is the one feature aimed at a *world* feature rather
+        than at a distance -- the chasm at the end of the level it was planned
+        in -- and every part of it re-derives that level from where the body is
+        standing right now. That is correct while the body is still on the
+        level being left and catastrophic the moment it is not, because the
+        chasm the crossing is then aimed at is the *next* level's, most of a
+        revolution away: :meth:`_aim_crossing` asks for a jump of fifty metres,
+        it is refused, :meth:`_cross_approach` walks, the recovery lays another
+        staircase, and the whole apparatus grinds up the new level's terrace
+        until it gives up -- at which point the level's own first beat starts,
+        on the terrace, four or five blocks below where the thrashing left the
+        body.
+
+        That is the owner's report exactly: *it gets up all the way and then it
+        jumps back down again, and this keeps recurring*. Measured before this
+        existed, eight landings of a level visit could be spent on it.
+
+        A stair tread or an approach hop crossing the boundary is not a fault
+        -- a narrow chasm is jumpable by an ordinary hop, and the tread that
+        does it has been through every check a crossing would have been. What
+        was faulty was carrying on climbing afterwards. So the test is where
+        the body *is*: past the author's level, and at or above the floor of
+        the level it is standing in, means the crossing has happened.
+        """
+        if self.author < 0 or self.segment != "ascent":
+            return False
+        prev = self.blocks[-1]
+        u = self.u_of(prev)
+        # A pending crossing whose own chasm is behind the body has nothing
+        # left to cross, whatever height the body is at. This is the case the
+        # height test below cannot see: an approach hop over the boundary that
+        # does not gain the next floor leaves the body on the far level's arc
+        # and still short of its terrace, and the crossing is then re-aimed at
+        # a hole a whole level away.
+        head = self._pending[0] if self._pending else None
+        if head is not None and head.get("cross") \
+                and head.get("from_level") is not None \
+                and u >= self.cone.level(head["from_level"]).u1:
+            return True
+        idx = self.cone.level_index(u)
+        if idx <= self.author:
+            return False
+        return self.surface(prev) >= self.cone.level(idx).y
 
     def _drop_climbed_treads(self) -> None:
         """Stop an authored exit once it has climbed high enough.
@@ -2872,7 +2952,11 @@ class Course:
         one it used to give.
         """
         u = self.u_of(prev)
-        lv = self.cone.level(self.cone.level_index(u))
+        # The level the crossing was planned in, not the one the body has
+        # since wandered into. See :meth:`_crossing`.
+        idx = node.get("from_level")
+        lv = self.cone.level(idx if idx is not None
+                             else self.cone.level_index(u))
         reach = max(0.0, (lv.u1 - u) * max(6.0, self.radius_of(prev)))
         arc = reach + 1.2
         return dict(node, arc=arc,
@@ -2909,7 +2993,9 @@ class Course:
         Returns ``(node, got)`` because the caller commits the pair.
         """
         u = self.u_of(prev)
-        lv = self.cone.level(self.cone.level_index(u))
+        idx = node.get("from_level")
+        lv = self.cone.level(idx if idx is not None
+                             else self.cone.level_index(u))
         radius = max(6.0, self.radius_of(prev))
         left = (lv.u_edge - u) * radius
         if left <= CROSS_LIP or self._cross_walks >= CROSS_WALK_MAX:
@@ -3488,14 +3574,36 @@ class Course:
         At three it is honest and mild: it refuses the arcs that climb hardest
         and passes the flat and descending ones, and it reads as a beam you go
         under. ``None`` means it cannot be built at all.
+
+        **The clearance is the head's, not the feet's, and it was the feet's
+        until now.** The test read ``apex > top`` against the *path*, which is
+        where the body's feet are, and a body is 1.8 m tall -- so a lid three
+        cells over the take-off had the runner's head and shoulders through it
+        on every jump that used its allowance. Measured with
+        ``tools/arc_probe.py``: lids were the largest single writer of cells
+        inside the body, 17 moves in 2,408 at up to 0.543 m, and four of the
+        seven moves that put the *camera* inside a drawn cell.
+
+        Simply refusing those is not available. Since every jump spends the
+        whole impulse (2026-08-18) every hop apexes about 1.25 m over its
+        take-off, so "apex plus a body under a lid at three" excludes *all* of
+        them and 244 of the roster's 276 lids would stop being buildable. So
+        the lid rises to clear the head instead, and only refuses when that
+        would take it higher than a beam can read as one. A flat walk keeps
+        its lid at three, which is the case the doorways are written for.
         """
         n = node["ceiling"]
         if not n:
             return ()
-        top = ifloor(self.surface(prev)) + 3
-        pts = move.points(ARC_SAMPLES)
-        if max(p[1] for p in pts) > top - 0.05:
-            return None                 # the jump cannot get under it
+        base = ifloor(self.surface(prev))
+        pts = move.points()
+        apex = max(p[1] for p in pts)
+        # The lowest whole cell whose floor is clear of the head at the arc's
+        # highest point. ``+ 0.05`` so a cell the head exactly touches is not
+        # counted as clearing it.
+        top = max(base + 3, int(math.ceil(apex + BODY_H + 0.05)))
+        if top > base + LID_MAX:
+            return None                 # too high to read as a lid at all
         mid = len(pts) // 2
         span = range(-(n // 2), n - n // 2)
         out = []
@@ -3543,6 +3651,11 @@ class Course:
         laid: set = set()
         for leg in move.legs:
             frm, to = leg["frm"], leg["to"]
+            if abs(to[1] - frm[1]) > 0.05:
+                # The step up onto the landing. Its ground is the landing
+                # itself -- see ``_move_for`` -- and anything laid under a
+                # rising leg is a cube around the body's shins.
+                continue
             span = math.dist(frm, to)
             steps = int(span / WALK_SAMPLE) + 2
             for i in range(steps):
@@ -3550,6 +3663,11 @@ class Course:
                 x = frm[0] + (to[0] - frm[0]) * f
                 y = frm[1] + (to[1] - frm[1]) * f
                 z = frm[2] + (to[2] - frm[2]) * f
+                # A walk is flat (see ``_move_for``), so the cell under the
+                # foot is the cell under every foot on this leg. It was not
+                # always -- a walk used to be allowed to ramp half a block onto
+                # a slab, and this line then picked the cell the body was
+                # standing *in*.
                 cy = ifloor(y - 0.05)
                 # Both cells the boots straddle: half a foot over an edge is
                 # still standing, the same generosity ``body_cells`` extends
@@ -3706,7 +3824,31 @@ class Course:
             # next differ by exactly half a block, which is inside it.
             if FORMS[prev["form"]] > 1.0 or FORMS[form] > 1.0:
                 return None
-            return Move("walk", [line_leg(frm, to, RUN_SPEED)]), ()
+            if abs(to[1] - frm[1]) <= 0.05:
+                return Move("walk", [line_leg(frm, to, RUN_SPEED)]), ()
+            # **A half-block walk is flat and then a step**, not a ramp, and
+            # the difference is the whole of what can be built under it.
+            # ``line_leg`` interpolates height linearly, so one leg from a full
+            # block to a slab climbs the whole way across -- and a ramp cannot
+            # be made of whole cubes: measured with ``tools/arc_probe.py``,
+            # ``_walk_bridge`` laid the cell under each *sample*, which on the
+            # ramp is the cell the body is standing in, and that was 5.4% of
+            # all walks and every 0.600 m penetration in the table. Laying the
+            # shelf under the lower end instead leaves the feet in mid-air,
+            # which ``test_a_walk_never_crosses_air`` rightly refuses. There is
+            # no third cell.
+            #
+            # So the rise is confined to the last ``STEP_UP`` metres, which are
+            # over the landing's own footprint -- the one cell that is already
+            # there, and whose surface is halfway up itself if it is a slab.
+            # The flat leg gets an honest shelf and the step gets the block it
+            # is stepping onto, which is also what the game does: half a block
+            # is walked up, not jumped.
+            f = max(0.0, 1.0 - STEP_UP / dist)
+            mid = (frm[0] + (to[0] - frm[0]) * f, frm[1],
+                   frm[2] + (to[2] - frm[2]) * f)
+            return Move("walk", [line_leg(frm, mid, RUN_SPEED),
+                                 line_leg(mid, to, RUN_SPEED)]), ()
         return None
 
     def _climb_move(self, prev, node, cx, cy, cz, form, step, frm, to,
@@ -3899,24 +4041,58 @@ class Course:
 
     def _decorate(self, blk: dict, node: dict, theme: Theme,
                   move: Move) -> None:
-        """The trim on a landing: a lantern, a lintel, a rail, a post."""
+        """The trim on a landing: a lantern, a lintel, a rail, a post.
+
+        **Nothing here may stand on the surface the body runs across**, and
+        that is not tidiness. A landing is one cell, the body is 0.6 m wide
+        and lands on the middle of it, and decoration is ``solid=False`` -- so
+        a lamp on top of a landing is a lit cube the runner walks straight
+        through, four times a second, on the block the camera is aimed at.
+        Measured with ``tools/arc_probe.py`` before this changed: **32% of all
+        moves passed through a piece of furniture**, worst 0.60 m, and the
+        offenders were 39 lanterns, 20 glowstone and 10 magma against three
+        stray lintels. It is the whole of the owner's *"there are blocks in
+        the way and the player just passes through them, and they look off"*
+        on this scene -- the arcs themselves are clean.
+
+        So a lamp hangs *under* the landing's leading edge, which is where a
+        lantern hangs in the reference anyway, and which is the face you can
+        see on the way in to a landing that is above you. A post goes to a
+        back corner. Only the lintel is deliberately in the air over the arc,
+        and that one is a checked constraint rather than trim.
+        """
         kind = node["deco"]
         fx, fz = quantise(*(blk["out"] or blk["step"]))
         if kind == "lamp":
-            blk["deco"].append(deco(0.0, 1.0, 0.0, 0.62, 0.62, 0.62,
-                                    theme.glow, glow=True))
+            # Under the block, set back toward the way in. ``step`` is the way
+            # *out*, so ``-f`` is the approach side: the lamp is on the face
+            # the body is looking at while it is still deciding to jump.
+            blk["deco"].append(deco(-fx * 0.34, -0.62, -fz * 0.34,
+                                    0.62, 0.62, 0.62, theme.glow, glow=True))
         elif kind == "lintel":
             # A beam over the arc, forcing the jump flat. Its height comes from
             # the arc it spans rather than from a number: a beam a fixed
             # distance over the *landing* is either scenery or a wall.
-            apex = max(p[1] for p in move.points(9))
-            dy = apex - blk["y"] + 0.35
+            # Over the *head* at the arc's highest point, not over the feet.
+            # This was ``apex + 0.35``, and a body is 1.8 m tall: on a hop
+            # that put a one-metre stone beam through the runner's chest, and
+            # on a ``walk`` -- which is what most lintels are written on,
+            # because a doorway is walked through -- the apex is the walking
+            # surface itself and the beam sat at knee height. Measured, the
+            # *camera* was inside a lintel on 2.9% of all moves.
+            apex = max(p[1] for p in move.points())
+            dy = apex - blk["y"] + BODY_H + 0.15
             if dy < 3.6:
                 blk["deco"].append(deco(-fx * 1.5, dy, -fz * 1.5,
                                         1.0, 1.0, 1.0, theme.rock))
         elif kind == "post":
-            blk["deco"].append(deco(0.0, 1.0, 0.0, 0.22, 1.0, 0.22,
-                                    theme.accent))
+            # A back corner, not the middle. 0.42 along both axes puts a
+            # 0.22-wide post's near corner at 0.31 from the block's centre,
+            # which is the body's own half-width -- clear, and still on its
+            # own block rather than hanging beside it.
+            blk["deco"].append(deco(-fx * 0.42 + fz * 0.42, 1.0,
+                                    -fz * 0.42 - fx * 0.42,
+                                    0.22, 1.0, 0.22, theme.accent))
 
     def _hang_orbs(self, prev: dict, blk: dict, count: int) -> None:
         """Strung *on* the path that is about to be flown, at chest height,
@@ -3938,6 +4114,23 @@ class Course:
         Cells are released here and nowhere else. This course comes back over
         itself every revolution, so an occupancy map that only grew would
         refuse the tower after two turns of it.
+
+        **What stops being solid here has to stop being drawn, or the two
+        descriptions of the world disagree** -- and a head-hitter is the one
+        released cell that cannot survive the disagreement. A lid is a beam
+        hanging in mid-air whose only justification is the jump underneath it;
+        released from the occupancy map but left in the chunk volume it is a
+        block floating over the course with nothing to do with anything, and
+        the next revolution's arcs fly straight through it because
+        :meth:`blocked` has correctly forgotten it. Measured with
+        ``tools/arc_probe.py``, that was the whole of the "drawn, but not
+        solid" class: fifteen of seventeen ghost cells were lids, and one of
+        them was flown through twice running.
+
+        Pedestals and footings stay drawn on purpose. They are stacks of
+        terrain standing on the terrace -- built ground, which is meant to
+        outlast the landing it was raised for, and which is what the levels
+        below you are made of when you look down.
         """
         if index <= TRAIL:
             return 0
@@ -3946,6 +4139,10 @@ class Course:
             self.orbs_missed += sum(1 for o in blk["orbs"] if not o["taken"])
             for cell in cells_of(blk):
                 self.solid.discard(cell)
+            for cell in blk.get("ceiling", ()):
+                if self.struct.get(cell) not in (None, "air"):
+                    self.struct[cell] = "air"
+                    self.writes.append((cell, "air"))
             for cell in (blk["pedestal"] + blk.get("footing", ())
                          + blk.get("ceiling", ())):
                 self.solid.discard(cell)
@@ -5005,9 +5202,19 @@ class Course:
         # down while it does. So the staircase climbs one higher than the level
         # it is heading for and the last jump comes down onto it -- which also
         # means you can see where you are going, from above, before you commit.
-        return self._node(nxt.theme.ground, arc=gap + 1.4, lift=0,
+        node = self._node(nxt.theme.ground, arc=gap + 1.4, lift=0,
                           form="floor", orbs=3, cross=True, label="ascent",
                           origin="crossing")
+        # **Which chasm this is.** A crossing is aimed at a world feature --
+        # the hole at the end of the level it was planned in -- and everything
+        # that re-aims it used to ask where the body is standing *now*
+        # instead. One approach hop over the boundary and the jump was being
+        # re-measured against the *next* level's chasm, most of a revolution
+        # away: measured, the median arc asked for at give-up was 6.4 m and
+        # the worst was 74.5, against a level hop of 4.26. See
+        # :meth:`_aim_crossing` and :meth:`_ascent_done`.
+        node["from_level"] = lv.index
+        return node
 
     def _ascent_climb(self, rng, lv, need: int, kind: str) -> list[dict]:
         """Out of the level in one vertical move: a ladder, a vine, a water

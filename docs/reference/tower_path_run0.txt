@@ -1,0 +1,794 @@
+THE PATH -- plan handplan, run 0, 786 landings
+  idx  level              lv  author            beat       orig    terr   surf  lift   cell                    material/form  move     dist   rise    t
+     0  BASALT FLUES        4  (none)            start      -         26   26.0   0.0   (  26,  25, -19)   netherrack  /floor  -        0.00  +0.0    0.00
+     1  BASALT FLUES        4  BASALT FLUES      landmark   -         26   27.0   1.0   (  27,  26, -17)   blackstone  /full   hop      2.33  +1.0    0.33
+     2  BASALT FLUES        4  BASALT FLUES      landmark   -         26   28.0   2.0   (  28,  27, -14)   blackstone  /full   hop      3.04  +1.0    0.76
+     3  BASALT FLUES        4  BASALT FLUES      crust      -         26   27.0   1.0   (  28,  26, -11)   glowstone   /full   hop      2.88  -1.0    1.16
+     4  BASALT FLUES        4  BASALT FLUES      crust      -         26   28.0   2.0   (  30,  27,  -8)   blackstone  /full   hop      3.10  +1.0    1.60
+     5  BASALT FLUES        4  BASALT FLUES      crust      -         26   28.0   2.0   (  30,  27,  -5)   magma       /full   walk     2.32  +0.0    2.01
+     6  BASALT FLUES        4  BASALT FLUES      crust      -         26   28.0   2.0   (  30,  27,  -2)   soulsand    /full   walk     2.32  +0.0    2.43
+     7  BASALT FLUES        4  BASALT FLUES      crust      -         26   29.0   3.0   (  31,  28,   1)   blackstone  /full   hop      3.09  +1.0    2.86
+     8  BASALT FLUES        4  BASALT FLUES      crust      -         26   30.0   4.0   (  31,  29,   4)   glowstone   /full   hop      2.88  +1.0    3.27
+     9  BASALT FLUES        4  BASALT FLUES      crust      -         26   28.0   2.0   (  30,  27,   9)   magma       /slime  hop      4.98  -2.0    3.97
+    10  BASALT FLUES        4  BASALT FLUES      crust      -         26   30.0   4.0   (  29,  29,  12)   magma       /full   bounce   2.45  +2.0    4.62
+    11  BASALT FLUES        4  BASALT FLUES      soffit     -         26   31.0   5.0   (  27,  30,  15)   blackstone  /full   hop      3.10  +1.0    5.05
+    12  BASALT FLUES        4  BASALT FLUES      ashbank    -         26   32.0   6.0   (  26,  31,  18)   netherrack  /full   hop      3.10  +1.0    5.49
+    13  BASALT FLUES        4  BASALT FLUES      ascent     approa    26   32.0   6.0   (  24,  31,  21)   blackstone  /full   hop      3.49  +0.0    5.98
+    14  BASALT FLUES        4  BASALT FLUES      ascent     approa    26   32.0   6.0   (  22,  31,  23)   blackstone  /full   hop      2.71  +0.0    6.36
+    15  BASALT FLUES        4  BASALT FLUES      ascent     approa    26   32.0   6.0   (  20,  31,  25)   blackstone  /full   hop      2.71  +0.0    6.74
+    16  BASALT FLUES        4  BASALT FLUES      ascent     stair     26   33.0   7.0   (  18,  32,  26)   magma       /full   hop      2.12  +1.0    7.04
+    17  THE PILLARS         5  BASALT FLUES      ascent     crossi    32   32.0   0.0   (  15,  31,  28)   purpur      /floor  hop      3.49  -1.0    7.53
+    18  THE PILLARS         5  THE PILLARS       colonnade  -         32   33.0   1.0   (  12,  32,  27)   sealantern  /full   hop      3.04  +1.0    7.96
+    19  THE PILLARS         5  THE PILLARS       colonnade  -         32   34.0   2.0   (   9,  33,  28)   obsidian    /full   hop      3.04  +1.0    8.39
+    20  THE PILLARS         5  THE PILLARS       colonnade  -         32   34.0   2.0   (   7,  33,  29)   endstone    /full   walk     1.48  +0.0    8.65
+    21  THE PILLARS         5  THE PILLARS       colonnade  -         32   33.5   1.5   (   3,  33,  32)   obsidian    /slab   hop      4.65  -0.5    9.31
+    22  THE PILLARS         5  THE PILLARS       colonnade  -         32   34.0   2.0   (   0,  33,  31)   obsidian    /full   hop      3.04  +0.5    9.73
+    23  THE PILLARS         5  THE PILLARS       colonnade  -         32   35.0   3.0   (  -3,  34,  31)   chorus      /full   hop      2.88  +1.0   10.14
+    24  THE PILLARS         5  THE PILLARS       landmark   -         32   35.0   3.0   (  -6,  34,  31)   obsidian    /full   hop      2.88  +0.0   10.55
+    25  THE PILLARS         5  THE PILLARS       stand      -         32   34.0   2.0   (  -9,  33,  29)   purpur      /full   hop      3.49  -1.0   11.04
+    26  THE PILLARS         5  THE PILLARS       stand      -         32   34.0   2.0   ( -11,  33,  27)   obsidian    /full   walk     1.87  +0.0   11.37
+    27  THE PILLARS         5  THE PILLARS       stand      -         32   35.0   3.0   ( -14,  34,  26)   chorus      /full   hop      3.09  +1.0   11.80
+    28  THE PILLARS         5  THE PILLARS       stand      -         32   36.0   4.0   ( -17,  35,  24)   endstone    /full   hop      3.10  +1.0   12.24
+    29  THE PILLARS         5  THE PILLARS       court      -         32   36.0   4.0   ( -20,  35,  21)   purpur      /full   hop      4.22  +0.0   12.84
+    30  THE PILLARS         5  THE PILLARS       court      -         32   36.0   4.0   ( -22,  35,  19)   obsidian    /full   walk     1.87  +0.0   13.17
+    31  THE PILLARS         5  THE PILLARS       court      -         32   37.0   5.0   ( -24,  36,  16)   endstone    /full   hop      3.10  +1.0   13.60
+    32  THE PILLARS         5  THE PILLARS       court      -         32   36.0   4.0   ( -26,  35,  13)   chorus      /full   hop      3.58  -1.0   14.11
+    33  THE PILLARS         5  THE PILLARS       ascent     design    32   36.0   4.0   ( -27,  35,  10)   sealantern  /full   hop      3.04  +0.0   14.54
+    34  THE PILLARS         5  THE PILLARS       ascent     design    32   39.0   7.0   ( -30,  38,  11)   obsidian    /full   bubble   2.45  +3.0   15.23
+    35  THE PILLARS         5  THE PILLARS       ascent     design    32   40.0   8.0   ( -30,  39,   8)   endstone    /full   hop      2.32  +1.0   15.56
+    36  THE PILLARS         5  THE PILLARS       ascent     approa    32   40.0   8.0   ( -31,  39,   5)   obsidian    /full   hop      3.37  +0.0   16.03
+    37  SPORE HOLLOW        6  THE PILLARS       ascent     crossi    39   39.0   0.0   ( -31,  38,   0)   mycelium    /floor  hop      4.88  -1.0   16.72
+    38  SPORE HOLLOW        6  SPORE HOLLOW      crust      -         39   40.0   1.0   ( -31,  39,  -3)   shroomlight /full   hop      2.88  +1.0   17.12
+    39  SPORE HOLLOW        6  SPORE HOLLOW      crust      -         39   41.0   2.0   ( -31,  40,  -6)   coarse      /full   hop      2.88  +1.0   17.53
+    40  SPORE HOLLOW        6  SPORE HOLLOW      sinkhole   -         39   42.0   3.0   ( -30,  41,  -9)   mushroomstem/full   hop      3.04  +1.0   17.96
+    41  SPORE HOLLOW        6  SPORE HOLLOW      sinkhole   -         39   43.0   4.0   ( -29,  42, -12)   mushroomred /full   hop      3.04  +1.0   18.39
+    42  SPORE HOLLOW        6  SPORE HOLLOW      sinkhole   -         39   41.0   2.0   ( -27,  40, -17)   slime       /slime  hop      5.27  -2.0   19.13
+    43  SPORE HOLLOW        6  SPORE HOLLOW      sinkhole   -         39   43.0   4.0   ( -25,  42, -20)   mushroomred /full   bounce   2.79  +2.0   19.82
+    44  SPORE HOLLOW        6  SPORE HOLLOW      landmark   -         39   43.0   4.0   ( -23,  42, -22)   mushroomstem/full   hop      3.11  +0.0   20.26
+    45  SPORE HOLLOW        6  SPORE HOLLOW      landmark   -         39   43.0   4.0   ( -20,  42, -25)   mushroomred /full   hop      4.12  +0.0   20.84
+    46  SPORE HOLLOW        6  SPORE HOLLOW      landmark   -         39   43.0   4.0   ( -17,  42, -27)   mushroomstem/full   hop      3.49  +0.0   21.33
+    47  SPORE HOLLOW        6  SPORE HOLLOW      brackets   -         39   41.0   2.0   ( -13,  40, -29)   mushroomstem/full   hop      4.35  -2.0   21.94
+    48  SPORE HOLLOW        6  SPORE HOLLOW      brackets   -         39   41.0   2.0   ( -11,  40, -29)   podzol      /full   walk     1.32  +0.0   22.18
+    49  SPORE HOLLOW        6  SPORE HOLLOW      brackets   -         39   42.0   3.0   (  -8,  41, -30)   mushroomred /full   hop      3.09  +1.0   22.61
+    50  SPORE HOLLOW        6  SPORE HOLLOW      brackets   -         39   43.0   4.0   (  -5,  42, -30)   mushroomstem/full   hop      2.88  +1.0   23.02
+    51  SPORE HOLLOW        6  SPORE HOLLOW      gills      -         39   42.0   3.0   (  -2,  41, -30)   mushroomred /full   hop      2.88  -1.0   23.42
+    52  SPORE HOLLOW        6  SPORE HOLLOW      gills      -         39   42.5   3.5   (   1,  42, -30)   mushroomstem/slab   hop      2.88  +0.5   23.83
+    53  SPORE HOLLOW        6  SPORE HOLLOW      spores     -         39   43.0   4.0   (   5,  42, -29)   mushroomred /full   hop      3.78  +0.5   24.36
+    54  SPORE HOLLOW        6  SPORE HOLLOW      ascent     approa    39   43.0   4.0   (   8,  42, -28)   mushroomstem/full   hop      3.04  +0.0   24.79
+    55  SPORE HOLLOW        6  SPORE HOLLOW      ascent     approa    39   43.0   4.0   (  11,  42, -27)   mushroomstem/full   hop      3.04  +0.0   25.22
+    56  THE ARCHIVE         7  SPORE HOLLOW      ascent     crossi    43   43.0   0.0   (  16,  42, -27)   plaster     /floor  hop      4.26  +0.0   25.82
+    57  THE ARCHIVE         7  THE ARCHIVE       stacks     -         43   44.0   1.0   (  19,  43, -25)   lantern     /full   hop      3.10  +1.0   26.26
+    58  THE ARCHIVE         7  THE ARCHIVE       stacks     -         43   45.0   2.0   (  22,  44, -23)   bookshelf   /full   hop      3.10  +1.0   26.69
+    59  THE ARCHIVE         7  THE ARCHIVE       stacks     -         43   45.0   2.0   (  24,  44, -21)   oak         /full   walk     1.87  +0.0   27.02
+    60  THE ARCHIVE         7  THE ARCHIVE       stacks     -         43   46.0   3.0   (  26,  45, -19)   bookshelf   /full   hop      3.10  +1.0   27.46
+    61  THE ARCHIVE         7  THE ARCHIVE       stacks     -         43   45.0   2.0   (  29,  44, -15)   darkoak     /full   hop      4.88  -1.0   28.15
+    62  THE ARCHIVE         7  THE ARCHIVE       stacks     -         43   46.0   3.0   (  30,  45, -12)   bookshelf   /full   hop      3.04  +1.0   28.58
+    63  THE ARCHIVE         7  THE ARCHIVE       catalogue  -         43   46.0   3.0   (  30,  45,  -9)   darkoak     /full   hop      2.88  +0.0   28.98
+    64  THE ARCHIVE         7  THE ARCHIVE       catalogue  -         43   46.0   3.0   (  31,  45,  -7)   oak         /full   walk     1.48  +0.0   29.24
+    65  THE ARCHIVE         7  THE ARCHIVE       catalogue  -         43   47.0   4.0   (  31,  46,  -4)   bookshelf   /full   hop      3.09  +1.0   29.68
+    66  THE ARCHIVE         7  THE ARCHIVE       catalogue  -         43   48.0   5.0   (  32,  47,  -1)   plaster     /full   hop      3.04  +1.0   30.11
+    67  THE ARCHIVE         7  THE ARCHIVE       gallery    -         43   47.0   4.0   (  33,  46,   2)   darkoak     /full   hop      3.04  -1.0   30.54
+    68  THE ARCHIVE         7  THE ARCHIVE       gallery    -         43   47.0   4.0   (  33,  46,   5)   oak         /full   walk     2.32  +0.0   30.95
+    69  THE ARCHIVE         7  THE ARCHIVE       gallery    -         43   48.0   5.0   (  32,  47,   8)   bookshelf   /full   hop      3.09  +1.0   31.39
+    70  THE ARCHIVE         7  THE ARCHIVE       aisles     -         43   48.0   5.0   (  31,  47,  11)   bookshelf   /full   hop      3.04  +0.0   31.81
+    71  THE ARCHIVE         7  THE ARCHIVE       aisles     -         43   48.0   5.0   (  30,  47,  13)   oak         /full   walk     1.48  +0.0   32.08
+    72  THE ARCHIVE         7  THE ARCHIVE       aisles     -         43   48.0   5.0   (  29,  47,  16)   darkoak     /full   hop      3.42  +0.0   32.56
+    73  THE ARCHIVE         7  THE ARCHIVE       aisles     -         43   48.0   5.0   (  27,  47,  18)   bookshelf   /full   hop      2.71  +0.0   32.94
+    74  THE ARCHIVE         7  THE ARCHIVE       aisles     -         43   48.0   5.0   (  25,  47,  21)   bookshelf   /full   hop      3.49  +0.0   33.43
+    75  THE ARCHIVE         7  THE ARCHIVE       ascent     approa    43   48.0   5.0   (  23,  47,  24)   bookshelf   /full   hop      3.49  +0.0   33.92
+    76  THE ARCHIVE         7  THE ARCHIVE       ascent     approa    43   48.0   5.0   (  21,  47,  26)   bookshelf   /full   hop      2.71  +0.0   34.30
+    77  THE ARCHIVE         7  THE ARCHIVE       ascent     stair     43   49.0   6.0   (  19,  48,  27)   darkoak     /full   hop      2.12  +1.0   34.60
+    78  PUMPKIN ROWS        8  THE ARCHIVE       ascent     crossi    48   48.0   0.0   (  15,  47,  29)   farmland    /floor  hop      4.35  -1.0   35.21
+    79  PUMPKIN ROWS        8  PUMPKIN ROWS      headland   -         48   49.0   1.0   (  12,  48,  28)   magma       /full   hop      3.04  +1.0   35.64
+    80  PUMPKIN ROWS        8  PUMPKIN ROWS      headland   -         48   50.0   2.0   (   9,  49,  29)   hay         /full   hop      3.04  +1.0   36.07
+    81  PUMPKIN ROWS        8  PUMPKIN ROWS      headland   -         48   50.0   2.0   (   7,  49,  30)   oak         /full   walk     1.48  +0.0   36.33
+    82  PUMPKIN ROWS        8  PUMPKIN ROWS      headland   -         48   51.0   3.0   (   4,  50,  31)   pumpkin     /full   hop      3.10  +1.0   36.77
+    83  PUMPKIN ROWS        8  PUMPKIN ROWS      headland   -         48   52.0   4.0   (   1,  51,  31)   hay         /full   hop      2.88  +1.0   37.18
+    84  PUMPKIN ROWS        8  PUMPKIN ROWS      landmark   -         48   51.0   3.0   (  -2,  50,  29)   hay         /full   hop      2.79  -1.0   37.57
+    85  PUMPKIN ROWS        8  PUMPKIN ROWS      leat       -         48   51.0   3.0   (  -6,  50,  30)   hay         /full   hop      4.22  +0.0   38.16
+    86  PUMPKIN ROWS        8  PUMPKIN ROWS      leat       -         48   51.5   3.5   (  -9,  51,  30)   gravel      /slab   hop      2.88  +0.5   38.57
+    87  PUMPKIN ROWS        8  PUMPKIN ROWS      leat       -         48   51.0   3.0   ( -12,  50,  28)   pumpkin     /full   hop      3.49  -0.5   39.06
+    88  PUMPKIN ROWS        8  PUMPKIN ROWS      leat       -         48   50.0   2.0   ( -16,  49,  27)   oak         /full   hop      4.00  -1.0   39.62
+    89  PUMPKIN ROWS        8  PUMPKIN ROWS      farrows    -         48   51.0   3.0   ( -19,  50,  25)   magma       /full   hop      3.10  +1.0   40.06
+    90  PUMPKIN ROWS        8  PUMPKIN ROWS      farrows    -         48   51.0   3.0   ( -21,  50,  24)   hay         /full   walk     1.48  +0.0   40.32
+    91  PUMPKIN ROWS        8  PUMPKIN ROWS      drills     -         48   51.0   3.0   ( -23,  50,  21)   hay         /full   hop      3.82  +0.0   40.86
+    92  PUMPKIN ROWS        8  PUMPKIN ROWS      drills     -         48   51.0   3.0   ( -25,  50,  19)   magma       /full   walk     1.87  +0.0   41.19
+    93  PUMPKIN ROWS        8  PUMPKIN ROWS      drills     -         48   52.0   4.0   ( -28,  51,  17)   pumpkin     /full   hop      3.10  +1.0   41.63
+    94  PUMPKIN ROWS        8  PUMPKIN ROWS      drills     -         48   51.0   3.0   ( -29,  50,  14)   oak         /full   hop      3.12  -1.0   42.07
+    95  PUMPKIN ROWS        8  PUMPKIN ROWS      ascent     design    48   51.0   3.0   ( -31,  50,  11)   magma       /full   hop      3.49  +0.0   42.56
+    96  PUMPKIN ROWS        8  PUMPKIN ROWS      ascent     design    48   51.0   3.0   ( -31,  50,   8)   oak         /full   walk     2.32  +0.0   42.97
+    97  PUMPKIN ROWS        8  PUMPKIN ROWS      ascent     design    48   52.0   4.0   ( -32,  51,   5)   hay         /full   hop      3.09  +1.0   43.41
+    98  PUMPKIN ROWS        8  PUMPKIN ROWS      ascent     design    48   53.0   5.0   ( -33,  52,   2)   magma       /full   hop      3.04  +1.0   43.84
+    99  THE GROVE           9  PUMPKIN ROWS      ascent     crossi    52   52.0   0.0   ( -34,  51,  -1)   warpednylium/floor  hop      3.04  -1.0   44.27
+   100  THE GROVE           9  THE GROVE         crack      -         52   53.0   1.0   ( -33,  52,  -4)   glowstone   /full   hop      3.04  +1.0   44.70
+   101  THE GROVE           9  THE GROVE         crack      -         52   54.0   2.0   ( -32,  53,  -7)   blackstone  /full   hop      3.04  +1.0   45.12
+   102  THE GROVE           9  THE GROVE         crack      -         52   54.0   2.0   ( -32,  53, -10)   soulsand    /full   walk     2.32  +0.0   45.54
+   103  THE GROVE           9  THE GROVE         crack      -         52   55.0   3.0   ( -30,  54, -13)   rawgold     /full   hop      3.10  +1.0   45.97
+   104  THE GROVE           9  THE GROVE         crack      -         52   56.0   4.0   ( -29,  55, -16)   warped      /full   hop      3.10  +1.0   46.41
+   105  THE GROVE           9  THE GROVE         crack      -         52   55.0   3.0   ( -27,  54, -20)   gold        /full   hop      4.35  -1.0   47.02
+   106  THE GROVE           9  THE GROVE         landmark   -         52   55.0   3.0   ( -24,  54, -23)   blackstone  /full   hop      4.12  +0.0   47.60
+   107  THE GROVE           9  THE GROVE         spill      -         52   56.0   4.0   ( -22,  55, -25)   rawgold     /full   hop      2.71  +1.0   47.98
+   108  THE GROVE           9  THE GROVE         spill      -         52   56.0   4.0   ( -20,  55, -26)   soulsand    /full   walk     1.48  +0.0   48.25
+   109  THE GROVE           9  THE GROVE         spill      -         52   56.0   4.0   ( -18,  55, -27)   soulsand    /full   walk     1.48  +0.0   48.51
+   110  THE GROVE           9  THE GROVE         spill      -         52   57.0   5.0   ( -15,  56, -28)   gold        /full   hop      3.10  +1.0   48.95
+   111  THE GROVE           9  THE GROVE         thicket    -         52   58.0   6.0   ( -12,  57, -29)   warped      /full   hop      3.04  +1.0   49.38
+   112  THE GROVE           9  THE GROVE         thicket    -         52   58.0   6.0   ( -10,  57, -30)   soulsand    /full   walk     1.48  +0.0   49.64
+   113  THE GROVE           9  THE GROVE         thicket    -         52   59.0   7.0   (  -7,  58, -31)   rawgold     /full   hop      3.10  +1.0   50.07
+   114  THE GROVE           9  THE GROVE         thicket    -         52   58.0   6.0   (  -3,  57, -32)   gold        /full   hop      4.00  -1.0   50.64
+   115  THE GROVE           9  THE GROVE         thicket    -         52   58.0   6.0   (   0,  57, -31)   warped      /full   hop      3.04  +0.0   51.07
+   116  THE GROVE           9  THE GROVE         ascent     design    52   58.0   6.0   (   4,  57, -31)   glowstone   /full   hop      3.88  +0.0   51.61
+   117  THE GROVE           9  THE GROVE         ascent     design    52   59.0   7.0   (   7,  58, -30)   gold        /full   hop      3.04  +1.0   52.04
+   118  THE GROVE           9  THE GROVE         ascent     design    52   60.0   8.0   (  10,  59, -30)   warped      /full   hop      2.88  +1.0   52.45
+   119  THE GROVE           9  THE GROVE         ascent     design    52   61.0   9.0   (  13,  60, -29)   glowstone   /full   hop      3.04  +1.0   52.88
+   120  DUST DEVILS        10  THE GROVE         ascent     crossi    60   60.0   0.0   (  17,  59, -27)   redsand     /floor  hop      4.35  -1.0   53.49
+   121  DUST DEVILS        10  DUST DEVILS       capstone   -         60   61.0   1.0   (  19,  60, -25)   lantern     /full   hop      2.71  +1.0   53.87
+   122  DUST DEVILS        10  DUST DEVILS       capstone   -         60   61.0   1.0   (  22,  60, -24)   terra_white /full   hop      2.45  +0.0   54.21
+   123  DUST DEVILS        10  DUST DEVILS       slot       -         60   62.0   2.0   (  23,  61, -21)   terra_yellow/full   hop      3.07  +1.0   54.65
+   124  DUST DEVILS        10  DUST DEVILS       slot       -         60   62.0   2.0   (  25,  61, -19)   terra_white /full   walk     1.87  +0.0   54.98
+   125  DUST DEVILS        10  DUST DEVILS       slot       -         60   63.0   3.0   (  27,  62, -16)   terra_orange/full   hop      3.10  +1.0   55.42
+   126  DUST DEVILS        10  DUST DEVILS       slot       -         60   63.5   3.5   (  28,  63, -13)   terra_yellow/slab   hop      3.14  +0.5   55.86
+   127  DUST DEVILS        10  DUST DEVILS       slot       -         60   62.0   2.0   (  30,  61,  -9)   terra_red   /full   hop      4.35  -1.5   56.47
+   128  DUST DEVILS        10  DUST DEVILS       field      -         60   63.0   3.0   (  31,  62,  -6)   terra_white /full   hop      3.04  +1.0   56.90
+   129  DUST DEVILS        10  DUST DEVILS       field      -         60   64.0   4.0   (  32,  63,  -3)   terra_red   /full   hop      3.04  +1.0   57.33
+   130  DUST DEVILS        10  DUST DEVILS       field      -         60   65.0   5.0   (  31,  64,   0)   terra_yellow/full   hop      3.04  +1.0   57.76
+   131  DUST DEVILS        10  DUST DEVILS       field      -         60   65.0   5.0   (  31,  64,   3)   terra_white /full   walk     2.32  +0.0   58.17
+   132  DUST DEVILS        10  DUST DEVILS       windgap    -         60   65.0   5.0   (  30,  64,   6)   terra_orange/full   hop      3.37  +0.0   58.64
+   133  DUST DEVILS        10  DUST DEVILS       windgap    -         60   65.0   5.0   (  30,  64,   9)   terra_white /full   walk     2.32  +0.0   59.06
+   134  DUST DEVILS        10  DUST DEVILS       windgap    -         60   64.0   4.0   (  28,  63,  13)   terra_yellow/full   hop      4.66  -1.0   59.71
+   135  DUST DEVILS        10  DUST DEVILS       windgap    -         60   65.0   5.0   (  26,  64,  15)   terra_red   /full   hop      2.71  +1.0   60.10
+   136  DUST DEVILS        10  DUST DEVILS       ascent     design    60   65.0   5.0   (  25,  64,  18)   terra_orange/full   hop      2.45  +0.0   60.44
+   137  DUST DEVILS        10  DUST DEVILS       ascent     design    60   66.0   6.0   (  23,  65,  20)   terra_yellow/full   hop      3.03  +1.0   60.87
+   138  DUST DEVILS        10  DUST DEVILS       ascent     approa    60   66.0   6.0   (  21,  65,  22)   terra_red   /full   hop      2.71  +0.0   61.25
+   139  DUST DEVILS        10  DUST DEVILS       ascent     approa    60   66.0   6.0   (  19,  65,  24)   terra_red   /full   hop      2.71  +0.0   61.63
+   140  DUST DEVILS        10  DUST DEVILS       ascent     stair     60   67.0   7.0   (  18,  66,  26)   terra_white /full   hop      2.12  +1.0   61.93
+   141  THE SEA GATE       11  DUST DEVILS       ascent     stair     67   68.0   1.0   (  15,  67,  26)   terra_yellow/full   hop      2.88  +1.0   62.33
+   142  THE SEA GATE       11  THE SEA GATE      sill       -         67   68.0   1.0   (  12,  67,  27)   sealantern  /full   hop      3.04  +0.0   62.76
+   143  THE SEA GATE       11  THE SEA GATE      sill       -         67   69.0   2.0   (   9,  68,  28)   darkprismari/full   hop      3.04  +1.0   63.19
+   144  THE SEA GATE       11  THE SEA GATE      sill       -         67   69.0   2.0   (   7,  68,  29)   gold        /full   walk     1.48  +0.0   63.45
+   145  THE SEA GATE       11  THE SEA GATE      sill       -         67   70.0   3.0   (   4,  69,  30)   prismarine  /full   hop      3.10  +1.0   63.89
+   146  THE SEA GATE       11  THE SEA GATE      sill       -         67   71.0   4.0   (   1,  70,  30)   prismarine  /full   hop      2.88  +1.0   64.30
+   147  THE SEA GATE       11  THE SEA GATE      sill       -         67   69.0   2.0   (  -4,  68,  32)   sand        /full   hop      5.27  -2.0   65.04
+   148  THE SEA GATE       11  THE SEA GATE      sill       -         67   70.0   3.0   (  -7,  69,  30)   copper      /full   hop      3.10  +1.0   65.47
+   149  THE SEA GATE       11  THE SEA GATE      basin      -         67   69.0   2.0   ( -10,  68,  29)   darkprismari/full   hop      3.14  -1.0   65.92
+   150  THE SEA GATE       11  THE SEA GATE      basin      -         67   69.5   2.5   ( -12,  69,  28)   prismarine  /slab   walk     1.48  +0.5   66.19
+   151  THE SEA GATE       11  THE SEA GATE      basin      -         67   70.0   3.0   ( -16,  69,  28)   gold        /full   hop      3.78  +0.5   66.73
+   152  THE SEA GATE       11  THE SEA GATE      basin      -         67   71.0   4.0   ( -18,  70,  25)   darkprismari/full   hop      3.10  +1.0   67.16
+   153  THE SEA GATE       11  THE SEA GATE      causeway   -         67   70.0   3.0   ( -21,  69,  23)   darkprismari/full   hop      3.58  -1.0   67.67
+   154  THE SEA GATE       11  THE SEA GATE      causeway   -         67   71.0   4.0   ( -24,  70,  21)   gold        /full   hop      3.10  +1.0   68.10
+   155  THE SEA GATE       11  THE SEA GATE      causeway   -         67   71.0   4.0   ( -26,  70,  19)   copper      /full   walk     1.87  +0.0   68.43
+   156  THE SEA GATE       11  THE SEA GATE      moorings   -         67   71.0   4.0   ( -27,  70,  16)   darkprismari/full   hop      3.48  +0.0   68.93
+   157  THE SEA GATE       11  THE SEA GATE      moorings   -         67   71.0   4.0   ( -28,  70,  14)   prismarine  /full   walk     1.48  +0.0   69.19
+   158  THE SEA GATE       11  THE SEA GATE      moorings   -         67   71.0   4.0   ( -30,  70,  11)   darkprismari/full   hop      3.86  +0.0   69.73
+   159  THE SEA GATE       11  THE SEA GATE      ascent     design    67   71.0   4.0   ( -30,  70,   8)   prismarine  /full   hop      2.88  +0.0   70.14
+   160  THE SEA GATE       11  THE SEA GATE      ascent     design    67   72.0   5.0   ( -31,  71,   5)   sealantern  /full   hop      3.04  +1.0   70.57
+   161  THE CORNICE        12  THE SEA GATE      ascent     crossi    72   72.0   0.0   ( -31,  71,   0)   snow        /floor  hop      4.26  +0.0   71.17
+   162  THE CORNICE        12  THE CORNICE       crown      -         72   73.0   1.0   ( -32,  72,  -3)   lantern     /full   hop      3.09  +1.0   71.60
+   163  THE CORNICE        12  THE CORNICE       crown      -         72   74.0   2.0   ( -32,  73,  -6)   deepslate   /full   hop      2.88  +1.0   72.01
+   164  THE CORNICE        12  THE CORNICE       crown      -         72   74.0   2.0   ( -31,  73,  -8)   frost       /full   walk     1.48  +0.0   72.27
+   165  THE CORNICE        12  THE CORNICE       crown      -         72   75.0   3.0   ( -30,  74, -12)   packedice   /ice    slide    4.36  +1.0   72.71
+   166  THE CORNICE        12  THE CORNICE       landmark   -         72   75.0   3.0   ( -31,  74, -16)   deepslate   /full   hop      4.00  +0.0   73.27
+   167  THE CORNICE        12  THE CORNICE       landmark   -         72   75.0   3.0   ( -29,  74, -19)   frost       /full   hop      3.49  +0.0   73.76
+   168  THE CORNICE        12  THE CORNICE       landmark   -         72   75.0   3.0   ( -27,  74, -22)   deepslate   /full   hop      3.49  +0.0   74.25
+   169  THE CORNICE        12  THE CORNICE       glaze      -         72   76.0   4.0   ( -24,  75, -23)   frost       /full   hop      3.04  +1.0   74.68
+   170  THE CORNICE        12  THE CORNICE       glaze      -         72   76.0   4.0   ( -20,  75, -26)   blueice     /ice    slide    4.88  +0.0   75.17
+   171  THE CORNICE        12  THE CORNICE       glaze      -         72   76.0   4.0   ( -18,  75, -28)   deepslate   /full   walk     1.87  +0.0   75.50
+   172  THE CORNICE        12  THE CORNICE       glaze      -         72   77.0   5.0   ( -15,  76, -30)   frost       /full   hop      3.10  +1.0   75.94
+   173  THE CORNICE        12  THE CORNICE       glaze      -         72   75.0   3.0   ( -11,  74, -32)   snow        /full   hop      4.45  -2.0   76.56
+   174  THE CORNICE        12  THE CORNICE       crack      -         72   76.0   4.0   (  -8,  75, -32)   frost       /full   hop      2.88  +1.0   76.97
+   175  THE CORNICE        12  THE CORNICE       crack      -         72   74.0   2.0   (  -4,  73, -33)   snow        /full   hop      4.00  -2.0   77.53
+   176  THE CORNICE        12  THE CORNICE       crack      -         72   75.0   3.0   (   0,  74, -33)   packedice   /ice    slide    3.88  +1.0   77.92
+   177  THE CORNICE        12  THE CORNICE       ascent     design    72   75.0   3.0   (   3,  74, -33)   lantern     /full   hop      2.88  +0.0   78.33
+   178  THE CORNICE        12  THE CORNICE       ascent     design    72   76.0   4.0   (   6,  75, -32)   frost       /full   hop      3.04  +1.0   78.76
+   179  THE CORNICE        12  THE CORNICE       ascent     design    72   76.0   4.0   (  10,  75, -32)   packedice   /ice    slide    3.88  +0.0   79.14
+   180  THE CORNICE        12  THE CORNICE       ascent     design    72   77.0   5.0   (  13,  76, -30)   deepslate   /full   hop      3.10  +1.0   79.58
+   181  THE CORNICE        12  THE CORNICE       ascent     design    72   78.0   6.0   (  15,  77, -32)   packedice   /ice    slide    2.73  +1.0   79.85
+   182  WART FIELDS        13  THE CORNICE       ascent     design    78   79.0   1.0   (  17,  78, -29)   lantern     /full   hop      3.10  +1.0   80.29
+   183  WART FIELDS        13  WART FIELDS       gate       -         78   79.0   1.0   (  20,  78, -27)   shroomlight /full   hop      3.58  +0.0   80.79
+   184  WART FIELDS        13  WART FIELDS       gate       -         78   80.0   2.0   (  23,  79, -25)   soulsand    /full   hop      3.10  +1.0   81.23
+   185  WART FIELDS        13  WART FIELDS       rows       -         78   81.0   3.0   (  25,  80, -22)   wartblock   /full   hop      3.10  +1.0   81.67
+   186  WART FIELDS        13  WART FIELDS       rows       -         78   81.0   3.0   (  27,  80, -19)   soulsand    /full   hop      3.58  +0.0   82.17
+   187  WART FIELDS        13  WART FIELDS       bank       -         78   82.0   4.0   (  28,  81, -16)   wartblock   /full   hop      3.04  +1.0   82.60
+   188  WART FIELDS        13  WART FIELDS       bank       -         78   82.0   4.0   (  29,  81, -13)   soulsand    /full   hop      3.04  +0.0   83.03
+   189  WART FIELDS        13  WART FIELDS       beds       -         78   83.0   5.0   (  31,  82, -10)   wartblock   /full   hop      3.10  +1.0   83.46
+   190  WART FIELDS        13  WART FIELDS       beds       -         78   83.0   5.0   (  32,  82,  -6)   soulsand    /full   hop      4.10  +0.0   84.04
+   191  WART FIELDS        13  WART FIELDS       beds       -         78   84.0   6.0   (  32,  83,  -3)   wartblock   /full   hop      2.88  +1.0   84.45
+   192  WART FIELDS        13  WART FIELDS       beds       -         78   84.0   6.0   (  32,  83,   0)   soulsand    /full   walk     2.32  +0.0   84.86
+   193  WART FIELDS        13  WART FIELDS       beds       -         78   85.0   7.0   (  32,  84,   3)   wartblock   /full   hop      3.10  +1.0   85.30
+   194  WART FIELDS        13  WART FIELDS       beds       -         78   84.0   6.0   (  32,  83,   7)   netherbrick /full   hop      3.88  -1.0   85.84
+   195  WART FIELDS        13  WART FIELDS       beds       -         78   84.0   6.0   (  30,  83,  10)   wartblock   /full   hop      3.49  +0.0   86.33
+   196  WART FIELDS        13  WART FIELDS       beds       -         78   84.0   6.0   (  29,  83,  12)   soulsand    /full   walk     1.48  +0.0   86.60
+   197  WART FIELDS        13  WART FIELDS       beds       -         78   85.0   7.0   (  28,  84,  15)   wartblock   /full   hop      3.10  +1.0   87.03
+   198  WART FIELDS        13  WART FIELDS       beds       -         78   84.0   6.0   (  26,  83,  19)   netherbrick /full   hop      4.35  -1.0   87.65
+   199  WART FIELDS        13  WART FIELDS       ascent     approa    78   84.0   6.0   (  24,  83,  21)   netherbrick /full   hop      2.71  +0.0   88.03
+   200  WART FIELDS        13  WART FIELDS       ascent     approa    78   84.0   6.0   (  22,  83,  23)   netherbrick /full   hop      2.71  +0.0   88.41
+   201  WART FIELDS        13  WART FIELDS       ascent     approa    78   84.0   6.0   (  20,  83,  25)   netherbrick /full   hop      2.71  +0.0   88.79
+   202  WART FIELDS        13  WART FIELDS       ascent     stair     78   85.0   7.0   (  18,  84,  26)   wartblock   /full   hop      2.12  +1.0   89.09
+   203  ECHO SHAFT         14  WART FIELDS       ascent     crossi    84   84.0   0.0   (  15,  83,  29)   sculk       /floor  hop      4.12  -1.0   89.67
+   204  ECHO SHAFT         14  ECHO SHAFT        shafthead  -         84   85.0   1.0   (  12,  84,  30)   sealantern  /full   hop      3.04  +1.0   90.10
+   205  ECHO SHAFT         14  ECHO SHAFT        shafthead  -         84   86.0   2.0   (   9,  85,  32)   sculk       /full   hop      3.10  +1.0   90.53
+   206  ECHO SHAFT         14  ECHO SHAFT        shafthead  -         84   86.0   2.0   (   6,  85,  32)   calcite     /full   walk     2.32  +0.0   90.95
+   207  ECHO SHAFT         14  ECHO SHAFT        shafthead  -         84   87.0   3.0   (   3,  86,  33)   calcite     /full   hop      3.09  +1.0   91.38
+   208  ECHO SHAFT         14  ECHO SHAFT        shafthead  -         84   86.0   2.0   (  -2,  85,  34)   deepslate   /full   hop      4.98  -1.0   92.08
+   209  ECHO SHAFT         14  ECHO SHAFT        shafthead  -         84   87.0   3.0   (  -5,  86,  33)   calcite     /full   hop      3.04  +1.0   92.51
+   210  ECHO SHAFT         14  ECHO SHAFT        shafthead  -         84   88.0   4.0   (  -8,  87,  33)   deepslate   /full   hop      2.88  +1.0   92.92
+   211  ECHO SHAFT         14  ECHO SHAFT        shafthead  -         84   89.0   5.0   ( -11,  88,  33)   deepslate   /full   hop      2.88  +1.0   93.32
+   212  ECHO SHAFT         14  ECHO SHAFT        landmark   -         84   89.0   5.0   ( -14,  88,  31)   deepslate   /full   hop      3.49  +0.0   93.82
+   213  ECHO SHAFT         14  ECHO SHAFT        drip       -         84   90.0   6.0   ( -16,  89,  28)   deepslate   /full   hop      3.10  +1.0   94.25
+   214  ECHO SHAFT         14  ECHO SHAFT        drip       -         84   90.0   6.0   ( -18,  89,  27)   calcite     /full   walk     1.48  +0.0   94.51
+   215  ECHO SHAFT         14  ECHO SHAFT        ledges     -         84   90.0   6.0   ( -21,  89,  25)   calcite     /full   hop      3.86  +0.0   95.06
+   216  ECHO SHAFT         14  ECHO SHAFT        ledges     -         84   90.0   6.0   ( -23,  89,  23)   sculk       /full   walk     1.87  +0.0   95.39
+   217  ECHO SHAFT         14  ECHO SHAFT        ledges     -         84   91.0   7.0   ( -25,  90,  21)   deepslate   /full   hop      3.10  +1.0   95.83
+   218  ECHO SHAFT         14  ECHO SHAFT        ledges     -         84   91.0   7.0   ( -27,  90,  19)   sculk       /full   walk     1.87  +0.0   96.16
+   219  ECHO SHAFT         14  ECHO SHAFT        ledges     -         84   92.0   8.0   ( -28,  91,  16)   sealantern  /full   hop      3.09  +1.0   96.60
+   220  ECHO SHAFT         14  ECHO SHAFT        ledges     -         84   90.0   6.0   ( -30,  89,  13)   calcite     /full   hop      3.49  -2.0   97.09
+   221  ECHO SHAFT         14  ECHO SHAFT        ascent     design    84   90.0   6.0   ( -31,  89,  10)   calcite     /full   hop      3.04  +0.0   97.51
+   222  ECHO SHAFT         14  ECHO SHAFT        ascent     design    84   91.0   7.0   ( -32,  90,   7)   deepslate   /full   hop      3.04  +1.0   97.94
+   223  ECHO SHAFT         14  ECHO SHAFT        ascent     design    84   92.0   8.0   ( -32,  91,   4)   calcite     /full   hop      2.88  +1.0   98.35
+   224  ECHO SHAFT         14  ECHO SHAFT        ascent     design    84   93.0   9.0   ( -33,  92,   1)   sealantern  /full   hop      2.45  +1.0   98.69
+   225  THE WHITE STAIR    15  ECHO SHAFT        ascent     crossi    92   92.0   0.0   ( -34,  91,  -1)   quartz      /floor  hop      2.47  -1.0   99.04
+   226  THE WHITE STAIR    15  THE WHITE STAIR   sill       -         92   93.0   1.0   ( -33,  92,  -4)   lantern     /full   hop      3.04  +1.0   99.47
+   227  THE WHITE STAIR    15  THE WHITE STAIR   sill       -         92   94.0   2.0   ( -32,  93,  -7)   gold        /full   hop      3.04  +1.0   99.90
+   228  THE WHITE STAIR    15  THE WHITE STAIR   sill       -         92   95.0   3.0   ( -32,  94, -10)   calcite     /full   hop      2.88  +1.0  100.30
+   229  THE WHITE STAIR    15  THE WHITE STAIR   sill       -         92   95.0   3.0   ( -32,  94, -13)   deepslate   /full   walk     2.32  +0.0  100.72
+   230  THE WHITE STAIR    15  THE WHITE STAIR   sill       -         92   96.0   4.0   ( -30,  95, -16)   chiselled   /full   hop      3.10  +1.0  101.15
+   231  THE WHITE STAIR    15  THE WHITE STAIR   sill       -         92   94.0   2.0   ( -28,  93, -21)   quartz      /full   hop      5.36  -2.0  101.91
+   232  THE WHITE STAIR    15  THE WHITE STAIR   landmark   -         92   95.0   3.0   ( -29,  94, -23)   calcite     /full   hop      2.12  +1.0  102.21
+   233  THE WHITE STAIR    15  THE WHITE STAIR   landmark   -         92   95.0   3.0   ( -27,  94, -26)   gold        /full   hop      3.49  +0.0  102.70
+   234  THE WHITE STAIR    15  THE WHITE STAIR   landmark   -         92   95.0   3.0   ( -24,  94, -28)   calcite     /full   hop      3.49  +0.0  103.19
+   235  THE WHITE STAIR    15  THE WHITE STAIR   colonnade  -         92   95.0   3.0   ( -20,  94, -28)   calcite     /full   hop      3.88  +0.0  103.74
+   236  THE WHITE STAIR    15  THE WHITE STAIR   colonnade  -         92   95.5   3.5   ( -18,  95, -29)   quartz      /slab   walk     1.48  +0.5  104.01
+   237  THE WHITE STAIR    15  THE WHITE STAIR   colonnade  -         92   96.0   4.0   ( -15,  95, -31)   gold        /full   hop      3.78  +0.5  104.55
+   238  THE WHITE STAIR    15  THE WHITE STAIR   colonnade  -         92   96.0   4.0   ( -13,  95, -32)   calcite     /full   walk     1.48  +0.0  104.81
+   239  THE WHITE STAIR    15  THE WHITE STAIR   colonnade  -         92   97.0   5.0   ( -10,  96, -33)   chiselled   /full   hop      2.45  +1.0  105.15
+   240  THE WHITE STAIR    15  THE WHITE STAIR   colonnade  -         92   95.0   3.0   (  -5,  94, -34)   deepslate   /full   hop      5.34  -2.0  105.90
+   241  THE WHITE STAIR    15  THE WHITE STAIR   basin      -         92   95.0   3.0   (  -2,  94, -34)   calcite     /full   hop      2.88  +0.0  106.31
+   242  THE WHITE STAIR    15  THE WHITE STAIR   basin      -         92   95.0   3.0   (   1,  94, -34)   deepslate   /full   walk     2.32  +0.0  106.72
+   243  THE WHITE STAIR    15  THE WHITE STAIR   ascent     design    92   95.0   3.0   (   4,  94, -34)   lantern     /full   hop      3.22  +0.0  107.18
+   244  THE WHITE STAIR    15  THE WHITE STAIR   ascent     design    92   96.0   4.0   (   7,  95, -33)   gold        /full   hop      3.04  +1.0  107.61
+   245  THE WHITE STAIR    15  THE WHITE STAIR   ascent     design    92   97.0   5.0   (  10,  96, -32)   calcite     /full   hop      3.04  +1.0  108.03
+   246  THE WHITE STAIR    15  THE WHITE STAIR   ascent     design    92   98.0   6.0   (  13,  97, -31)   quartz      /full   hop      3.04  +1.0  108.46
+   247  THE WHITE STAIR    15  THE WHITE STAIR   ascent     crossi    92   97.0   5.0   (  16,  96, -30)   endstone    /full   hop      3.04  -1.0  108.89
+   248  THE GATE           16  THE WHITE STAIR   ascent     crossi    97   97.0   0.0   (  18,  96, -29)   endstone    /floor  hop      2.12  +0.0  109.19
+   249  THE GATE           16  THE GATE          gatehouse  -         97   98.0   1.0   (  21,  97, -27)   magma       /full   hop      3.10  +1.0  109.63
+   250  THE GATE           16  THE GATE          gatehouse  -         97   99.0   2.0   (  23,  98, -25)   calcite     /full   hop      2.74  +1.0  110.01
+   251  THE GATE           16  THE GATE          gatehouse  -         97   99.0   2.0   (  25,  98, -23)   blackstone  /full   walk     1.87  +0.0  110.34
+   252  THE GATE           16  THE GATE          gatehouse  -         97   99.0   2.0   (  27,  98, -21)   obsidian    /full   walk     1.87  +0.0  110.68
+   253  THE GATE           16  THE GATE          gatehouse  -         97  100.0   3.0   (  29,  99, -18)   obsidian    /full   hop      3.10  +1.0  111.11
+   254  THE GATE           16  THE GATE          gatehouse  -         97  100.0   3.0   (  30,  99, -16)   obsidian    /full   walk     1.48  +0.0  111.38
+   255  THE GATE           16  THE GATE          gatehouse  -         97   99.0   2.0   (  33,  98, -12)   calcite     /full   hop      4.98  -1.0  112.08
+   256  THE GATE           16  THE GATE          gatehouse  -         97  100.0   3.0   (  33,  99,  -9)   blackstone  /full   hop      2.88  +1.0  112.48
+   257  THE GATE           16  THE GATE          landmark   -         97  101.0   4.0   (  33, 100,  -6)   blackstone  /full   hop      2.88  +1.0  112.89
+   258  THE GATE           16  THE GATE          landmark   -         97  101.0   4.0   (  33, 100,  -3)   blackstone  /full   hop      2.88  +0.0  113.29
+   259  THE GATE           16  THE GATE          landmark   -         97  101.0   4.0   (  35, 100,  -2)   blackstone  /full   hop      2.12  +0.0  113.59
+   260  THE GATE           16  THE GATE          landmark   -         97  101.0   4.0   (  35, 100,   2)   obsidian    /full   hop      3.88  +0.0  114.14
+   261  THE GATE           16  THE GATE          landmark   -         97  101.0   4.0   (  35, 100,   6)   blackstone  /full   hop      3.88  +0.0  114.68
+   262  THE GATE           16  THE GATE          court      -         97   99.0   2.0   (  33,  98,   9)   endstone    /full   hop      3.49  -2.0  115.18
+   263  THE GATE           16  THE GATE          court      -         97   99.0   2.0   (  33,  98,  12)   obsidian    /full   walk     2.32  +0.0  115.59
+   264  THE GATE           16  THE GATE          court      -         97  100.0   3.0   (  31,  99,  15)   blackstone  /full   hop      3.10  +1.0  116.03
+   265  THE GATE           16  THE GATE          court      -         97  101.0   4.0   (  30, 100,  18)   magma       /full   hop      3.10  +1.0  116.46
+   266  THE GATE           16  THE GATE          causeway   -         97  101.0   4.0   (  27, 100,  21)   endstone    /full   hop      4.12  +0.0  117.04
+   267  THE GATE           16  THE GATE          ascent     approa    97  101.0   4.0   (  25, 100,  23)   blackstone  /full   hop      2.71  +0.0  117.42
+   268  THE GATE           16  THE GATE          ascent     approa    97  101.0   4.0   (  23, 100,  25)   blackstone  /full   hop      2.71  +0.0  117.81
+   269  THE GATE           16  THE GATE          ascent     approa    97  101.0   4.0   (  20, 100,  27)   blackstone  /full   hop      3.49  +0.0  118.30
+   270  THE GATEHOUSE      17  THE GATE          ascent     crossi   101  101.0   0.0   (  17, 100,  30)   grass       /floor  hop      4.12  +0.0  118.88
+   271  THE GATEHOUSE      17  THE GATEHOUSE     gate       -        101  102.0   1.0   (  14, 101,  32)   lantern     /full   hop      3.10  +1.0  119.31
+   272  THE GATEHOUSE      17  THE GATEHOUSE     gate       -        101  103.0   2.0   (  11, 102,  33)   cobble      /full   hop      3.07  +1.0  119.75
+   273  THE GATEHOUSE      17  THE GATEHOUSE     gate       -        101  103.0   2.0   (   9, 102,  34)   cobble      /full   walk     1.48  +0.0  120.01
+   274  THE GATEHOUSE      17  THE GATEHOUSE     landmark   -        101  104.0   3.0   (   6, 103,  35)   mossy       /full   hop      3.10  +1.0  120.44
+   275  THE GATEHOUSE      17  THE GATEHOUSE     landmark   -        101  105.0   4.0   (   3, 104,  35)   mossy       /full   hop      2.88  +1.0  120.85
+   276  THE GATEHOUSE      17  THE GATEHOUSE     landmark   -        101  105.0   4.0   (   0, 104,  35)   mossy       /full   hop      2.88  +0.0  121.26
+   277  THE GATEHOUSE      17  THE GATEHOUSE     landmark   -        101  105.0   4.0   (  -1, 104,  37)   mossy       /full   hop      2.12  +0.0  121.55
+   278  THE GATEHOUSE      17  THE GATEHOUSE     causeway   -        101  104.0   3.0   (  -4, 103,  37)   mossy       /full   hop      2.88  -1.0  121.96
+   279  THE GATEHOUSE      17  THE GATEHOUSE     causeway   -        101  104.0   3.0   (  -7, 103,  37)   oak         /full   walk     2.32  +0.0  122.37
+   280  THE GATEHOUSE      17  THE GATEHOUSE     causeway   -        101  105.0   4.0   ( -10, 104,  37)   oak         /full   hop      3.10  +1.0  122.81
+   281  THE GATEHOUSE      17  THE GATEHOUSE     ditch      -        101  105.0   4.0   ( -13, 104,  34)   mossy       /full   hop      4.12  +0.0  123.39
+   282  THE GATEHOUSE      17  THE GATEHOUSE     ditch      -        101  103.0   2.0   ( -16, 102,  30)   slime       /full   hop      4.88  -2.0  124.08
+   283  THE GATEHOUSE      17  THE GATEHOUSE     ditch      -        101  104.0   3.0   ( -19, 103,  28)   mossy       /full   bounce   2.79  +1.0  124.84
+   284  THE GATEHOUSE      17  THE GATEHOUSE     wallhead   -        101  105.0   4.0   ( -22, 104,  26)   mossy       /full   hop      3.10  +1.0  125.28
+   285  THE GATEHOUSE      17  THE GATEHOUSE     wallhead   -        101  105.0   4.0   ( -25, 104,  24)   cobble      /full   hop      3.58  +0.0  125.78
+   286  THE GATEHOUSE      17  THE GATEHOUSE     wallhead   -        101  105.0   4.0   ( -27, 104,  21)   mossy       /full   hop      3.49  +0.0  126.28
+   287  THE GATEHOUSE      17  THE GATEHOUSE     court      -        101  105.0   4.0   ( -30, 104,  17)   podzol      /full   hop      4.26  +0.0  126.88
+   288  THE GATEHOUSE      17  THE GATEHOUSE     court      -        101  105.0   4.0   ( -31, 104,  15)   oak         /full   walk     1.48  +0.0  127.14
+   289  THE GATEHOUSE      17  THE GATEHOUSE     court      -        101  105.0   4.0   ( -32, 104,  11)   podzol      /full   hop      4.26  +0.0  127.74
+   290  THE GATEHOUSE      17  THE GATEHOUSE     ascent     approa   101  105.0   4.0   ( -33, 104,   8)   mossy       /full   hop      3.04  +0.0  128.17
+   291  THE GATEHOUSE      17  THE GATEHOUSE     ascent     approa   101  105.0   4.0   ( -34, 104,   5)   mossy       /full   hop      3.04  +0.0  128.59
+   292  WINDMILL REACH     18  THE GATEHOUSE     ascent     crossi   105  105.0   0.0   ( -34, 104,   0)   hay         /floor  hop      4.26  +0.0  129.19
+   293  WINDMILL REACH     18  WINDMILL REACH    sill       -        105  106.0   1.0   ( -34, 105,  -3)   lantern     /full   hop      3.10  +1.0  129.63
+   294  WINDMILL REACH     18  WINDMILL REACH    race       -        105  110.0   5.0   ( -33, 109,  -6)   oak         /full   climb    2.45  +4.0  131.75
+   295  WINDMILL REACH     18  WINDMILL REACH    race       -        105  110.0   5.0   ( -33, 109,  -9)   hay         /full   walk     2.32  +0.0  132.17
+   296  WINDMILL REACH     18  WINDMILL REACH    pit        -        105  108.0   3.0   ( -31, 107, -14)   darkoak     /full   hop      5.55  -2.0  132.95
+   297  WINDMILL REACH     18  WINDMILL REACH    pit        -        105  108.0   3.0   ( -30, 107, -17)   stone       /full   hop      3.04  +0.0  133.38
+   298  WINDMILL REACH     18  WINDMILL REACH    rick       -        105  109.0   4.0   ( -28, 108, -20)   hay         /full   hop      3.10  +1.0  133.81
+   299  WINDMILL REACH     18  WINDMILL REACH    rick       -        105  109.5   4.5   ( -26, 108, -22)   oak         /fence  hop      2.81  +0.5  134.21
+   300  WINDMILL REACH     18  WINDMILL REACH    rick       -        105  110.0   5.0   ( -24, 109, -24)   hay         /full   hop      2.76  +0.5  134.60
+   301  WINDMILL REACH     18  WINDMILL REACH    yard       -        105  110.0   5.0   ( -21, 109, -27)   hay         /full   hop      4.12  +0.0  135.18
+   302  WINDMILL REACH     18  WINDMILL REACH    yard       -        105  110.0   5.0   ( -19, 109, -28)   oak         /full   walk     1.48  +0.0  135.44
+   303  WINDMILL REACH     18  WINDMILL REACH    yard       -        105  110.5   5.5   ( -16, 109, -29)   darkoak     /fence  hop      3.42  +0.5  135.92
+   304  WINDMILL REACH     18  WINDMILL REACH    yard       -        105  110.0   5.0   ( -13, 109, -31)   hay         /full   hop      3.55  -0.5  136.42
+   305  WINDMILL REACH     18  WINDMILL REACH    yard       -        105  110.0   5.0   (  -9, 109, -32)   hay         /full   hop      4.00  +0.0  136.98
+   306  WINDMILL REACH     18  WINDMILL REACH    yard       -        105  110.0   5.0   (  -7, 109, -33)   oak         /full   walk     1.48  +0.0  137.25
+   307  WINDMILL REACH     18  WINDMILL REACH    yard       -        105  110.5   5.5   (  -4, 109, -33)   darkoak     /fence  hop      3.23  +0.5  137.70
+   308  WINDMILL REACH     18  WINDMILL REACH    yard       -        105  110.0   5.0   (  -1, 109, -34)   hay         /full   hop      3.11  -0.5  138.14
+   309  WINDMILL REACH     18  WINDMILL REACH    yard       -        105  110.0   5.0   (   3, 109, -34)   hay         /full   hop      3.88  +0.0  138.69
+   310  WINDMILL REACH     18  WINDMILL REACH    yard       -        105  110.0   5.0   (   7, 109, -33)   hay         /full   hop      4.00  +0.0  139.25
+   311  WINDMILL REACH     18  WINDMILL REACH    ascent     design   105  111.0   6.0   (  10, 110, -33)   hay         /full   hop      2.88  +1.0  139.66
+   312  WINDMILL REACH     18  WINDMILL REACH    ascent     design   105  112.0   7.0   (  12, 111, -31)   log         /full   hop      2.71  +1.0  140.04
+   313  WINDMILL REACH     18  WINDMILL REACH    ascent     crossi   105  112.0   7.0   (  15, 111, -31)   terracotta  /full   hop      2.32  +0.0  140.36
+   314  MARKET STREET      19  WINDMILL REACH    ascent     crossi   111  111.0   0.0   (  19, 110, -30)   terracotta  /floor  hop      4.33  -1.0  140.97
+   315  MARKET STREET      19  MARKET STREET     gate       -        111  112.0   1.0   (  22, 111, -29)   lantern     /full   hop      3.04  +1.0  141.40
+   316  MARKET STREET      19  MARKET STREET     gate       -        111  113.0   2.0   (  25, 112, -27)   plaster     /full   hop      3.10  +1.0  141.84
+   317  MARKET STREET      19  MARKET STREET     stalls     -        111  113.5   2.5   (  27, 112, -25)   oak         /fence  hop      2.81  +0.5  142.23
+   318  MARKET STREET      19  MARKET STREET     stalls     -        111  114.0   3.0   (  29, 113, -23)   plaster     /full   hop      2.76  +0.5  142.62
+   319  MARKET STREET      19  MARKET STREET     stalls     -        111  115.0   4.0   (  31, 114, -21)   roof        /full   hop      2.71  +1.0  143.00
+   320  MARKET STREET      19  MARKET STREET     stalls     -        111  116.0   5.0   (  33, 115, -18)   roof        /full   hop      3.10  +1.0  143.44
+   321  MARKET STREET      19  MARKET STREET     stalls     -        111  116.0   5.0   (  34, 115, -16)   roof        /full   hop      2.21  +0.0  143.75
+   322  MARKET STREET      19  MARKET STREET     stuck      -        111  116.0   5.0   (  35, 115, -13)   roof        /full   hop      2.45  +0.0  144.10
+   323  MARKET STREET      19  MARKET STREET     stuck      -        111  116.0   5.0   (  36, 115, -10)   roof        /full   hop      2.45  +0.0  144.44
+   324  MARKET STREET      19  MARKET STREET     ridge      -        111  116.0   5.0   (  37, 115,  -6)   roof        /full   hop      4.26  +0.0  145.04
+   325  MARKET STREET      19  MARKET STREET     ridge      -        111  116.0   5.0   (  38, 115,  -2)   lantern     /full   hop      4.00  +0.0  145.61
+   326  MARKET STREET      19  MARKET STREET     ridge      -        111  116.0   5.0   (  38, 115,   2)   oak         /full   hop      3.88  +0.0  146.15
+   327  MARKET STREET      19  MARKET STREET     ridge      -        111  116.0   5.0   (  38, 115,   5)   plaster     /full   hop      2.88  +0.0  146.56
+   328  MARKET STREET      19  MARKET STREET     ridge      -        111  116.0   5.0   (  37, 115,   9)   roof        /full   hop      4.00  +0.0  147.12
+   329  MARKET STREET      19  MARKET STREET     ridge      -        111  116.0   5.0   (  35, 115,  12)   lantern     /full   hop      3.49  +0.0  147.61
+   330  MARKET STREET      19  MARKET STREET     ridge      -        111  116.0   5.0   (  34, 115,  16)   oak         /full   hop      4.00  +0.0  148.18
+   331  MARKET STREET      19  MARKET STREET     ridge      -        111  116.0   5.0   (  32, 115,  19)   plaster     /full   hop      3.49  +0.0  148.67
+   332  MARKET STREET      19  MARKET STREET     ridge      -        111  116.0   5.0   (  29, 115,  22)   roof        /full   hop      4.12  +0.0  149.25
+   333  MARKET STREET      19  MARKET STREET     ascent     design   111  116.0   5.0   (  26, 115,  24)   plaster     /full   hop      3.49  +0.0  149.74
+   334  MARKET STREET      19  MARKET STREET     ascent     stair    111  117.0   6.0   (  24, 116,  26)   roof        /full   hop      2.71  +1.0  150.12
+   335  MARKET STREET      19  MARKET STREET     ascent     stair    111  118.0   7.0   (  22, 117,  28)   brick       /full   hop      2.71  +1.0  150.50
+   336  MARKET STREET      19  MARKET STREET     ascent     stair    111  119.0   8.0   (  20, 118,  29)   brick       /full   hop      2.12  +1.0  150.80
+   337  THE TIMBERWORKS    20  MARKET STREET     ascent     crossi   118  118.0   0.0   (  17, 117,  31)   oak         /floor  hop      3.49  -1.0  151.29
+   338  THE TIMBERWORKS    20  THE TIMBERWORKS   sawbench   -        118  119.0   1.0   (  14, 118,  33)   lantern     /full   hop      3.10  +1.0  151.73
+   339  THE TIMBERWORKS    20  THE TIMBERWORKS   sawbench   -        118  120.0   2.0   (  11, 119,  34)   darkoak     /full   hop      3.07  +1.0  152.16
+   340  THE TIMBERWORKS    20  THE TIMBERWORKS   sawbench   -        118  121.0   3.0   (   8, 120,  35)   log         /full   hop      3.04  +1.0  152.59
+   341  THE TIMBERWORKS    20  THE TIMBERWORKS   sawbench   -        118  122.0   4.0   (   5, 121,  35)   oak         /full   hop      2.88  +1.0  152.99
+   342  THE TIMBERWORKS    20  THE TIMBERWORKS   pond       -        118  120.0   2.0   (   1, 119,  35)   spruce      /full   hop      3.88  -2.0  153.54
+   343  THE TIMBERWORKS    20  THE TIMBERWORKS   pond       -        118  120.0   2.0   (  -2, 119,  35)   oak         /full   hop      2.88  +0.0  153.95
+   344  THE TIMBERWORKS    20  THE TIMBERWORKS   pond       -        118  121.0   3.0   (  -5, 120,  35)   log         /full   hop      2.88  +1.0  154.35
+   345  THE TIMBERWORKS    20  THE TIMBERWORKS   landmark   -        118  121.0   3.0   (  -7, 120,  34)   spruce      /full   hop      2.12  +0.0  154.65
+   346  THE TIMBERWORKS    20  THE TIMBERWORKS   landmark   -        118  121.0   3.0   ( -10, 120,  34)   spruce      /full   hop      2.88  +0.0  155.05
+   347  THE TIMBERWORKS    20  THE TIMBERWORKS   landmark   -        118  121.0   3.0   ( -14, 120,  33)   spruce      /full   hop      4.00  +0.0  155.62
+   348  THE TIMBERWORKS    20  THE TIMBERWORKS   stacks     -        118  121.0   3.0   ( -17, 120,  31)   log         /full   hop      3.49  +0.0  156.11
+   349  THE TIMBERWORKS    20  THE TIMBERWORKS   stacks     -        118  120.5   2.5   ( -19, 120,  30)   oak         /slab   walk     1.48  -0.5  156.39
+   350  THE TIMBERWORKS    20  THE TIMBERWORKS   stacks     -        118  121.0   3.0   ( -21, 120,  28)   spruce      /full   hop      3.07  +0.5  156.82
+   351  THE TIMBERWORKS    20  THE TIMBERWORKS   stacks     -        118  121.0   3.0   ( -25, 120,  25)   log         /full   hop      4.26  +0.0  157.42
+   352  THE TIMBERWORKS    20  THE TIMBERWORKS   stacks     -        118  120.5   2.5   ( -27, 120,  23)   oak         /slab   walk     1.87  -0.5  157.76
+   353  THE TIMBERWORKS    20  THE TIMBERWORKS   stacks     -        118  121.0   3.0   ( -29, 120,  20)   spruce      /full   hop      3.78  +0.5  158.30
+   354  THE TIMBERWORKS    20  THE TIMBERWORKS   stacks     -        118  121.0   3.0   ( -30, 120,  16)   log         /full   hop      4.00  +0.0  158.86
+   355  THE TIMBERWORKS    20  THE TIMBERWORKS   stacks     -        118  121.0   3.0   ( -31, 120,  12)   log         /full   hop      4.00  +0.0  159.42
+   356  THE TIMBERWORKS    20  THE TIMBERWORKS   ascent     design   118  121.0   3.0   ( -32, 120,   9)   spruce      /full   hop      3.04  +0.0  159.85
+   357  THE TIMBERWORKS    20  THE TIMBERWORKS   ascent     design   118  124.0   6.0   ( -31, 123,   6)   ladder      /full   climb    2.45  +3.0  161.55
+   358  THE TIMBERWORKS    20  THE TIMBERWORKS   ascent     approa   118  124.0   6.0   ( -33, 123,   3)   spruce      /full   hop      3.72  +0.0  162.07
+   359  SUNKEN TEMPLE      21  THE TIMBERWORKS   ascent     crossi   123  123.0   0.0   ( -35, 122,  -1)   sandstone   /floor  hop      4.35  -1.0  162.69
+   360  SUNKEN TEMPLE      21  SUNKEN TEMPLE     doorstep   -        123  124.0   1.0   ( -35, 123,  -4)   glowstone   /full   hop      2.88  +1.0  163.09
+   361  SUNKEN TEMPLE      21  SUNKEN TEMPLE     doorstep   -        123  125.0   2.0   ( -35, 124,  -7)   chiselled   /full   hop      2.88  +1.0  163.50
+   362  SUNKEN TEMPLE      21  SUNKEN TEMPLE     steps      -        123  125.0   2.0   ( -34, 124, -10)   chiselled   /full   hop      3.04  +0.0  163.93
+   363  SUNKEN TEMPLE      21  SUNKEN TEMPLE     steps      -        123  126.0   3.0   ( -33, 125, -13)   sandstone   /full   hop      3.04  +1.0  164.36
+   364  SUNKEN TEMPLE      21  SUNKEN TEMPLE     steps      -        123  127.0   4.0   ( -32, 126, -16)   gold        /full   hop      3.04  +1.0  164.78
+   365  SUNKEN TEMPLE      21  SUNKEN TEMPLE     landmark   -        123  127.0   4.0   ( -31, 126, -19)   chiselled   /full   hop      3.04  +0.0  165.21
+   366  SUNKEN TEMPLE      21  SUNKEN TEMPLE     landmark   -        123  127.0   4.0   ( -30, 126, -21)   chiselled   /full   hop      2.12  +0.0  165.51
+   367  SUNKEN TEMPLE      21  SUNKEN TEMPLE     landmark   -        123  127.0   4.0   ( -28, 126, -23)   chiselled   /full   hop      2.71  +0.0  165.89
+   368  SUNKEN TEMPLE      21  SUNKEN TEMPLE     landmark   -        123  126.0   3.0   ( -24, 125, -27)   gold        /full   hop      4.98  -1.0  166.59
+   369  SUNKEN TEMPLE      21  SUNKEN TEMPLE     landmark   -        123  126.0   3.0   ( -21, 125, -30)   chiselled   /full   hop      4.26  +0.0  167.19
+   370  SUNKEN TEMPLE      21  SUNKEN TEMPLE     nave       -        123  125.0   2.0   ( -17, 124, -31)   prismarine  /full   hop      4.00  -1.0  167.76
+   371  SUNKEN TEMPLE      21  SUNKEN TEMPLE     nave       -        123  126.0   3.0   ( -14, 125, -33)   chiselled   /full   hop      3.10  +1.0  168.19
+   372  SUNKEN TEMPLE      21  SUNKEN TEMPLE     colonnade  -        123  126.0   3.0   ( -11, 125, -34)   chiselled   /full   hop      3.14  +0.0  168.64
+   373  SUNKEN TEMPLE      21  SUNKEN TEMPLE     colonnade  -        123  126.0   3.0   (  -9, 125, -35)   sandstone   /full   walk     1.48  +0.0  168.90
+   374  SUNKEN TEMPLE      21  SUNKEN TEMPLE     colonnade  -        123  126.0   3.0   (  -6, 125, -36)   prismarine  /full   hop      3.42  +0.0  169.38
+   375  SUNKEN TEMPLE      21  SUNKEN TEMPLE     colonnade  -        123  126.0   3.0   (  -3, 125, -36)   chiselled   /full   hop      2.88  +0.0  169.79
+   376  SUNKEN TEMPLE      21  SUNKEN TEMPLE     colonnade  -        123  126.0   3.0   (   0, 125, -36)   sandstone   /full   walk     2.32  +0.0  170.20
+   377  SUNKEN TEMPLE      21  SUNKEN TEMPLE     colonnade  -        123  126.0   3.0   (   3, 125, -37)   prismarine  /full   hop      3.37  +0.0  170.67
+   378  SUNKEN TEMPLE      21  SUNKEN TEMPLE     colonnade  -        123  126.0   3.0   (   6, 125, -37)   chiselled   /full   hop      2.88  +0.0  171.08
+   379  SUNKEN TEMPLE      21  SUNKEN TEMPLE     ascent     design   123  126.0   3.0   (   9, 125, -36)   chiselled   /full   hop      3.04  +0.0  171.51
+   380  SUNKEN TEMPLE      21  SUNKEN TEMPLE     ascent     stair    123  127.0   4.0   (  12, 126, -35)   gold        /full   hop      3.04  +1.0  171.94
+   381  SUNKEN TEMPLE      21  SUNKEN TEMPLE     ascent     stair    123  128.0   5.0   (  15, 127, -34)   chiselled   /full   hop      3.04  +1.0  172.36
+   382  THE BALCONIES      22  SUNKEN TEMPLE     ascent     crossi   127  127.0   0.0   (  20, 126, -31)   terra_orange/floor  hop      4.98  -1.0  173.07
+   383  THE BALCONIES      22  THE BALCONIES     sill       -        127  128.0   1.0   (  23, 127, -30)   lantern     /full   hop      3.10  +1.0  173.50
+   384  THE BALCONIES      22  THE BALCONIES     sill       -        127  129.0   2.0   (  26, 128, -28)   terra_white /full   hop      3.10  +1.0  173.94
+   385  THE BALCONIES      22  THE BALCONIES     balconies  -        127  130.0   3.0   (  28, 129, -25)   oak         /full   hop      3.10  +1.0  174.37
+   386  THE BALCONIES      22  THE BALCONIES     balconies  -        127  130.0   3.0   (  30, 129, -22)   terra_white /full   hop      3.58  +0.0  174.88
+   387  THE BALCONIES      22  THE BALCONIES     landmark   -        127  131.0   4.0   (  32, 130, -19)   terra_white /full   hop      3.10  +1.0  175.32
+   388  THE BALCONIES      22  THE BALCONIES     landmark   -        127  132.0   5.0   (  34, 131, -16)   terra_white /full   hop      3.10  +1.0  175.75
+   389  THE BALCONIES      22  THE BALCONIES     landmark   -        127  133.0   6.0   (  35, 132, -13)   terra_white /full   hop      3.10  +1.0  176.19
+   390  THE BALCONIES      22  THE BALCONIES     landmark   -        127  133.0   6.0   (  36, 132, -10)   terra_white /full   hop      3.04  +0.0  176.62
+   391  THE BALCONIES      22  THE BALCONIES     landmark   -        127  133.0   6.0   (  37, 132,  -6)   terra_white /full   hop      4.00  +0.0  177.18
+   392  THE BALCONIES      22  THE BALCONIES     seep       -        127  132.0   5.0   (  37, 131,  -3)   terra_white /full   hop      2.88  -1.0  177.59
+   393  THE BALCONIES      22  THE BALCONIES     seep       -        127  132.0   5.0   (  37, 131,   0)   terra_orange/full   walk     2.32  +0.0  178.00
+   394  THE BALCONIES      22  THE BALCONIES     gallery    -        127  133.0   6.0   (  36, 132,   3)   terra_white /full   hop      3.09  +1.0  178.44
+   395  THE BALCONIES      22  THE BALCONIES     gallery    -        127  133.0   6.0   (  36, 132,   6)   oak         /full   walk     2.32  +0.0  178.85
+   396  THE BALCONIES      22  THE BALCONIES     ledgerun   -        127  133.0   6.0   (  35, 132,   9)   terra_orange/full   hop      3.37  +0.0  179.32
+   397  THE BALCONIES      22  THE BALCONIES     ledgerun   -        127  132.5   5.5   (  34, 132,  12)   terra_white /slab   hop      3.04  -0.5  179.75
+   398  THE BALCONIES      22  THE BALCONIES     ledgerun   -        127  133.0   6.0   (  34, 132,  16)   terra_yellow/full   hop      3.78  +0.5  180.28
+   399  THE BALCONIES      22  THE BALCONIES     ledgerun   -        127  133.0   6.0   (  31, 132,  18)   terra_orange/full   hop      3.49  +0.0  180.78
+   400  THE BALCONIES      22  THE BALCONIES     ledgerun   -        127  133.0   6.0   (  29, 132,  21)   terra_orange/full   hop      3.49  +0.0  181.27
+   401  THE BALCONIES      22  THE BALCONIES     ascent     design   127  133.0   6.0   (  27, 132,  23)   terra_orange/full   hop      2.71  +0.0  181.65
+   402  THE BALCONIES      22  THE BALCONIES     ascent     design   127  134.0   7.0   (  26, 133,  26)   terra_yellow/full   hop      3.04  +1.0  182.08
+   403  THE BALCONIES      22  THE BALCONIES     ascent     approa   127  134.0   7.0   (  24, 133,  28)   terra_white /full   hop      2.71  +0.0  182.46
+   404  THE BALCONIES      22  THE BALCONIES     ascent     approa   127  134.0   7.0   (  22, 133,  30)   terra_white /full   hop      2.71  +0.0  182.84
+   405  THE BALCONIES      22  THE BALCONIES     ascent     stair    127  135.0   8.0   (  20, 134,  29)   terra_yellow/full   hop      2.12  +1.0  183.14
+   406  THE BALCONIES      22  THE BALCONIES     ascent     stair    127  136.0   9.0   (  21, 135,  31)   terra_white /full   hop      2.12  +1.0  183.44
+   407  CANOPY WALK        23  THE BALCONIES     ascent     crossi   135  135.0   0.0   (  18, 134,  34)   moss        /floor  hop      4.12  -1.0  184.02
+   408  CANOPY WALK        23  CANOPY WALK       sill       -        135  136.0   1.0   (  15, 135,  35)   lantern     /full   hop      3.04  +1.0  184.44
+   409  CANOPY WALK        23  CANOPY WALK       sill       -        135  137.0   2.0   (  12, 136,  37)   mossy       /full   hop      3.10  +1.0  184.88
+   410  CANOPY WALK        23  CANOPY WALK       boardwalk  -        135  138.0   3.0   (   9, 137,  37)   junglelog   /full   hop      2.96  +1.0  185.30
+   411  CANOPY WALK        23  CANOPY WALK       boardwalk  -        135  138.0   3.0   (   7, 137,  38)   oak         /full   walk     1.48  +0.0  185.56
+   412  CANOPY WALK        23  CANOPY WALK       boardwalk  -        135  139.0   4.0   (   4, 138,  38)   oak         /full   hop      3.09  +1.0  186.00
+   413  CANOPY WALK        23  CANOPY WALK       boardwalk  -        135  137.0   2.0   (  -1, 136,  38)   mushroomred /full   hop      4.88  -2.0  186.68
+   414  CANOPY WALK        23  CANOPY WALK       landmark   -        135  137.0   2.0   (  -5, 136,  38)   junglelog   /full   hop      3.88  +0.0  187.23
+   415  CANOPY WALK        23  CANOPY WALK       spur       -        135  138.0   3.0   (  -8, 137,  38)   oak         /full   hop      2.88  +1.0  187.64
+   416  CANOPY WALK        23  CANOPY WALK       spur       -        135  139.0   4.0   ( -11, 138,  39)   lantern     /full   hop      3.04  +1.0  188.06
+   417  CANOPY WALK        23  CANOPY WALK       understory -        135  139.0   4.0   ( -13, 138,  36)   oak         /full   hop      3.49  +0.0  188.56
+   418  CANOPY WALK        23  CANOPY WALK       understory -        135  139.0   4.0   ( -15, 138,  35)   mossy       /full   walk     1.48  +0.0  188.82
+   419  CANOPY WALK        23  CANOPY WALK       understory -        135  139.0   4.0   ( -18, 138,  34)   junglelog   /full   hop      3.42  +0.0  189.30
+   420  CANOPY WALK        23  CANOPY WALK       understory -        135  139.0   4.0   ( -21, 138,  32)   oak         /full   hop      3.49  +0.0  189.79
+   421  CANOPY WALK        23  CANOPY WALK       understory -        135  139.0   4.0   ( -23, 138,  30)   mossy       /full   walk     1.87  +0.0  190.12
+   422  CANOPY WALK        23  CANOPY WALK       understory -        135  139.0   4.0   ( -26, 138,  28)   junglelog   /full   hop      3.96  +0.0  190.68
+   423  CANOPY WALK        23  CANOPY WALK       understory -        135  139.0   4.0   ( -28, 138,  25)   oak         /full   hop      3.49  +0.0  191.17
+   424  CANOPY WALK        23  CANOPY WALK       understory -        135  139.0   4.0   ( -30, 138,  23)   mossy       /full   walk     1.87  +0.0  191.50
+   425  CANOPY WALK        23  CANOPY WALK       understory -        135  139.0   4.0   ( -32, 138,  20)   junglelog   /full   hop      3.96  +0.0  192.06
+   426  CANOPY WALK        23  CANOPY WALK       understory -        135  139.0   4.0   ( -33, 138,  16)   oak         /full   hop      4.00  +0.0  192.63
+   427  CANOPY WALK        23  CANOPY WALK       ascent     design   135  139.0   4.0   ( -34, 138,  13)   oak         /full   hop      3.04  +0.0  193.05
+   428  CANOPY WALK        23  CANOPY WALK       ascent     design   135  140.0   5.0   ( -35, 139,  10)   junglelog   /full   hop      3.04  +1.0  193.48
+   429  CANOPY WALK        23  CANOPY WALK       ascent     design   135  141.0   6.0   ( -36, 140,   7)   oak         /full   hop      3.04  +1.0  193.91
+   430  CANOPY WALK        23  CANOPY WALK       ascent     design   135  142.0   7.0   ( -36, 141,   4)   lantern     /full   hop      2.88  +1.0  194.32
+   431  THE CISTERN        24  CANOPY WALK       ascent     crossi   141  141.0   0.0   ( -36, 140,  -1)   dripstone   /floor  hop      4.88  -1.0  195.00
+   432  THE CISTERN        24  THE CISTERN       coping     -        141  142.0   1.0   ( -36, 141,  -4)   lantern     /full   hop      2.88  +1.0  195.41
+   433  THE CISTERN        24  THE CISTERN       coping     -        141  143.0   2.0   ( -35, 142,  -7)   calcite     /full   hop      3.04  +1.0  195.84
+   434  THE CISTERN        24  THE CISTERN       tank       -        141  144.0   3.0   ( -34, 143, -10)   calcite     /full   hop      3.04  +1.0  196.27
+   435  THE CISTERN        24  THE CISTERN       tank       -        141  145.0   4.0   ( -33, 144, -13)   calcite     /full   hop      3.04  +1.0  196.70
+   436  THE CISTERN        24  THE CISTERN       tank       -        141  143.0   2.0   ( -32, 142, -17)   slime       /full   hop      4.00  -2.0  197.26
+   437  THE CISTERN        24  THE CISTERN       tank       -        141  145.0   4.0   ( -31, 144, -20)   amethyst    /full   bounce   2.45  +2.0  197.76
+   438  THE CISTERN        24  THE CISTERN       geode      -        141  144.0   3.0   ( -29, 143, -23)   amethyst    /full   hop      3.83  -1.0  198.30
+   439  THE CISTERN        24  THE CISTERN       geode      -        141  144.0   3.0   ( -27, 143, -25)   amethyst    /full   walk     1.87  +0.0  198.63
+   440  THE CISTERN        24  THE CISTERN       geode      -        141  145.0   4.0   ( -24, 144, -27)   calcite     /full   hop      3.10  +1.0  199.07
+   441  THE CISTERN        24  THE CISTERN       drip       -        141  145.0   4.0   ( -22, 144, -29)   calcite     /full   hop      2.81  +0.0  199.46
+   442  THE CISTERN        24  THE CISTERN       drip       -        141  145.0   4.0   ( -20, 144, -31)   dripstone   /full   walk     1.87  +0.0  199.79
+   443  THE CISTERN        24  THE CISTERN       drip       -        141  145.0   4.0   ( -17, 144, -32)   amethyst    /full   hop      3.48  +0.0  200.28
+   444  THE CISTERN        24  THE CISTERN       drip       -        141  145.0   4.0   ( -13, 144, -33)   dripstone   /full   hop      4.00  +0.0  200.85
+   445  THE CISTERN        24  THE CISTERN       drip       -        141  145.0   4.0   ( -10, 144, -34)   calcite     /full   hop      3.04  +0.0  201.28
+   446  THE CISTERN        24  THE CISTERN       drip       -        141  145.0   4.0   (  -8, 144, -35)   dripstone   /full   walk     1.48  +0.0  201.54
+   447  THE CISTERN        24  THE CISTERN       drip       -        141  145.0   4.0   (  -5, 144, -36)   amethyst    /full   hop      3.42  +0.0  202.02
+   448  THE CISTERN        24  THE CISTERN       drip       -        141  145.0   4.0   (  -1, 144, -37)   dripstone   /full   hop      4.00  +0.0  202.58
+   449  THE CISTERN        24  THE CISTERN       drip       -        141  145.0   4.0   (   2, 144, -37)   calcite     /full   hop      2.88  +0.0  202.99
+   450  THE CISTERN        24  THE CISTERN       ascent     design   141  145.0   4.0   (   5, 144, -36)   calcite     /full   hop      3.04  +0.0  203.42
+   451  THE CISTERN        24  THE CISTERN       ascent     design   141  148.0   7.0   (   8, 147, -35)   calcite     /full   bubble   2.45  +3.0  204.11
+   452  THE CISTERN        24  THE CISTERN       ascent     approa   141  148.0   7.0   (  11, 147, -34)   dripstone   /full   hop      3.40  +0.0  204.59
+   453  THE CISTERN        24  THE CISTERN       ascent     approa   141  148.0   7.0   (  14, 147, -34)   dripstone   /full   hop      2.88  +0.0  205.00
+   454  GLACIER SHELF      25  THE CISTERN       ascent     crossi   147  147.0   0.0   (  19, 146, -31)   snow        /floor  hop      4.97  -1.0  205.70
+   455  GLACIER SHELF      25  GLACIER SHELF     sill       -        147  148.0   1.0   (  22, 147, -30)   lantern     /full   hop      3.10  +1.0  206.13
+   456  GLACIER SHELF      25  GLACIER SHELF     sill       -        147  149.0   2.0   (  25, 148, -28)   frost       /full   hop      3.10  +1.0  206.57
+   457  GLACIER SHELF      25  GLACIER SHELF     landmark   -        147  150.0   3.0   (  28, 149, -26)   blueice     /full   hop      3.10  +1.0  207.00
+   458  GLACIER SHELF      25  GLACIER SHELF     landmark   -        147  150.0   3.0   (  30, 149, -23)   blueice     /full   hop      3.58  +0.0  207.51
+   459  GLACIER SHELF      25  GLACIER SHELF     landmark   -        147  150.0   3.0   (  32, 149, -20)   blueice     /full   hop      3.49  +0.0  208.00
+   460  GLACIER SHELF      25  GLACIER SHELF     landmark   -        147  150.0   3.0   (  34, 149, -17)   blueice     /full   hop      3.49  +0.0  208.49
+   461  GLACIER SHELF      25  GLACIER SHELF     landmark   -        147  150.0   3.0   (  36, 149, -14)   blueice     /full   hop      3.49  +0.0  208.98
+   462  GLACIER SHELF      25  GLACIER SHELF     seracs     -        147  150.0   3.0   (  36, 149, -10)   packedice   /ice    slide    3.88  +0.0  209.37
+   463  GLACIER SHELF      25  GLACIER SHELF     seracs     -        147  151.0   4.0   (  37, 150,  -7)   blueice     /ice    slide    3.04  +1.0  209.67
+   464  GLACIER SHELF      25  GLACIER SHELF     seracs     -        147  152.0   5.0   (  38, 151,  -4)   packedice   /ice    slide    3.04  +1.0  209.98
+   465  GLACIER SHELF      25  GLACIER SHELF     seracs     -        147  149.0   2.0   (  37, 148,   1)   frost       /full   hop      4.98  -3.0  210.68
+   466  GLACIER SHELF      25  GLACIER SHELF     meltcave   -        147  149.0   2.0   (  37, 148,   4)   calcite     /full   hop      2.88  +0.0  211.08
+   467  GLACIER SHELF      25  GLACIER SHELF     meltcave   -        147  149.0   2.0   (  37, 148,   7)   frost       /full   walk     2.32  +0.0  211.50
+   468  GLACIER SHELF      25  GLACIER SHELF     calving    -        147  150.0   3.0   (  37, 149,  11)   blueice     /ice    slide    4.22  +1.0  211.92
+   469  GLACIER SHELF      25  GLACIER SHELF     calving    -        147  150.0   3.0   (  36, 149,  15)   packedice   /ice    slide    4.00  +0.0  212.32
+   470  GLACIER SHELF      25  GLACIER SHELF     floes      -        147  150.0   3.0   (  34, 149,  18)   packedice   /ice    slide    3.49  +0.0  212.67
+   471  GLACIER SHELF      25  GLACIER SHELF     floes      -        147  150.0   3.0   (  32, 149,  21)   packedice   /ice    slide    3.49  +0.0  213.02
+   472  GLACIER SHELF      25  GLACIER SHELF     ascent     design   147  150.0   3.0   (  31, 149,  24)   packedice   /full   hop      3.04  +0.0  213.45
+   473  GLACIER SHELF      25  GLACIER SHELF     ascent     design   147  151.0   4.0   (  29, 150,  26)   frost       /full   hop      2.71  +1.0  213.83
+   474  GLACIER SHELF      25  GLACIER SHELF     ascent     approa   147  151.0   4.0   (  27, 150,  28)   blueice     /full   hop      2.71  +0.0  214.21
+   475  GLACIER SHELF      25  GLACIER SHELF     ascent     approa   147  151.0   4.0   (  25, 150,  30)   blueice     /full   hop      2.71  +0.0  214.59
+   476  GLACIER SHELF      25  GLACIER SHELF     ascent     approa   147  151.0   4.0   (  23, 150,  32)   blueice     /full   hop      2.71  +0.0  214.97
+   477  GLACIER SHELF      25  GLACIER SHELF     ascent     stair    147  152.0   5.0   (  24, 151,  35)   calcite     /full   slide    3.04  +1.0  215.28
+   478  THE APIARY         26  GLACIER SHELF     ascent     stair    152  153.0   1.0   (  20, 152,  35)   packedice   /full   slide    3.88  +1.0  215.66
+   479  THE APIARY         26  THE APIARY        yardgate   -        152  153.0   1.0   (  16, 152,  34)   lantern     /full   hop      4.00  +0.0  216.23
+   480  THE APIARY         26  THE APIARY        yardgate   -        152  154.0   2.0   (  13, 153,  36)   podzol      /full   hop      3.10  +1.0  216.66
+   481  THE APIARY         26  THE APIARY        stack      -        152  154.0   2.0   (   9, 153,  35)   honeycomb   /full   hop      4.07  +0.0  217.24
+   482  THE APIARY         26  THE APIARY        stack      -        152  155.0   3.0   (   6, 154,  35)   honey       /full   hop      2.88  +1.0  217.64
+   483  THE APIARY         26  THE APIARY        stack      -        152  155.0   3.0   (   3, 154,  35)   podzol      /full   walk     2.32  +0.0  218.06
+   484  THE APIARY         26  THE APIARY        stack      -        152  156.0   4.0   (   0, 155,  35)   honeycomb   /full   hop      3.10  +1.0  218.49
+   485  THE APIARY         26  THE APIARY        landmark   -        152  156.0   4.0   (  -2, 155,  36)   honeycomb   /full   hop      2.12  +0.0  218.79
+   486  THE APIARY         26  THE APIARY        landmark   -        152  156.0   4.0   (  -4, 155,  37)   honeycomb   /full   hop      2.12  +0.0  219.09
+   487  THE APIARY         26  THE APIARY        landmark   -        152  155.0   3.0   (  -7, 154,  38)   honeycomb   /full   hop      3.04  -1.0  219.52
+   488  THE APIARY         26  THE APIARY        landmark   -        152  155.0   3.0   ( -11, 154,  37)   honey       /full   hop      4.00  +0.0  220.08
+   489  THE APIARY         26  THE APIARY        landmark   -        152  155.0   3.0   ( -14, 154,  36)   honeycomb   /full   hop      3.04  +0.0  220.51
+   490  THE APIARY         26  THE APIARY        trough     -        152  154.0   2.0   ( -17, 153,  32)   grass       /full   hop      4.88  -1.0  221.20
+   491  THE APIARY         26  THE APIARY        trough     -        152  154.0   2.0   ( -19, 153,  30)   honeycomb   /full   hop      2.71  +0.0  221.58
+   492  THE APIARY         26  THE APIARY        trough     -        152  155.0   3.0   ( -21, 154,  28)   honey       /full   hop      2.71  +1.0  221.96
+   493  THE APIARY         26  THE APIARY        meadow     -        152  155.0   3.0   ( -23, 154,  26)   honeycomb   /full   hop      2.71  +0.0  222.34
+   494  THE APIARY         26  THE APIARY        meadow     -        152  155.0   3.0   ( -25, 154,  24)   podzol      /full   walk     1.87  +0.0  222.67
+   495  THE APIARY         26  THE APIARY        meadow     -        152  155.0   3.0   ( -27, 154,  21)   honey       /full   hop      3.96  +0.0  223.23
+   496  THE APIARY         26  THE APIARY        meadow     -        152  155.0   3.0   ( -29, 154,  18)   honeycomb   /full   hop      3.49  +0.0  223.72
+   497  THE APIARY         26  THE APIARY        meadow     -        152  155.0   3.0   ( -30, 154,  16)   podzol      /full   walk     1.48  +0.0  223.98
+   498  THE APIARY         26  THE APIARY        meadow     -        152  155.0   3.0   ( -31, 154,  13)   honey       /full   hop      3.42  +0.0  224.47
+   499  THE APIARY         26  THE APIARY        ascent     design   152  155.0   3.0   ( -33, 154,  11)   honeycomb   /full   hop      2.71  +0.0  224.85
+   500  THE APIARY         26  THE APIARY        ascent     stair    152  156.0   4.0   ( -34, 155,   8)   honey       /full   hop      3.04  +1.0  225.28
+   501  THE APIARY         26  THE APIARY        ascent     stair    152  157.0   5.0   ( -34, 156,   5)   hay         /full   hop      2.88  +1.0  225.68
+   502  THE CRUCIBLE       27  THE APIARY        ascent     crossi   156  156.0   0.0   ( -37, 155,   0)   blackstone  /floor  hop      4.98  -1.0  226.38
+   503  THE CRUCIBLE       27  THE CRUCIBLE      landmark   -        156  157.0   1.0   ( -37, 156,  -3)   netherbrick /full   hop      3.08  +1.0  226.82
+   504  THE CRUCIBLE       27  THE CRUCIBLE      landmark   -        156  158.0   2.0   ( -37, 157,  -6)   netherbrick /full   hop      2.88  +1.0  227.22
+   505  THE CRUCIBLE       27  THE CRUCIBLE      landmark   -        156  158.0   2.0   ( -36, 157, -10)   netherbrick /full   hop      4.00  +0.0  227.79
+   506  THE CRUCIBLE       27  THE CRUCIBLE      landmark   -        156  158.0   2.0   ( -36, 157, -13)   netherbrick /full   hop      2.88  +0.0  228.19
+   507  THE CRUCIBLE       27  THE CRUCIBLE      landmark   -        156  158.0   2.0   ( -34, 157, -16)   netherbrick /full   hop      3.49  +0.0  228.68
+   508  THE CRUCIBLE       27  THE CRUCIBLE      taphole    -        156  157.0   1.0   ( -33, 156, -20)   glowstone   /full   hop      4.00  -1.0  229.25
+   509  THE CRUCIBLE       27  THE CRUCIBLE      taphole    -        156  158.0   2.0   ( -30, 157, -22)   blackstone  /full   hop      3.10  +1.0  229.68
+   510  THE CRUCIBLE       27  THE CRUCIBLE      taphole    -        156  158.0   2.0   ( -28, 157, -24)   magma       /full   walk     1.87  +0.0  230.02
+   511  THE CRUCIBLE       27  THE CRUCIBLE      taphole    -        156  158.0   2.0   ( -26, 157, -26)   netherbrick /full   walk     1.87  +0.0  230.35
+   512  THE CRUCIBLE       27  THE CRUCIBLE      taphole    -        156  159.0   3.0   ( -24, 158, -28)   blackstone  /full   hop      3.10  +1.0  230.79
+   513  THE CRUCIBLE       27  THE CRUCIBLE      taphole    -        156  160.0   4.0   ( -22, 159, -30)   glowstone   /full   hop      2.71  +1.0  231.17
+   514  THE CRUCIBLE       27  THE CRUCIBLE      furnace    -        156  158.0   2.0   ( -18, 157, -33)   netherbrick /full   hop      4.88  -2.0  231.85
+   515  THE CRUCIBLE       27  THE CRUCIBLE      furnace    -        156  158.0   2.0   ( -16, 157, -34)   magma       /full   walk     1.48  +0.0  232.12
+   516  THE CRUCIBLE       27  THE CRUCIBLE      furnace    -        156  159.0   3.0   ( -13, 158, -35)   blackstone  /full   hop      3.10  +1.0  232.55
+   517  THE CRUCIBLE       27  THE CRUCIBLE      furnace    -        156  160.0   4.0   ( -10, 159, -36)   glowstone   /full   hop      3.04  +1.0  232.98
+   518  THE CRUCIBLE       27  THE CRUCIBLE      furnace    -        156  158.0   2.0   (  -6, 157, -38)   netherbrick /full   hop      4.35  -2.0  233.59
+   519  THE CRUCIBLE       27  THE CRUCIBLE      slagrun    -        156  158.0   2.0   (  -3, 157, -37)   blackstone  /full   hop      3.04  +0.0  234.02
+   520  THE CRUCIBLE       27  THE CRUCIBLE      slagrun    -        156  158.0   2.0   (   0, 157, -37)   soulsand    /full   walk     2.32  +0.0  234.44
+   521  THE CRUCIBLE       27  THE CRUCIBLE      slagrun    -        156  158.0   2.0   (   3, 157, -36)   blackstone  /full   hop      3.37  +0.0  234.91
+   522  THE CRUCIBLE       27  THE CRUCIBLE      ascent     design   156  158.0   2.0   (   6, 157, -36)   netherbrick /full   hop      2.88  +0.0  235.32
+   523  THE CRUCIBLE       27  THE CRUCIBLE      ascent     design   156  159.0   3.0   (   9, 158, -36)   magma       /full   hop      2.88  +1.0  235.72
+   524  THE CRUCIBLE       27  THE CRUCIBLE      ascent     approa   156  159.0   3.0   (  12, 158, -35)   netherbrick /full   hop      3.04  +0.0  236.15
+   525  THE CRUCIBLE       27  THE CRUCIBLE      ascent     approa   156  159.0   3.0   (  15, 158, -34)   netherbrick /full   hop      3.04  +0.0  236.58
+   526  THE CRUCIBLE       27  THE CRUCIBLE      ascent     stair    156  160.0   4.0   (  17, 159, -35)   magma       /full   hop      2.12  +1.0  236.88
+   527  THE CRUCIBLE       27  THE CRUCIBLE      ascent     stair    156  161.0   5.0   (  18, 160, -37)   magma       /full   hop      2.12  +1.0  237.18
+   528  REEF GARDEN        28  THE CRUCIBLE      ascent     stair    161  162.0   1.0   (  20, 161, -34)   magma       /full   hop      3.10  +1.0  237.61
+   529  REEF GARDEN        28  REEF GARDEN       tideline   -        161  161.5   0.5   (  21, 161, -29)   sealantern  /slab   hop      4.65  -0.5  238.27
+   530  REEF GARDEN        28  REEF GARDEN       tideline   -        161  162.0   1.0   (  23, 161, -27)   sandstone   /full   walk     1.87  +0.5  238.61
+   531  REEF GARDEN        28  REEF GARDEN       tideline   -        161  163.0   2.0   (  25, 162, -25)   coral_red   /full   hop      3.10  +1.0  239.05
+   532  REEF GARDEN        28  REEF GARDEN       landmark   -        161  164.0   3.0   (  27, 163, -23)   prismarine  /full   hop      2.71  +1.0  239.43
+   533  REEF GARDEN        28  REEF GARDEN       landmark   -        161  165.0   4.0   (  29, 164, -21)   prismarine  /full   hop      2.71  +1.0  239.81
+   534  REEF GARDEN        28  REEF GARDEN       landmark   -        161  165.0   4.0   (  32, 164, -21)   prismarine  /full   hop      2.88  +0.0  240.22
+   535  REEF GARDEN        28  REEF GARDEN       landmark   -        161  165.0   4.0   (  33, 164, -17)   coral_red   /full   hop      4.00  +0.0  240.78
+   536  REEF GARDEN        28  REEF GARDEN       landmark   -        161  165.0   4.0   (  35, 164, -14)   prismarine  /full   hop      3.49  +0.0  241.27
+   537  REEF GARDEN        28  REEF GARDEN       lagoon     -        161  163.0   2.0   (  35, 162, -10)   prismarine  /full   hop      3.88  -2.0  241.82
+   538  REEF GARDEN        28  REEF GARDEN       lagoon     -        161  164.0   3.0   (  36, 163,  -7)   coral_red   /full   hop      3.04  +1.0  242.25
+   539  REEF GARDEN        28  REEF GARDEN       lagoon     -        161  165.0   4.0   (  36, 164,  -4)   coral_pink  /full   hop      2.88  +1.0  242.65
+   540  REEF GARDEN        28  REEF GARDEN       lagoon     -        161  163.0   2.0   (  37, 162,   1)   moss        /slime  hop      4.98  -2.0  243.35
+   541  REEF GARDEN        28  REEF GARDEN       lagoon     -        161  165.0   4.0   (  37, 164,   5)   coral_red   /full   bounce   3.32  +2.0  244.00
+   542  REEF GARDEN        28  REEF GARDEN       bars       -        161  163.0   2.0   (  36, 162,   9)   sand        /full   hop      4.33  -2.0  244.61
+   543  REEF GARDEN        28  REEF GARDEN       bars       -        161  163.5   2.5   (  35, 163,  11)   sandstone   /slab   walk     1.48  +0.5  244.89
+   544  REEF GARDEN        28  REEF GARDEN       bars       -        161  164.5   3.5   (  34, 164,  14)   sand        /slab   hop      3.10  +1.0  245.32
+   545  REEF GARDEN        28  REEF GARDEN       bars       -        161  165.0   4.0   (  33, 164,  17)   coral_pink  /full   hop      3.04  +0.5  245.75
+   546  REEF GARDEN        28  REEF GARDEN       fans       -        161  165.0   4.0   (  30, 164,  21)   sand        /full   hop      4.26  +0.0  246.35
+   547  REEF GARDEN        28  REEF GARDEN       ascent     design   161  165.0   4.0   (  28, 164,  23)   prismarine  /full   hop      3.02  +0.0  246.78
+   548  REEF GARDEN        28  REEF GARDEN       ascent     stair    161  166.0   5.0   (  26, 165,  25)   coral_red   /full   hop      2.71  +1.0  247.16
+   549  REEF GARDEN        28  REEF GARDEN       ascent     stair    161  167.0   6.0   (  26, 166,  28)   prismarine  /full   hop      2.88  +1.0  247.57
+   550  REEF GARDEN        28  REEF GARDEN       ascent     stair    161  168.0   7.0   (  23, 167,  28)   prismarine  /full   hop      2.88  +1.0  247.97
+   551  REEF GARDEN        28  REEF GARDEN       ascent     approa   161  168.0   7.0   (  21, 167,  31)   prismarine  /full   hop      3.49  +0.0  248.46
+   552  THE SILENCE        29  REEF GARDEN       ascent     crossi   167  167.0   0.0   (  18, 166,  34)   sculk       /floor  hop      4.12  -1.0  249.04
+   553  THE SILENCE        29  THE SILENCE       sill       -        167  168.0   1.0   (  15, 167,  36)   lantern     /full   hop      3.10  +1.0  249.48
+   554  THE SILENCE        29  THE SILENCE       sill       -        167  169.0   2.0   (  12, 168,  37)   spruce      /full   hop      3.07  +1.0  249.91
+   555  THE SILENCE        29  THE SILENCE       landmark   -        167  170.0   3.0   (   9, 169,  38)   blackstone  /full   hop      3.04  +1.0  250.34
+   556  THE SILENCE        29  THE SILENCE       landmark   -        167  171.0   4.0   (   6, 170,  39)   blackstone  /full   hop      3.04  +1.0  250.77
+   557  THE SILENCE        29  THE SILENCE       landmark   -        167  172.0   5.0   (   3, 171,  39)   blackstone  /full   hop      2.88  +1.0  251.17
+   558  THE SILENCE        29  THE SILENCE       landmark   -        167  173.0   6.0   (   0, 172,  39)   blackstone  /full   hop      2.88  +1.0  251.58
+   559  THE SILENCE        29  THE SILENCE       landmark   -        167  173.0   6.0   (  -1, 172,  42)   blackstone  /full   hop      3.04  +0.0  252.01
+   560  THE SILENCE        29  THE SILENCE       trestles   -        167  172.0   5.0   (  -4, 171,  42)   spruce      /full   hop      2.88  -1.0  252.41
+   561  THE SILENCE        29  THE SILENCE       trestles   -        167  173.0   6.0   (  -7, 172,  42)   oak         /full   hop      2.88  +1.0  252.82
+   562  THE SILENCE        29  THE SILENCE       trestles   -        167  172.0   5.0   ( -10, 171,  42)   lantern     /full   hop      2.88  -1.0  253.23
+   563  THE SILENCE        29  THE SILENCE       adit       -        167  172.0   5.0   ( -13, 171,  40)   blackstone  /full   hop      3.49  +0.0  253.72
+   564  THE SILENCE        29  THE SILENCE       adit       -        167  172.0   5.0   ( -15, 171,  38)   sculk       /full   walk     1.87  +0.0  254.05
+   565  THE SILENCE        29  THE SILENCE       collar     -        167  172.0   5.0   ( -18, 171,  36)   blackstone  /full   hop      3.96  +0.0  254.61
+   566  THE SILENCE        29  THE SILENCE       collar     -        167  173.0   6.0   ( -20, 172,  33)   iron        /full   hop      3.10  +1.0  255.04
+   567  THE SILENCE        29  THE SILENCE       campline   -        167  173.0   6.0   ( -23, 172,  30)   spruce      /full   hop      4.22  +0.0  255.64
+   568  THE SILENCE        29  THE SILENCE       campline   -        167  173.0   6.0   ( -25, 172,  29)   sculk       /full   walk     1.48  +0.0  255.90
+   569  THE SILENCE        29  THE SILENCE       campline   -        167  174.0   7.0   ( -28, 173,  27)   blackstone  /full   hop      3.10  +1.0  256.34
+   570  THE SILENCE        29  THE SILENCE       campline   -        167  173.0   6.0   ( -30, 172,  24)   oak         /full   hop      3.58  -1.0  256.84
+   571  THE SILENCE        29  THE SILENCE       campline   -        167  173.0   6.0   ( -32, 172,  21)   spruce      /full   hop      3.49  +0.0  257.33
+   572  THE SILENCE        29  THE SILENCE       campline   -        167  173.0   6.0   ( -33, 172,  19)   sculk       /full   walk     1.48  +0.0  257.59
+   573  THE SILENCE        29  THE SILENCE       campline   -        167  173.0   6.0   ( -34, 172,  15)   spruce      /full   hop      4.26  +0.0  258.19
+   574  THE SILENCE        29  THE SILENCE       ascent     design   167  173.0   6.0   ( -35, 172,  12)   lantern     /full   hop      3.04  +0.0  258.62
+   575  THE SILENCE        29  THE SILENCE       ascent     design   167  175.0   8.0   ( -35, 174,   9)   blackstone  /full   bubble   2.32  +2.0  259.19
+   576  THE SILENCE        29  THE SILENCE       ascent     design   167  176.0   9.0   ( -37, 175,   6)   iron        /full   hop      3.10  +1.0  259.63
+   577  THE SILENCE        29  THE SILENCE       ascent     approa   167  176.0   9.0   ( -38, 175,   3)   blackstone  /full   hop      3.14  +0.0  260.07
+   578  THE BELFRY         30  THE SILENCE       ascent     crossi   175  175.0   0.0   ( -38, 174,  -1)   plaster     /floor  hop      3.88  -1.0  260.62
+   579  THE BELFRY         30  THE BELFRY        lychgate   -        175  176.0   1.0   ( -38, 175,  -4)   lantern     /full   hop      2.88  +1.0  261.02
+   580  THE BELFRY         30  THE BELFRY        lychgate   -        175  176.5   1.5   ( -38, 176,  -7)   spruce      /slab   walk     2.32  +0.5  261.44
+   581  THE BELFRY         30  THE BELFRY        nave       -        175  177.0   2.0   ( -37, 176, -10)   sandstone   /full   hop      3.37  +0.5  261.92
+   582  THE BELFRY         30  THE BELFRY        nave       -        175  178.0   3.0   ( -35, 177, -13)   plaster     /full   hop      3.10  +1.0  262.35
+   583  THE BELFRY         30  THE BELFRY        nave       -        175  177.0   2.0   ( -35, 176, -17)   mossy       /full   hop      3.96  -1.0  262.91
+   584  THE BELFRY         30  THE BELFRY        cornice    -        175  177.0   2.0   ( -32, 176, -19)   sandstone   /full   hop      3.49  +0.0  263.40
+   585  THE BELFRY         30  THE BELFRY        cornice    -        175  177.0   2.0   ( -31, 176, -21)   spruce      /full   walk     1.48  +0.0  263.67
+   586  THE BELFRY         30  THE BELFRY        cornice    -        175  177.0   2.0   ( -29, 176, -24)   plaster     /full   hop      3.86  +0.0  264.21
+   587  THE BELFRY         30  THE BELFRY        cornice    -        175  177.0   2.0   ( -26, 176, -27)   chiselled   /full   hop      4.12  +0.0  264.79
+   588  THE BELFRY         30  THE BELFRY        landmark   -        175  177.0   2.0   ( -23, 176, -29)   sandstone   /full   hop      3.49  +0.0  265.28
+   589  THE BELFRY         30  THE BELFRY        landmark   -        175  177.0   2.0   ( -20, 176, -31)   sandstone   /full   hop      3.49  +0.0  265.77
+   590  THE BELFRY         30  THE BELFRY        landmark   -        175  177.0   2.0   ( -19, 176, -33)   sandstone   /full   hop      2.12  +0.0  266.07
+   591  THE BELFRY         30  THE BELFRY        landmark   -        175  177.0   2.0   ( -16, 176, -34)   spruce      /full   hop      3.04  +0.0  266.50
+   592  THE BELFRY         30  THE BELFRY        landmark   -        175  177.0   2.0   ( -12, 176, -35)   sandstone   /full   hop      4.00  +0.0  267.06
+   593  THE BELFRY         30  THE BELFRY        cornice    -        175  177.0   2.0   (  -9, 176, -36)   sandstone   /full   hop      3.04  +0.0  267.49
+   594  THE BELFRY         30  THE BELFRY        cornice    -        175  177.0   2.0   (  -7, 176, -37)   spruce      /full   walk     1.48  +0.0  267.76
+   595  THE BELFRY         30  THE BELFRY        cornice    -        175  177.0   2.0   (  -4, 176, -38)   plaster     /full   hop      3.42  +0.0  268.24
+   596  THE BELFRY         30  THE BELFRY        cornice    -        175  177.0   2.0   (   0, 176, -38)   chiselled   /full   hop      3.88  +0.0  268.78
+   597  THE BELFRY         30  THE BELFRY        cornice    -        175  177.0   2.0   (   3, 176, -37)   sandstone   /full   hop      3.04  +0.0  269.21
+   598  THE BELFRY         30  THE BELFRY        ascent     design   175  177.0   2.0   (   6, 176, -37)   lantern     /full   hop      2.88  +0.0  269.62
+   599  THE BELFRY         30  THE BELFRY        ascent     design   175  180.0   5.0   (   9, 179, -38)   sandstone   /full   climb    2.45  +3.0  271.31
+   600  THE BELFRY         30  THE BELFRY        ascent     approa   175  180.0   5.0   (  12, 179, -36)   sandstone   /full   hop      3.72  +0.0  271.84
+   601  THE BELFRY         30  THE BELFRY        ascent     approa   175  180.0   5.0   (  15, 179, -35)   sandstone   /full   hop      3.04  +0.0  272.27
+   602  WOOLWORKS          31  THE BELFRY        ascent     crossi   179  179.0   0.0   (  19, 178, -32)   wool_purple /floor  hop      4.88  -1.0  272.95
+   603  WOOLWORKS          31  WOOLWORKS         dyehouse   -        179  179.5   0.5   (  22, 179, -31)   glowstone   /slab   hop      3.04  +0.5  273.38
+   604  WOOLWORKS          31  WOOLWORKS         dyehouse   -        179  180.0   1.0   (  24, 179, -29)   oak         /full   walk     1.87  +0.5  273.73
+   605  WOOLWORKS          31  WOOLWORKS         dyehouse   -        179  181.0   2.0   (  27, 180, -27)   quartz      /full   hop      3.10  +1.0  274.16
+   606  WOOLWORKS          31  WOOLWORKS         skeins     -        179  181.0   2.0   (  29, 180, -24)   quartz      /full   hop      3.58  +0.0  274.67
+   607  WOOLWORKS          31  WOOLWORKS         skeins     -        179  182.0   3.0   (  31, 181, -22)   wool_yellow /full   hop      2.71  +1.0  275.05
+   608  WOOLWORKS          31  WOOLWORKS         skeins     -        179  183.0   4.0   (  33, 182, -19)   quartz      /full   hop      3.10  +1.0  275.48
+   609  WOOLWORKS          31  WOOLWORKS         skeins     -        179  181.0   2.0   (  35, 180, -15)   wool_yellow /full   hop      4.45  -2.0  276.11
+   610  WOOLWORKS          31  WOOLWORKS         landmark   -        179  182.0   3.0   (  36, 181, -12)   quartz      /full   hop      3.04  +1.0  276.54
+   611  WOOLWORKS          31  WOOLWORKS         landmark   -        179  183.0   4.0   (  37, 182,  -9)   quartz      /full   hop      3.04  +1.0  276.97
+   612  WOOLWORKS          31  WOOLWORKS         landmark   -        179  183.0   4.0   (  38, 182,  -7)   quartz      /full   hop      2.12  +0.0  277.27
+   613  WOOLWORKS          31  WOOLWORKS         landmark   -        179  183.0   4.0   (  38, 182,  -3)   wool_yellow /full   hop      3.88  +0.0  277.81
+   614  WOOLWORKS          31  WOOLWORKS         landmark   -        179  183.0   4.0   (  38, 182,   1)   quartz      /full   hop      3.88  +0.0  278.36
+   615  WOOLWORKS          31  WOOLWORKS         vats       -        179  181.0   2.0   (  37, 180,   5)   quartz      /full   hop      4.00  -2.0  278.92
+   616  WOOLWORKS          31  WOOLWORKS         vats       -        179  181.0   2.0   (  37, 180,   8)   oak         /full   walk     2.32  +0.0  279.34
+   617  WOOLWORKS          31  WOOLWORKS         vats       -        179  182.0   3.0   (  36, 181,  11)   wool_yellow /full   hop      3.09  +1.0  279.77
+   618  WOOLWORKS          31  WOOLWORKS         vats       -        179  183.0   4.0   (  35, 182,  14)   quartz      /full   hop      3.04  +1.0  280.20
+   619  WOOLWORKS          31  WOOLWORKS         hanks      -        179  183.0   4.0   (  34, 182,  18)   quartz      /full   hop      4.00  +0.0  280.77
+   620  WOOLWORKS          31  WOOLWORKS         hanks      -        179  183.0   4.0   (  32, 182,  20)   oak         /full   walk     1.87  +0.0  281.10
+   621  WOOLWORKS          31  WOOLWORKS         hanks      -        179  183.0   4.0   (  30, 182,  24)   quartz      /full   hop      4.26  +0.0  281.70
+   622  WOOLWORKS          31  WOOLWORKS         ascent     design   179  183.0   4.0   (  28, 182,  26)   quartz      /full   hop      2.71  +0.0  282.08
+   623  WOOLWORKS          31  WOOLWORKS         ascent     stair    179  184.0   5.0   (  26, 183,  28)   wool_yellow /full   hop      2.71  +1.0  282.46
+   624  WOOLWORKS          31  WOOLWORKS         ascent     stair    179  185.0   6.0   (  24, 184,  29)   quartz      /full   hop      2.12  +1.0  282.76
+   625  WOOLWORKS          31  WOOLWORKS         ascent     stair    179  186.0   7.0   (  22, 185,  31)   quartz      /full   hop      2.71  +1.0  283.14
+   626  THE VAULT          32  WOOLWORKS         ascent     crossi   185  185.0   0.0   (  19, 184,  34)   rawgold     /floor  hop      4.12  -1.0  283.72
+   627  THE VAULT          32  THE VAULT         door       -        185  186.0   1.0   (  17, 185,  36)   glowstone   /full   hop      2.71  +1.0  284.10
+   628  THE VAULT          32  THE VAULT         door       -        185  187.0   2.0   (  14, 186,  37)   blackstone  /full   hop      3.04  +1.0  284.53
+   629  THE VAULT          32  THE VAULT         door       -        185  187.0   2.0   (  12, 186,  38)   iron        /full   walk     1.48  +0.0  284.79
+   630  THE VAULT          32  THE VAULT         door       -        185  187.0   2.0   (  10, 186,  39)   chiselled   /full   walk     1.48  +0.0  285.06
+   631  THE VAULT          32  THE VAULT         door       -        185  188.0   3.0   (   7, 187,  40)   gold        /full   hop      3.10  +1.0  285.49
+   632  THE VAULT          32  THE VAULT         door       -        185  189.0   4.0   (   4, 188,  41)   glowstone   /full   hop      3.04  +1.0  285.92
+   633  THE VAULT          32  THE VAULT         landmark   -        185  189.0   4.0   (   1, 188,  42)   blackstone  /full   hop      3.04  +0.0  286.35
+   634  THE VAULT          32  THE VAULT         landmark   -        185  188.0   3.0   (  -2, 187,  43)   blackstone  /full   hop      3.04  -1.0  286.78
+   635  THE VAULT          32  THE VAULT         landmark   -        185  188.0   3.0   (  -6, 187,  42)   gold        /full   hop      4.00  +0.0  287.34
+   636  THE VAULT          32  THE VAULT         landmark   -        185  188.0   3.0   ( -10, 187,  42)   blackstone  /full   hop      3.88  +0.0  287.89
+   637  THE VAULT          32  THE VAULT         ledger     -        185  188.0   3.0   ( -13, 187,  39)   blackstone  /full   hop      4.12  +0.0  288.47
+   638  THE VAULT          32  THE VAULT         ledger     -        185  188.0   3.0   ( -16, 187,  39)   chiselled   /full   walk     2.32  +0.0  288.88
+   639  THE VAULT          32  THE VAULT         ledger     -        185  189.0   4.0   ( -18, 188,  37)   gold        /full   hop      2.96  +1.0  289.30
+   640  THE VAULT          32  THE VAULT         ledger     -        185  188.0   3.0   ( -22, 187,  35)   blackstone  /full   hop      4.35  -1.0  289.91
+   641  THE VAULT          32  THE VAULT         piers      -        185  187.0   2.0   ( -24, 186,  33)   blackstone  /full   hop      2.71  -1.0  290.29
+   642  THE VAULT          32  THE VAULT         piers      -        185  187.0   2.0   ( -26, 186,  31)   gold        /full   walk     1.87  +0.0  290.63
+   643  THE VAULT          32  THE VAULT         piers      -        185  188.0   3.0   ( -29, 187,  29)   iron        /full   hop      3.10  +1.0  291.06
+   644  THE VAULT          32  THE VAULT         piers      -        185  187.0   2.0   ( -31, 186,  26)   blackstone  /full   hop      3.58  -1.0  291.57
+   645  THE VAULT          32  THE VAULT         piers      -        185  187.0   2.0   ( -32, 186,  24)   gold        /full   walk     1.48  +0.0  291.83
+   646  THE VAULT          32  THE VAULT         piers      -        185  188.0   3.0   ( -34, 187,  21)   iron        /full   hop      3.10  +1.0  292.27
+   647  THE VAULT          32  THE VAULT         piers      -        185  187.0   2.0   ( -36, 186,  18)   blackstone  /full   hop      3.58  -1.0  292.77
+   648  THE VAULT          32  THE VAULT         piers      -        185  187.0   2.0   ( -37, 186,  15)   blackstone  /full   hop      3.04  +0.0  293.20
+   649  THE VAULT          32  THE VAULT         ascent     design   185  187.0   2.0   ( -38, 186,  12)   glowstone   /full   hop      3.04  +0.0  293.63
+   650  THE VAULT          32  THE VAULT         ascent     design   185  188.0   3.0   ( -39, 187,   9)   gold        /full   hop      3.04  +1.0  294.06
+   651  THE VAULT          32  THE VAULT         ascent     design   185  188.0   3.0   ( -39, 187,   6)   blackstone  /full   hop      2.88  +0.0  294.46
+   652  THE VAULT          32  THE VAULT         ascent     design   185  188.0   3.0   ( -40, 187,   3)   gold        /full   hop      3.04  +0.0  294.89
+   653  THE BELFRY         30  THE VAULT         ascent     design   175  189.0  14.0   ( -40, 188,   0)   glowstone   /full   hop      2.88  +1.0  295.30
+   654  THE WEIR           33  THE VAULT         ascent     crossi   190  190.0   0.0   ( -38, 189,  -2)   moss        /floor  hop      2.71  +1.0  295.68
+   655  THE WEIR           33  THE WEIR          headgate   -        190  191.0   1.0   ( -37, 190,  -5)   lantern     /full   hop      3.04  +1.0  296.11
+   656  THE WEIR           33  THE WEIR          headgate   -        190  192.0   2.0   ( -36, 191,  -8)   stonebrick  /full   hop      3.04  +1.0  296.53
+   657  THE WEIR           33  THE WEIR          crest      -        190  193.0   3.0   ( -35, 192, -11)   stonebrick  /full   hop      3.04  +1.0  296.96
+   658  THE WEIR           33  THE WEIR          crest      -        190  194.0   4.0   ( -34, 193, -14)   mossy       /full   hop      3.04  +1.0  297.39
+   659  THE WEIR           33  THE WEIR          crest      -        190  195.0   5.0   ( -32, 194, -17)   stonebrick  /full   hop      3.10  +1.0  297.83
+   660  THE WEIR           33  THE WEIR          crest      -        190  195.0   5.0   ( -30, 194, -21)   mossy       /full   hop      4.26  +0.0  298.43
+   661  THE WEIR           33  THE WEIR          landmark   -        190  196.0   6.0   ( -31, 195, -23)   stonebrick  /full   hop      2.12  +1.0  298.73
+   662  THE WEIR           33  THE WEIR          landmark   -        190  196.0   6.0   ( -28, 195, -26)   darkoak     /full   hop      4.12  +0.0  299.31
+   663  THE WEIR           33  THE WEIR          landmark   -        190  196.0   6.0   ( -25, 195, -29)   stonebrick  /full   hop      4.12  +0.0  299.89
+   664  THE WEIR           33  THE WEIR          tailrace   -        190  196.0   6.0   ( -22, 195, -30)   gravel      /full   hop      3.04  +0.0  300.32
+   665  THE WEIR           33  THE WEIR          tailrace   -        190  196.0   6.0   ( -20, 195, -31)   darkoak     /full   walk     1.48  +0.0  300.58
+   666  THE WEIR           33  THE WEIR          ford       -        190  196.0   6.0   ( -17, 195, -34)   mossy       /full   hop      4.26  +0.0  301.18
+   667  THE WEIR           33  THE WEIR          ford       -        190  196.0   6.0   ( -15, 195, -35)   cobble      /full   walk     1.48  +0.0  301.44
+   668  THE WEIR           33  THE WEIR          ford       -        190  196.0   6.0   ( -12, 195, -35)   stonebrick  /full   hop      3.23  +0.0  301.90
+   669  THE WEIR           33  THE WEIR          ford       -        190  196.0   6.0   (  -8, 195, -36)   mossy       /full   hop      4.00  +0.0  302.46
+   670  THE WEIR           33  THE WEIR          ford       -        190  196.0   6.0   (  -6, 195, -37)   cobble      /full   walk     1.48  +0.0  302.72
+   671  THE WEIR           33  THE WEIR          ford       -        190  196.0   6.0   (  -3, 195, -37)   stonebrick  /full   hop      3.23  +0.0  303.18
+   672  THE WEIR           33  THE WEIR          ford       -        190  196.0   6.0   (   1, 195, -37)   mossy       /full   hop      3.88  +0.0  303.72
+   673  THE WEIR           33  THE WEIR          ford       -        190  196.0   6.0   (   4, 195, -37)   cobble      /full   walk     2.32  +0.0  304.14
+   674  THE WEIR           33  THE WEIR          ford       -        190  196.0   6.0   (   8, 195, -36)   mossy       /full   hop      4.26  +0.0  304.74
+   675  THE WEIR           33  THE WEIR          ascent     design   190  196.0   6.0   (  11, 195, -35)   stonebrick  /full   hop      3.04  +0.0  305.16
+   676  THE WEIR           33  THE WEIR          ascent     design   190  197.0   7.0   (  14, 196, -34)   stonebrick  /full   hop      3.04  +1.0  305.59
+   677  THE WEIR           33  THE WEIR          ascent     stair    190  198.0   8.0   (  16, 197, -33)   darkoak     /full   hop      2.12  +1.0  305.89
+   678  BLUE RUN           34  THE WEIR          ascent     crossi   197  197.0   0.0   (  20, 196, -33)   blueice     /floor  hop      3.88  -1.0  306.44
+   679  BLUE RUN           34  BLUE RUN          startgate  -        197  198.0   1.0   (  23, 197, -32)   sealantern  /full   hop      3.04  +1.0  306.87
+   680  BLUE RUN           34  BLUE RUN          startgate  -        197  199.0   2.0   (  26, 198, -30)   spruce      /full   hop      3.10  +1.0  307.30
+   681  BLUE RUN           34  BLUE RUN          landmark   -        197  200.0   3.0   (  29, 199, -28)   packedice   /full   hop      3.10  +1.0  307.74
+   682  BLUE RUN           34  BLUE RUN          landmark   -        197  200.0   3.0   (  31, 199, -25)   packedice   /full   hop      3.58  +0.0  308.24
+   683  BLUE RUN           34  BLUE RUN          landmark   -        197  200.0   3.0   (  33, 199, -22)   packedice   /full   hop      3.49  +0.0  308.73
+   684  BLUE RUN           34  BLUE RUN          landmark   -        197  200.0   3.0   (  35, 199, -19)   packedice   /full   hop      3.49  +0.0  309.22
+   685  BLUE RUN           34  BLUE RUN          flume      -        197  200.0   3.0   (  35, 199, -15)   packedice   /full   hop      3.88  +0.0  309.77
+   686  BLUE RUN           34  BLUE RUN          flume      -        197  200.0   3.0   (  37, 199, -10)   blueice     /ice    slide    5.27  +0.0  310.30
+   687  BLUE RUN           34  BLUE RUN          flume      -        197  201.0   4.0   (  37, 200,  -7)   packedice   /full   hop      2.88  +1.0  310.70
+   688  BLUE RUN           34  BLUE RUN          flume      -        197  199.0   2.0   (  38, 198,  -2)   spruce      /slime  hop      4.98  -2.0  311.40
+   689  BLUE RUN           34  BLUE RUN          flume      -        197  201.0   4.0   (  38, 200,   1)   blueice     /full   bounce   2.32  +2.0  312.05
+   690  BLUE RUN           34  BLUE RUN          sump       -        197  199.0   2.0   (  38, 198,   5)   packedice   /full   hop      4.22  -2.0  312.65
+   691  BLUE RUN           34  BLUE RUN          sump       -        197  200.0   3.0   (  38, 199,   9)   blueice     /ice    slide    3.88  +1.0  313.04
+   692  BLUE RUN           34  BLUE RUN          staging    -        197  200.0   3.0   (  37, 199,  12)   blueice     /ice    slide    3.04  +0.0  313.34
+   693  BLUE RUN           34  BLUE RUN          staging    -        197  200.0   3.0   (  36, 199,  17)   packedice   /ice    slide    4.98  +0.0  313.84
+   694  BLUE RUN           34  BLUE RUN          staging    -        197  200.0   3.0   (  35, 199,  20)   spruce      /full   hop      3.04  +0.0  314.27
+   695  BLUE RUN           34  BLUE RUN          staging    -        197  200.0   3.0   (  33, 199,  23)   blueice     /ice    slide    3.49  +0.0  314.61
+   696  BLUE RUN           34  BLUE RUN          staging    -        197  200.0   3.0   (  30, 199,  26)   blueice     /ice    slide    4.12  +0.0  315.03
+   697  BLUE RUN           34  BLUE RUN          ascent     design   197  200.0   3.0   (  28, 199,  29)   spruce      /full   hop      3.49  +0.0  315.52
+   698  BLUE RUN           34  BLUE RUN          ascent     design   197  201.0   4.0   (  25, 200,  31)   blueice     /ice    slide    3.49  +1.0  315.87
+   699  BLUE RUN           34  BLUE RUN          ascent     design   197  202.0   5.0   (  22, 201,  33)   packedice   /ice    slide    3.49  +1.0  316.21
+   700  THE QUARRY         35  BLUE RUN          ascent     crossi   201  201.0   0.0   (  19, 200,  35)   terra_orange/floor  hop      3.49  -1.0  316.71
+   701  THE QUARRY         35  THE QUARRY        cut        -        201  202.0   1.0   (  16, 201,  36)   lantern     /full   hop      3.04  +1.0  317.13
+   702  THE QUARRY         35  THE QUARRY        cut        -        201  203.0   2.0   (  13, 202,  37)   spruce      /full   hop      3.04  +1.0  317.56
+   703  THE QUARRY         35  THE QUARRY        cut        -        201  203.0   2.0   (  11, 202,  38)   sandstone   /full   walk     1.48  +0.0  317.83
+   704  THE QUARRY         35  THE QUARRY        cut        -        201  204.0   3.0   (   8, 203,  38)   copper      /full   hop      3.09  +1.0  318.26
+   705  THE QUARRY         35  THE QUARRY        cut        -        201  204.0   3.0   (   6, 203,  39)   copper      /full   walk     1.48  +0.0  318.52
+   706  THE QUARRY         35  THE QUARRY        cut        -        201  203.0   2.0   (   1, 202,  40)   chiselled   /full   hop      4.98  -1.0  319.22
+   707  THE QUARRY         35  THE QUARRY        cut        -        201  204.0   3.0   (  -2, 203,  42)   sandstone   /full   hop      3.10  +1.0  319.66
+   708  THE QUARRY         35  THE QUARRY        cut        -        201  204.0   3.0   (  -6, 203,  44)   copper      /full   hop      4.26  +0.0  320.26
+   709  THE QUARRY         35  THE QUARRY        landmark   -        201  205.0   4.0   (  -8, 204,  43)   sandstone   /full   hop      2.12  +1.0  320.56
+   710  THE QUARRY         35  THE QUARRY        landmark   -        201  205.0   4.0   ( -12, 204,  42)   sandstone   /full   hop      4.00  +0.0  321.12
+   711  THE QUARRY         35  THE QUARRY        benches    -        201  205.0   4.0   ( -13, 204,  38)   sandstone   /full   hop      4.00  +0.0  321.69
+   712  THE QUARRY         35  THE QUARRY        spoil      -        201  206.0   5.0   ( -16, 205,  36)   terra_orange/full   hop      3.10  +1.0  322.12
+   713  THE QUARRY         35  THE QUARRY        spoil      -        201  206.0   5.0   ( -18, 205,  35)   spruce      /full   walk     1.48  +0.0  322.39
+   714  THE QUARRY         35  THE QUARRY        spoil      -        201  207.0   6.0   ( -21, 206,  33)   chiselled   /full   hop      3.10  +1.0  322.82
+   715  THE QUARRY         35  THE QUARRY        spoil      -        201  206.0   5.0   ( -24, 205,  31)   copper      /full   hop      3.58  -1.0  323.33
+   716  THE QUARRY         35  THE QUARRY        spoil      -        201  207.0   6.0   ( -27, 206,  29)   terra_orange/full   hop      3.10  +1.0  323.76
+   717  THE QUARRY         35  THE QUARRY        spoil      -        201  207.0   6.0   ( -29, 206,  27)   spruce      /full   walk     1.87  +0.0  324.10
+   718  THE QUARRY         35  THE QUARRY        spoil      -        201  208.0   7.0   ( -30, 207,  24)   chiselled   /full   hop      3.09  +1.0  324.53
+   719  THE QUARRY         35  THE QUARRY        spoil      -        201  207.0   6.0   ( -32, 206,  22)   copper      /full   hop      2.71  -1.0  324.91
+   720  THE QUARRY         35  THE QUARRY        spoil      -        201  207.0   6.0   ( -35, 206,  19)   terra_orange/full   hop      4.12  +0.0  325.49
+   721  THE QUARRY         35  THE QUARRY        spoil      -        201  207.0   6.0   ( -36, 206,  15)   terra_orange/full   hop      4.00  +0.0  326.06
+   722  THE QUARRY         35  THE QUARRY        ascent     design   201  207.0   6.0   ( -38, 206,  12)   lantern     /full   hop      3.49  +0.0  326.55
+   723  THE QUARRY         35  THE QUARRY        ascent     design   201  209.0   8.0   ( -37, 208,   8)   sandstone   /full   bubble   3.42  +2.0  327.28
+   724  THE QUARRY         35  THE QUARRY        ascent     design   201  210.0   9.0   ( -39, 209,   5)   copper      /full   hop      3.10  +1.0  327.72
+   725  ROPE BRIDGE        36  THE QUARRY        ascent     crossi   209  209.0   0.0   ( -40, 208,   0)   grass       /floor  hop      4.98  -1.0  328.42
+   726  ROPE BRIDGE        36  ROPE BRIDGE       bridgehead -        209  210.0   1.0   ( -40, 209,  -3)   lantern     /full   hop      2.88  +1.0  328.82
+   727  ROPE BRIDGE        36  ROPE BRIDGE       bridgehead -        209  210.5   1.5   ( -39, 210,  -5)   spruce      /slab   walk     1.48  +0.5  329.10
+   728  ROPE BRIDGE        36  ROPE BRIDGE       bridgehead -        209  211.0   2.0   ( -39, 210,  -8)   spruce      /full   hop      3.23  +0.5  329.56
+   729  ROPE BRIDGE        36  ROPE BRIDGE       bridgehead -        209  212.0   3.0   ( -39, 211, -11)   spruce      /full   hop      2.88  +1.0  329.96
+   730  ROPE BRIDGE        36  ROPE BRIDGE       bridgehead -        209  213.0   4.0   ( -38, 212, -14)   spruce      /full   hop      3.04  +1.0  330.39
+   731  ROPE BRIDGE        36  ROPE BRIDGE       thespan    -        209  214.0   5.0   ( -37, 213, -17)   oak         /full   hop      3.04  +1.0  330.82
+   732  ROPE BRIDGE        36  ROPE BRIDGE       thespan    -        209  215.0   6.0   ( -36, 214, -20)   oak         /full   hop      3.04  +1.0  331.25
+   733  ROPE BRIDGE        36  ROPE BRIDGE       thespan    -        209  215.0   6.0   ( -34, 214, -23)   oak         /full   hop      3.49  +0.0  331.74
+   734  ROPE BRIDGE        36  ROPE BRIDGE       thespan    -        209  214.0   5.0   ( -31, 213, -27)   mossy       /full   hop      4.88  -1.0  332.43
+   735  ROPE BRIDGE        36  ROPE BRIDGE       thespan    -        209  215.0   6.0   ( -28, 214, -29)   coarse      /full   hop      3.10  +1.0  332.86
+   736  ROPE BRIDGE        36  ROPE BRIDGE       shallows   -        209  215.0   6.0   ( -25, 214, -32)   mossy       /full   hop      4.22  +0.0  333.46
+   737  ROPE BRIDGE        36  ROPE BRIDGE       planks     -        209  215.0   6.0   ( -23, 214, -34)   oak         /full   hop      2.71  +0.0  333.84
+   738  ROPE BRIDGE        36  ROPE BRIDGE       planks     -        209  215.0   6.0   ( -21, 214, -35)   spruce      /full   walk     1.48  +0.0  334.10
+   739  ROPE BRIDGE        36  ROPE BRIDGE       planks     -        209  215.0   6.0   ( -18, 214, -37)   oak         /full   hop      3.86  +0.0  334.64
+   740  ROPE BRIDGE        36  ROPE BRIDGE       planks     -        209  215.0   6.0   ( -15, 214, -38)   oak         /full   hop      3.04  +0.0  335.07
+   741  ROPE BRIDGE        36  ROPE BRIDGE       planks     -        209  215.0   6.0   ( -12, 214, -38)   spruce      /full   walk     2.32  +0.0  335.49
+   742  ROPE BRIDGE        36  ROPE BRIDGE       planks     -        209  215.0   6.0   (  -9, 214, -40)   oak         /full   hop      3.78  +0.0  336.02
+   743  ROPE BRIDGE        36  ROPE BRIDGE       planks     -        209  215.0   6.0   (  -6, 214, -39)   oak         /full   hop      3.04  +0.0  336.45
+   744  ROPE BRIDGE        36  ROPE BRIDGE       planks     -        209  215.0   6.0   (  -3, 214, -39)   spruce      /full   walk     2.32  +0.0  336.86
+   745  ROPE BRIDGE        36  ROPE BRIDGE       planks     -        209  215.0   6.0   (   0, 214, -40)   oak         /full   hop      3.37  +0.0  337.33
+   746  ROPE BRIDGE        36  ROPE BRIDGE       planks     -        209  215.0   6.0   (   3, 214, -39)   oak         /full   hop      3.04  +0.0  337.76
+   747  ROPE BRIDGE        36  ROPE BRIDGE       planks     -        209  215.0   6.0   (   6, 214, -39)   spruce      /full   walk     2.32  +0.0  338.18
+   748  ROPE BRIDGE        36  ROPE BRIDGE       ascent     design   209  215.0   6.0   (   9, 214, -36)   lantern     /full   hop      4.24  +0.0  338.77
+   749  ROPE BRIDGE        36  ROPE BRIDGE       ascent     design   209  217.0   8.0   (  14, 216, -34)   mossy       /full   bubble   4.65  +2.0  339.69
+   750  ROPE BRIDGE        36  ROPE BRIDGE       ascent     crossi   209  217.0   8.0   (  16, 216, -33)   netherrack  /full   hop      2.48  +0.0  340.04
+   751  BASALT FLUES       37  ROPE BRIDGE       ascent     crossi   216  216.0   0.0   (  20, 215, -33)   netherrack  /floor  hop      3.88  -1.0  340.59
+   752  BASALT FLUES       37  BASALT FLUES      crust      -        216  217.0   1.0   (  23, 216, -32)   glowstone   /full   hop      3.04  +1.0  341.01
+   753  BASALT FLUES       37  BASALT FLUES      crust      -        216  218.0   2.0   (  26, 217, -30)   blackstone  /full   hop      3.10  +1.0  341.45
+   754  BASALT FLUES       37  BASALT FLUES      crust      -        216  218.0   2.0   (  28, 217, -28)   magma       /full   walk     1.87  +0.0  341.78
+   755  BASALT FLUES       37  BASALT FLUES      crust      -        216  218.0   2.0   (  30, 217, -26)   soulsand    /full   walk     1.87  +0.0  342.12
+   756  BASALT FLUES       37  BASALT FLUES      crust      -        216  219.0   3.0   (  32, 218, -24)   blackstone  /full   hop      3.10  +1.0  342.55
+   757  BASALT FLUES       37  BASALT FLUES      crust      -        216  220.0   4.0   (  34, 219, -21)   glowstone   /full   hop      3.10  +1.0  342.99
+   758  BASALT FLUES       37  BASALT FLUES      crust      -        216  218.0   2.0   (  37, 217, -17)   magma       /slime  hop      4.98  -2.0  343.69
+   759  BASALT FLUES       37  BASALT FLUES      crust      -        216  220.0   4.0   (  37, 219, -13)   magma       /full   bounce   3.32  +2.0  344.34
+   760  BASALT FLUES       37  BASALT FLUES      crust      -        216  221.0   5.0   (  39, 220, -10)   blackstone  /full   hop      3.10  +1.0  344.77
+   761  BASALT FLUES       37  BASALT FLUES      crust      -        216  222.0   6.0   (  40, 221,  -7)   blackstone  /full   hop      3.10  +1.0  345.21
+   762  BASALT FLUES       37  BASALT FLUES      crust      -        216  223.0   7.0   (  41, 222,  -4)   blackstone  /full   hop      3.04  +1.0  345.64
+   763  BASALT FLUES       37  BASALT FLUES      crust      -        216  224.0   8.0   (  41, 223,  -1)   blackstone  /full   hop      2.88  +1.0  346.04
+   764  BASALT FLUES       37  BASALT FLUES      landmark   -        216  222.0   6.0   (  41, 221,   3)   blackstone  /full   hop      3.88  -2.0  346.59
+   765  BASALT FLUES       37  BASALT FLUES      soffit     -        216  222.0   6.0   (  40, 221,   7)   blackstone  /full   hop      4.00  +0.0  347.15
+   766  BASALT FLUES       37  BASALT FLUES      soffit     -        216  222.0   6.0   (  40, 221,  10)   soulsand    /full   walk     2.32  +0.0  347.57
+   767  BASALT FLUES       37  BASALT FLUES      soffit     -        216  223.0   7.0   (  39, 222,  13)   magma       /full   hop      3.09  +1.0  348.00
+   768  BASALT FLUES       37  BASALT FLUES      soffit     -        216  222.0   6.0   (  38, 221,  17)   netherrack  /full   hop      4.00  -1.0  348.57
+   769  BASALT FLUES       37  BASALT FLUES      ashbank    -        216  222.0   6.0   (  36, 221,  20)   netherrack  /full   hop      3.49  +0.0  349.06
+   770  BASALT FLUES       37  BASALT FLUES      ashbank    -        216  222.0   6.0   (  34, 221,  22)   soulsand    /full   walk     1.87  +0.0  349.39
+   771  BASALT FLUES       37  BASALT FLUES      ashbank    -        216  222.0   6.0   (  33, 221,  25)   magma       /full   hop      3.48  +0.0  349.88
+   772  BASALT FLUES       37  BASALT FLUES      ashbank    -        216  222.0   6.0   (  30, 221,  27)   netherrack  /full   hop      3.49  +0.0  350.37
+   773  BASALT FLUES       37  BASALT FLUES      ascent     approa   216  222.0   6.0   (  28, 221,  29)   blackstone  /full   hop      2.71  +0.0  350.75
+   774  BASALT FLUES       37  BASALT FLUES      ascent     approa   216  222.0   6.0   (  26, 221,  31)   blackstone  /full   hop      2.71  +0.0  351.14
+   775  BASALT FLUES       37  BASALT FLUES      ascent     approa   216  222.0   6.0   (  24, 221,  33)   blackstone  /full   hop      2.71  +0.0  351.52
+   776  BASALT FLUES       37  BASALT FLUES      ascent     stair    216  223.0   7.0   (  22, 222,  32)   magma       /full   hop      2.12  +1.0  351.81
+   777  THE PILLARS        38  BASALT FLUES      ascent     crossi   222  222.0   0.0   (  19, 221,  34)   purpur      /floor  hop      3.49  -1.0  352.31
+   778  THE PILLARS        38  THE PILLARS       colonnade  -        222  223.0   1.0   (  16, 222,  34)   sealantern  /full   hop      2.88  +1.0  352.71
+   779  THE PILLARS        38  THE PILLARS       colonnade  -        222  224.0   2.0   (  13, 223,  35)   obsidian    /full   hop      3.04  +1.0  353.14
+   780  THE PILLARS        38  THE PILLARS       colonnade  -        222  224.0   2.0   (  11, 223,  37)   endstone    /full   walk     1.87  +0.0  353.47
+   781  THE PILLARS        38  THE PILLARS       colonnade  -        222  223.5   1.5   (   7, 223,  39)   obsidian    /slab   hop      4.64  -0.5  354.13
+   782  THE PILLARS        38  THE PILLARS       colonnade  -        222  224.0   2.0   (   4, 223,  39)   obsidian    /full   hop      2.88  +0.5  354.53
+   783  THE PILLARS        38  THE PILLARS       colonnade  -        222  225.0   3.0   (   1, 224,  39)   chorus      /full   hop      2.88  +1.0  354.94
+   784  THE PILLARS        38  THE PILLARS       colonnade  -        222  224.0   2.0   (  -4, 223,  38)   endstone    /full   hop      4.98  -1.0  355.64
+   785  THE PILLARS        38  THE PILLARS       landmark   -        222  224.0   2.0   (  -8, 223,  38)   obsidian    /full   hop      3.88  +0.0  356.19
+
+  landings                 786
+  levels traversed         36  (BASALT FLUES, THE PILLARS, SPORE HOLLOW, THE ARCHIVE, PUMPKIN ROWS, THE GROVE, DUST DEVILS, THE SEA GATE, THE CORNICE, WART FIELDS, ECHO SHAFT, THE WHITE STAIR ...)
+  blocks climbed           325  (+198 net)
+  simulated seconds        356.2
+  after 5 minutes          landing 664 of 786, THE WEIR, 300.3 s
