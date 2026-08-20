@@ -196,12 +196,67 @@ AXIS_BIAS = 0.05
 TANGENT_MIX = 0.45
 TANGENT_LOOK = 15.0
 PITCH_BIAS = 0.30
-#: How far out over the drop a ladder or bubble ride looks, and how hard.
-#: See the note beside the blend itself: the ride is the one move whose body
-#: is pinned against the core, so it is the one move whose camera must not be
-#: aimed inboard.
-RIDE_LOOK = 14.0
-RIDE_OUT = 0.70
+#: The ride: how far past the wall the head aims, how far up it, how hard, and
+#: how quickly it gets there and back.
+#:
+#: **A ride looks at the ladder.** This used to swing the aim fourteen metres
+#: radially *outward* -- a ninety-degree snap the instant the body grabbed the
+#: column, held for the whole ride, and snapped back. It was written to answer
+#: a jam metric (42% of climb frames were most-of-the-frame-one-near-surface)
+#: and it answered it by turning the camera away from the move, so a climb was
+#: eight blocks of blank wall sliding past on one side and empty sky on the
+#: other, with the ladder never once in shot. The owner's report is the honest
+#: reading of that: *it looks very far to the outside, and it would be better
+#: if it looked towards the ladder instead of doing a full ninety-degree
+#: switch all of a sudden.*
+#:
+#: The metric was measuring the wrong thing. Climbing a ladder in the real game
+#: *is* a near surface filling most of the frame -- that is what a wall you are
+#: two feet from looks like -- and what makes it read as climbing rather than
+#: as being stuck is that the rungs are there, moving. So the head turns to the
+#: wall the column is bolted to, eased over about a quarter of a second, and
+#: the ladder is drawn on that wall's face (:data:`LADDER_HUG`) instead of
+#: floating half a block off it.
+#:
+#: ``RIDE_WALL`` is past the wall rather than at it -- the wall is one cell
+#: away, and an aim point *on* it swings wildly as the body drifts within its
+#: own cell.
+RIDE_WALL = 2.6
+RIDE_RISE = 2.2
+RIDE_MIX = 0.88
+#: ...and how much of the aim comes from along the corridor instead of square
+#: at the wall. Aimed dead at it, the ladder plate is 0.42 m from the eye and
+#: fills the entire frame with rungs -- which is worse than the ninety-degree
+#: swing it replaced, and only the frames say so. A three-quarter view puts the
+#: ladder up one side of the frame with the wall it climbs behind it, which is
+#: what a climb looks like from behind the shoulder in the real game.
+RIDE_SIDE = 0.26
+#: ...and how far up the head tilts while riding, in radians, taken over
+#: outright: about thirty-six degrees. See the note at the blend.
+RIDE_PITCH = -0.62
+#: Ease rate for the turn, in units a second: about a quarter of a second in
+#: and the same out. Driven by the body's own vertical speed rather than by the
+#: phase, so the turn arrives with the grab and leaves with the step-off
+#: instead of at a boundary the viewer cannot see.
+RIDE_EASE = 4.0
+
+#: How far along the wall's own face a ladder or a vine plate is drawn, from
+#: the centre of the cell the body rides in.
+#:
+#: It was zero: the plate sat in the middle of its cell, half a block clear of
+#: the block it is supposed to be nailed to, so a ladder read as a wooden
+#: lattice hanging in the air near a wall. In the game a ladder is *on* the
+#: face, and the player stands in the cell next to it -- so at 0.42 the body's
+#: eye is about half a metre from the rungs, which is the real game's number.
+LADDER_HUG = 0.34
+
+#: Head under water: how blue the frame goes at most, and how fast it gets
+#: there. A bubble column is a column of *liquid* and the body rides up the
+#: inside of it -- so for those two seconds the eye is submerged, and nothing
+#: in the frame said so. Tinted toward the liquid's own colour rather than a
+#: fixed blue, because the nether family's column is lava.
+SUBMERGE_ALPHA = 96
+SUBMERGE_EASE = 7.0
 #: The furthest *in* the camera's aim point may be, measured from the rim. The
 #: outer clamp beside it has always existed; this is the same rule at the other
 #: end and it was missing.
@@ -332,6 +387,18 @@ class SpiralScene(Scene):
         self.pitch = 0.10
         self._flick = 0.0
         self._roll = 0.0
+        #: How much of the ride camera is showing, 0..1, eased. See
+        #: :data:`RIDE_EASE`; it is also what tells the pitch to measure from
+        #: the body rather than from the surface the feet left.
+        self.ride = 0.0
+        #: ...and how much of the frame is under the liquid of a bubble
+        #: column, with the colour to wash it toward.
+        self.submerged = 0.0
+        self.submerged_rgb = (60, 130, 210)
+        #: The cell the head is in, refreshed once a frame by ``_draw_course``
+        #: and read by ``_draw_furniture``. Seeded here because a scene may be
+        #: asked to draw before it has ever updated.
+        self._eye_cell = (0, 0, 0)
         self._begin_ground()
         self.yaw = math.atan2(blk["step"][0], -blk["step"][1])
 
@@ -750,6 +817,19 @@ class SpiralScene(Scene):
         # frame's exposure reads as a rendering fault rather than as going
         # indoors.
         self.indoor += (want - self.indoor) * min(1.0, dt * 3.2)
+        # Head under water. A bubble column is a column of liquid and the body
+        # rides up the *inside* of it, so for those two seconds the eye is
+        # submerged -- and until now the only thing that said so was the
+        # translucent cell you were in the middle of, which from the inside is
+        # nearly nothing. Eased, because a whole-frame colour switched at a
+        # phase boundary reads as a rendering fault.
+        ride = self._ride_face()
+        under = 0.0
+        if ride is not None and self.move.kind == "bubble" \
+                and ride[1] in _TRANSLUCENT and self.vy > 0.4:
+            under = 1.0
+            self.submerged_rgb = self._colour(ride[1])
+        self.submerged += (under - self.submerged) * min(1.0, dt * SUBMERGE_EASE)
         self._settle(dt)
         self.swing = max(0.0, self.swing - dt * 3.0)
         self.mine = max(0.0, self.mine - dt * 3.2)
@@ -804,6 +884,28 @@ class SpiralScene(Scene):
                                      count=8, speed=2.2, rng=self.hop_rng)
 
     # -- camera ------------------------------------------------------------
+
+    def _ride_face(self):
+        """The wall this ride is bolted to, as ``((ax, az), style)``, or None.
+
+        Worked out when the move was solved and carried on the *landing's* soft
+        cells -- the column belongs to the block being climbed to, not to the
+        one being left -- because at draw time the only honest answer would be
+        a cube. :meth:`spiralplan.Course._climb_move` is where it is chosen: it
+        is the first of the four horizontal neighbours with solid rock or
+        pedestal beside the column's middle and its top, which is the thing a
+        ladder in this world can actually hang on.
+        """
+        if self.phase != "move" or self.move is None:
+            return None
+        if self.move.kind not in ("climb", "bubble"):
+            return None
+        last = len(self.course.blocks) - 1
+        nxt = self.course.blocks[min(self.index + 1, last)]
+        for s in nxt["soft"]:
+            if s.get("face"):
+                return s["face"], s["style"]
+        return None
 
     def _look(self, dt: float) -> None:
         """Turn the head toward where the climb is going.
@@ -920,10 +1022,31 @@ class SpiralScene(Scene):
         # 1.0% of hops -- three quarters of every jammed frame in the run, and
         # the longest-standing visual complaint the project has. The pitch
         # already tilts up for the view; the yaw was still aimed at the rungs.
-        if self.phase == "move" and self.move.kind in ("climb", "bubble"):
-            r = math.hypot(x, z) or 1.0
-            aim[0] += (x + x / r * RIDE_LOOK - aim[0]) * RIDE_OUT
-            aim[2] += (z + z / r * RIDE_LOOK - aim[2]) * RIDE_OUT
+        ride = self._ride_face()
+        # Driven by the body's own vertical speed, not by the phase: a ride is
+        # three legs -- a hop onto the column, the climb, a step off -- and
+        # only the middle one is the thing the camera turns for. Keyed to the
+        # phase, the turn began before the hands were on the ladder and let go
+        # before the feet were off it.
+        want_ride = 1.0 if (ride is not None and self.vy > 0.4) else 0.0
+        self.ride += (want_ride - self.ride) * min(1.0, dt * RIDE_EASE)
+        if self.ride > 0.01 and ride is not None:
+            ax, az = ride[0]
+            # Square at the wall, then swung along the corridor: see
+            # ``RIDE_SIDE``. The tangent is the one already computed for the
+            # corridor pull, and its sign is chosen so the swing is *forward*
+            # -- swung backwards the climb is spent looking at where you came
+            # from, which is the same defect as before with a different angle.
+            sx, sz = tx, tz
+            if sx * ax + sz * az > 0.0:
+                sx, sz = -sx, -sz
+            px = ax * (1.0 - RIDE_SIDE) + sx * RIDE_SIDE
+            pz = az * (1.0 - RIDE_SIDE) + sz * RIDE_SIDE
+            n = math.hypot(px, pz) or 1.0
+            g = self.ride * RIDE_MIX
+            aim[0] += (x + px / n * RIDE_WALL - aim[0]) * g
+            aim[1] += (self.pos[1] + RIDE_RISE - aim[1]) * g
+            aim[2] += (z + pz / n * RIDE_WALL - aim[2]) * g
 
         # The flick, and it is half what it was. A landing here is a tenth of
         # a second and the next move begins straight out of it, so at 22 the
@@ -941,12 +1064,28 @@ class SpiralScene(Scene):
         # off the arc, the wanted pitch swings against the jump and the world
         # pitches about twice as far as the body does. See the flat scene's
         # ``_look`` for the whole of it.
-        want = math.atan2(self.land_y + tp.EYE - (aim[1] + tp.EYE * 0.95),
+        # ...except on a ride, where the surface the feet left is at the bottom
+        # of the climb and gets further away every frame: measured from it, the
+        # pitch winds steadily further up the longer the ladder is, and an
+        # eight-block column ends with the camera looking at the sky. A
+        # climbing body's reference is the body.
+        from_y = self.pos[1] if self.ride > 0.01 else self.land_y
+        want = math.atan2(from_y + tp.EYE - (aim[1] + tp.EYE * 0.95),
                           max(3.2, flat))
         # Riding something looks *up* it. A ladder or a bubble column is the
         # one moment in the run with time to spare, and spending it looking at
         # the rungs is the difference between a lift and a climb.
-        if self.phase == "move" and self.move.kind in ("climb", "bubble"):
+        if self.ride > 0.01:
+            # Taken over outright rather than nudged, and it replaces
+            # ``PITCH_BIAS`` too. The eye is half a metre from a wall, so the
+            # only thing a level camera can frame is that wall -- measured off
+            # the frames, two thirds of a ladder ride was one flat untextured
+            # face with the rungs off the top edge. Pitched up, the plate the
+            # body is holding sits along the bottom of the frame where a pair
+            # of hands would be and the ladder runs away up the middle of it,
+            # which is what climbing one looks like.
+            want += (RIDE_PITCH - PITCH_BIAS - want) * self.ride
+        elif self.phase == "move" and self.move.kind in ("climb", "bubble"):
             want -= 0.42
         else:
             # Gently: a jump swings ``vy`` from +8.4 to -8.4, so at the 0.028
@@ -1118,6 +1257,7 @@ class SpiralScene(Scene):
         rl.EndMode3D()
 
         self.weather.draw(self.elapsed)
+        self._draw_submerged()
         self._draw_crosshair()
         self._draw_hud()
 
@@ -1193,6 +1333,10 @@ class SpiralScene(Scene):
     def _draw_course(self) -> None:
         eye = (self.camera.position.x, self.camera.position.y,
                self.camera.position.z)
+        # The cell the head is in this frame. ``x`` and ``z`` of a cell are its
+        # centre and ``y`` is its floor, which is the project's oldest landmine
+        # and the reason this is not three calls to the same rounding.
+        self._eye_cell = (round(eye[0]), math.floor(eye[1]), round(eye[2]))
         for blk in self.course.blocks:
             if blk["form"] == "floor":
                 continue          # it is the building; the volume drew it
@@ -1294,7 +1438,13 @@ class SpiralScene(Scene):
                 # what this was -- they read as a solid pillar of wood, which
                 # is not a thing the game has.
                 ax, az = s["face"]
-                rl.DrawModelEx(model.model, at, (0, 1, 0),
+                # ...and *on* that face, not in the middle of the cell. See
+                # ``LADDER_HUG``: a plate at the cell's centre stands half a
+                # block clear of the block it is nailed to, which is a lattice
+                # hanging in the air rather than a ladder.
+                rl.DrawModelEx(model.model,
+                               (at[0] + ax * LADDER_HUG, at[1],
+                                at[2] + az * LADDER_HUG), (0, 1, 0),
                                math.degrees(math.atan2(-ax, az)),
                                (1.0, 1.0, 1.0), self._fog(dist, alpha))
                 continue
@@ -1365,6 +1515,28 @@ class SpiralScene(Scene):
         except Exception:
             y = int(self.height * 0.5)
         return max(int(self.height * 0.05), min(int(self.height * 0.95), y))
+
+    def _draw_submerged(self) -> None:
+        """Wash the frame toward the liquid while the head is inside it.
+
+        Over the weather and under the HUD: rain falling *behind* a wall of
+        water is the one ordering that is obviously wrong, and a tinted score
+        readout is the other. Two draws -- a flat wash and a heavier edge --
+        because a uniform tint reads as a colour-grade and the darkening at
+        the sides is what says you are looking through something.
+        """
+        if self.submerged <= 0.01:
+            return
+        a = int(SUBMERGE_ALPHA * self.submerged)
+        rl.DrawRectangle(0, 0, self.width, self.height,
+                         rl.rgba(self.submerged_rgb, a))
+        edge = max(1, int(self.width * 0.18))
+        for i in range(3):
+            f = (i + 1) / 3.0
+            w = int(edge * f)
+            b = rl.rgba(self.submerged_rgb, int(a * 0.55 * f))
+            rl.DrawRectangle(0, 0, w, self.height, b)
+            rl.DrawRectangle(self.width - w, 0, w, self.height, b)
 
     def _draw_haze(self, pal) -> None:
         """Aerial perspective at the horizon, in two directions.

@@ -2115,6 +2115,66 @@ free draws: a run covers about a revolution a minute, so four pieces that
 happen to land on one bearing are four pieces at once and then nothing for a
 minute.
 
+## The ride looks at the ladder (2026-08-20, later)
+
+The owner on the tower's climbs: *"when a player jumps into the water or onto a
+ladder to get further up, it looks very far to the outside -- essentially to
+the right. It would be better if it didn't just do a full ninety-degree switch
+all of a sudden but actually looked towards the ladder. And maybe the ladder
+can be made visually closer to the block so it looks like climbing a ladder in
+Minecraft. In the water the screen could go a bit bluer, because the player's
+head would be inside the water."*
+
+All four were real, and the first is a lesson about metrics. `RIDE_OUT` swung
+the aim fourteen metres radially *outward* the instant the body grabbed the
+column, held it for the whole ride, and snapped back. It was written to answer
+a jam metric -- 42% of climb frames were most-of-the-frame-one-near-surface --
+and it answered it by **turning the camera away from the move**. Nobody looked,
+because a ride is two seconds long, fires on a fraction of level exits, and
+arrives somewhere nobody chooses. `tools/ride_shot.py` is the tool that ends
+that: it rolls a scene on until a climb, a bubble ride or a web wade starts and
+renders every frame of it and the second either side. The first sheet it
+produced is eight blocks of blank wall on one side and empty sky on the other,
+with the ladder never once in shot.
+
+The metric was measuring the wrong thing. Climbing a ladder in the real game
+*is* a near surface filling most of the frame; what makes it read as climbing
+rather than as being stuck is that the rungs are there and moving.
+
+- **The head turns to the wall the column is bolted to** -- `_ride_face` reads
+  the face off the landing's soft cells, where `_climb_move` recorded it --
+  eased over about a quarter of a second (`RIDE_EASE`) and **driven by the
+  body's own vertical speed rather than by the phase**, so the turn arrives
+  with the grab and leaves with the step-off rather than at a boundary the
+  viewer cannot see.
+- **Not square at it** (`RIDE_SIDE`): aimed dead on, the plate is 0.4 m from
+  the eye and fills the frame with rungs, which is worse than what it replaced.
+  At 0.26 of a swing along the corridor it is a three-quarter view.
+- **And pitched up 36 degrees** (`RIDE_PITCH`), taken over outright rather than
+  nudged, and replacing `PITCH_BIAS` for the duration. The eye is half a metre
+  from a wall, so a level camera can frame nothing but that wall: measured off
+  the frames, two thirds of a ride was one flat untextured face with the rungs
+  off the top edge.
+- **The ladder is drawn on the wall's face** (`LADDER_HUG = 0.34`). It was at
+  the centre of its own cell, half a block clear of the block it is nailed to,
+  which is a lattice hanging in the air.
+- **The head goes under water** (`_draw_submerged`): a bubble column is a
+  column of *liquid* and the body rides up the inside of it. Tinted toward the
+  liquid's own colour, because the nether family's column is lava, and drawn
+  over the weather and under the HUD.
+
+Yaw per frame on the tower: p99 **7.4 -> 5.45 degrees**, worst **25.6 ->
+13.86** -- the ninety-degree switch was most of that worst case. Everything
+else in `flow_probe` is unchanged.
+
+Two things tried and reverted, both visible only in frames. **Culling the rung
+the eye is inside** sounds right -- one plate is always 0.4 m from the lens --
+and it leaves a bare wall with the ladder off the top edge; the near plate is
+the thing you are holding, and pitching up puts it along the bottom of the
+frame where a pair of hands would be. And **`LADDER_HUG` at 0.42** buries the
+plate: the model's own geometry sits 0.14 behind its origin, so anything past
+about 0.36 puts it inside the wall block and the ladder vanishes entirely.
+
 ## Known limit: how long a parkour jump can be
 
 There is one jump impulse and one horizontal speed, so the furthest a hop can
@@ -2228,6 +2288,13 @@ long jumps you need a different motion model, not a bigger number.
   the physics on paper (`--design-only` needs nothing built and is instant),
   then how much of the design survived being placed, per level and per beat.
   Run it after touching a level. A beat under 98% is a design to look at.
+- `python tools/ride_shot.py --scene spiral --seed 3 --kind climb` renders every
+  frame of one ladder climb, bubble ride or web wade, plus the second either
+  side, and tiles it. A ride is two seconds long and arrives somewhere nobody
+  chooses, which is how the ride camera spent months aimed at the wrong thing
+  with every number green. `--kind bubble` for the underwater one. **Look at
+  the individual frames as well as the sheet**: a twenty-frame sheet at strip
+  size is too small to see that the ladder is missing.
 - `python tools/arc_probe.py --runs 8 --blocks 300` is the acceptance test for
   *"there are blocks in the way and the player just passes through them"*, and
   it is the only probe here that asks about what is **drawn** rather than about
