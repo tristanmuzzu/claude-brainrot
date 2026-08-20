@@ -93,6 +93,72 @@ SEA_Y = -90.0
 #: crisply lit stub hanging in mid-air.
 UNDER_FOG = 2.6
 
+# ---------------------------------------------------------------------------
+# What else is out there
+# ---------------------------------------------------------------------------
+#
+# The tower stood in an empty ocean under an empty sky: one flat blue plane a
+# hundred metres down, a few drifting cloud sheets, and nothing else in any
+# direction. Every sense of *height* the format has came from the fog, which
+# is a wash rather than a thing -- there was no object anywhere whose apparent
+# size could say how far up you had got.
+#
+# So the sea has islands and wrecks in it and the air has ruins and airships
+# in it, and their whole job is parallax: a sky island you look up at on level
+# four, are level with on level twelve and look down on by level twenty is the
+# only thing in this scene that says a hundred blocks were climbed. They are
+# placed once at scene construction from the run's own seed, they never move
+# (except the airships), and they are pure scenery -- nothing collides with
+# them and the course does not know they exist, because they stand well
+# outside the widest the cone ever gets.
+#
+# The assets are ``assets/src/props_world.py``. Read its origin conventions
+# before changing a ``y`` here: the sea pieces measure from their waterline,
+# the two floating ones from their *top* surface, and the waterfall hangs.
+
+#: How far a scenery piece is still drawn. Far past ``FOG_FAR``, because these
+#: are forty-metre objects and the point of them is that they are a long way
+#: off; the fog tint is what makes the distance read.
+SCENERY_FAR = 620.0
+#: ...and how far outside the camera's own direction, as a cosine. Wider than
+#: ``PROP_AHEAD`` because a big object at the edge of the frame is still most
+#: of a second's worth of parallax.
+SCENERY_AHEAD = -0.35
+
+#: One entry per kind: how many, the band of radii from the tower's axis, and
+#: the band of altitudes. ``sea`` pieces sit on the waterline and are drawn
+#: with the sea, under the haze; the rest hang in the air and are drawn with
+#: the tower. ``clear`` is how far outside the cone's own rim at that altitude
+#: the piece must stand -- a floating island that intersects a terrace reads
+#: as a rendering fault, which is the same reasoning ``_spawn_shelf`` uses.
+SCENERY = (
+    # name          n   radius        altitude        sea   clear  scale
+    ("startisle",   1, (125.0, 175.0), (0.0, 0.0),     True,   0.0, 1.00),
+    ("seastack",    5, (100.0, 400.0), (0.0, 0.0),     True,   0.0, 1.00),
+    ("seaarch",     1, (150.0, 260.0), (0.0, 0.0),     True,   0.0, 1.00),
+    ("shipwreck",   2, (95.0, 190.0),  (0.0, 0.0),     True,   0.0, 1.00),
+    ("lighthouse",  1, (230.0, 350.0), (0.0, 0.0),     True,   0.0, 1.00),
+    ("skyisland",   8, (75.0, 175.0),  (-20.0, 235.0), False, 34.0, 1.00),
+    ("skyruin",     6, (95.0, 240.0),  (10.0, 255.0),  False, 44.0, 1.00),
+    ("airship",     3, (70.0, 150.0),  (0.0, 225.0),   False, 38.0, 1.00),
+)
+
+#: Every kind the scene has to load, plus the waterfall, which is never placed
+#: on its own -- it hangs off a sky island's spout.
+SCENERY_KINDS = tuple(row[0] for row in SCENERY) + ("waterfall",)
+
+#: Where ``props_world.skyisland`` puts its spout, in the island's own local
+#: axes, and the height of the fall. Written down here rather than measured
+#: because the model is committed geometry and this is the contract between
+#: the two assets.
+SPOUT = (8.4, -0.6)
+
+#: How fast an airship travels, in metres a second, and how far round the
+#: tower it goes before it turns. Slow: the whole read is "that is under way",
+#: and anything quick enough to notice moving is quick enough to notice being
+#: on rails.
+AIRSHIP_SPEED = 2.6
+
 #: How far the look-at point is pushed *outward*, away from the tower's axis,
 #: and how much further down the camera aims than the next landing.
 #:
@@ -218,6 +284,18 @@ class SpiralScene(Scene):
                 "metal": rl.mix_rgb(pal.structure, (86, 88, 96), 0.55),
                 "glow": pal.window_lit,
             })
+        # The far world. Loaded apart from ``props`` because these are not
+        # furniture: they are drawn at hundreds of metres with their own fog
+        # and their own culling, and none of them is ever placed on a landing.
+        self.scene_props = {name: assets.load(name)
+                            for name in SCENERY_KINDS}
+        for model in self.scene_props.values():
+            model.recolor({
+                "leaf": rl.mix_rgb(pal.accent, (110, 160, 60), 0.55),
+                "wood": rl.mix_rgb(pal.structure, (120, 84, 46), 0.5),
+                "metal": rl.mix_rgb(pal.structure, (86, 88, 96), 0.55),
+                "glow": pal.window_lit,
+            })
         self.kit = _choose_kit(ctx.stream("kit"))
         self.swing = 0.0
         self.mine = 0.0
@@ -288,6 +366,7 @@ class SpiralScene(Scene):
             self._spawn_shelf(crng)
         self.crng = crng
         self.cloud_tint = rl.mix_rgb(pal.sky_bottom, (255, 255, 255), 0.6)
+        self._place_scenery(ctx.stream("scenery"))
         self._pump(prime=True)
 
     # -- materials ---------------------------------------------------------
@@ -352,6 +431,103 @@ class SpiralScene(Scene):
         # enough is that the cone is now emitted outward from the body rather
         # than upward from the bottom, so these are the chunks in shot.
         self.volume.build_pending(PRIME_CHUNKS if prime else CHUNK_BUDGET)
+
+    def _place_scenery(self, rng) -> None:
+        """Stand the islands, wrecks and ruins up, once, for this run.
+
+        Placed rather than spawned: a cloud shelf streams past and is gone, but
+        these are the landmarks the climb is measured against, so the one on
+        the horizon at the start of a run has to be the same one still on the
+        horizon four minutes later. Nothing here is ever re-rolled or moved --
+        an airship is translated along a fixed bearing and that is the only
+        motion in the list.
+
+        Bearings are spread round the tower rather than drawn freely: a run
+        covers about a revolution a minute, so four pieces that happen to land
+        on the same bearing are four pieces you see at once and then nothing
+        for a minute. Each kind gets its own even spread with a jitter inside
+        it, which is what a scatter looks like when it is not clumped.
+        """
+        self.scenery: list[dict] = []
+        for name, count, (r0, r1), (y0, y1), sea, clear, scale in SCENERY:
+            for i in range(count):
+                # An even spread with a jitter, per kind and per index.
+                base = (i + rng.random() * 0.7) / count * math.tau
+                ang = base + rng.uniform(0.0, 0.4)
+                y = SEA_Y if sea else rng.uniform(y0, y1)
+                r = rng.uniform(r0, r1)
+                if not sea:
+                    r = max(r, self.cone.rim_at(y) + clear)
+                piece = {
+                    "kind": name, "s": scale,
+                    "x": math.cos(ang) * r, "z": math.sin(ang) * r, "y": y,
+                    "yaw": rng.uniform(0.0, math.tau),
+                    # Only the airships have one, and it is a bearing rather
+                    # than a heading: they orbit, so the model's own yaw and
+                    # the direction it travels stay consistent for free.
+                    "orbit": (AIRSHIP_SPEED / max(1.0, r)
+                              * (1 if rng.random() < 0.5 else -1)
+                              if name == "airship" else 0.0),
+                    "ang": ang, "r": r,
+                }
+                self.scenery.append(piece)
+                if name == "skyisland":
+                    # Hung off the island's own spout, in the island's local
+                    # axes turned by its yaw. A waterfall placed anywhere else
+                    # pours out of thin air beside it.
+                    ox = SPOUT[0] * math.cos(piece["yaw"])
+                    oz = -SPOUT[0] * math.sin(piece["yaw"])
+                    self.scenery.append({
+                        "kind": "waterfall", "s": scale,
+                        "x": piece["x"] + ox, "z": piece["z"] + oz,
+                        "y": y + SPOUT[1], "yaw": piece["yaw"],
+                        "orbit": 0.0, "ang": ang, "r": r,
+                    })
+
+    def _draw_scenery(self, sea: bool) -> None:
+        """The far world: everything in the water, or everything in the air.
+
+        Split because the two halves belong on opposite sides of the haze band.
+        The sea and what floats on it are washed by it -- that band *is* the
+        hundred metres of air between the body and the water. What hangs in the
+        sky is at the body's own altitude and must not be, or a floating island
+        level with the runner comes out paler than the terrace next to it.
+        """
+        cam = self.camera[0]
+        eye = (cam.position.x, cam.position.y, cam.position.z)
+        fx = cam.target.x - eye[0]
+        fy = cam.target.y - eye[1]
+        fz = cam.target.z - eye[2]
+        n = math.sqrt(fx * fx + fy * fy + fz * fz) or 1.0
+        fx, fy, fz = fx / n, fy / n, fz / n
+        sky = self.palette.sky_bottom
+        for piece in self.scenery:
+            if (piece["y"] <= SEA_Y) != sea:
+                continue
+            x, y, z = piece["x"], piece["y"], piece["z"]
+            dx, dy, dz = x - eye[0], y - eye[1], z - eye[2]
+            d2 = dx * dx + dy * dy + dz * dz
+            if d2 > SCENERY_FAR * SCENERY_FAR:
+                continue
+            dist = math.sqrt(d2)
+            if dx * fx + dy * fy + dz * fz < SCENERY_AHEAD * dist:
+                continue
+            model = self.scene_props.get(piece["kind"])
+            if model is None:
+                continue
+            # Aerial perspective, and further than the course's own fog goes:
+            # ``_fog`` saturates at 110 m, which is nothing to something four
+            # hundred metres away, so the tint keeps going toward the sky's
+            # own colour and the horizon pieces end up as silhouettes.
+            far = min(1.0, dist / SCENERY_FAR) ** 0.7
+            tint = rl.mix_rgb(
+                rl.mix_rgb((255, 255, 255),
+                           rl.mix_rgb(self.ring_light, self.palette.fog, 0.35),
+                           min(1.0, dist / FOG_FAR) ** 0.85 * 0.5),
+                sky, far * 0.72)
+            rl.DrawModelEx(model.model, (x, y, z), (0, 1, 0),
+                           math.degrees(piece["yaw"]), (piece["s"],) * 3,
+                           rl.rgba(tint, 255))
 
     def _spawn_shelf(self, rng) -> None:
         y = self._next_shelf + rng.uniform(18, 46)
@@ -592,6 +768,16 @@ class SpiralScene(Scene):
             self._spawn_shelf(self.crng)
         if self.shelves and self.shelves[0]["y"] < self.pos[1] - 90:
             self.shelves.pop(0)
+        for piece in self.scenery:
+            if not piece["orbit"]:
+                continue
+            # Round the tower rather than across the frame, so the model's
+            # nose keeps pointing the way it is going without a second angle
+            # to keep in step.
+            piece["ang"] += piece["orbit"] * dt
+            piece["x"] = math.cos(piece["ang"]) * piece["r"]
+            piece["z"] = math.sin(piece["ang"]) * piece["r"]
+            piece["yaw"] += piece["orbit"] * dt
 
     def body_box(self) -> AABB:
         return AABB.around(self.pos[0], self.pos[1], self.pos[2],
@@ -908,6 +1094,18 @@ class SpiralScene(Scene):
         self._draw_haze(pal)
 
         rl.BeginMode3D(self.camera[0])
+        # Before the tower: they are further away than all of it, and drawing
+        # them first lets the wall in front reject them by depth for free.
+        #
+        # *After* the haze band, and that is not a preference. The band is a
+        # screen-space wash at alpha 205 covering half the frame below the
+        # horizon -- everything drawn before it in that region is 80% fog
+        # colour, which for an island four hundred metres out on a flat sea is
+        # not aerial perspective, it is deletion. Drawn here they keep their
+        # own distance tint, which does the same job honestly (see
+        # :meth:`_draw_scenery`), and the sea behind them stays hazed.
+        self._draw_scenery(sea=True)
+        self._draw_scenery(sea=False)
         self._draw_tower()
         self._draw_props()
         self._draw_course()
