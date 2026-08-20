@@ -950,6 +950,11 @@ assets/
     ├── props_climb.py the two climbable block *faces*: a ladder lattice and a
     │                 ragged vine sheet, both tileable vertically. Not cubes --
     │                 drawn as one they read as a pillar of wood
+    ├── props_odd.py  one thing per level or two that is neither landmark nor
+    │                 furniture: six with a clear 3x3 passage (torii, arch,
+    │                 doorframe, hollow log, pipe mouth, rib cage), six with a
+    │                 flat standable top, seven that are only there to be odd.
+    │                 All ground origin. `spiralplan.ODDITIES` places them
     └── props_world.py the far world the tower stands in: a start island, sea
                       stacks, an arch, a shipwreck, a lighthouse, floating
                       islands with waterfalls, a sky ruin, an airship. Drawn at

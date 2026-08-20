@@ -2175,6 +2175,64 @@ frame where a pair of hands would be. And **`LADDER_HUG` at 0.42** buries the
 plate: the model's own geometry sits 0.14 behind its origin, so anything past
 about 0.36 puts it inside the wall block and the ladder vanishes entirely.
 
+## One odd thing every other level (2026-08-20, later still)
+
+*"Create some smaller things or structures -- funny things, things that can be
+interacted with or not -- and place one per level or one every two levels, in
+cool places. Things a player could go through, check out, or jump on top of."*
+
+`assets/src/props_odd.py` is nineteen of them, in three flavours: six with a
+**verified-clear three-by-three passage** (torii, broken arch, doorframe,
+hollow log, pipe mouth, a bone rib cage), six with a **flat standable top**
+whose height is in the table (giant mushroom, crate stack, anvil on a plinth,
+upturned boat, tome stack, layer cake), and seven that are only there to be odd
+(a scarecrow wearing a bucket, a shrine, a stack of balanced blocks, a signpost
+pointing nowhere, a wizard's hat on a rock, a half-melted snowman with its
+bucket on the floor beside it, a chicken statue). The passages were proved
+empty with a triangle-vs-box check rather than by eye, which found six real
+intrusions -- including a rib cage whose arch is an *ellipse*, so its honest
+clear rectangle was 3.4 x 2.1 and not 3.4 x 3.4.
+
+`spiralplan.ODDITIES` and `Course._stand_oddity` place them, deterministic off
+the level's own index so a level is the same place every time you reach it.
+They are **models, not cell blueprints** -- drawn and never collided with --
+which makes where they go the whole of the problem: a four-metre rib cage
+standing in a jump is exactly the defect `tools/arc_probe.py` exists for, with
+the aggravation that the body would fly through it. Every cell of the footprint
+therefore goes through `_dressable`, which already refuses the running line
+with a margin, the head-room over it, the no-climb ring beside every landing
+and anything a landmark is holding.
+
+**43% of levels get one -- about one every other level, which is the ask** --
+and four numbers had to be found to get there, none of them guessable:
+
+- **A solid cylinder at full height fits nowhere.** Tested that way, 7% of
+  levels got anything at all and nothing bigger than a signpost. What has to
+  be clear to the sky is the *middle*; a torii is seven metres across the roof
+  and stands on two posts under three apart (`ODD_EAVE`, and the table's radius
+  is the footing rather than the bounding box).
+- **Unbroken floor is rarer than the prop is.** Every level cuts three or four
+  breaks through its paving, so ground is required under the foot only, capped
+  at two cells: that one requirement was 4,732 refusals against 3,480 for
+  everything about the course put together.
+- **Whichever family is tried first wins nearly every time.** Gates first took
+  27 of 36 placements and no joke ever appeared; gates last and they never
+  appeared at all. A gate on one level in three, the rest shuffled per level,
+  and the other family is always the fallback -- 13 of the 19 kinds now show up
+  in four runs.
+- **Nearest the running lane, not the first spot that fits** (`ODD_LANE`).
+  First-fit put them out at the rim, and a thing at the rim of a nine-block
+  terrace is somebody else's scenery.
+
+**What is not done, and it is the interesting half.** These are placed *beside*
+the course, not on it: the course flies two to four blocks above its terrace
+(see the rehash), so a prop standing on the terrace is below you and off to one
+side. Running *through* a gate needs the piece stood on a plinth at the level's
+deck height and the course steered through its passage, which is what
+`_landmark_nodes` already does for the gated landmarks -- and the plinth is the
+part with real risk, because a stack beside the course is a staircase back up
+to it, which is the whole thing `noclimb` exists to stop.
+
 ## Known limit: how long a parkour jump can be
 
 There is one jump impulse and one horizontal speed, so the furthest a hop can
@@ -2657,7 +2715,7 @@ long jumps you need a different motion model, not a bigger number.
   nothing can walk up the tower without touching the parkour).
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~255s). **656
+- Run `python -m pytest tests/` before committing; it is fast (~255s). **675
   passed, 34 skipped.** The Win32 suite skips off Windows and the X11 suite
   skips without a display, so a green run means less on the other platform's
   machine -- check the count.

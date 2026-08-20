@@ -225,6 +225,78 @@ HANGING = frozenset(("vinehang", "dripstone", "chain", "bell"))
 #: nothing and says nothing about it.
 PROP_KINDS: tuple[str, ...] = ()
 
+# ---------------------------------------------------------------------------
+# Oddities
+# ---------------------------------------------------------------------------
+#
+# One thing per level that is not its landmark and not its furniture: a torii
+# to run under, a giant cake to land on, a half-melted snowman with its bucket
+# on the floor beside it. ``assets/src/props_odd.py`` builds them.
+#
+# They are *models*, like furniture, and not cell blueprints like the
+# landmarks -- so they are drawn and never collided with, which makes where
+# they go the whole of the problem. A four-metre bone rib cage standing in a
+# jump is precisely the defect ``tools/arc_probe.py`` was written for, with the
+# aggravation that the body would fly straight through it. Every cell of an
+# oddity's footprint therefore goes through :meth:`Course._dressable`, which
+# already refuses the running line with a margin, the head-room over it, the
+# no-climb ring beside every landing, and anything held for a landmark.
+#
+# ``(name, radius in blocks, standable top in metres or 0.0)``. The radius is
+# half the model's larger horizontal extent, rounded up, and it is what decides
+# whether a level has room -- which is why the through-pieces are grouped
+# apart: a three-metre passage needs four and a half metres of structure round
+# it, so a hollow log you can actually run through is a five-metre log with a
+# ten-metre footprint, and most terraces cannot take one.
+#: The radius here is the *footing*, not the bounding box: a torii is seven
+#: metres across the roof and stands on two posts under three apart, and it is
+#: the posts that have to find room. The eaves are covered by
+#: :data:`ODD_EAVE`.
+ODD_THROUGH = (
+    ("torii", 2, 6, 0.0), ("brokenarch", 2, 6, 0.0),
+    ("doorframe", 2, 6, 0.0), ("hollowlog", 4, 6, 0.0),
+    ("pipemouth", 4, 8, 0.0), ("boneribs", 4, 7, 0.0),
+)
+#: ...things with a flat top, and how high that top is. Stood where the course
+#: is not, so they are something to look at; standing one *under* a landing is
+#: the obvious next step and is not done yet.
+ODD_STAND = (
+    ("bigshroom", 2, 3, 2.60), ("cratestack", 2, 3, 2.36),
+    ("anvilplinth", 2, 3, 2.52), ("boathull", 4, 3, 2.28),
+    ("tomestack", 2, 3, 2.26), ("layercake", 2, 4, 2.82),
+)
+#: ...and the ones that are only there to be odd.
+ODD_FUN = (
+    ("bucketcrow", 2, 4, 0.0), ("oddshrine", 2, 4, 0.0),
+    ("blockjenga", 2, 6, 0.0), ("signpost", 2, 5, 0.0),
+    ("hatrock", 2, 3, 0.0), ("meltman", 2, 3, 0.0),
+    ("chickenstatue", 2, 4, 0.0),
+)
+#: The pool a level draws from, biggest first: a level with room for the torii
+#: gets the torii, and one without falls down the list rather than going
+#: without. Ordered rather than weighted because the interesting pieces are the
+#: ones that barely fit, and a weighted roll spends them on the wide levels.
+ODDITIES = ODD_THROUGH + ODD_STAND + ODD_FUN
+
+#: How much of an oddity's disc has to have its *full* height clear, as a
+#: radius reduction. The outer ring gets ``ODD_EAVE`` cells instead.
+#:
+#: A torii is seven metres across the roof and stands on two posts less than
+#: three apart; a rib cage is ten metres nose to tail and its arches lean in.
+#: Tested as a solid cylinder at full height, every one of the six through-
+#: pieces was refused on every level -- measured, 7% of levels got an oddity
+#: at all and not one of them was bigger than a signpost. What has to be clear
+#: to the sky is the *middle*; the overhang only has to clear a head.
+ODD_EAVE = 2
+
+#: How far out from the core wall an oddity aims to stand, in blocks. The
+#: course hugs the core between 2 and 4.8, so this puts a piece just outboard
+#: of the running lane -- close enough to be a thing you pass, far enough that
+#: ``_dressable`` will still have it. Taking the first spot that fitted instead
+#: put them out at the rim, where a nine-block terrace makes them somebody
+#: else's scenery.
+ODD_LANE = 5.5
+
 #: The eight wools, in the order a rainbow section lays them.
 WOOLS = ("wool_red", "wool_orange", "wool_yellow", "wool_lime",
          "wool_cyan", "wool_blue", "wool_purple", "wool_pink")
@@ -1323,6 +1395,11 @@ class Cone:
         self._breaks_cache: dict[int, tuple] = {}
         #: ``(cell, kind, yaw)`` for sub-block furniture, drawn as models.
         self.props: list[tuple[tuple[int, int, int], str, float]] = []
+        #: ...and the same for the one oddity a level gets. Kept apart from
+        #: ``props`` because they are two to ten metres across against a
+        #: torch's fifth of one, so they are worth drawing three times as far
+        #: away and are worth culling less eagerly. See :data:`ODDITIES`.
+        self.oddities: list[tuple[tuple[int, int, int], str, float]] = []
         #: Cells the renderer should hang a glow on. A dark section lit only by
         #: its own lamps is most of what makes it read as a different place
         #: from the one below it.
@@ -4879,6 +4956,7 @@ class Course:
         if span <= 0:
             return
         self._landmark(section)
+        self._stand_oddity(section)
         self._pour(section)
         steps = max(6, int(span * cone.outer_at(section.u0) * 1.6))
         pool_at = rng.uniform(0.2, 0.8) if theme.liquid else -1.0
@@ -4945,6 +5023,139 @@ class Course:
                         if self._dressable((x, yf + h, z)):
                             self.write((x, yf + h, z), theme.rock)
                     break
+
+    def _stand_oddity(self, section) -> None:
+        """Stand this level's one oddity somewhere it will actually be seen.
+
+        Not a landmark and not furniture: a torii to run under, a giant cake, a
+        half-melted snowman. See :data:`ODDITIES` for what they are and why
+        their footprint is checked so hard.
+
+        Deterministic off the level's own index, so a level is the same place
+        every time you reach it -- which is the whole argument for hand-
+        building a tower, and it is worth more here than variety is. The pool
+        is walked biggest-first (:data:`ODDITIES`): a level with room for the
+        ten-metre bone rib cage gets it, and one without falls down the list
+        rather than going without.
+
+        Where, and this is most of it. Out on the shelf rather than against the
+        core, because the wall is where the camera already spends its time and
+        a thing against it is a thing behind the lens; and in the *second*
+        third of the terrace, because the first is the apron the crossing lands
+        on and the last is the exit climb's run-up. Both were measured on the
+        contact sheets of the landmark pass and neither is a guess.
+        """
+        cone = self.cone
+        rng = random.Random(section.index * 6779 + cone.wind * 37)
+        span = section.u1 - section.u0
+        # A quarter turn of the pool per level rather than the next one along:
+        # consecutive levels are seconds apart and two gates in a row read as
+        # one repeated gate, which is the failure the landmark roster has a
+        # whole rule about.
+        # The through-pieces first, always, because a level with room for a
+        # gate should get the gate; then the rest **shuffled per level**. A
+        # plain rotation is not enough: several of the small pieces have the
+        # identical two-by-three footprint, so whichever the rotation reaches
+        # first among them always wins, and measured that was one giant
+        # mushroom on 42% of the levels that got anything at all.
+        rest = list(ODD_STAND + ODD_FUN)
+        rng.shuffle(rest)
+        start = (section.index * 5) % len(ODD_THROUGH)
+        gates = [ODD_THROUGH[(start + i) % len(ODD_THROUGH)]
+                 for i in range(len(ODD_THROUGH))]
+        # A gate on one level in three, and the rest of the pool shuffled per
+        # level on the other two. Whichever family goes first wins nearly
+        # every time -- with the gates first, measured, they took 27 of 36
+        # placements and not one joke ever appeared; with them last they never
+        # appeared at all. The other family is always the fallback, so a level
+        # with no room for its first choice still gets something.
+        order = (gates + rest) if section.index % 3 == 0 else (rest + gates)
+        # A real scan rather than a handful of spots. Measured with the six
+        # fractions this started with, 30% of levels got an oddity and not one
+        # of them was bigger than a signpost: a terrace is mostly spoken for --
+        # the no-climb ring beside every landing, the head-room over the
+        # running line, three or four floor breaks -- so the free ground is a
+        # few pockets rather than most of it, and finding a pocket takes
+        # looking. Eighty-odd candidates per piece, and the whole pass runs
+        # once per level.
+        spots = [0.30 + 0.035 * i for i in range(13)]
+        outs = [0.22 + 0.10 * i for i in range(8)]
+        for name, radius, height, _top in order:
+            for f in spots:
+                u = section.u0 + span * f
+                yf = cone.floor_at(u)
+                th = u * cone.wind
+                ct, st = math.cos(th), math.sin(th)
+                r0f, r1f = cone.floor_range(u)
+                if r1f - r0f < radius * 2 + 1:
+                    break               # this level's shelf is too narrow
+                # Nearest the running lane wins, not the first that fits.
+                # The course hugs the core between 2 and 4.8 blocks out, so a
+                # piece scored toward ``r0f + ODD_LANE`` ends up beside the
+                # line rather than out at the rim -- and a thing at the rim of
+                # a nine-block terrace is a thing you never look at. It is
+                # still only ever placed where ``_dressable`` allows, which is
+                # the running line plus a margin, the head-room over it and
+                # the no-climb ring beside every landing.
+                best, best_d = None, 1e9
+                for out in outs:
+                    r = r0f + (r1f - r0f) * out
+                    cx, cz = iround(ct * r), iround(st * r)
+                    d = abs(r - (r0f + ODD_LANE))
+                    if d >= best_d:
+                        continue
+                    if not self._oddity_fits(cx, yf, cz, radius, height):
+                        continue
+                    best, best_d = (cx, cz), d
+                if best is not None:
+                    cx, cz = best
+                    # A gate faces the way you are running, so you go through
+                    # it rather than past its side. The others are free.
+                    tangent = math.atan2(-st * cone.wind, ct * cone.wind)
+                    yaw = tangent if (name, radius, height, _top) \
+                        in ODD_THROUGH else rng.uniform(0.0, math.tau)
+                    cone.oddities.append(((cx, yf, cz), name, yaw))
+                    return
+
+    def _oddity_fits(self, cx: int, cy: int, cz: int, radius: int,
+                     height: int) -> bool:
+        """Is there room on the terrace for something this big, and floor
+        under the part of it that stands on the ground?
+
+        Every cell goes through :meth:`_dressable`, which is the same test the
+        rest of the dressing uses -- so an oddity cannot end up in the running
+        line, in the head-room over it, in the no-climb ring beside a landing,
+        or in a landmark's held passage. What varies is *how far up*: the
+        middle of the footprint has to be clear to the model's full height and
+        the overhanging ring only has to clear a head (:data:`ODD_EAVE`),
+        because a torii is seven metres across the roof and stands on two posts
+        less than three apart.
+
+        Ground is required under the middle for the same reason and not under
+        the eaves: a floor break clipping the corner of a rib cage's shadow is
+        not a rib cage hanging in the air.
+        """
+        core = max(1, radius - ODD_EAVE)
+        # ...and the ground is only required under the *foot*, capped at two
+        # cells whatever the model's span. Every level cuts three or four
+        # breaks through its paving, so a seven-by-seven patch of unbroken
+        # floor is a rarer thing than a seven-metre prop: measured, that one
+        # requirement was 4,732 of the refusals against 3,480 for everything
+        # about the course put together.
+        foot = min(2, core)
+        for dx in range(-radius, radius + 1):
+            for dz in range(-radius, radius + 1):
+                d2 = dx * dx + dz * dz
+                if d2 > radius * radius:
+                    continue
+                x, z = cx + dx, cz + dz
+                inner = d2 <= core * core
+                if d2 <= foot * foot and not self.blocked((x, cy - 1, z)):
+                    return False
+                for dy in range(height if inner else ODD_EAVE):
+                    if not self._dressable((x, cy + dy, z)):
+                        return False
+        return True
 
     def _dressable(self, cell, margin: int = 1) -> bool:
         """Is this a cell dressing may be put in, or dug out of?

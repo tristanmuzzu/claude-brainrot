@@ -70,6 +70,14 @@ FOOT_EASE = 9.0
 PROP_FAR = 30.0
 PROP_AHEAD = -0.2
 
+#: The same two for the one oddity a level gets. Three times as far, because
+#: these are two to ten metres across against a torch's fifth of one and the
+#: whole point of them is that you see one coming; and wider, because a gate
+#: you are about to run under leaves the front of the frame before you reach
+#: it. See ``spiralplan.ODDITIES``.
+ODD_FAR = 92.0
+ODD_AHEAD = -0.55
+
 #: How far a landing is still lit. Past this it is a few pixels in the haze and
 #: the glow is a draw call for nothing.
 LAND_LIT_FAR = 26.0
@@ -146,6 +154,12 @@ SCENERY = (
 #: Every kind the scene has to load, plus the waterfall, which is never placed
 #: on its own -- it hangs off a sky island's spout.
 SCENERY_KINDS = tuple(row[0] for row in SCENERY) + ("waterfall",)
+
+#: Everything ``scene_props`` holds: the far world above, plus the oddities,
+#: which are loaded here rather than with the furniture because they are not
+#: furniture -- one per level, model-sized rather than sub-block, and drawn on
+#: their own budget. The plan owns the list so a scene cannot load a set the
+#: generator does not place.
 
 #: Where ``props_world.skyisland`` puts its spout, in the island's own local
 #: axes, and the height of the fall. Written down here rather than measured
@@ -342,8 +356,10 @@ class SpiralScene(Scene):
         # The far world. Loaded apart from ``props`` because these are not
         # furniture: they are drawn at hundreds of metres with their own fog
         # and their own culling, and none of them is ever placed on a landing.
-        self.scene_props = {name: assets.load(name)
-                            for name in SCENERY_KINDS}
+        self.scene_props = {
+            name: assets.load(name)
+            for name in SCENERY_KINDS
+            + tuple(row[0] for row in self.plan.ODDITIES)}
         for model in self.scene_props.values():
             model.recolor({
                 "leaf": rl.mix_rgb(pal.accent, (110, 160, 60), 0.55),
@@ -1341,6 +1357,25 @@ class SpiralScene(Scene):
             tint = self._fog(self._depth(eye, (x, y, z)))
             rl.DrawModelEx(model.model, (x, y, z), (0, 1, 0),
                            math.degrees(yaw), (1.0, 1.0, 1.0), tint)
+
+        # The level's one oddity, on its own budget. Same loop, different
+        # numbers -- and it is a separate list rather than a flag on ``props``
+        # because a torch and a ten-metre rib cage want opposite answers to
+        # every question here.
+        far2 = ODD_FAR * ODD_FAR
+        for (x, y, z), kind, yaw in self.cone.oddities:
+            dx, dy, dz = x - eye[0], y - eye[1], z - eye[2]
+            d2 = dx * dx + dy * dy + dz * dz
+            if d2 > far2:
+                continue
+            if dx * fx + dy * fy + dz * fz < ODD_AHEAD * math.sqrt(d2):
+                continue
+            model = self.scene_props.get(kind)
+            if model is None:
+                continue
+            rl.DrawModelEx(model.model, (x, y, z), (0, 1, 0),
+                           math.degrees(yaw), (1.0, 1.0, 1.0),
+                           self._fog(self._depth(eye, (x, y, z))))
 
     def _draw_course(self) -> None:
         eye = (self.camera.position.x, self.camera.position.y,

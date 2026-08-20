@@ -30,6 +30,7 @@ from . import spiralplan as sp
 from .handlevels import LEVELS, ROLES, Level, n  # noqa: F401
 from .spiralplan import (  # noqa: F401  -- the renderer reads these off the plan
     HANGING,
+    ODDITIES,
     PROP_BUDGET,
     PROP_KINDS,
     THEMES,
