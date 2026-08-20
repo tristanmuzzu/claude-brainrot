@@ -826,9 +826,21 @@ class SpiralScene(Scene):
         ride = self._ride_face()
         under = 0.0
         if ride is not None and self.move.kind == "bubble" \
-                and ride[1] in _TRANSLUCENT and self.vy > 0.4:
+                and ride[1] in _LIQUID and self.vy > 0.4:
             under = 1.0
             self.submerged_rgb = self._colour(ride[1])
+        else:
+            # ...and any other way the head ends up inside a liquid: a pond
+            # dug on a terrace, a lava moat cut under a jump. Rare, because
+            # the course flies over its terrace -- but the one time it happens
+            # is the one time it has to be right, and it costs a dictionary
+            # lookup on a cell already worked out for the ladder cull.
+            eye = (round(self.pos[0]), math.floor(self.pos[1] + tp.EYE),
+                   round(self.pos[2]))
+            style = self.course.struct.get(eye)
+            if style in _LIQUID:
+                under = 1.0
+                self.submerged_rgb = self._colour(style)
         self.submerged += (under - self.submerged) * min(1.0, dt * SUBMERGE_EASE)
         self._settle(dt)
         self.swing = max(0.0, self.swing - dt * 3.0)
@@ -1665,6 +1677,11 @@ class SpiralScene(Scene):
 _GLOWING = frozenset(("lantern", "torch", "glowstone", "sealantern", "magma"))
 #: Soft cells drawn see-through, which therefore must not write depth.
 _TRANSLUCENT = frozenset(("water", "lava", "web", "glass"))
+#: ...and the subset of those a head can be *inside*. A web is translucent and
+#: waded through and does not wash the frame: a cobweb is a thing you push
+#: past, not a thing you are submerged in, and tinting for one turns every
+#: wade into a grey fog. See ``_draw_submerged``.
+_LIQUID = frozenset(("water", "lava"))
 #: Columns a body rides up, and the light that spills off the top of one. A
 #: bubble column used to be water whatever the node asked for, so this table
 #: had no reason to exist; it does now, and the nether family's exit is a
