@@ -2233,6 +2233,89 @@ deck height and the course steered through its passage, which is what
 part with real risk, because a stack beside the course is a staircase back up
 to it, which is the whole thing `noclimb` exists to stop.
 
+## A landing has to go somewhere (2026-08-20, last)
+
+The owner, on THE VAULT: *"at the end it jumps back and forth a couple of
+times, from just before the end to almost the end, and then it jumps all the
+way down -- there's a bunch of glowstone blocks there and it doesn't really
+know where to jump."*
+
+**`arc` is a distance and nothing made a candidate spend it going forward.**
+`_targets` refused a landing at or behind the body and nothing else, so a
+landing three metres from the one before it could be a third of a metre
+further round the tower and the rest of the way *across* the band. Two of those
+in a row is two blocks a foot apart with the body hopping between them.
+Measured on the VAULT's exit at **0.35 m then 0.33 m** of corridor advance,
+and the same shape found on THE CRUCIBLE (0.03 m), DUST DEVILS (0.04) and
+PUMPKIN ROWS (0.06) -- so it was never a level bug.
+
+`MIN_ADVANCE = 1.0`, and the metre is a reading rather than a taste: over four
+simulated hours the first percentile of corridor advance is 1.91 m and only
+0.38% of landings came under one. Stalls **7 -> 0**, landings advancing under
+0.6 m **97 -> 0**, and it is *free* -- design fidelity 94.7% -> **95.0%**,
+authored exits placed as authored 95.8% -> **97.4%**, unchecked 0.18% ->
+0.17%. Refusing the stalled candidate makes placement pick a better one.
+
+## Left alone for an hour, does it keep climbing? (2026-08-20)
+
+`tools/endurance_probe.py`. Every other probe here measures a sample -- twelve
+runs of three hundred landings, four minutes of strip each -- which is the
+right size for "is this level built as designed" and the wrong size for the
+only question a viewer can ask by leaving it running. Three failure shapes it
+looks for and a short sweep cannot see: a **stall** (landings that go nowhere
+along the corridor), a **give-back** (a level climbed and then dropped), and a
+**wall** (a level the course cannot leave at all).
+
+**The answer is that it does keep climbing**: four simulated hours, 31,784
+landings, 895 level visits, **27 to 28 visits to every one of the 33 levels**,
+~800 blocks an hour, **0 stalls**, unchecked 0.17%, and the crossings come out
+at a median of **+6 blocks each**. An even visit count across the roster is the
+statement that there is no loop; a loop is one level at six times the rest,
+which is precisely what the three bad labellings below each produced.
+
+**Read this before trusting any per-level table on this course.** Three times
+in one session a probe reported one level being visited six times more often
+than every other, which is exactly what a loop looks like, and all three were
+the bucketing:
+
+- by **position** (`unwrap`): a landing out over the chasm is at a bearing
+  belonging to the next level but below that level's floor, so the last turn at
+  or below it is a level a whole *revolution* down. Correct arithmetic, useless
+  label. 4% of landings.
+- by **`author`**: set from the frontier's own position, so it inherits the
+  same ambiguity one layer along.
+- by **`author` with the segmentation fixed**: segmenting on crossings and
+  still *labelling* by author is the same mistake wearing the fix.
+
+- by **`to_level`**, a field added to the block for exactly this -- and
+  `from_level` is read from the frontier's position too, so it inherited the
+  same ambiguity a fourth time.
+
+The label that works is **how many crossings have happened**. A crossing
+advances exactly one level, so counting them cannot be ambiguous; if the run's
+first landing is one of the 4%, every name in the table is rotated by a
+constant and the distribution -- which is the finding -- is intact.
+`blk["to_level"]` is kept because it is still the right thing for a *crossing*
+to record, not because it settled this.
+
+**Still outstanding here, and it is the one number in the table that is not
+zero**: 24 give-backs in 895 visits (2.7%), and dumping one shows what they
+are. `('THE BELFRY', start 1135.0, peak 1139.0, lost 12.0, **114 landings**)`
+-- a stretch of *four levels' worth* of landings with **no crossing in it at
+all**, over which the course climbed four blocks and then sank twelve. Normal
+is 27 landings between crossings. So it is not a per-level fault and the level
+name on it is only where the counter had got to; it is a rare failure to cross
+that then wanders and loses height, about one every ten simulated minutes.
+
+Two things known about it already. It does **not** appear in half-hour runs (0
+in 7,932 landings) and does in hour-long ones, so it is something that
+degrades with altitude -- the tower flares to 1.7x its base width over
+fourteen revolutions, and `MIN_ADVANCE` is in metres while the radius grows.
+And the give-back is *gradual* -- twelve blocks over fifty seconds -- so it
+reads as the course wandering rather than as a fall, which is why no contact
+sheet has ever caught it. Start with `--show` on a run that has one and print
+the landings of that segment; the question is why no crossing fired.
+
 ## Known limit: how long a parkour jump can be
 
 There is one jump impulse and one horizontal speed, so the furthest a hop can
@@ -2346,6 +2429,14 @@ long jumps you need a different motion model, not a bigger number.
   the physics on paper (`--design-only` needs nothing built and is instant),
   then how much of the design survived being placed, per level and per beat.
   Run it after touching a level. A beat under 98% is a design to look at.
+- `python tools/endurance_probe.py --hours 1 --runs 4 --levels` is the only
+  probe here that asks whether the thing ever *stops*: one simulated hour a
+  run, every landing checked for a stall, a give-back or a level it cannot
+  leave, plus the distribution of how far a landing carries the body along the
+  corridor. Ten minutes, no window. Run it after anything that touches
+  placement or the exit climb. **Its per-level table is only trustworthy
+  because visits are segmented by the crossing and labelled by `to_level`** --
+  see "Left alone for an hour" for the three false alarms that cost.
 - `python tools/ride_shot.py --scene spiral --seed 3 --kind climb` renders every
   frame of one ladder climb, bubble ride or web wade, plus the second either
   side, and tiles it. A ride is two seconds long and arrives somewhere nobody

@@ -2331,6 +2331,22 @@ LIFT_MAX = 6
 #: through the runner.
 LID_MAX = 5
 
+#: The least a landing may carry the body *along the corridor*, in metres.
+#:
+#: ``arc`` is a distance and nothing made a candidate spend it going forward:
+#: a landing three metres from the one before it could be a third of a metre
+#: further round the tower and the rest of the way across the band. Two of
+#: those in a row is two blocks a foot apart with the body hopping between
+#: them, which is what the owner reported on THE VAULT and what
+#: ``tools/endurance_probe.py`` then found on THE CRUCIBLE, DUST DEVILS and
+#: PUMPKIN ROWS as well.
+#:
+#: One metre, measured rather than chosen: over four simulated hours the first
+#: percentile of corridor advance is 1.91 m and only 0.38% of landings come
+#: under one, so this refuses the pathological tail and nothing any level
+#: meant to ask for.
+MIN_ADVANCE = 1.0
+
 #: Kinds whose rise is bounded by one jump impulse. Everything else in the
 #: vocabulary exists precisely because it is not.
 BALLISTIC = frozenset(("hop", "slide", "walk"))
@@ -3375,6 +3391,10 @@ class Course:
         th = u * self.cone.wind
         ix, iz = math.cos(th) * radius, math.sin(th) * radius
         bx, bz = iround(ix), iround(iz)
+        #: The body's own radius, which is what an angular advance has to be
+        #: measured at to come out in metres. The candidate's would flatter a
+        #: landing thrown outward and punish one tucked in.
+        r_prev = self.radius_of(prev)
         span = 3
         scored = []
         for dz in range(-span, span + 1):
@@ -3383,8 +3403,24 @@ class Course:
                 if x == prev["x"] and z == prev["z"]:
                     continue
                 cu = self._u_at(u, x, z)
-                if cu <= pu + 1e-6:
-                    continue            # never backwards along the trough
+                if (cu - pu) * max(6.0, r_prev) < MIN_ADVANCE:
+                    # **Never backwards along the trough, and never on the
+                    # spot either.** This was ``cu <= pu``, which forbids only
+                    # the first: a landing may be three metres from the one
+                    # before it and still be a *third of a metre* further round
+                    # the tower, because ``arc`` is a distance and a candidate
+                    # is free to spend it going across the band instead of
+                    # along it. On screen that is two blocks a foot apart with
+                    # the body hopping between them -- the owner's report on
+                    # THE VAULT, and traced to the same shape on THE CRUCIBLE
+                    # and DUST DEVILS.
+                    #
+                    # A metre, and the number is a reading rather than a
+                    # choice: over four simulated hours the first percentile of
+                    # corridor advance is 1.91 m and only 0.38% of landings
+                    # come under one, so this refuses the pathological tail and
+                    # nothing a level meant.
+                    continue
                 if beyond is not None and self.cone.level_index(cu) <= beyond:
                     continue            # a crossing that does not cross
                 clo, chi = self.band(cu, hug)
@@ -4078,6 +4114,24 @@ class Course:
         blk["ceiling"] = got["ceiling"]
         blk["exact"] = got.get("exact", False)
         blk["origin"] = node.get("origin")
+        #: For a crossing, the level it was aimed at -- the one it lands on.
+        #:
+        #: The only unambiguous statement of "which level am I on" this course
+        #: has. Every other answer is derived from position, and position is
+        #: genuinely ambiguous in the one place it matters: a landing out over
+        #: the chasm sits at a bearing belonging to the next level but at a
+        #: height below that level's floor, so :meth:`Cone.unwrap` -- correctly
+        #: -- names a level a whole revolution down. 4% of landings are like
+        #: that, and ``author`` inherits the same ambiguity because it is set
+        #: from the frontier's own position.
+        #:
+        #: Measured cost of not having it: ``tools/endurance_probe.py`` twice
+        #: reported a level being visited six times more often than any other
+        #: and it was the bucketing both times, once through ``unwrap`` and
+        #: once through ``author``. A probe that segments a run by crossings
+        #: and labels each segment with this is not guessing.
+        if node["cross"] and node.get("from_level") is not None:
+            blk["to_level"] = node["from_level"] + 1
         blk["author"] = self.author
         for cell in got["ceiling"]:
             self.write(cell, node["pedestal_style"] or theme.rock)

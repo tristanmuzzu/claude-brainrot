@@ -26,11 +26,12 @@ from pathlib import Path
 os.environ["BRAINROT_HEADLESS"] = "1"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from brainrot.config import Config                         # noqa: E402
-from brainrot.engine import rl, scene as scene_api         # noqa: E402
-from brainrot.engine.window import HeadlessWindow          # noqa: E402
-from brainrot.palette import generate as generate_palette  # noqa: E402
-from brainrot.rng import Seed                              # noqa: E402
+from brainrot.config import Config
+from brainrot.engine import rl
+from brainrot.engine import scene as scene_api
+from brainrot.engine.window import HeadlessWindow
+from brainrot.palette import generate as generate_palette
+from brainrot.rng import Seed
 
 W, H = 420, 760
 DT = 1.0 / 60.0
