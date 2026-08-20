@@ -947,9 +947,16 @@ assets/
     │                 vines, bamboo, mushroom caps
     ├── props_deco.py torches, rails, end rods, chorus plants, nether fungus,
     │                 pebbles, dripstone
-    └── props_climb.py the two climbable block *faces*: a ladder lattice and a
-                      ragged vine sheet, both tileable vertically. Not cubes --
-                      drawn as one they read as a pillar of wood
+    ├── props_climb.py the two climbable block *faces*: a ladder lattice and a
+    │                 ragged vine sheet, both tileable vertically. Not cubes --
+    │                 drawn as one they read as a pillar of wood
+    └── props_world.py the far world the tower stands in: a start island, sea
+                      stacks, an arch, a shipwreck, a lighthouse, floating
+                      islands with waterfalls, a sky ruin, an airship. Drawn at
+                      40-300 m, so each one *is* its silhouette: no bevels,
+                      six-sided cylinders, big and irregular in plan. Three
+                      origin conventions and the module says which each uses --
+                      waterline, deck (top surface) and hanging
 
 src/brainrot/
 ├── cli.py            run / demo / shoot / install / uninstall / ping / scenes

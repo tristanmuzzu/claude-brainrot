@@ -919,12 +919,24 @@ touching any of it — the reasoning is there, this is the short list:
    is zero and this is the one number that went the wrong way. `--only "ROPE
    BRIDGE"` plus the throwaway path-printer described under item 0a is the way
    in.
-00000a. **One unchecked emergency placed a 26.76 m "hop".** `_emergency` aims
-   at the far side of a chasm when the body is stranded over one, and nothing
-   checks the move it implies, so `tower_probe`'s designed-jump maximum reads
-   26.76 m where every checked jump is under 7. One landing in 2,600 and the
-   escape hatch is deliberate, but a body crossing a quarter of the tower in
-   one frame is visible if it lands in shot.
+00000a. ~~One unchecked emergency placed a 26.76 m "hop".~~ **Attributed and
+   very probably gone.** `tools/arc_probe.py --dump` traced it: a 26.76 m,
+   +8.00 m, 3.77 s "hop" from THE SILENCE to THE BELFRY through 118 cone cells,
+   landing beat `stuck`, and it was the exit climb aiming at the wrong chasm
+   (see "The climb stopped aiming at the wrong chasm"). The designed-jump
+   maximum reads **5.63 m** now over the same sweep, against 26.76 before. Not
+   *proven* gone -- `_emergency` is still the module's one unchecked placement
+   and nothing stops it -- so if the maximum ever reads over about 8 again,
+   this is what it is.
+00000b. **0.96% of tower moves still pass through something drawn**, worst
+   0.575 m, and the biggest remaining writer is `landmark` -- 5 moves and 21
+   cells over 2,408, which is the gated structure the course is deliberately
+   steered *through*. Worth asking whether the held passage is wide enough at
+   the shoulders; the crossing's landings are cells and the body is 0.6 m wide
+   and straddles the next one whenever it is not dead centre. `lid` also still
+   ghosts on 9 cells that `advance`'s un-draw does not reach, and the mechanism
+   for those is not yet known. `python tools/arc_probe.py --runs 8 --blocks
+   300` is the number; `docs/PATH.md` is the write-up.
 
 0000. ~~The sideways hop between two roofs happens 0.75 times a minute~~
    **Done, and the guess in this entry was half right.** Laying the flank
@@ -1942,6 +1954,167 @@ Four things worth not relearning:
   "hop" of 26.76 m across an eight-block climb, which the checks then let
   through because it was the module's one unchecked emergency placement.
 
+## The climb stopped aiming at the wrong chasm (2026-08-20)
+
+The owner's report on the tower: on one level *"it starts at about zero on the
+height, gets all the way up to exactly height eleven, and then it jumps down
+again, and this keeps recurring -- it doesn't seem like it can get past it."*
+He named THE VAULT. **It is not a level bug and it is not the Vault**: it is
+the exit-climb machinery, and the level on the HUD during it is the *next* one
+along, because the strip labels the section the body is standing in.
+
+**Every part of the climb out re-derived which chasm it was crossing from
+where the body is standing right now.** That is correct while the body is on
+the level being left and catastrophic the moment it is not. One approach hop
+over a level boundary -- an ordinary, checked, legal hop, because a narrow
+chasm is jumpable -- and `_aim_crossing` re-measures the jump against the
+*next* level's far lip, most of a revolution away. Instrumented over eight
+runs: 293 crossings aimed, **median arc asked 6.4 m and worst 74.5**, against
+a level hop of 4.26 and 4.98 dropping one. It is refused forever;
+`_cross_approach` walks; the recovery lays another staircase; eleven to
+thirteen treads later the apparatus gives up and the level's own first beat
+starts on the terrace, four to eleven blocks below where the thrashing left
+the body. That drop is the thing on screen.
+
+Two changes, both in `spiralplan`. A crossing carries `from_level`, the level
+it was planned in, and `_aim_crossing`/`_cross_approach` use that rather than
+asking where the body is. And `_ascent_done` abandons a climb the moment the
+body is standing on the next level, however it got there -- a stair tread that
+crosses the boundary is not a fault, it has been through every check a
+crossing would have; what was faulty was carrying on climbing afterwards.
+
+| 12 runs x 320 landings | before | after |
+|---|---|---|
+| level visits that climb >=3 and give it back >=4 | 5.6% | **0.7%** |
+| worst mean exit-climb landings on a level | 13.0 (ROPE BRIDGE) | **5.9** |
+| the exit climb, as a share of the course | 27% | **23%** |
+| a generated staircase (the thrash) | 218 | **151** |
+| walking to the chasm lip | 273 | **164** |
+| designed content | 58% | **62%** |
+| placed as authored | 94.4% | **94.7%** |
+| longest "designed" jump | **26.76 m** | **5.63 m** |
+
+That last row is outstanding item 0a, which had never been attributed: a
+26.76 m teleport once a sweep, and it was this. Not proven gone -- the
+emergency hatch is still unchecked -- but it has not been seen since.
+
+Three things measured and worth not re-deriving. `from_level` on its own moves
+the aggregates by nothing (62% vs 63%, staircase 151 vs 135, inside noise);
+what it buys is that the crossing can no longer be aimed at a hole a level
+away, and it is kept for that. The remaining generated staircases are **not**
+a tread problem: instrumented, the median distance to the lip when one fires
+is 2.4 m and `need` is 0 or 1 on 36 of 65 -- the height is already won and the
+crossing is being refused on *placement*. And half of those refusals report
+`no move: hop` with a legal arc, which means the offered *cells* are further
+than the arc asked for; that is where to look next.
+
+## Nothing stands in the middle of a jump any more (2026-08-20)
+
+The owner's second report, same watch: *"many jumps look impossible because
+there are blocks in the way, but the player just passes through whatever is in
+its way and lands on the next block -- and they look off, they don't belong
+there at all."* Every probe this project owns read green, because they all ask
+about *arcs and cells* and the complaint is about **decoration, lids and
+ghosts** -- three classes nothing had ever counted.
+
+`tools/arc_probe.py` is the tool and `docs/PATH.md` is the write-up, including
+the whole course as a table (`--path`) and one full cycle's numbers. Five
+causes, none visible in the aggregate:
+
+- **`Move.points` sampled evenly in time at seventeen points, with a note
+  claiming 0.2 m spacing.** Measured over 1,950 committed moves: median gap
+  0.27 m, **worst 1.13 m -- wider than a cell**, so a whole block could sit
+  between two tests. A long descending hop is 0.44 m a sample, and a move whose
+  legs run at different speeds gives the slow leg nearly all seventeen. The
+  points are also what `_commit` reserves as `pathcells`, so an unsampled cell
+  is an unreserved one. `ARC_STEP = 0.3` with a per-leg closed-form count:
+  worst gap **0.300 m**, and free (30.2 s against 31.0 for the same sweep).
+- **A lamp was a lit 0.62 m cube at the centre of the landing's own walking
+  surface**, and `deco` is `solid=False` by design. The body ran through one on
+  **31.9% of all moves** and the camera was inside one on 2.6%. It hangs under
+  the landing's leading edge now -- where a lantern hangs in the reference, and
+  the face you see on the way in to a landing above you. **0.21% and 0.00%.**
+- **A `lintel` sat at the apex *of the feet* plus 0.35.** A body is 1.8 m
+  tall, and most lintels are written on a `walk` -- where the apex is the
+  walking surface, so the beam was at knee height. Over the head now.
+- **A head-hitter's clearance was the feet's too** (`_ceiling_cells`), and lids
+  were the largest single writer of cells inside the body: 17 moves at up to
+  0.543 m. Refusing them is not available -- since every jump spends the whole
+  impulse a hop apexes 1.25 m over its take-off, so "apex plus a body under a
+  lid at three" excludes every hop and 244 of the roster's 276 lids stop being
+  buildable. The lid **rises to clear the head** (`LID_MAX`) and refuses only
+  past the point where it stops reading as a beam. Fidelity unchanged.
+- **`_walk_bridge` laid full cubes around the shins** on a walk joining two
+  surfaces half a cell apart: `ifloor(y - 0.05)` is right only when the foot
+  height is a cell top, and on a ramp it never is. 5.4% of all walks and every
+  0.600 m reading in the table. Laying the shelf under the *lower* end instead
+  leaves the feet in mid-air and `test_a_walk_never_crosses_air` refuses it;
+  there is no third cell, because a ramp cannot be made of whole cubes.
+  Refusing half-block walks outright works and costs **two points of fidelity**
+  (94.7% -> 92.7%). What costs nothing is to stop the walk being a ramp: it is
+  **flat and then a step** (`STEP_UP`), with the rise confined to the last two
+  thirds of a cell, over the landing's own footprint. Which is what the game
+  does -- half a block is walked up, not jumped.
+- **A lid outlives the jump it was built for.** `advance` releases a landing's
+  cells from the occupancy map and the renderer never un-draws them. Right for
+  a pedestal -- built ground, and what the levels below you are made of. Wrong
+  for a head-hitter, which is a beam in mid-air with nothing left to justify
+  it, and which the next revolution's arcs fly straight through because
+  `blocked()` has correctly forgotten it. Fifteen of seventeen ghost cells were
+  lids and one was flown through twice running.
+
+| 8 runs x 300 landings, 2,408 moves | before | after |
+|---|---|---|
+| moves through something drawn | 1.83% | **0.96%** |
+| the body through furniture | **31.9%** | **0.21%** |
+| the camera inside furniture | **2.57%** | **0.00%** |
+| drawn but not solid ("ghosts") | 0.50% | 0.33% |
+| worst penetration | 0.600 m | 0.575 m |
+
+**91% of the offending cells were laid *before* the arc that hits them was
+solved**, and that one number is why the fix is never "delete afterwards": the
+three reservation ledgers are doing their job. Fix the writer.
+
+## The sea has things in it and so does the sky (2026-08-20)
+
+The tower stood in an empty ocean under an empty sky: one flat blue plane a
+hundred metres down, a few cloud sheets, nothing else in any direction. Every
+sense of *height* the format had came from the fog, which is a wash rather
+than a thing -- there was no object anywhere whose apparent size could say how
+far up you had got.
+
+`assets/src/props_world.py` is nine new baked-light models built for 40-300 m
+against sea and sky, where a model is its silhouette and nothing else:
+`startisle` (a beach, trees and a jetty), `seastack`, `seaarch`, `shipwreck`,
+`lighthouse`, `skyisland` (with a `waterfall` hung off its spout), `skyruin`
+and `airship`. 3,152 triangles for the set, one draw call each. `SCENERY` in
+`spiral.py` places them once per run from the run's own seed and they never
+move, because the piece on the horizon at the start of a run has to be the
+same one still on the horizon four minutes later; only the airships travel,
+and they orbit rather than cross, so the model's yaw and its heading stay in
+step for free. Frame cost: tower/parkour **1.56** against 1.46 recorded.
+
+Four things the assets themselves had to get right, all found by rendering and
+all recorded in the module: no two overlapping slabs may share a top face (the
+bake comes back with black rectangles that read as holes -- the same landmine
+as the cactus elbow); a cap must be wider than the mass it caps *including*
+`rocky`'s jitter; a linear taper is an upside-down wedding cake, so an
+underside needs a fat shoulder and then a thin tail; and `merge()` has to apply
+the joined object's transform into the mesh or glTF carries a second
+description of where the model is.
+
+**And two placement facts that cost renders.** The pieces are drawn *after*
+the haze band, not with the sea: that band is a screen-space wash at alpha 205
+over half the frame below the horizon, and everything drawn before it there
+comes out 80% fog colour -- which for an island four hundred metres out is not
+aerial perspective, it is deletion. They carry their own distance tint
+instead, which goes further than `FOG_FAR` because these are forty-metre
+objects and the whole point is that they are a long way off. And they are
+placed on an even spread of bearings with a jitter inside it rather than on
+free draws: a run covers about a revolution a minute, so four pieces that
+happen to land on one bearing are four pieces at once and then nothing for a
+minute.
+
 ## Known limit: how long a parkour jump can be
 
 There is one jump impulse and one horizontal speed, so the furthest a hop can
@@ -2055,6 +2228,24 @@ long jumps you need a different motion model, not a bigger number.
   the physics on paper (`--design-only` needs nothing built and is instant),
   then how much of the design survived being placed, per level and per beat.
   Run it after touching a level. A beat under 98% is a design to look at.
+- `python tools/arc_probe.py --runs 8 --blocks 300` is the acceptance test for
+  *"there are blocks in the way and the player just passes through them"*, and
+  it is the only probe here that asks about what is **drawn** rather than about
+  what is solid -- which is where three whole classes of defect were hiding.
+  It walks every committed move the way the body plays it, samples the body's
+  swept volume **by distance**, and reports what is inside it with the
+  **provenance of the offending cell** (course block, pedestal, lid, shell,
+  bridge, landmark, prop, terrain paint, cone) and with whether that cell was
+  written *before or after* the arc it blocks -- which is the number that
+  decides whether the fix is "reserve more" or "fix the writer". It counts
+  three things nothing else ever has: the body through non-solid **furniture**,
+  the **camera** inside anything, and **ghosts** (drawn, released by `advance`,
+  never un-drawn). `--dump run,index` prints one move sample by sample; every
+  cause found in this pass was invisible in the aggregate and obvious in one
+  dump. `--path --run N --blocks 760` prints the whole course as a table --
+  block to block, distance, rise, move, cumulative simulated seconds -- and is
+  what `docs/reference/tower_path_run0.txt` was produced with. No window, about
+  two minutes. `docs/PATH.md` is the write-up.
 - `python tools/walk_probe.py --plan tower --runs 12 --blocks 240` asks whether
   a *solved* move is still legal when it is played: it walks every committed
   move against the world as it stands `AHEAD` landings later, which is where
@@ -2399,7 +2590,7 @@ long jumps you need a different motion model, not a bigger number.
   nothing can walk up the tower without touching the parkour).
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~255s). **641
+- Run `python -m pytest tests/` before committing; it is fast (~255s). **656
   passed, 34 skipped.** The Win32 suite skips off Windows and the X11 suite
   skips without a display, so a green run means less on the other platform's
   machine -- check the count.
