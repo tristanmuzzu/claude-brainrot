@@ -64,11 +64,16 @@ class Event:
         except (TypeError, ValueError):
             hwnd = 0
         pids: list[int] = []
-        for value in data.get("pids") or ():
-            try:
-                pids.append(int(value))
-            except (TypeError, ValueError):
-                continue
+        raw_pids = data.get("pids")
+        # A truthy non-sequence here ({"pids": 5}) must degrade, not raise:
+        # parse runs on the listener thread, and an exception out of it ends
+        # the daemon's hearing for the rest of its life.
+        if isinstance(raw_pids, (list, tuple)):
+            for value in raw_pids:
+                try:
+                    pids.append(int(value))
+                except (TypeError, ValueError):
+                    continue
         return cls(
             kind=kind,
             session=str(data.get("session") or data.get("session_id") or ""),
@@ -138,14 +143,14 @@ class EventListener:
                         continue
                 except Exception:
                     pass
-            event = Event.parse(payload)
-            if event is not None:
-                try:
+            try:
+                event = Event.parse(payload)
+                if event is not None:
                     self._on_event(event)
-                except Exception:
-                    # A scene bug must not kill the listener; the next event
-                    # gets a fresh attempt.
-                    pass
+            except Exception:
+                # Neither a malformed datagram nor a scene bug may kill the
+                # listener; the next event gets a fresh attempt.
+                pass
 
     def stop(self) -> None:
         self._stop.set()

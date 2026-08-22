@@ -17,6 +17,36 @@ from .rng import state_dir
 DEFAULT_PORT = 47821
 
 
+def _coerce(value: object, default: object) -> object | None:
+    """``value`` as the type ``default`` has, or None when it cannot be."""
+    try:
+        if isinstance(default, bool):
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                return value.strip().lower() in ("1", "true", "yes", "on")
+            return None
+        if isinstance(default, int):
+            if isinstance(value, bool):
+                return None
+            return int(value)
+        if isinstance(default, float):
+            if isinstance(value, bool):
+                return None
+            return float(value)
+        if isinstance(default, list):
+            if isinstance(value, str):
+                return [s.strip() for s in value.split(",") if s.strip()]
+            if isinstance(value, list):
+                return [str(s) for s in value]
+            return None
+        if isinstance(default, str):
+            return value if isinstance(value, str) else None
+    except (TypeError, ValueError):
+        return None
+    return None
+
+
 @dataclass
 class Config:
     # --- IPC -------------------------------------------------------------
@@ -128,8 +158,18 @@ class Config:
 
         known = {f.name: f for f in fields(cls)}
         for key, value in flat.items():
-            if key in known:
-                setattr(cfg, key, value)
+            if key not in known:
+                continue
+            coerced = _coerce(value, getattr(cfg, key))
+            if coerced is None:
+                # Same policy as the env overrides below: a malformed value
+                # should not stop the overlay starting -- and it used to,
+                # because an un-coerced string reached _validate (crashing
+                # every command including doctor) or leaked through untyped
+                # (a str port reaching sock.bind, a str scenes iterated
+                # char-wise).
+                continue
+            setattr(cfg, key, coerced)
 
         cfg._apply_env()
         cfg._validate()

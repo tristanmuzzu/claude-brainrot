@@ -327,15 +327,25 @@ def _check_hooks(cfg: Config) -> list[Check]:
     try:
         settings = json.loads(path.read_text(encoding="utf-8"))
         hooks = settings.get("hooks", {})
-    except (OSError, json.JSONDecodeError):
+        if not isinstance(hooks, dict):
+            hooks = {}
+    except (OSError, json.JSONDecodeError, AttributeError):
         checks.append(Check("hooks", FAIL, f"cannot read {path}", "Run: brainrot install"))
         return checks
+
+    def _has_shim(entries) -> bool:
+        # Hand-edited settings are exactly this check's audience, so a
+        # malformed entry is a "no", never an AttributeError out of doctor.
+        return any(
+            isinstance(h, dict) and SHIM_NAME in str(h.get("command", ""))
+            for e in entries if isinstance(e, dict)
+            for h in (e.get("hooks") if isinstance(e.get("hooks"), list) else [])
+        )
 
     registered = [
         event
         for event, entries in hooks.items()
-        if isinstance(entries, list)
-        and any(SHIM_NAME in str(h.get("command", "")) for e in entries for h in e.get("hooks", []))
+        if isinstance(entries, list) and _has_shim(entries)
     ]
     if registered:
         checks.append(Check("hooks", OK, ", ".join(sorted(registered))))

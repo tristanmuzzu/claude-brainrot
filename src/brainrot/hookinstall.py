@@ -148,9 +148,16 @@ def hook_command(shim: Path) -> str:
     return f'"{_python_for_hooks()}" -S "{shim}"'
 
 
-def _is_ours(entry: dict) -> bool:
-    for hook in entry.get("hooks", []):
-        if SHIM_NAME in str(hook.get("command", "")):
+def _is_ours(entry) -> bool:
+    # Hand-edited settings can hold anything; a malformed entry is simply not
+    # ours rather than a crash in install/uninstall/doctor.
+    if not isinstance(entry, dict):
+        return False
+    hooks = entry.get("hooks")
+    if not isinstance(hooks, list):
+        return False
+    for hook in hooks:
+        if isinstance(hook, dict) and SHIM_NAME in str(hook.get("command", "")):
             return True
     return False
 
@@ -180,11 +187,22 @@ def install(
         settings = {}
 
     hooks = settings.setdefault("hooks", {})
+    if not isinstance(hooks, dict):
+        hooks = settings["hooks"] = {}
+    # Sweep *every* event for a previous install of ours, not just the ones
+    # being registered: installing with --with-tool-events and later without
+    # used to leave the PreToolUse/PostToolUse shims in place forever -- a
+    # shim spawn on every tool call the user asked to stop paying for.
+    for event, entries in list(hooks.items()):
+        if not isinstance(entries, list):
+            continue
+        entries[:] = [e for e in entries if not _is_ours(e)]
+        if not entries and event not in events:
+            hooks.pop(event, None)
     for event in events:
         entries = hooks.setdefault(event, [])
-        # Drop any previous install of ours so re-running is idempotent rather
-        # than stacking duplicate shims, while leaving other tools' hooks alone.
-        entries[:] = [e for e in entries if not _is_ours(e)]
+        if not isinstance(entries, list):
+            entries = hooks[event] = []
         entry: dict = {"hooks": [{"type": "command", "command": command}]}
         if event in TOOL_EVENTS:
             entry["matcher"] = "*"

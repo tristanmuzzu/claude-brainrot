@@ -104,11 +104,18 @@ def hosts(overlay_hwnd: int):
 
 @pytest.fixture
 def window(overlay_hwnd: int):
-    """An ``OverlayWindow`` driving the shared raylib window."""
+    """An ``OverlayWindow`` driving the shared raylib window.
+
+    ``create()`` would open a second raylib window, which the shared-window
+    rule forbids, so the two fields it would have filled in are set by hand:
+    the resolved backend and the native handle of the session's one window.
+    """
     from brainrot.engine.window import OverlayWindow
 
     overlay = OverlayWindow()
     overlay._cfg = Config()
+    overlay._native = win32
+    overlay._win = overlay_hwnd
     yield overlay
     overlay.detach_host()
 
@@ -222,7 +229,7 @@ def test_handles_survive_the_ctypes_round_trip(overlay_hwnd: int, host: int) -> 
     assert win32.owner_of(overlay_hwnd) == host
 
 
-def test_owned_only_while_visible(host: int) -> None:
+def test_owned_only_while_visible(overlay_hwnd: int, host: int) -> None:
     """The daemon lets go of the host whenever it has nothing to show.
 
     Ownership couples lifetimes: while attached, closing the terminal destroys
@@ -233,17 +240,19 @@ def test_owned_only_while_visible(host: int) -> None:
 
     window = OverlayWindow()
     window._cfg = Config()
+    window._native = win32
+    window._win = overlay_hwnd
     window.attach_host(host)
     assert window._attached is True
-    assert win32.owner_of(window._hwnd()) == host
+    assert win32.owner_of(window._win) == host
 
     window.detach_host()
     assert window._attached is False
-    assert win32.owner_of(window._hwnd()) == 0
+    assert win32.owner_of(window._win) == 0
 
     window.set_visible(True)            # coming back on screen re-takes it
     assert window._attached is True
-    assert win32.owner_of(window._hwnd()) == host
+    assert win32.owner_of(window._win) == host
     window.detach_host()
 
 
@@ -289,7 +298,7 @@ def test_only_the_sessions_that_are_working_count(window, hosts) -> None:
 def test_the_live_foreground_window_is_what_is_actually_consulted(window) -> None:
     """No override: whatever is genuinely in front of this desktop right now."""
     front = win32.foreground_root()
-    if not front or front == win32.root_of(window._hwnd()):
+    if not front or front == win32.root_of(window._win):
         pytest.skip("nothing but our own window in front right now")
     allowed = window.focus_allows({front})
     denied = window.focus_allows(frozenset())
@@ -331,7 +340,7 @@ def test_the_overlay_being_in_front_is_not_the_user_leaving(window, hosts) -> No
     state the takeover happens to be in.
     """
     claude = hosts("claude")
-    assert window.focus_allows({claude}, foreground=window._hwnd()) is True
+    assert window.focus_allows({claude}, foreground=window._win) is True
 
 
 def test_an_owned_overlay_is_still_its_own_root(overlay_hwnd: int, host: int) -> None:
@@ -350,10 +359,10 @@ def test_a_second_session_replaces_the_attachment(window, hosts) -> None:
     overlay to the first host it ever saw."""
     first, second = hosts("first"), hosts("second")
     window.attach_host(first)
-    assert win32.owner_of(window._hwnd()) == first
+    assert win32.owner_of(window._win) == first
     window.attach_host(second)
-    assert win32.owner_of(window._hwnd()) == second
-    assert window._host_hwnd == second
+    assert win32.owner_of(window._win) == second
+    assert window._host == second
 
 
 def test_a_dead_host_is_forgotten_rather_than_latched(window, hosts) -> None:
@@ -369,15 +378,15 @@ def test_a_dead_host_is_forgotten_rather_than_latched(window, hosts) -> None:
     # the whole test session shares. `_attached` is deliberately left True:
     # that drift between what the daemon believes and what Windows has
     # recorded is the thing being tested.
-    win32.detach(window._hwnd())
+    win32.detach(window._win)
     assert user32.DestroyWindow(claude)
     assert not win32.is_window(claude)
 
     assert window.focus_allows({claude}, foreground=claude) is False
-    assert window._host_hwnd == 0, "kept a handle that names nothing"
+    assert window._host == 0, "kept a handle that names nothing"
     assert window._attached is False, "still believes it is attached"
-    assert win32.owner_of(window._hwnd()) == 0
-    assert not win32.is_topmost(window._hwnd()), "stranded above everything"
+    assert win32.owner_of(window._win) == 0
+    assert not win32.is_topmost(window._win), "stranded above everything"
 
 
 def test_reattaching_to_a_dead_host_forgets_it(window, hosts) -> None:
@@ -392,7 +401,7 @@ def test_reattaching_to_a_dead_host_forgets_it(window, hosts) -> None:
 
     window.set_visible(True)            # what the daemon does on the way back up
     assert window._attached is False
-    assert window._host_hwnd == 0
+    assert window._host == 0
     assert window.focus_allows(frozenset(), foreground=hosts("elsewhere")) is False
 
 
@@ -440,7 +449,7 @@ def test_moving_the_overlay_does_not_activate_it(window, hosts) -> None:
     somewhere else. A move that stole the foreground would undo the whole
     point of following it."""
     before = win32.foreground_root()
-    if not before or before == win32.root_of(window._hwnd()):
+    if not before or before == win32.root_of(window._win):
         pytest.skip("no other window in front to lose")
     hwnd = hosts("movable")
     win32.move_window(hwnd, 320, 160, 200, 200)
@@ -457,17 +466,17 @@ def test_the_overlay_places_itself_beside_a_live_host(window, hosts) -> None:
     # The overlay here is the one raylib window the whole session shares, so
     # put its rectangle back exactly as found -- resizing it behind raylib's
     # back would hand every later test a surface of a size it did not ask for.
-    was = win32.window_rect(window._hwnd())
+    was = win32.window_rect(window._win)
     try:
         window.follow_host()
         spot = window._placed
         assert spot is not None
         assert spot.x >= 210, "landed on top of the window it follows"
-        assert win32.window_rect(window._hwnd()) == (
+        assert win32.window_rect(window._win) == (
             spot.x, spot.y, spot.x + spot.width, spot.y + spot.height)
     finally:
         if was:
-            win32.move_window(window._hwnd(), was[0], was[1],
+            win32.move_window(window._win, was[0], was[1],
                               was[2] - was[0], was[3] - was[1])
 
 
@@ -506,7 +515,7 @@ def test_the_overlay_never_shows_itself_through_raylib(window, monkeypatch) -> N
                         lambda *a: pytest.fail("showed through raylib's hide flag"))
     window.set_visible(False)
     window.set_visible(True)
-    assert calls == [(window._hwnd(), False), (window._hwnd(), True)]
+    assert calls == [(window._win, False), (window._win, True)]
 
 
 def test_click_through_is_a_real_style_bit(overlay_hwnd: int) -> None:
@@ -543,8 +552,8 @@ def test_a_whole_drag_against_the_real_window(window, hosts, monkeypatch,
     monkeypatch.setenv("BRAINROT_STATE_DIR", str(tmp_path))
     host = hosts("claude")
     window.attach_host(host)
-    win32.apply_overlay_styles(window._hwnd(), Config())
-    was = win32.window_rect(window._hwnd())
+    win32.apply_overlay_styles(window._win, Config())
+    was = win32.window_rect(window._win)
     assert was
 
     held, down, at = [True], [False], [(was[0] + 10, was[1] + 10)]
@@ -553,11 +562,11 @@ def test_a_whole_drag_against_the_real_window(window, hosts, monkeypatch,
     try:
         down[0] = True
         mover.update()
-        assert mover.dragging and not win32.is_click_through(window._hwnd())
+        assert mover.dragging and not win32.is_click_through(window._win)
 
         at[0] = (at[0][0] + 120, at[0][1] + 90)
         mover.update()
-        moved = win32.window_rect(window._hwnd())
+        moved = win32.window_rect(window._win)
         assert moved == (was[0] + 120, was[1] + 90,
                          was[2] + 120, was[3] + 90), "the window did not follow"
 
@@ -570,10 +579,10 @@ def test_a_whole_drag_against_the_real_window(window, hosts, monkeypatch,
 
         held[0] = False
         mover.update()
-        assert win32.is_click_through(window._hwnd()), "left it eating clicks"
+        assert win32.is_click_through(window._win), "left it eating clicks"
     finally:
-        win32.set_click_through(window._hwnd(), True)
-        win32.move_window(window._hwnd(), was[0], was[1],
+        win32.set_click_through(window._win, True)
+        win32.move_window(window._win, was[0], was[1],
                           was[2] - was[0], was[3] - was[1])
 
 

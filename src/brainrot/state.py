@@ -33,6 +33,7 @@ The clock is injected so all of this is testable without sleeping.
 
 from __future__ import annotations
 
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -87,6 +88,13 @@ class ThinkingState:
     _suppressed: bool = False
     caption: str = ""
 
+    #: ``handle()`` arrives on the IPC listener thread while ``tick()`` runs
+    #: every frame on the render thread, and both iterate *and* mutate
+    #: ``_thinking`` -- unlocked, a set mutation during the other thread's
+    #: iteration raises ``RuntimeError`` out of the render loop and exits the
+    #: daemon. Reentrant because ``handle()`` ends by calling ``tick()``.
+    _lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
+
     # -- queries ----------------------------------------------------------
 
     @property
@@ -100,6 +108,12 @@ class ThinkingState:
     @property
     def busy(self) -> bool:
         return bool(self._thinking)
+
+    @property
+    def sessions(self) -> frozenset[str]:
+        """Ids of the sessions currently thinking."""
+        with self._lock:
+            return frozenset(self._thinking)
 
     @property
     def hosts(self) -> frozenset[int]:
@@ -126,17 +140,22 @@ class ThinkingState:
         turn of the overlay behaving as though it does not know where Claude
         Code is -- because it does not.
         """
-        session = session or "default"
-        if not hwnd or self._hosts.get(session) == hwnd:
-            return False
-        self._hosts[session] = int(hwnd)
-        if session in self._thinking:
-            self._turn_hosts = self._turn_hosts | {int(hwnd)}
-        return True
+        with self._lock:
+            session = session or "default"
+            if not hwnd or self._hosts.get(session) == hwnd:
+                return False
+            self._hosts[session] = int(hwnd)
+            if session in self._thinking:
+                self._turn_hosts = self._turn_hosts | {int(hwnd)}
+            return True
 
     def handle(self, kind: str, session: str = "", tool: str = "",
                hwnd: int = 0) -> None:
         """Fold one hook event into the state."""
+        with self._lock:
+            self._handle(kind, session, tool, hwnd)
+
+    def _handle(self, kind: str, session: str, tool: str, hwnd: int) -> None:
         session = session or "default"
 
         if kind in _START_EVENTS:
@@ -199,6 +218,10 @@ class ThinkingState:
 
     def tick(self) -> Visibility:
         """Advance timers. Call every frame; returns the current visibility."""
+        with self._lock:
+            return self._tick()
+
+    def _tick(self) -> Visibility:
         now = self.clock()
         self._expire()
 
@@ -264,6 +287,10 @@ class ThinkingState:
         self.caption = ""
 
     def reset(self) -> None:
+        with self._lock:
+            self._reset()
+
+    def _reset(self) -> None:
         self._thinking.clear()
         self._hosts.clear()
         self._turn_hosts = frozenset()

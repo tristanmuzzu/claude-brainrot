@@ -50,6 +50,13 @@ from ctypes import wintypes
 
 from ..config import Config
 
+#: Same reason as the Linux backend: the styles that stop this window taking
+#: the keyboard (and the topmost band it must not flash in) have to be on it
+#: before it is ever mapped, so it is born hidden and shown deliberately via
+#: ``set_window_shown``. Without this the daemon's startup flashed a topmost
+#: undecorated window full of calibration frames.
+CREATE_HIDDEN = True
+
 user32 = ctypes.windll.user32  # type: ignore[attr-defined]
 
 GWL_EXSTYLE = -20
@@ -106,6 +113,8 @@ user32.SetWindowPos.argtypes = [
     wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
     ctypes.c_int, ctypes.c_int, wintypes.UINT,
 ]
+user32.SetForegroundWindow.restype = wintypes.BOOL
+user32.SetForegroundWindow.argtypes = [wintypes.HWND]
 user32.IsWindow.restype = wintypes.BOOL
 user32.IsWindow.argtypes = [wintypes.HWND]
 user32.GetAncestor.restype = wintypes.HWND
@@ -409,7 +418,16 @@ def focus_window(win: int, focused: bool) -> None:
     if focused:
         ex &= ~(WS_EX_TRANSPARENT | WS_EX_NOACTIVATE)
         _set_long(win, GWL_EXSTYLE, ex)
-        user32.SetForegroundWindow(win)
+        if not user32.SetForegroundWindow(win):
+            # Windows refuses foreground to a process that did not receive
+            # the last input event, which a chord *polled* off
+            # GetAsyncKeyState never did. Proceeding anyway leaves the strip
+            # non-click-through with focus somewhere else -- it eats clicks
+            # and types nothing. Put the styles back and let the caller's
+            # exception path stand the takeover down.
+            _set_long(win, GWL_EXSTYLE,
+                      ex | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE)
+            raise OSError("SetForegroundWindow refused; takeover abandoned")
     else:
         ex |= WS_EX_TRANSPARENT | WS_EX_NOACTIVATE
         _set_long(win, GWL_EXSTYLE, ex)

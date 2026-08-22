@@ -107,9 +107,12 @@ def install(cfg: Config) -> tuple[bool, str]:
     # The extension has to send to the port the daemon actually listens on,
     # and it cannot read the daemon's config.toml -- gnome-shell has no
     # business reading files out of an application's state directory.
-    if cfg.port != Config.port:
-        _run(["gsettings", "--schemadir", str(schemas), "set", SCHEMA_ID,
-              "port", str(cfg.port)])
+    # Unconditionally: written only when the port differed from the default,
+    # a config later reverted to the default kept the extension on the old
+    # port forever, and `brainrot extension install` -- the advertised fix --
+    # did not repair it.
+    _run(["gsettings", "--schemadir", str(schemas), "set", SCHEMA_ID,
+          "port", str(cfg.port)])
 
     if _run(["gnome-extensions", "enable", UUID]) is not None:
         return True, f"installed and enabled ({target})"
@@ -139,6 +142,10 @@ def _mark_enabled() -> bool:
     if UUID in current:
         return True
     body = current.strip()
+    # An empty list prints as the typed literal `@as []` -- exactly the fresh
+    # machine with no extensions where this path matters most.
+    if body.startswith("@as "):
+        body = body[4:].strip()
     if not body.startswith("[") or not body.endswith("]"):
         return False
     inner = body[1:-1].strip()

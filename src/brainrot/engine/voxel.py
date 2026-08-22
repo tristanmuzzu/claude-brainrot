@@ -420,5 +420,15 @@ def draw_box(model, x: float, y: float, z: float, tint,
 
 def clear() -> None:
     """Forget models (textures are owned by the textures cache). The shared
-    mesh is deliberately kept -- scenes reload styles cheaply."""
+    mesh is deliberately kept -- scenes reload styles cheaply.
+
+    The per-model arrays ``LoadModelFromMesh`` RL_CALLOCs (meshes,
+    meshMaterial, materials, maps) are **deliberately leaked** -- tens of KB
+    per scene build. Freeing them here was tried (2026-08-22) and segfaulted
+    the suite: a scene object can outlive the next scene's ``clear()`` (tests
+    do this routinely, ``styles[...]["model"]`` keeps the Model), and a freed
+    array under a live Model turns a tolerated stale read into a
+    use-after-free reported wherever the heap is next touched. The leak is
+    the cheap side of that trade; do not re-derive the "fix".
+    """
     _MODELS.clear()

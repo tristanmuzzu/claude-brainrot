@@ -2875,13 +2875,28 @@ class Course:
                 node = self._pending.pop(0)
                 got = self._try_node(prev, node)
         if got is None:
-            got = self._last_resort(prev)
+            # The recovery built its own node (label/origin ``recover`` or an
+            # ``ascent`` climb) and the block must be committed with *that*
+            # node, not the abandoned one -- committed with the failed node,
+            # recoveries were invisible to every probe, ``to_level`` was
+            # stamped on landings that never crossed, and a failed node's
+            # moat or shell was built around a landing it never described.
+            recovered, got = self._last_resort(prev)
+            if got is not None:
+                node = recovered
         if got is None:
             self.stuck += 1
             got = self._emergency(prev, node)
             node = dict(node, label="stuck")
         blk = self._commit(prev, node, got)
-        self.u = self.u_of(blk)
+        # Resolved against the angle already known, never through ``unwrap``:
+        # height-resolved, a legal landing below the floor at its bearing
+        # (authored exit treads stop one under the next floor, crossings
+        # descend by design) names the level a whole revolution down and
+        # snaps ``u`` back ~2pi -- measured at 696 regressions in 4,000
+        # landings on one tower seed, and a permanent three-level loop on two
+        # others.
+        self.u = self._u_at(self.u, blk["x"], blk["z"])
         self._paint_behind()
         return blk
 
@@ -3125,9 +3140,9 @@ class Course:
         self._abandon(prev)
         theme = self.cone.section_at(self.u).theme
         if self.segment == "ascent":
-            got = self._climb_on(prev, theme)
+            node, got = self._climb_on(prev, theme)
             if got is not None:
-                return got
+                return node, got
         for arc in (3, 4, 2, 5, 6):
             for lift in self._recover_lifts():
                 for radial in (0.0, 2.0, -2.0, 4.0, -4.0):
@@ -3138,7 +3153,7 @@ class Course:
                     for cell in self._targets(prev, node):
                         got = self._attempt(prev, node, cell, strict=False)
                         if got is not None:
-                            return got
+                            return node, got
         # Still nothing, which over a chasm is the normal case: everything
         # above wanted ground under it. Two answers, in this order, and the
         # order is the whole point.
@@ -3157,7 +3172,7 @@ class Course:
             for cell in self._targets(prev, node):
                 got = self._attempt(prev, node, cell, strict=False)
                 if got is not None:
-                    return got
+                    return node, got
         # ...and only then a block in the air, and only ever *upward*.
         for step in (1, 0):
             for arc in (2.7, 3.1, 2.4, 3.5):
@@ -3166,8 +3181,8 @@ class Course:
                 for cell in self._targets(prev, node):
                     got = self._attempt(prev, node, cell, strict=False)
                     if got is not None:
-                        return got
-        return None
+                        return node, got
+        return None, None
 
     def _recover_lifts(self):
         """Heights a recovery hop may be laid at, best first.
@@ -3190,7 +3205,7 @@ class Course:
         held has left the recovery a wall to argue with.
         """
 
-    def _climb_on(self, prev: dict, theme) -> dict | None:
+    def _climb_on(self, prev: dict, theme) -> "tuple[dict | None, dict | None]":
         """Recovery for a failed exit climb that does not throw the climb away.
 
         The ordinary recovery is a hop at a height measured from the *level's
@@ -3235,10 +3250,10 @@ class Course:
                         for cell in self._targets(prev, node):
                             got = self._attempt(prev, node, cell, strict=False)
                             if got is not None:
-                                return got
+                                return node, got
         return self._grab_the_wall(prev, theme)
 
-    def _grab_the_wall(self, prev: dict, theme) -> dict | None:
+    def _grab_the_wall(self, prev: dict, theme) -> "tuple[dict | None, dict | None]":
         """The last thing to try before the unchecked hop: climb the far wall.
 
         What is left when everything above has failed is always the same
@@ -3260,7 +3275,7 @@ class Course:
         lv = self.cone.level(self.cone.level_index(u))
         need = self.cone.level(lv.index + 1).y - int(self.surface(prev))
         if need < 2:
-            return None                 # a jump would have done, and did not
+            return None, None           # a jump would have done, and did not
         kind = "vine" if "vine" in theme.exits else "ladder"
         style, climb = ASCENT_STYLE[kind]
         for step in (need + 1, need, need + 2):
@@ -3273,8 +3288,8 @@ class Course:
                 for cell in self._targets(prev, node):
                     got = self._attempt(prev, node, cell, strict=False)
                     if got is not None:
-                        return got
-        return None
+                        return node, got
+        return None, None
 
     def _emergency(self, prev: dict, node: dict):
         """The one unchecked answer in the module.

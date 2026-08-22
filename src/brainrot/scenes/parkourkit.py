@@ -553,12 +553,17 @@ class GroundRun:
 # ---------------------------------------------------------------------------
 
 def wrap_angle(a: float) -> float:
-    """An angle folded into -pi..pi."""
-    while a > math.pi:
-        a -= 2 * math.pi
-    while a < -math.pi:
+    """An angle folded into -pi..pi.
+
+    Closed form, not a subtraction loop: callers feed it differences against
+    unwrapped angles that grow ~2pi per revolution, and on the candidate
+    ranking path a loop is O(altitude) -- hundreds of iterations per call an
+    hour into a run.
+    """
+    a = math.fmod(a + math.pi, 2 * math.pi)
+    if a <= 0.0:
         a += 2 * math.pi
-    return a
+    return a - math.pi
 
 
 def iround(v: float) -> int:

@@ -2316,6 +2316,54 @@ reads as the course wandering rather than as a fall, which is why no contact
 sheet has ever caught it. Start with `--show` on a run that has one and print
 the landings of that segment; the question is why no crossing fired.
 
+## The review pass (2026-08-22): the course's own progress coordinate lied
+
+A six-way code review (ledger: `FINDINGS.md`, one row per defect, statuses
+kept there) found and fixed, same day, the two bugs under most of the section
+above, plus a set of daemon-killers. `GENERATION_EPOCH` stays 4: bumping it
+was tried and reverted -- the bump re-rolls the *runner's* test worlds too,
+and two runner tests pin world-dependent facts (a graze threshold on seed 10,
+"on the ground two seconds into run 11") that fail on an unlucky re-roll.
+The u fix below re-shapes tower courses by itself, so nothing needed the
+bump. The two findings that change how this file is read:
+
+- **`spawn()` re-derived `self.u` through `unwrap`, height-resolved** -- so a
+  legal landing below the floor at its bearing (authored exit treads stop one
+  under the next floor; crossings descend by design) snapped the course's
+  progress back a full revolution, and the machinery re-laid levels it had
+  already climbed. One tower seed measured 696 full-revolution regressions in
+  4,000 landings; two seeds looped *permanently* over three levels, which is
+  the owner's THE VAULT report. `self.u` now advances by `_u_at` (bearing
+  delta from the angle already known) and cannot snap. A/B on identical
+  worlds: climb rate 809 -> **1,149 blocks/h**, backwards landings 199 ->
+  **26**. The "give-back" above is mostly this; what remains reads at 54
+  bucketed give-backs but over *honest* (fewer, longer) crossing segments.
+- **A recovery landing was committed with the failed node's metadata**, so
+  `label="recover"`/`origin="recover"` never reached a block: the reliability
+  chain read 0 forever (it actually fires ~21 landings a sweep), false
+  crossings inflated the endurance probe's visit count by exactly the 1-in-100
+  the labels leaked, and fidelity's denominator held ~170 landings the design
+  never described. tower_probe A/B: placed-as-authored 95.1% -> **99.8%**,
+  fallback placements 4.9% -> **0.2%**, stuck unchanged (17 = 17). **Read any
+  pre-2026-08-22 fidelity, crossing-rate or reliability-chain number in this
+  file with that correction in mind.**
+
+One number to keep watching: hour-scale endurance now reads **0.47%**
+unchecked (was 0.17%) -- at 42% more altitude per hour, which the buggy
+course never reached. Same-sweep stuck is unchanged, so treat it as new
+territory to characterise, not a regression to bisect.
+
+The daemon half, in one line each, all fixed: a malformed UDP datagram could
+kill the listener thread for good (`ipc.py`); `ThinkingState.tick()` raced
+itself across the IPC and render threads (now locked); host attachment now
+queues onto the render thread; scene *construction* errors are forgiven like
+draw errors; a draw that raises still closes its frame (`window.end()` in a
+finally); wrong-typed config.toml values degrade instead of crashing doctor;
+re-install now removes tool-event hooks it is no longer asked for; the Win32
+test suite was calling an API renamed in the Linux port and could not have
+passed on Windows -- renamed, fixture repaired, **needs one run on the
+Windows box to confirm**.
+
 ## Known limit: how long a parkour jump can be
 
 There is one jump impulse and one horizontal speed, so the furthest a hop can

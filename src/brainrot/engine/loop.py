@@ -71,6 +71,9 @@ class Overlay:
         #: Sessions whose window could not be resolved when their prompt
         #: arrived, kept so it can be resolved once it becomes possible.
         self._unresolved: dict[str, tuple[int, ...]] = {}
+        #: Host handle announced by a prompt, waiting for the render thread
+        #: to attach it (one int write, so no lock; 0 means nothing pending).
+        self._pending_host = 0
 
         from .input import Controller, Mover, Takeover
 
@@ -81,9 +84,9 @@ class Overlay:
     # -- events -----------------------------------------------------------
 
     def _on_event(self, event: Event) -> None:
-        # Called from the listener thread. ThinkingState mutations are simple
-        # set/scalar writes under the GIL and the render thread only ever reads
-        # derived values, so no lock is warranted here.
+        # Called from the listener thread. ThinkingState takes its own lock:
+        # the render thread calls tick() every frame, which iterates the very
+        # sets this call mutates.
         if self.verbose:
             print(f"[brainrot] {event.kind} session={event.session[:8]} "
                   f"tool={event.tool}", flush=True)
@@ -95,14 +98,21 @@ class Overlay:
             # the shim because it is the daemon that has the window list, and
             # because the shim must stay a single datagram.
             host = self.native.resolve_host(event.pids)
-            if not host:
-                self._unresolved[event.session or "default"] = event.pids
         self.state.handle(event.kind, event.session, event.tool, host)
+        if not host and event.pids and self.native is not None:
+            # After handle(), so the session is already marked thinking --
+            # _retry_hosts prunes entries for sessions that are not, and
+            # recorded first this one would be pruned before it ever counted.
+            self._unresolved[event.session or "default"] = event.pids
         # A prompt submission tells us which window hosts Claude Code; layer
-        # the overlay one level above it (no-op when there is nothing to layer
-        # against, or when already attached).
+        # the overlay one level above it. Queued for the render thread rather
+        # than attached here: platform window calls belong on the thread that
+        # owns the window, and attaching from this one raced detach-on-idle --
+        # the losing interleaving left the daemon idle *and owned*, which is
+        # exactly the state detach_host exists to prevent (the host closes and
+        # DestroyWindow takes the hidden overlay window with it).
         if event.kind == "UserPromptSubmit" and host:
-            self.window.attach_host(host)
+            self._pending_host = host
 
     # -- scene lifecycle --------------------------------------------------
 
@@ -170,6 +180,9 @@ class Overlay:
                     self.running = False
 
                 self._report_mode()
+                pending, self._pending_host = self._pending_host, 0
+                if pending:
+                    self.window.attach_host(pending)
                 self._retry_hosts()
                 visibility = self.state.tick()
                 wants_visible = (
@@ -178,7 +191,24 @@ class Overlay:
                 )
 
                 if wants_visible and self.scene is None:
-                    self._begin_scene()
+                    try:
+                        self._begin_scene()
+                    except Exception as exc:
+                        # Construction is forgiven like drawing is: a bug in
+                        # one generated world should cost that world, not the
+                        # daemon. The next attempt draws a fresh seed; the
+                        # sleep bounds the retry rate when the failure is
+                        # persistent (e.g. a force_scene typo).
+                        if self.verbose:
+                            import traceback
+
+                            traceback.print_exc()
+                        else:
+                            print(f"[brainrot] scene build error, retrying: {exc}",
+                                  flush=True)
+                        self.scene = None
+                        time.sleep(0.5)
+                        continue
 
                 self._advance_fade(dt, wants_visible)
 
@@ -206,9 +236,15 @@ class Overlay:
                         self.scene.update(dt)
                         self.scene.elapsed += dt
                         self.window.begin()
-                        self.scene.draw()
-                        self._draw_caption()
-                        self.window.end()
+                        try:
+                            self.scene.draw()
+                            self._draw_caption()
+                        finally:
+                            # A draw that raises must still close the frame:
+                            # skipping end() leaves the render-texture mode
+                            # open and the frame unpresented, and each retry
+                            # leaks rlgl state the next world inherits.
+                            self.window.end()
                     except Exception as exc:
                         # A bug in one generated world should cost that world,
                         # not the daemon. Drop it; the next show builds a fresh
@@ -239,6 +275,12 @@ class Overlay:
         """
         if not self._unresolved or self.native is None:
             return
+        # A session that stopped thinking no longer needs a window, and a
+        # dead one would otherwise be re-resolved every frame for the life of
+        # the daemon.
+        alive = self.state.sessions
+        for session in [s for s in self._unresolved if s not in alive]:
+            del self._unresolved[session]
         for session, pids in list(self._unresolved.items()):
             try:
                 host = self.native.resolve_host(pids)

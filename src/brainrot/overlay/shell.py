@@ -173,7 +173,19 @@ class Snapshot:
         multiplexer resolve to the window you are actually looking at.
         """
         wanted = [int(p) for p in pids if p]
-        by_pid = {win.pid: win.id for win in self.windows if win.pid}
+        # One process can own several windows -- gnome-terminal-server owns
+        # every gnome-terminal, VS Code windows all report the main pid -- and
+        # a dict keyed by pid kept whichever came last in the compositor's
+        # actor list. The prompt was just typed into the focused window, so
+        # among same-pid candidates the focused one is the right one; the
+        # actor-list tail stays the fallback when focus is elsewhere.
+        by_pid: dict[int, int] = {}
+        for win in self.windows:
+            if not win.pid:
+                continue
+            if by_pid.get(win.pid) == self.focus and win.id != self.focus:
+                continue              # a focused claim is never displaced
+            by_pid[win.pid] = win.id
         for pid in wanted:                    # ordered nearest-ancestor-first
             if pid in by_pid:
                 return by_pid[pid]

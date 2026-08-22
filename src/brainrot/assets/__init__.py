@@ -101,6 +101,7 @@ class ModelAsset:
 
         count = ffi.new("int *")
         self._anims = rl.LoadModelAnimations(str(path).encode(), count)
+        self._anim_count = count[0]
         self.clips: dict[str, object] = {}
         for i in range(count[0]):
             anim = self._anims[i]
@@ -166,6 +167,11 @@ def unload_all() -> None:
                 tex = asset.model.materials[i].maps[rl.MATERIAL_MAP_ALBEDO].texture
                 if tex.id != 0 and (tex.width > 1 or tex.height > 1):
                     rl.UnloadTexture(tex)
+            # The animation array (framePoses: keyframes x bones x two
+            # transform structs) is the largest allocation an asset owns and
+            # UnloadModel knows nothing about it.
+            if asset._anim_count:
+                rl.UnloadModelAnimations(asset._anims, asset._anim_count)
             rl.UnloadModel(asset.model)
         except Exception:
             pass

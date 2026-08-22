@@ -73,6 +73,12 @@ export default class BrainrotExtension extends Extension {
     }
 
     disable() {
+        /* The lock screen disables session-mode "user" extensions, so this
+         * runs with a takeover genuinely active: give the keyboard back
+         * exactly as the chord would, or the previously focused window never
+         * regains focus and the daemon stays latched until the turn idles. */
+        if (this._takeoverActive)
+            this._toggleTakeover();
         if (this._timer) {
             GLib.source_remove(this._timer);
             this._timer = 0;
@@ -210,7 +216,13 @@ export default class BrainrotExtension extends Extension {
         if (this._timer)
             GLib.source_remove(this._timer);
         this._interval = interval;
-        this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, interval, () => {
+        /* PRIORITY_DEFAULT, not DEFAULT_IDLE: the daemon calls the bridge
+         * stale after 3 s of silence, and idle-priority sources are starved
+         * for exactly that long whenever the shell's main loop stays busy --
+         * a workspace animation under load was enough to flap the daemon
+         * into degraded mode mid-turn and back. The tick is a snapshot and a
+         * datagram; it costs the compositor nothing measurable. */
+        this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, interval, () => {
             this._tick();
             return GLib.SOURCE_CONTINUE;
         });

@@ -336,6 +336,7 @@ class OverlayWindow(_BaseWindow):
         self._click_through = True
         self._ratio = 1.0
         self._target = None
+        self._warned_no_win = False
 
     # -- creation ---------------------------------------------------------
 
@@ -396,7 +397,8 @@ class OverlayWindow(_BaseWindow):
     def _after_create(self, cfg: Config) -> None:
         self._manual = placement_store.load()
         if self._native is None:
-            rl.SetWindowPosition(*compute_placement(cfg, self._ratio)[:2])
+            p = compute_placement(cfg, self._ratio)
+            rl.SetWindowPosition(p.x, p.y)
             self.set_visible(False)
             return
         self._win = self._native.own_window(
@@ -450,6 +452,17 @@ class OverlayWindow(_BaseWindow):
             self._apply_stacking()
         if self._native is None:
             super().set_visible(visible)
+        elif not self._win:
+            # The window scan failed: the backend's calls would all return
+            # silently and the strip would be believed shown while never
+            # mapped. Not raylib's show either -- that route steals the
+            # keyboard (see set_window_shown below). Say so, once, instead of
+            # being invisible with no symptom.
+            if visible and not self._warned_no_win:
+                self._warned_no_win = True
+                print("[brainrot] no native window handle -- the strip cannot "
+                      "be shown. Restart the daemon; if it recurs, run "
+                      "brainrot doctor.", flush=True)
         elif visible != self._visible:
             self._visible = visible
             try:

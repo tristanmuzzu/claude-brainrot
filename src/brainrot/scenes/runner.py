@@ -1207,7 +1207,7 @@ class RunnerScene(Scene):
     def _mark(self) -> tuple:
         """Everything a set-piece could have changed, before it starts."""
         return (len(self.entities), len(self._spans), len(self._over),
-                len(self._acts), self._held)
+                len(self._acts), self._held, dict(self.spawned))
 
     def _rewind(self, mark: tuple, row0: int) -> None:
         """Undo a set-piece that decided it could not fit.
@@ -1219,12 +1219,16 @@ class RunnerScene(Scene):
         Every ledger here is append-only for exactly this reason: rolling one
         back is a truncation.
         """
-        n_ent, n_spans, n_over, n_acts, held = mark
+        n_ent, n_spans, n_over, n_acts, held, spawned = mark
         del self.entities[n_ent:]
         del self._spans[n_spans:]
         del self._over[n_over:]
         del self._acts[n_acts:]
         self._held = held
+        # The counters feed the probes' obstacle-mix and rate numbers; left
+        # uncorrected, a declined set-piece's entities stay counted forever
+        # (measured at ~50% ghost coins on one run).
+        self.spawned = spawned
         for row in [r for r in self.corridor if r >= row0]:
             del self.corridor[row]
         self._last_row = max(self.corridor) if self.corridor else 0
@@ -2625,7 +2629,6 @@ class RunnerScene(Scene):
     def _crash_step(self, dt: float) -> None:
         """Hold the wreck, then start again."""
         self.crash_t += dt
-        self.elapsed += dt
         self.cam_shake = max(0.0, self.cam_shake - dt * 1.4)
         self.burst.update(dt)
         # The body tumbles forward off whatever it hit rather than freezing
