@@ -954,9 +954,13 @@ touching any of it — the reasoning is there, this is the short list:
    and the deep one is the same shape with the contact happening in the air
    rather than after landing -- the cancel in `Motion.advance` fires when the
    body walks off an edge, and by then the fall is already committed to an x
-   the world has moved under. Next thing to try: refuse the *offer* rather
-   than the arrival, i.e. do not let `_roof_across` pick a lane whose surface
-   ends before the current roof does.
+   the world has moved under. ~~Next thing to try: refuse the *offer* rather
+   than the arrival~~ -- **tried 2026-08-23 and it is worse.** Distance-swept
+   far-lane sampling was built at the offer, the advance and verify, in every
+   combination, and every one read 71 frames on the same sweep against 42: a
+   crossing refused for a gap the forward leap already handles strands the
+   body on a roof that is about to end. The full note is at `_roof_across`.
+   No cheap answer to the residue is known.
 0000b. **Dead air is 4.0%, against 0.7-2.2% before this pass.** Two causes and
    both are the run ending: the two or three seconds of `blind` running before
    a wreck, in which nothing is planned and so nothing is counted as an
@@ -2348,10 +2352,23 @@ bump. The two findings that change how this file is read:
   pre-2026-08-22 fidelity, crossing-rate or reliability-chain number in this
   file with that correction in mind.**
 
-One number to keep watching: hour-scale endurance now reads **0.47%**
+One number to keep watching: hour-scale endurance now reads **0.44-0.47%**
 unchecked (was 0.17%) -- at 42% more altitude per hour, which the buggy
-course never reached. Same-sweep stuck is unchanged, so treat it as new
-territory to characterise, not a regression to bisect.
+course never reached. Same-sweep stuck is unchanged. **Characterised
+2026-08-23** (94 events over 16,000 landings, instrumented `_emergency`): it
+is *not* altitude decay -- the per-band rate is flat from level 50 to 210 --
+and it is the known crossing class: 56% are `ascent`/stair with the height
+already won (`need` <= 3 on most) and the body mid-terrace, i.e. the
+crossing refused on placement, which is exactly the open thread at the end
+of "What the exit climb is made of". One lever, `_aim_crossing`'s
+distance, would move both numbers.
+
+Two more ledgers closed the same day: the write-side ledgers (`struct`,
+`carved`, terrain `solid`, `noclimb`, the mesher queue) are pruned below the
+`_rock` floor every `PRUNE_EVERY` dropped landings -- 6-8x smaller over
+4,000 landings, `stuck` identical, endurance profile unchanged -- and the
+runner's roof-gap sampling was *disproven* as a defect: sweeping it measured
+worse in every combination (see item 0000a and `_roof_across`).
 
 The daemon half, in one line each, all fixed: a malformed UDP datagram could
 kill the listener thread for good (`ipc.py`); `ThinkingState.tick()` raced

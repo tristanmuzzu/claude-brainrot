@@ -2222,6 +2222,8 @@ class Cone:
 #: what an orb the body has not quite reached yet needs.
 AHEAD = 16
 TRAIL = 3
+#: Sweep the write-side ledgers every this many dropped landings (advance).
+PRUNE_EVERY = 400
 #: Blocks laid before a run is at full difficulty.
 RAMP_BLOCKS = 70
 #: How much wider every gap gets between the start of a run and full
@@ -2468,6 +2470,8 @@ class Course:
         self.rng = rng
         self.hop_rng = hop_rng or rng
         self.cone = cone
+        #: Landings dropped since the ledgers were last pruned (see advance).
+        self._dropped = 0
         #: cell -> style for everything *drawn* that is not the cone: pedestals,
         #: terrain dressing, liquids. Handed to the renderer as a stream.
         self.struct: dict[tuple[int, int, int], str] = {}
@@ -4310,6 +4314,33 @@ class Course:
         if len(self._rock) > 90000:
             floor = self.blocks[0]["y"] - BUILD_BELOW
             self._rock = {c: v for c, v in self._rock.items() if c[1] >= floor}
+        self._dropped += drop
+        if self._dropped >= PRUNE_EVERY:
+            self._dropped = 0
+            floor = self.blocks[0]["y"] - BUILD_BELOW
+            # The write-side ledgers grow with altitude for the life of a run
+            # -- terrain cells in ``solid``, every drawn cell in ``struct``,
+            # every hole in ``carved``, the ring beside each landing in
+            # ``noclimb`` -- about 50-100 MB over a four-hour run. Everything
+            # below the floor is beyond both placement (frontier-only) and
+            # the drawn world's bottom, so it can never be asked about again.
+            # Swept every PRUNE_EVERY dropped landings, because a full sweep
+            # of four sets is not a per-landing cost. ``carved`` shares the
+            # ``_rock`` floor: a carved hole whose cache entry is gone
+            # re-answers as rock, and only a query below the shared floor --
+            # which cannot happen -- would see the disagreement.
+            self.struct = {c: v for c, v in self.struct.items()
+                           if c[1] >= floor}
+            self.carved = {c for c in self.carved if c[1] >= floor}
+            self.solid = {c for c in self.solid if c[1] >= floor}
+            self.noclimb = {c for c in self.noclimb if c[1] >= floor}
+            # And the mesher queue, which only the renderer drains: a course
+            # driven without one (every probe) otherwise keeps every cell
+            # ever written. A live renderer consumes its budget every frame
+            # and is never a quarter of a million writes behind, so nothing
+            # real is ever dropped.
+            if len(self.writes) > 500_000:
+                del self.writes[:len(self.writes) - 250_000]
         return drop
 
     # -- features ----------------------------------------------------------

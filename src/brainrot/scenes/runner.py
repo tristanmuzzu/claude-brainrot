@@ -2700,6 +2700,17 @@ class RunnerScene(Scene):
             # is actually committing to -- a second of it is twenty-four
             # metres at speed, longer than any train beside it, so the test
             # was never true and the hop never happened.
+            #
+            # Four instants, NOT a sweep. The samples sit further apart than
+            # a convoy gap, which reads like a bug and was "fixed" on
+            # 2026-08-23 with a ROOF_SCAN-spaced sweep here (and at the
+            # advance and verify twins): every combination measured *worse*
+            # -- 71 body frames over the 60x180 sweep against 42, and the
+            # offer-only variant was exactly as bad as all three. The
+            # permissiveness is load-bearing: a crossing onto a chain with a
+            # gap ahead is a crossing the forward leap machinery already
+            # handles, and refusing it strands the body on a roof that is
+            # about to end with nothing booked. Do not re-derive the sweep.
             step = self.kin.lane_time
             if min(self.surface_at(t, gx, self.motion.y)
                    for t in (0.0, step, 2.0 * step, 3.0 * step)) \
@@ -2904,6 +2915,8 @@ class RunnerScene(Scene):
             self._fly(dt, desired)
         else:
             gx, y = self._lane_x(desired), self.motion.y
+            # Two samples, not a sweep -- see the note in _roof_across: every
+            # swept variant of these checks measured worse on the full sweep.
             self.motion.advance(dt, self.kin, desired,
                                 self.surface_at(0.0, self.motion.x, y),
                                 min(self.surface_at(0.0, gx, y),

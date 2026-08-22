@@ -465,6 +465,16 @@ def verify(motion: Motion, lane_plan: "LanePlan", booked: list[tuple[float, str]
                 # contacts over twenty-four runs became 51.
                 across = sim.ground
             else:
+                # Two samples on purpose. A convoy gap narrower than
+                # speed * lane_time can hide between them, but sweeping this
+                # window (tried 2026-08-23, distance-spaced samples here, in
+                # the scene's advance and at the crossing's offer, in every
+                # combination) measured worse on the 60x180 sweep -- 71 body
+                # frames against 42 -- for the same reason the other
+                # strictness experiments in this scene's history did: a
+                # crossing refused for a gap the forward-leap machinery would
+                # have handled leaves the body somewhere worse. The full note
+                # is at runner._roof_across.
                 across = min(ground(t, gx, sim.y),
                              ground(t + kin.lane_time, gx, sim.y))
         sim.advance(step, kin, want, here, across)

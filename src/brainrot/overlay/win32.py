@@ -123,6 +123,18 @@ user32.GetForegroundWindow.restype = wintypes.HWND
 user32.GetForegroundWindow.argtypes = []
 user32.GetWindowRect.restype = wintypes.BOOL
 user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+
+#: The rectangle DWM actually draws, without the invisible resize borders
+#: GetWindowRect includes on composited desktops. HRESULT: 0 is S_OK.
+DWMWA_EXTENDED_FRAME_BOUNDS = 9
+try:
+    _dwm = ctypes.windll.dwmapi  # type: ignore[attr-defined]
+    _dwm.DwmGetWindowAttribute.restype = ctypes.c_long
+    _dwm.DwmGetWindowAttribute.argtypes = [
+        wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD,
+    ]
+except OSError:
+    _dwm = None
 user32.MonitorFromWindow.restype = wintypes.HANDLE
 user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
 user32.MonitorFromPoint.restype = wintypes.HANDLE
@@ -394,7 +406,31 @@ def focus_known() -> bool:
 
 
 own_rect = window_rect
-host_rect = window_rect
+def host_rect(hwnd: int) -> tuple[int, int, int, int] | None:
+    """The host window's *visible* rectangle.
+
+    Not ``GetWindowRect``: on Win10/11 that includes the invisible DWM resize
+    borders -- seven or eight pixels a side, scaled per-monitor -- so a strip
+    placed "beside the window" stood that much further from the visible edge,
+    and a host with exactly enough room beside it could be misjudged by the
+    border width. ``DWMWA_EXTENDED_FRAME_BOUNDS`` is the rectangle the eye
+    sees. The overlay's *own* rect stays ``GetWindowRect`` (``own_rect``): a
+    GLFW borderless popup has no invisible frame, so for it the two agree and
+    the cheap call wins.
+
+    Falls back to ``GetWindowRect`` when DWM says no (remote sessions,
+    composition off), which is the pre-2026-08-23 behaviour.
+    """
+    if not is_window(hwnd):
+        return None
+    if _dwm is not None:
+        rect = wintypes.RECT()
+        if _dwm.DwmGetWindowAttribute(
+                hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, ctypes.byref(rect),
+                ctypes.sizeof(rect)) == 0:
+            return (int(rect.left), int(rect.top),
+                    int(rect.right), int(rect.bottom))
+    return window_rect(hwnd)
 host_alive = is_window
 foreground_host = foreground_root
 
