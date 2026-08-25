@@ -2747,6 +2747,23 @@ long jumps you need a different motion model, not a bigger number.
   it owns. The daemon therefore detaches whenever it goes idle. In tests,
   destroy the fake host *after* detaching or it takes the shared raylib window
   with it.
+- **Two compositors on one machine both ran the extension, and the strip
+  jumped side to side.** A headless gnome-shell (`--headless
+  --virtual-monitor`, run by computer-use tooling for an invisible second
+  session) loads the same enabled-extensions list as the real one, so two
+  extensions pushed snapshots of two different desktops to the daemon's one
+  port -- and every reading alternated datagram by datagram: scale 1.0/1.5,
+  the work area, the focus, and the host window, which the headless snapshot
+  does not contain at all, so the daemon *forgot* it once a second
+  (2026-08-25). On screen: the strip flapping between two positions and two
+  sizes, and a dragged placement that would not hold. Fixed twice over: the
+  extension stays silent when `/proc/self/cmdline` says the compositor is
+  headless, and the daemon drops extension datagrams whose *sender* -- UDP
+  source port, resolved through /proc to the owning gnome-shell -- is a
+  headless shell, because an already-running headless shell keeps its old
+  extension code until it restarts. Diagnosed by logging `follow_host`'s
+  inputs on every placement change; the two-line log alternation was the
+  whole story.
 - **Two daemons used to bind the same port quite happily.** UDP with
   `SO_REUSEADDR` did not refuse the second bind; the datagrams then went to
   one of them only -- the first showed the strip on a prompt, the second took

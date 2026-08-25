@@ -53,6 +53,17 @@ const MOD_MASK = SHIFT | CONTROL | ALT | SUPER | BUTTONS;
 
 export default class BrainrotExtension extends Extension {
     enable() {
+        /* A headless gnome-shell (`gnome-shell --headless --virtual-monitor
+         * ...`, e.g. a second invisible session for computer-use tooling)
+         * loads the same enabled-extensions list as the real one -- and two
+         * extensions pushing snapshots of two different desktops to one
+         * daemon port made the strip flap between them: scale, work area and
+         * host window alternated with every datagram, which on screen is the
+         * strip jumping side to side (2026-08-25). This extension's whole job
+         * is to describe the desktop the user is looking at, so in a
+         * compositor nobody can look at it stays silent. */
+        if (this._isHeadless())
+            return;
         this._settings = this.getSettings();
         this._encoder = new TextEncoder();
         this._socket = null;
@@ -100,6 +111,23 @@ export default class BrainrotExtension extends Extension {
             this._socket = null;
         }
         this._settings = null;
+    }
+
+    _isHeadless() {
+        /* The compositor's own command line is the one place its headlessness
+         * is stated. Extensions run inside the gnome-shell process, so
+         * /proc/self is that process; anything unreadable means a real
+         * session, because every headless invocation names itself. */
+        try {
+            const [ok, bytes] = GLib.file_get_contents('/proc/self/cmdline');
+            if (!ok)
+                return false;
+            const cmdline = new TextDecoder().decode(bytes);
+            return cmdline.includes('--headless') ||
+                cmdline.includes('--virtual-monitor');
+        } catch (e) {
+            return false;
+        }
     }
 
     /* -- transport ------------------------------------------------------ */

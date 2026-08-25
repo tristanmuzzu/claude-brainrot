@@ -49,9 +49,9 @@ def available() -> bool:
     return x11.available()
 
 
-def offer_datagram(payload: bytes) -> bool:
+def offer_datagram(payload: bytes, port: int = 0) -> bool:
     """Take a datagram if it came from the shell extension rather than a hook."""
-    return shell.bridge().offer(payload)
+    return shell.bridge().offer(payload, port)
 
 
 def prepare() -> bool:

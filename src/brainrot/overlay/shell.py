@@ -27,6 +27,7 @@ stays up for the whole turn), not an error.
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import dataclass, field
 
@@ -249,8 +250,20 @@ class Bridge:
     #: from "extension went quiet", which want different advice from doctor.
     seen: int = 0
 
-    def offer(self, payload: bytes) -> bool:
-        """Take a datagram if it is one of the extension's. True if it was."""
+    def offer(self, payload: bytes, port: int = 0) -> bool:
+        """Take a datagram if it is one of the extension's. True if it was.
+
+        ``port`` is the sender's UDP source port. Extension datagrams from a
+        *headless* gnome-shell are consumed and dropped: a second compositor
+        (``gnome-shell --headless --virtual-monitor``, run by computer-use
+        tooling) loads the same enabled-extensions list as the real session,
+        and two extensions describing two different desktops on one socket
+        made every reading here -- scale, work area, host window, focus --
+        alternate datagram by datagram. On screen that was the strip jumping
+        side to side (2026-08-25). The extension now stays silent in a
+        headless shell, but the one already running keeps its old code until
+        that shell restarts, so the daemon checks the sender too.
+        """
         try:
             data = json.loads(payload.decode("utf-8", errors="replace"))
         except (ValueError, UnicodeDecodeError):
@@ -258,11 +271,15 @@ class Bridge:
         if not isinstance(data, dict):
             return False
         if data.get("kind") == "takeover":
+            if port and headless_sender(port):
+                return True
             self.takeover_pending = bool(data.get("on", True))
             return True
         shot = Snapshot.parse(data)
         if shot is None:
             return False
+        if port and headless_sender(port):
+            return True
         self.snapshot = shot
         self.seen += 1
         return True
@@ -273,6 +290,68 @@ class Bridge:
     def claim_takeover(self) -> "bool | None":
         pending, self.takeover_pending = self.takeover_pending, None
         return pending
+
+
+#: Sender-port verdicts, re-probed after a TTL rather than kept: ephemeral
+#: ports are reused, and a stale "headless" verdict against a port the real
+#: shell later binds would silently put the daemon in degraded mode. The
+#: probe is a few /proc reads and each extension pushes at most a few
+#: datagrams a second, so a minute of caching makes its cost nothing.
+_SENDER_TTL = 60.0
+_sender_cache: "dict[int, tuple[bool, float]]" = {}
+
+
+def headless_sender(port: int) -> bool:
+    """Is the UDP peer on this source port a headless gnome-shell?"""
+    now = time.monotonic()
+    cached = _sender_cache.get(port)
+    if cached is not None and now - cached[1] < _SENDER_TTL:
+        return cached[0]
+    verdict = _probe_sender(port)
+    _sender_cache[port] = (verdict, now)
+    return verdict
+
+
+def _probe_sender(port: int) -> bool:
+    """Walk /proc: UDP port -> socket inode -> owning gnome-shell -> cmdline.
+
+    Loopback, same user, Linux only -- which is the only place this backend
+    runs at all. Anything that cannot be resolved is treated as not headless,
+    so a failure here degrades to the old behaviour rather than to silence.
+    """
+    try:
+        inode = ""
+        with open("/proc/net/udp", encoding="ascii") as f:
+            next(f, None)
+            for line in f:
+                parts = line.split()
+                if len(parts) > 9 and int(parts[1].split(":")[1], 16) == port:
+                    inode = parts[9]
+                    break
+        if not inode or inode == "0":
+            return False
+        target = f"socket:[{inode}]"
+        for proc in os.listdir("/proc"):
+            if not proc.isdigit():
+                continue
+            try:
+                with open(f"/proc/{proc}/comm", encoding="ascii") as f:
+                    if f.read().strip() != "gnome-shell":
+                        continue
+                fd_dir = f"/proc/{proc}/fd"
+                if not any(os.path.islink(f"{fd_dir}/{fd}")
+                           and os.readlink(f"{fd_dir}/{fd}") == target
+                           for fd in os.listdir(fd_dir)):
+                    continue
+                with open(f"/proc/{proc}/cmdline", encoding="ascii",
+                          errors="replace") as f:
+                    cmdline = f.read()
+                return "--headless" in cmdline or "--virtual-monitor" in cmdline
+            except OSError:
+                continue
+    except (OSError, ValueError):
+        pass
+    return False
 
 
 #: One per process. The daemon has exactly one desktop to know about, and

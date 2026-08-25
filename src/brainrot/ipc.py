@@ -92,7 +92,7 @@ class EventListener:
     """
 
     def __init__(self, host: str, port: int, on_event: Callable[[Event], None],
-                 on_raw: "Callable[[bytes], bool] | None" = None) -> None:
+                 on_raw: "Callable[[bytes, int], bool] | None" = None) -> None:
         self.host = host
         self.port = port
         self._on_event = on_event
@@ -132,14 +132,17 @@ class EventListener:
         assert self._sock is not None
         while not self._stop.is_set():
             try:
-                payload, _addr = self._sock.recvfrom(MAX_DATAGRAM)
+                payload, addr = self._sock.recvfrom(MAX_DATAGRAM)
             except socket.timeout:
                 continue
             except OSError:
                 break
             if self._on_raw is not None:
                 try:
-                    if self._on_raw(payload):
+                    # The sender's port is the one fact the socket knows about
+                    # who is talking; the backend uses it to tell one
+                    # compositor's snapshots from another's.
+                    if self._on_raw(payload, addr[1] if addr else 0):
                         continue
                 except Exception:
                     pass

@@ -253,3 +253,37 @@ def test_a_resized_screen_changes_the_measured_scale(monkeypatch) -> None:
         assert linux.scale() == 1.0
     finally:
         bridge.snapshot, bridge.seen = before
+
+
+def test_a_headless_compositors_snapshots_are_swallowed(monkeypatch) -> None:
+    """Two gnome-shells -- the real session and a headless one run by
+    computer-use tooling -- load the same extension and push to the same
+    port. Acting on both made every reading alternate between two desktops,
+    which on screen was the strip jumping side to side. A datagram from a
+    headless sender is consumed (it is ours) but must change nothing."""
+    monkeypatch.setattr(shell, "headless_sender", lambda port: port == 3900)
+    bridge = shell.Bridge()
+
+    assert bridge.offer(json.dumps(snapshot()).encode(), port=5800)
+    assert bridge.snapshot.focus == 11
+
+    ghost = snapshot(focus=12, logical=[1280, 720])
+    assert bridge.offer(json.dumps(ghost).encode(), port=3900), \
+        "swallowed, so it never reaches the hook parser"
+    assert bridge.snapshot.focus == 11, "and it changed nothing"
+    assert bridge.offer(b'{"kind": "takeover", "on": true}', port=3900)
+    assert bridge.claim_takeover() is None, "a headless chord is nobody's ask"
+
+    assert bridge.offer(json.dumps(snapshot(focus=12)).encode(), port=5800)
+    assert bridge.snapshot.focus == 12
+
+
+def test_an_unresolvable_sender_degrades_to_being_believed() -> None:
+    """No port, or a port /proc cannot tie to a headless shell, must behave
+    exactly as before the filter existed: refusing snapshots on a failed
+    lookup would be degraded mode with no symptom pointing anywhere."""
+    bridge = shell.Bridge()
+    assert bridge.offer(json.dumps(snapshot()).encode())
+    assert bridge.snapshot.focus == 11
+    assert bridge.offer(json.dumps(snapshot(focus=12)).encode(), port=64000)
+    assert bridge.snapshot.focus == 12
