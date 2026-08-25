@@ -230,6 +230,16 @@ def _check_linux_backend(cfg: Config) -> "tuple[list[Check], str]":
             "Update it with: brainrot extension install",
         ))
 
+    # Deliberate, so not a failure -- but it is the first thing to say when
+    # somebody asks why nothing appears, and the answer is one click away.
+    if extinstall.overlay_switch() is False:
+        checks.append(Check(
+            "switch", WARN, "the top-bar switch is off -- the strip stays hidden",
+            "Click the game-controller icon in the top bar to turn it back on, "
+            f"or: gsettings --schemadir {extinstall.target_dir()}/schemas set "
+            f"{extinstall.SCHEMA_ID} overlay-enabled true",
+        ))
+
     port = extinstall.configured_port()
     if port is not None and port != cfg.port:
         checks.append(Check(

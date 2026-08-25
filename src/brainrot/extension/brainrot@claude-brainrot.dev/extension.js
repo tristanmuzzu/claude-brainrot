@@ -22,12 +22,16 @@
  * pointer. No titles, no contents, no keystrokes.
  */
 
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
+import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 /* Idle cadence. A packet a second is enough to tell a daemon that has just
@@ -50,6 +54,96 @@ const ALT = 1 << 3;          /* MOD1 */
 const SUPER = 1 << 6;        /* MOD4 */
 const BUTTONS = (1 << 8) | (1 << 9) | (1 << 10);
 const MOD_MASK = SHIFT | CONTROL | ALT | SUPER | BUTTONS;
+
+/* How switched-off looks. The strip is off far more often than it is on for
+ * anybody who uses the switch at all, so "off" has to be legible at a glance
+ * in a bar of full-strength symbolic icons without becoming a second icon to
+ * learn. Dimmed is what the shell itself does everywhere else. */
+const ICON_ON = 255;
+const ICON_OFF = 85;
+
+/*
+ * The top-bar switch.
+ *
+ * The overlay is deliberately hard to dismiss from inside itself: it never
+ * takes focus, never appears on alt-tab and passes every click through to
+ * whatever is behind it, so there is nowhere on the strip to put a close
+ * button that a click could ever reach. The one place a toggle can live is
+ * the panel, and the panel belongs to the shell -- which is where this
+ * extension already is.
+ *
+ * No menu (`dontCreateMenu`): one press is the whole interaction, and a
+ * popup asking which of one thing you meant is a second click for nothing.
+ */
+const BrainrotIndicator = GObject.registerClass(
+class BrainrotIndicator extends PanelMenu.Button {
+    _init(settings, onChanged) {
+        super._init(0.0, 'Claude Brainrot', true);
+        this._settings = settings;
+        this._onChanged = onChanged;
+        this._icon = new St.Icon({
+            /* In the standard icon set on every shell version this extension
+             * claims, so there is no asset to ship and nothing to fall back
+             * to when a user's icon theme is not Adwaita. */
+            icon_name: 'applications-games-symbolic',
+            style_class: 'system-status-icon',
+        });
+        this.add_child(this._icon);
+        this._changedId = this._settings.connect(
+            'changed::overlay-enabled', () => this._sync(false));
+        this._bindClick();
+        this._sync(true);
+    }
+
+    /* GNOME 49 moved the panel off event signals and onto Clutter gestures --
+     * `PanelMenu.Button` itself opens its menu from a `ClickGesture` now, and
+     * a gesture that recognises a press is not obliged to let the old
+     * `button-press-event` signal through afterwards. Use the same mechanism
+     * the panel uses where it exists, and the old signals where it does not,
+     * because this extension claims shell 45 upwards and 45-48 have no
+     * `ClickGesture` at all. */
+    _bindClick() {
+        if (Clutter.ClickGesture) {
+            const gesture = new Clutter.ClickGesture();
+            gesture.set_recognize_on_press(true);
+            gesture.connect('recognize', () => this._toggle());
+            this.add_action(gesture);
+            return;
+        }
+        this.connect('button-press-event', () => this._toggle());
+        this.connect('touch-event', event => {
+            if (event.type() === Clutter.EventType.TOUCH_BEGIN)
+                return this._toggle();
+            return Clutter.EVENT_PROPAGATE;
+        });
+    }
+
+    _toggle() {
+        this._settings.set_boolean(
+            'overlay-enabled', !this._settings.get_boolean('overlay-enabled'));
+        return Clutter.EVENT_STOP;
+    }
+
+    _sync(quiet) {
+        const on = this._settings.get_boolean('overlay-enabled');
+        this._icon.opacity = on ? ICON_ON : ICON_OFF;
+        /* Both of these are read aloud by a screen reader and shown by the
+         * accessibility inspector; a dimmed icon says nothing to either. */
+        this.accessible_name = on
+            ? 'Claude Brainrot: on' : 'Claude Brainrot: off';
+        this._icon.accessible_name = this.accessible_name;
+        if (!quiet && this._onChanged)
+            this._onChanged(on);
+    }
+
+    destroy() {
+        if (this._changedId) {
+            this._settings.disconnect(this._changedId);
+            this._changedId = 0;
+        }
+        super.destroy();
+    }
+});
 
 export default class BrainrotExtension extends Extension {
     enable() {
@@ -76,6 +170,11 @@ export default class BrainrotExtension extends Extension {
 
         this._openSocket();
         this._bindTakeover();
+        /* Leftmost of the right-hand group: beside the other things that are
+         * about this session rather than about the machine. */
+        this._indicator = new BrainrotIndicator(
+            this._settings, () => this._tick());
+        Main.panel.addToStatusArea(this.uuid, this._indicator, 0, 'right');
         this._portChangedId = this._settings.connect('changed::port', () => {
             this._address = null;
             this._openSocket();
@@ -90,6 +189,10 @@ export default class BrainrotExtension extends Extension {
          * regains focus and the daemon stays latched until the turn idles. */
         if (this._takeoverActive)
             this._toggleTakeover();
+        if (this._indicator) {
+            this._indicator.destroy();
+            this._indicator = null;
+        }
         if (this._timer) {
             GLib.source_remove(this._timer);
             this._timer = 0;
@@ -211,6 +314,11 @@ export default class BrainrotExtension extends Extension {
             windows,
             monitors,
             pointer: [px, py, mods & MOD_MASK],
+            /* The top-bar switch, on every snapshot rather than as an edge
+             * when it changes: the daemon restarts far more often than the
+             * shell does, and a toggle it missed while it was down would come
+             * back on by itself. Costs a boolean a second. */
+            power: this._settings.get_boolean('overlay-enabled'),
             /* The daemon works in X11 pixels and everything above is in
              * logical ones; it derives the ratio from this against the X
              * screen size rather than trusting a scale factor it cannot

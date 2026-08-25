@@ -234,6 +234,13 @@ chord is held over the strip; otherwise the mouse falls straight through, and
 focus is never taken either way. On Linux this needs the extension, which is
 where the pointer position comes from.
 
+**You can switch it off.** On GNOME the extension puts a game-controller icon
+in the top bar; one click puts the strip away for as long as you want to read
+in peace, and the icon dims to say so. Everything else is unchanged when it is
+back on -- it still only appears while a Claude Code window that is working is
+the one in front. The switch is remembered across restarts and logins
+(gsettings `overlay-enabled`), and `brainrot doctor` says when it is off.
+
 **It is the size you asked for.** On a HiDPI display the strip is drawn at the
 configured size and scaled to the display, so `width = 360` means 360 points
 and not 360 device pixels, and the scenes keep their own pixel geometry

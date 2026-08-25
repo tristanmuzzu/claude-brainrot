@@ -67,6 +67,7 @@ class Overlay:
         self._window_shown = False
         self._focus_ok = True
         self._focus_left_at = 0.0
+        self._power_ok = True
         self._blind: "bool | None" = None
         #: Sessions whose window could not be resolved when their prompt
         #: arrived, kept so it can be resolved once it becomes possible.
@@ -187,6 +188,7 @@ class Overlay:
                 visibility = self.state.tick()
                 wants_visible = (
                     visibility in (Visibility.VISIBLE, Visibility.LINGERING)
+                    and self._power_allows()
                     and self._focus_allows()
                 )
 
@@ -326,6 +328,32 @@ class Overlay:
         else:
             print("[brainrot] following the Claude Code window: on screen only "
                   "while you are looking at it", flush=True)
+
+    def _power_allows(self) -> bool:
+        """Whether the user's own switch is on.
+
+        The top-bar toggle, and the one condition above every other: the strip
+        is a thing you are meant to be able to put away while you read, and it
+        must go away whatever the thinking state and whatever the focus says.
+        Asked every frame rather than latched on an event so a daemon started
+        after the switch was turned off never comes up wrong.
+
+        Falls through the ordinary fade, so it eases out rather than blinking
+        away, and fails open like everything else at this boundary -- a
+        backend with no switch at all (Windows, no extension, no display) is
+        the behaviour there has always been.
+        """
+        getter = getattr(self.native, "power_state", None)
+        if getter is None:
+            return True
+        try:
+            on = bool(getter())
+        except Exception:
+            return True
+        if self.verbose and on != self._power_ok:
+            print(f"[brainrot] switch: {'on' if on else 'off'}", flush=True)
+        self._power_ok = on
+        return on
 
     def _focus_allows(self) -> bool:
         """Whether the window in front is one the overlay belongs over.

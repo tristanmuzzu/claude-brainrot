@@ -287,6 +287,21 @@ def scale() -> float:
     return shell.bridge().snapshot.scale_against(x11.screen_rect()[2])
 
 
+def power_state() -> bool:
+    """Is the top-bar toggle on?
+
+    Fails *open*, like every other question this backend answers: no
+    extension, a stale snapshot or a shell that has just restarted all mean
+    "nobody has told us otherwise", and an overlay that can never appear again
+    is broken in a way an overlay that appears once too often is not. The
+    switch itself lives in gsettings inside the shell, so it survives a daemon
+    restart, a logout and an upgrade without the daemon storing anything.
+    """
+    if not shell.bridge().live():
+        return True
+    return shell.bridge().snapshot.power
+
+
 # ---------------------------------------------------------------------------
 # Pointer and keys
 # ---------------------------------------------------------------------------

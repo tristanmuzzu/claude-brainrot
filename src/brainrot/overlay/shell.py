@@ -86,6 +86,15 @@ class Snapshot:
     pointer: tuple[int, int, int] = (0, 0, 0)
     #: Logical size of the whole desktop.
     logical: tuple[int, int] = (0, 0)
+    #: The top-bar toggle. False means the user has switched the strip off and
+    #: it must stay hidden however hard Claude is thinking. Carried on every
+    #: snapshot rather than sent as an edge, because the daemon is restarted
+    #: far more often than the shell is: an edge missed while the daemon was
+    #: down is an overlay that comes back on against the user's wishes, and a
+    #: quarter of a second of a heartbeat is not worth remembering state for.
+    #: Defaults True so an older extension -- which sends no such field -- is
+    #: the behaviour there has always been.
+    power: bool = True
     seq: int = 0
     at: float = 0.0
 
@@ -148,6 +157,7 @@ class Snapshot:
             monitors=tuple(monitors),
             pointer=(pointer[0], pointer[1], pointer[2]),
             logical=(logical[0], logical[1]),
+            power=bool(data.get("power", True)),
             seq=seq,
             at=time.monotonic() if now is None else now,
         )

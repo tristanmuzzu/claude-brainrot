@@ -10,6 +10,17 @@
         overlay's config.toml; `brainrot install` keeps the two in step.
       </description>
     </key>
+    <key name="overlay-enabled" type="b">
+      <default>true</default>
+      <summary>Show the overlay at all</summary>
+      <description>
+        The top-bar switch. False keeps the strip off the screen however hard
+        Claude is thinking; every other condition (a Claude Code window in
+        front, actually working) still applies when it is true. Lives here
+        rather than in the daemon's config so it survives a daemon restart
+        and so the panel icon and the overlay can never disagree.
+      </description>
+    </key>
     <key name="takeover" type="as">
       <default><![CDATA[['<Control><Alt><Shift>Home']]]></default>
       <summary>Hand the keyboard to the overlay</summary>

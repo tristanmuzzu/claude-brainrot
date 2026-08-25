@@ -287,3 +287,49 @@ def test_an_unresolvable_sender_degrades_to_being_believed() -> None:
     assert bridge.snapshot.focus == 11
     assert bridge.offer(json.dumps(snapshot(focus=12)).encode(), port=64000)
     assert bridge.snapshot.focus == 12
+
+
+def test_the_top_bar_switch_rides_on_every_snapshot() -> None:
+    """State, not an edge. The daemon restarts far more often than the shell
+    does, and a toggle missed while it was down would be an overlay that
+    switched itself back on."""
+    bridge = shell.Bridge()
+    assert bridge.offer(json.dumps(snapshot(power=False)).encode())
+    assert bridge.snapshot.power is False
+    assert bridge.offer(json.dumps(snapshot(power=True)).encode())
+    assert bridge.snapshot.power is True
+
+
+def test_an_extension_too_old_to_have_a_switch_is_switched_on() -> None:
+    """The field is absent from every extension shipped before the icon
+    existed, and an upgrade that silently hides the strip has no symptom
+    pointing anywhere."""
+    assert shell.Snapshot.parse(snapshot()).power is True
+    assert shell.Snapshot().power is True
+
+
+def test_the_switch_fails_open_when_nobody_is_saying() -> None:
+    """No extension, a stale snapshot, a shell that has just restarted: an
+    overlay that appears once too often is a nuisance, one that can never
+    appear again is broken."""
+    import time
+
+    from brainrot.overlay import linux
+
+    bridge = shell.bridge()
+    before = bridge.snapshot, bridge.seen
+    try:
+        bridge.snapshot, bridge.seen = shell.Snapshot(), 0
+        assert linux.power_state() is True, "no extension means no opinion"
+
+        bridge.snapshot = shell.Snapshot.parse(
+            snapshot(power=False), now=time.monotonic())
+        bridge.seen = 1
+        assert linux.power_state() is False
+
+        # Stale: the shell stopped talking, so this is last week's answer.
+        bridge.snapshot = shell.Snapshot.parse(
+            snapshot(power=False), now=time.monotonic() - 60.0)
+        assert linux.power_state() is True
+    finally:
+        bridge.snapshot, bridge.seen = before

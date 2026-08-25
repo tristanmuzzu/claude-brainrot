@@ -281,6 +281,23 @@ def configured_port() -> "int | None":
         return None
 
 
+def overlay_switch() -> "bool | None":
+    """The top-bar switch, or None when it cannot be read.
+
+    Read out of gsettings rather than asked of the daemon: the daemon holds
+    the UDP port, so a second process -- ``brainrot doctor`` -- can never hear
+    the snapshot that carries it, and gsettings is where the switch actually
+    lives anyway.
+    """
+    schemas = target_dir() / "schemas"
+    out = _run(["gsettings", "--schemadir", str(schemas), "get", SCHEMA_ID,
+                "overlay-enabled"])
+    if out is None:
+        return None
+    text = out.strip()
+    return True if text == "true" else False if text == "false" else None
+
+
 def shell_version() -> str:
     out = _run(["gnome-shell", "--version"])
     return out.strip() if out else ""

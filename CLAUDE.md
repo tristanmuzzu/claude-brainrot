@@ -909,6 +909,49 @@ touching any of it — the reasoning is there, this is the short list:
   is no handle to read on Wayland. The shim sends its `/proc` ancestry
   nearest-first and `Snapshot.host_for` matches it against window pids.
 
+## The top-bar switch (2026-08-25)
+
+The strip is a nuisance while you are reading, and there was no way to put it
+away: it never takes focus, is off alt-tab and passes every click through, so
+there is nowhere *on* it a click could ever reach. The switch therefore lives
+where the shell is -- a panel indicator in the GNOME top bar
+(`extension.js`'s `BrainrotIndicator`), one press to toggle, dimmed when off.
+
+- **The state lives in gsettings** (`overlay-enabled`), not in the daemon's
+  config: the panel icon and the overlay can never disagree, and it survives a
+  daemon restart, a logout and an upgrade with nothing stored on our side.
+- **It rides on every snapshot** (`Snapshot.power`) rather than being sent as
+  an edge when it changes. The daemon restarts far more often than the shell
+  does, and an edge missed while it was down is an overlay that switches
+  itself back on. Costs a boolean a second.
+- **Absent means on.** An older extension sends no such field, `Snapshot()`
+  defaults it True, and `linux.power_state()` fails open on a stale snapshot
+  or no extension at all -- same rule as every other question at that
+  boundary.
+- **`Overlay._power_allows` gates `wants_visible` above `_focus_allows`**, so
+  it goes through the ordinary fade and the ordinary `_go_idle`: switched off
+  mid-turn, the world is released and the process goes back to costing
+  nothing. Windows has no `power_state` at all and `getattr` degrades to True.
+- **GNOME 49 moved the panel onto Clutter gestures.** `PanelMenu.Button` opens
+  its own menu from a `Clutter.ClickGesture` now, and a gesture that
+  recognises a press need not let the old `button-press-event` through
+  afterwards -- so the indicator adds its own `ClickGesture` where the class
+  exists and falls back to the event signals on shell 45-48, which have no
+  such class.
+- `brainrot doctor` says so when it is off, because "nothing appears" is
+  otherwise indistinguishable from a fault (`extinstall.overlay_switch`,
+  read from gsettings -- the daemon holds the UDP port, so doctor can never
+  hear the snapshot that carries it).
+
+**A changed `extension.js` cannot be loaded into the running shell at all**,
+and that is a gjs fact rather than a policy: `extensionSystem.js` does
+`await import(extensionJs.get_uri())` with the comment "Extensions can only be
+imported once", and the ESM cache is keyed by URI -- so `gnome-extensions
+disable && enable`, and `reloadExtension` itself, all re-run the *old* module.
+Measured here on GNOME 50.1: the cycle reported ACTIVE, logged nothing, and
+the panel had no new icon. `brainrot extension load` is for an extension the
+shell has never seen; **new code in an already-loaded one means logging out.**
+
 ## Still outstanding
 
 00000. **ROPE BRIDGE grew a re-entry, once.** The impulse pass re-rolls which
@@ -2888,7 +2931,7 @@ long jumps you need a different motion model, not a bigger number.
   nothing can walk up the tower without touching the parkour).
 - `GENERATION_EPOCH` in `rng.py` re-rolls all seeds after big generation
   changes; bump it rather than fighting stale-looking runs.
-- Run `python -m pytest tests/` before committing; it is fast (~255s). **675
+- Run `python -m pytest tests/` before committing; it is fast (~270s). **682
   passed, 34 skipped.** The Win32 suite skips off Windows and the X11 suite
   skips without a display, so a green run means less on the other platform's
   machine -- check the count.

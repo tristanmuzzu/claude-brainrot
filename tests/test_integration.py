@@ -227,6 +227,54 @@ def test_follow_focus_off_ignores_the_window_in_front(tmp_path, monkeypatch) -> 
         thread.join(timeout=5.0)
 
 
+def test_the_top_bar_switch_keeps_the_strip_off_a_working_turn(
+        daemon: Overlay) -> None:
+    """The whole point of the icon: switched off, no amount of thinking may
+    put the strip on screen -- and switching it back on must be enough on its
+    own, without waiting for the next turn."""
+    class Switch:
+        on = False
+
+        def power_state(self) -> bool:
+            return self.on
+
+    switch = Switch()
+    daemon.native = switch
+
+    send("127.0.0.1", PORT, "UserPromptSubmit", session="s1")
+    assert wait_for(lambda: daemon.state.busy), "never heard the prompt"
+    time.sleep(1.0)
+    assert daemon.scene is None, "built a world while switched off"
+    assert daemon.alpha == pytest.approx(0.0, abs=0.01), "appeared anyway"
+
+    switch.on = True
+    assert wait_for(lambda: daemon.alpha > 0.9), "the switch did not bring it back"
+
+    switch.on = False
+    assert wait_for(lambda: daemon.alpha == pytest.approx(0.0, abs=0.01)), \
+        "would not go away mid-turn"
+    assert wait_for(lambda: daemon.scene is None), "kept the world it was hiding"
+
+    daemon.native = None
+    send("127.0.0.1", PORT, "Stop", session="s1")
+    assert wait_for(lambda: not daemon.state.on_screen)
+
+
+def test_a_backend_with_no_switch_is_never_switched_off(daemon: Overlay) -> None:
+    """Windows, no extension, no display: the question is not answerable and
+    the answer must be the behaviour there has always been."""
+    daemon.native = object()
+    assert daemon._power_allows() is True
+
+    class Broken:
+        def power_state(self) -> bool:
+            raise RuntimeError("no shell today")
+
+    daemon.native = Broken()
+    assert daemon._power_allows() is True
+    daemon.native = None
+
+
 def test_event_carries_hwnd_without_breaking(daemon: Overlay) -> None:
     """The host-window handle rides along on prompt events; a headless
     backend must simply ignore it."""
