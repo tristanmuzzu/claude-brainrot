@@ -427,7 +427,20 @@ export default class BrainrotExtension extends Extension {
             this._takeoverReturnTo = focus && !focus.is_override_redirect() ? focus : null;
         } else if (this._takeoverReturnTo) {
             try {
-                this._takeoverReturnTo.activate(global.get_current_time());
+                /* Only put focus back if nothing else claimed it while the
+                 * overlay had the keyboard. A window that opened mid-takeover
+                 * -- a portal file chooser, a modal dialog -- holds focus
+                 * legitimately, and re-activating the old window would raise
+                 * it over the new one and bury it. Focus still on the window
+                 * being restored, on the overlay's own strip (WM_CLASS
+                 * "claude-brainrot", the title InitWindow sets), or on
+                 * nothing at all means the chord is the only thing that
+                 * moved focus, so give it back. */
+                const focusNow = global.display.focus_window;
+                if (!focusNow
+                    || focusNow === this._takeoverReturnTo
+                    || focusNow.get_wm_class() === 'claude-brainrot')
+                    this._takeoverReturnTo.activate(global.get_current_time());
             } catch (e) {
                 /* The window went away while the overlay had the keyboard. */
             }
