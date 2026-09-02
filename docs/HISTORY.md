@@ -1,0 +1,2193 @@
+# History: the build diary, moved out of CLAUDE.md
+
+Moved verbatim from `CLAUDE.md` on 2026-09-02 so the instruction file could
+hold only what is needed to build, test and not break the project. Nothing
+here was rewritten; the sections are in the order they stood in `CLAUDE.md`,
+dated as they were written. Numbers are the numbers of their day. In
+particular, read any fidelity, crossing-rate or reliability-chain figure from
+before 2026-08-22 with the correction in "The review pass (2026-08-22)" in
+mind, and re-run the probe rather than quoting a table here.
+
+Companion files carved out at the same time: `docs/OUTSTANDING.md` (the
+backlog), `docs/PROBES.md` (the dev loop and every probe), `docs/LANDMINES.md`
+(the traps). Current conventions live in `CLAUDE.md`.
+
+## State of the project (updated 2026-08-12)
+
+Branch `claude/project-visuals-animations-qzbkiq` holds a complete rebuild:
+pygame → raylib + baked-light glTF assets, both original scenes rebuilt to
+match the real reel formats, animation overhaul (rig with knees/elbows,
+world-axis pose system, ballistic parkour hops with ground beats) — and a
+**third scene, `spiral`**, which is the other Minecraft reel format, Parkour
+Spiral — and, since 2026-08-12, a **fourth, `tower`**, which is that scene's
+renderer against a *hand-built* course of thirty-three designed levels. `tower`
+is what the default rotation plays. Both have their own sections below. (The
+old ring tower and platform-stack spiral were earlier, deleted attempts at the
+same format with the reference wrong; nothing of them survives, and the current
+`tower_probe.py` / `test_tower.py` are new files about the new scene, not
+resurrections.)
+
+**Now verified on real Windows hardware with a GPU**, which turned up several
+things the software-rasteriser cloud sessions could not have seen — see
+"Landmines" below. 647 passed, 34 skipped, including a Win32 suite that
+exercises the real window API.
+
+The runner has a real collision model. Obstacles carry hitboxes derived from
+the assets' own measured geometry (`assets/measure.py` → `metrics.json`), and
+`scenes/runnerplan.py` plans lanes and take-offs *in time* and then verifies
+the plan by simulating it before committing. **Do not read the old "zero
+interpenetration across 60 seeds × 180 s" claim that stood here: it lapsed, and
+it was measured again on 2026-08-17.** The sweep reads 42 frames inside an
+obstacle over three hours of simulated running, worst 0.534 m, against 303 and
+0.452 m on the commit before — twice now this file has carried a clean sheet
+for a guarantee that had quietly stopped holding, which is the argument for
+re-running the sweep rather than reading the number. Both residues are
+characterised under "Still outstanding". If you change anything in the runner,
+re-run `--safety-runs 60 --safety-seconds 180`; `tests/test_collision.py`
+covers the same ground in a form that fits in the suite, and 24 × 120 does
+*not* — it reads five grazes at 0.011 m for the same code.
+
+**Every jump in the parkour family is a full-impulse sprint jump since
+2026-08-18** -- the note was that the jumping felt like a hop or a bounce
+rather than a Minecraft jump, and it measured as one: the median hop was taken
+at 6.4 m/s and apexed at two thirds of vanilla. See "Every jump is the jump"
+for the mechanism, the numbers and the three camera pumps that came out with
+it.
+
+**Both families were reworked again on 2026-08-16**, on the owner's last two
+notes about them, and each has its own section below. The parkour body stopped
+clicking into every block it lands on -- see "The body stops clicking..." and
+`tools/flow_probe.py`. The runner became trains rather than barriers, with a
+speed range that opens where the old one finished -- see "The runner is a
+convoy" and the frame-level research behind it. Everything the two older
+passes below established still holds; those sections are the history of how
+the machinery got its shape.
+
+The runner had the same pass the parkour scene did (2026-08-11), for the same
+complaint — "a bit slow, doesn't feel natural, something missing for it to be
+actually entertaining" — and the same method: turn each complaint into a
+number, write `tools/runner_probe.py` to measure it, then rewrite against the
+probe. Four structural facts came out of it:
+
+- **Content is laid down a set-piece at a time**, not a row at a time.
+  `SEGMENT_TABLE` is the vocabulary — cruise, hurdles, slalom, tunnel, yard,
+  express, roofrun — and each entry decides a stretch of track *and the
+  corridor through it* together, which is the only way to express a weave, a
+  train yard or a ramp onto a roof at all. A set-piece never follows itself,
+  and one that finds the track it wanted occupied declines and is rewound
+  whole (`_mark`/`_rewind`): a segment that wrote a corridor and then gave up
+  used to leave those rows for the next one to overwrite from a different
+  lane, and a corridor that steps two lanes in one row is a promise the body
+  cannot keep.
+- **There is an occupancy ledger, and a separate ledger for *moves*.**
+  `_spans` is per-lane track occupancy in absolute distance and nothing is
+  placed without asking it; `_acts` is the same idea for the stretch a jump or
+  a slide commits the body to. Row counting stood in for both and could see
+  neither: a 25 m train against a 6 m row is a great many rows of nothing
+  being said, and two hurdles either side of a set-piece boundary put the
+  runner's feet through the second while it was still coming down off the
+  first.
+- **The runner rides train roofs** — see below. That is the move the owner
+  asked for by name, and the reason the motion model now has surfaces at all.
+- **It starts quick.** The speed ramp was 8.5–15.5 m/s over 75 s, which is
+  sensible for a game somebody sits down to play and wrong for a strip that is
+  on screen for as long as Claude is thinking: it spent its whole visible life
+  in the bottom third of its own range. 10.5–18.0 over 40 s.
+
+The probe's numbers, before and after, both measured with the *same* probe —
+`tools/runner_probe.py` runs against the old scene too, because a before/after
+tool that only works on "after" measures nothing. Safety over 60 seeds × 180 s
+after and 20 × 180 s before; pacing over 20 × 180 s both sides. Re-run it after
+touching anything in this scene; the first two rows are non-negotiable.
+
+| | before | after |
+|---|---|---|
+| obstacles drawn inside each other | 305,134 frame-pairs, worst 2.18 m | **0** |
+| body inside an obstacle | 6 frames, worst 0.19 m | **0** |
+| required actions per minute | 42.8 | **49.2** |
+| median idle between actions | 1.15 s | **1.00 s** |
+| 95th-percentile idle | 3.48 s | **2.78 s** |
+| worst idle | 9.17 s | **7.48 s** |
+| dead air (idle over 3 s, riding excluded) | 5.8% | **1.8%** |
+| speed at 15 s / 30 s | 9.9 / 11.3 m/s | **13.3 / 16.1 m/s** |
+
+(Both columns are the 2026-08-11 pass, and every roof row in it was
+superseded on 2026-08-16 -- 17.3 seconds a roof a minute now, not 2.35.)
+| slides per minute | 4.6 | **4.5** |
+| mounts onto a train roof per minute | n/a | **1.84** |
+| median time to the first mount | n/a | **3.0 s** |
+| seconds spent on a roof per minute | n/a | **2.35** |
+| distinct obstacle kinds per 30 s | n/a | **9.1** |
+
+Two of those deserve a note. The 6 body contacts before are the interesting
+one: this file claimed zero interpenetration across 60 seeds × 180 s, and that
+was true of the sweep it was measured on and is not true of `HEAD` — the
+guarantee had quietly lapsed. And **slides per minute did not move**, which is
+the honest reading of a mix that looks much more varied: the slide was always
+about as frequent as it is now, and what changed is that it arrives in a
+*tunnel* of two or three rather than singly. Nothing in the probe measures
+that, and it is the kind of thing only looking at a contact sheet catches.
+
+The overlay is **installed and verified end to end** on the owner's machine:
+hooks registered, daemon running, `brainrot doctor` 12/12. Measured live —
+appears 2.0 s after `UserPromptSubmit`, click-through, never focused, off
+alt-tab, hides 3.0 s after `Stop`, and (2026-08-07) stays hidden while the
+window in front is not the one the prompt came from.
+
+The parkour scene has had the same depth pass, and then a second one
+(2026-08-11) after the note that "the blocks are sometimes inside each other"
+and "the parkour feels fake and scripted". Both were true and both were
+measurable; `tools/parkour_probe.py` is the thing that measures them and the
+numbers it prints are the acceptance criteria. Before: 3,756 interpenetrating
+solid pairs in 8,000 blocks (worst 0.87 m), 0.2% of blocks on an integer grid,
+the body inside a solid block on 9.3% of frames, and the player standing
+perfectly still for 30% of every frame drawn. After: **0, 100%, 0.04 m worst
+case, and 0%.** Re-run it after touching anything in this scene.
+
+Then a third pass (2026-08-11, later) for "invisible blocks or walls blocking
+other stuff", "tiny jumps that would be very weird to do quickly", and "make it
+more difficult". All three were real:
+
+- **The invisible walls were the glows.** See the depth-write landmine below.
+- **The hops were too short**, and one number fixed nearly all of it: `MIN_HOP`
+  went 1.1 -> 2.0, and because every set-piece's gap goes through `fit_gap`,
+  every hard-coded one-block gap in the file widened to two at a stroke.
+  Take-off to landing went from min 1.32 / median 2.43 to **min 2.32 / median
+  2.79 / mean 3.03 m**; landing to landing, which is what the probe has always
+  printed, went from min 2.00 / median 3.13 / max 6.45 to **2.99 / 4.00 /
+  8.18**.
+- **The course now ramps.** `difficulty` goes 0 to 1 over the first 80 blocks
+  laid. Mean flight by block index: **2.93 -> 3.08 -> 3.15 -> 3.14 m** across
+  blocks 0-40, 40-80, 80-200, 200+ -- it climbs and then *holds*, which is the
+  half of a ramp that is easy to get wrong. Two new set-pieces, `slabs`
+  (half-height landings) and `squeeze` (beams to skim under, columns to
+  clear). Report the ramp on the **mean**: a hop length is one of a handful of
+  discrete values, so the median snaps between modes and can move the wrong
+  way between two samples that differ by a few per cent.
+
+Four structural facts, all of which the tests state:
+
+- **The course is on an integer lattice, with an occupancy map** (`_solid`).
+  Headings stay continuous — a course restricted to eight compass points looks
+  like a maze — but placement snaps to whole cells, and whole cells cannot
+  interpenetrate. Placement asks four questions: are the block's cells free,
+  are the two cells above the landing free, is the hop one a body can make,
+  and does the *arc* pass through anything.
+- **Motion is vanilla's.** `GRAVITY`, `JUMP_V`, `RUN_SPEED`, `AIR_SPEED` are
+  Minecraft's own numbers converted from ticks. Horizontal speed is
+  **constant**, so `flight()` is one line and every hop is the same motion at
+  a different height. What used to be there solved each hop for a duration and
+  then clamped it, so speed swung between 3.5 and 6 m/s from hop to hop.
+- **The body never stops.** It lands on a block's near edge, runs across it,
+  and leaves from the far edge; the beat on each block is a run-up, and its
+  length is that distance at sprint pace rather than a number anybody chose.
+  This is the single change that answers "feels scripted".
+- **The course knows its own path.** Where the feet land and leave is decided
+  when the block is generated, so the arc of every future hop is computable at
+  generation time. Orbs hang *on* that arc at chest height, which is why
+  "every orb laid down is collected" is a test rather than a hope. An early
+  jump moves the take-off, so `_begin_air` re-solves the arc and re-hangs that
+  hop's orbs; on autopilot the two are identical numbers.
+
+A fifth: **the difficulty ramp is counted in blocks laid, not metres
+travelled** (`ParkourScene.difficulty`). Generation runs fourteen blocks ahead
+of the body, and the probes and half the generation tests grow a course by
+calling `_spawn_block` without ever moving one -- keyed to `self.distance` the
+ramp would read zero forever and every test that believes it is checking the
+hard end of the course would be checking the easy one.
+
+`scene.stuck` counts the times placement fell back on its unchecked emergency
+hop. It must stay zero — when it was not, the visible symptom was a flight of
+stairs stacked nearly vertically, and the cause was a set-piece asking for a
+gap its rise could not support. `fit_gap` now reconciles the two centrally.
+
+The strip can also be **dragged where you want it**: hold `drag_chord`
+(`ctrl+alt`) and drag with the mouse; double-click while holding it to go back
+to automatic placement. Click-through is lifted only while the chord is held
+*and* the pointer is over the strip, so an ordinary click still belongs to the
+app behind, and focus is never taken. Where it was dropped is stored as an
+offset from the host window (`placement.py`), so a remembered spot still
+follows that window and still means something at another resolution.
+
+`runner` and `parkour` can also be **driven by hand** (`engine/input.py`):
+arrows or WASD, up/space to jump, down to duck, eight idle seconds to hand
+back. The overlay never reads a key until the takeover chord deliberately gives
+it focus — there is no global key hook, on purpose. `brainrot demo` needs no
+chord. Both opt in via `Scene.playable`; `spiral` does not, because a course of
+solved helical arcs has no free movement to hand over. Steering parkour bends the
+*course* rather than moving a body: there is no free movement to give a runner
+made of solved arcs between blocks that do not exist yet.
+
+The overlay is on screen **only while a Claude Code window that is actually
+working is the window in front** (`follow_focus`, default on). Ownership alone
+was never enough for that — it decides what covers what, not what is visible,
+so a strip that did not overlap whatever you switched to just sat there over
+it. Each frame the daemon compares the real foreground window against the
+hosts of the sessions currently thinking; `ThinkingState` tracks those per
+session id, from prompt events only. Not one of them, and not the overlay
+itself (the takeover chord makes the overlay the foreground window — a naive
+"hide unless the host is in front" hides the strip the instant you press it)
+→ fade out. Unknown host means hidden, never topmost.
+
+It is also **placed against the host window rather than the screen**
+(`engine/window.py:place`, pure geometry, `tests/test_placement.py`). Docking
+to a monitor edge put it straight on top of the Claude Code sidebar, which is
+what a screen edge holds in every app worth overlaying. It now stands *beside*
+the host window when the desktop has room and in that window's own gutter when
+it does not, on the `dock` side, re-checked every frame so it keeps up with a
+window being dragged. Real geometry lives in `overlay/win32.py`
+(`window_rect`, `work_area`, `move_window` — `SetWindowPos`, never raylib's
+`SetWindowPosition`, which would block off-thread).
+
+## The spiral tower: a cone of stacked levels (rebuilt 2026-08-12)
+
+A third scene, `spiral`, and the other Minecraft reel format -- the Parkour
+Spiral genre, where the course winds up the outside of a tower that keeps going
+out of the top of the frame.
+
+**The trough is not a ramp: it is a stack of levels, and that is the headline.**
+The owner looked at a render and said *without the parkour you could still just
+walk up this*. He was right, and it was geometry rather than course design: the
+trough climbed a block every eight blocks of arc -- a spiral staircase, which a
+body walks up without noticing -- so every landing was decoration on a ramp that
+already reached the top. A `Section` is now a **level**: a flat themed terrace,
+then a chasm with no floor in it at all (`GAP_ARC = (2.8, 3.9)` blocks of arc),
+then the next terrace `LEVEL_RISE = (4, 6)` blocks higher. Neither half is
+passable, so the only way out of a level is the climb out of it. **The
+acceptance test is a walker**: `spiral_probe`'s `walkability` floods the *cone
+alone* -- no course blocks, no pedestals, no dressing -- one block up and any
+survivable drop, and gets **0 m at worst, 0.0 m mean**.
+
+- **One turn must be a whole number of levels** (`LEVELS_PER_TURN = 3`). The
+  ceiling over level `i` is the floor slab of level `i + LEVELS_PER_TURN`;
+  anything else has soffit and floor stepping at different bearings and sawing
+  against each other.
+- **The rises vary**, so a revolution gains 12-18 rather than a fixed 22 -- the
+  other half of the same complaint, that it climbed at the same rate forever.
+- **`unwrap` is no longer a division.** It was one while every turn rose by the
+  same fixed amount and cannot be now, so it walks the levels at a bearing (they
+  are `j`, `j+3`, `j+6`...) to the last floor at or below the height. That walk
+  is why `Course._rock` memoises.
+- **The exit climb (`ascent`) is ~47% of all landings** and is the load-bearing
+  feature: a staircase of ledges against the core, or a ladder, vine or
+  soul-sand column where the theme has one (`Theme.exits`). Stairs are weighted
+  well above the vertical climbs for a *measured* reason -- stair-only exits
+  fall through to the unchecked hop on 2.35% of landings, mixed exits on 3.05%,
+  because a ladder needs a free column, an anchor and a launch block hard
+  against the core, and any of the three can be missing.
+- **The staircase has a theme's own footing** (`Theme.step`, a
+  `(material, move)`). Being half of every run, one stone and one hop in all
+  fifteen places was the largest source of sameness left: the farm climbs hay,
+  the nether soul sand, the mine oak, the end purpur, and the ice level climbs
+  packed ice on *slides*, which reach further than a hop for the same rise.
+- **The crossing descends one block.** `hop_span(-1)` allows 2.35-4.98 m where a
+  flat jump reaches 4.26, so the staircase climbs one *above* the next level and
+  the last jump comes down onto it.
+- **The crossing must actually cross** (`node["cross"]`), and until 2026-08-12
+  nothing said so -- it was a landing on the trough's own ground, and the
+  nearest such ground is the terrace being climbed off. It is also **re-aimed
+  from where the climb got to** (`_aim_crossing`) rather than from where it was
+  planned a dozen blocks earlier; asked too early it is refused, and the climb
+  lays another step and asks again. This one bug was three quarters of every
+  unchecked placement the format had.
+- **And when nothing crosses, the far wall does** (`_grab_the_wall`): a ladder
+  or vine up the other side of the chasm, checked by `_climb_move` like any
+  other climb, tried immediately before the unchecked hop.
+- **The staircase stays on the level's own ground** (`node["confine"]`), and
+  nothing may be placed in a chasm below the far level's floor
+  (`Course._far_floor`): a body stranded low over a chasm cannot get out, the
+  climb re-plans from inside the hole, and lays its staircase through the one
+  already there.
+- **`hug` is a distance, not a flag.** An exit climb laid mid-lane finds no
+  anchor and fails, and that was 96% of every run that got stuck -- but at 1.0
+  the wall filled the lens. The column stands one cell back from the landing it
+  caps, so 1.6 still finds its anchor while the *body* stands clear (2.2 for
+  its launch block, 2.4 for a staircase). And **no slab step in the exit
+  stair**: a slab stands half a block up, so the step after asks for +1.5.
+  `step_y` is nevertheless measured between *walking surfaces* rather than
+  between block floors, because a stair may still *begin* on a slab some other
+  feature left behind -- and asked as `prev["y"] + 1` that beginning was a rise
+  of one and a half, which no hop has, refused identically at every distance.
+- **Head-hitters are a checked constraint**, not a beam drawn near a jump -- the
+  lid goes into the arc's clearance test, so a landing whose jump would rise
+  through it is refused. Why it sits at three, not the genre's two: landmine
+  below.
+- **Landings are the level's own stone, marked by being *lit*** -- the candy
+  palette is gone from this scene. Owner's objection and map-making consensus
+  both: a contrasting jump block wrecks the theme and buys nothing (a cake and a
+  cobblestone have the same hitbox), so light the landing face (`LAND_LIT_FAR`).
+- **Ladders and vines are thin models on a block face**, not 0.84-wide cubes
+  (`assets/src/props_climb.py`, tileable vertically). Which face is recorded
+  when the column is placed: working it out at draw time is how you draw a cube.
+
+**The building** is one solid **inverted cone** (`BASE_R = 24.0`,
+`FLARE = 0.05`, 1.7x as wide at the crown over fourteen revolutions), and the
+"forest of columns" in the reference is its **skin** -- one-cell ribs
+alternating in and out for the whole height (`RIBS = 56`, `SKIN = 2`, taken from
+the *bearing*, since arc-length ribs drift up a growing circumference and read
+as a barber's pole). You are always in a **corridor**: drop and sky outboard,
+fluted core inboard, the slab above as a ceiling (`BAND = 9.5`, `FLOOR_T = 5`
+out of a turn of 12-18, so about a third solid and seven to thirteen blocks of
+open air), three themed sections to a revolution with *hard* seams, 6-10 s of
+strip each, fifteen themes from a shuffled bag, and the parkour **built into the
+theme's own ground** -- floating blocks over the void are a *theme* (the wool
+section), not the default. That shape was misread twice getting here; the
+history is in `docs/ARCHITECTURE.md` § "Scene formats".
+
+**Three modules, and the split is the point.** `scenes/parkourkit.py` is the
+kernel -- vanilla's motion numbers, `Move` as a list of legs, `hop_span`,
+`fit_gap`, the lattice helpers, `body_cells`, `MATERIALS` -- extracted
+**unchanged** from the deleted ring-tower plan, being the part that measured
+clean and had nothing to do with a building whose shape was wrong.
+`scenes/spiralplan.py` is the cone, the levels, the course and 35 features
+besides the ascent; `scenes/spiral.py` is the renderer and nothing else. Neither
+plan module imports raylib: a 24-run sweep costs seconds and no window.
+
+**The building is analytic, and that deletes a class of bug.** `Cone.rock(cell)`
+answers "is this inside the tower" in closed form, no memory, same answer
+whenever asked, so nothing can appear behind the course. The old design streamed
+its building into an occupancy map as the course advanced -- a wall could be
+built through a jump already solved -- and needed four reservations to defend
+against that. Three remain (`headroom`, `pathcells`, `softcells`) plus `ground`,
+the cells load-bearing *under* a landing: a `floor` landing places no block, so
+without it a pond dug during dressing takes the floor out from under one.
+
+**Course first, terrain second.** The course is laid, its arc, its run and its
+head-room reserved, and only *then* is terrain painted around what is reserved,
+so terrain laid second cannot block a course. Building the world first and
+negotiating through it started at **13% of nodes** falling through to the one
+unchecked emergency hop; it was 0.46% before the levels, 2.98% with them, and
+**0.30%** now -- better than before the levels, and the regression that stood
+at the top of "Still outstanding" for two days is closed.
+
+**What closed it was one bug, and it never once looked like one.** The exit
+climb's last node was a landing on the trough's own ground at whatever bearing
+its arc reached -- and *the nearest such ground is the terrace the body has
+just spent five landings climbing off*. So a staircase would gain its blocks,
+come down where it started, and be asked to climb out again with less room each
+time; the run reached the chasm lip having climbed nothing, and there is no
+jump in this motion model that both crosses a hole and gains four blocks.
+Nothing caught it because **the crossing always succeeded**. A crossing now
+carries `cross`, `_targets` refuses any candidate on the level being left, and
+`_aim_crossing` re-measures the jump from where the climb actually got to
+rather than from where it was planned -- so a crossing asked for too early is
+refused and the climb lays another step instead.
+
+Four more, each found by reading `Course.rejects` and none by reading the code:
+
+- **`step_y` is a rise between *walking surfaces*.** It was `prev["y"] + 1`,
+  so a stair starting from a slab asked for +1.5, which no hop has, and every
+  candidate failed identically at every distance.
+- **A failed climb recovers with another climb** (`_climb_on`), not with a hop
+  at a height measured from the level's own floor -- which, three blocks up a
+  staircase, is a *descent*.
+- **...but only while there is climbing left to do.** Past the height it needs
+  it walks. Gaining a block on every filler stride runs the body up into the
+  slab overhead, and then every cell around it is solid.
+- **When nothing can leave a level, climb the far wall** (`_grab_the_wall`). On
+  the ground at the lip, three below the far terrace, there is a wall three
+  metres away with four blocks of climbable rock in it. Halved the rate on its
+  own, and it is the only recovery in the module that improves the move mix.
+
+Three things that were tried and made it **worse**, all measured, none obvious:
+a switchback staircase across the corridor instead of along it (0.64% ->
+1.34%); converting arc-to-angle at the body's radius instead of the tower's rim
+in `_plan_feature`, which is *arithmetically correct* and still costs a point,
+because the same number is the ordinary features' truncation budget and
+shrinking it cuts them to single nodes; and triggering the climb earlier, for
+the same reason.
+
+Two defects that cost real time here, both of the kind that recurs:
+
+- **`Cone.rock` had two unreachable branches.** `unwrap` returns the level *at
+  or below* a cell, so the branches for lower heights never fired -- a smooth
+  cylinder with the themes as stripes and nothing to run along. Found by
+  rendering the world in Blender from outside, not by reading the code.
+- **Nothing rises two blocks in one ballistic move**, and a landing one block
+  above the ground reached from one *on* the ground across a step asks for two:
+  at two thirds of the stuck cases *every* candidate rose exactly +2.0. The
+  clamp is in `Course._targets`, `BALLISTIC` kinds only -- clamping ladders and
+  bubble columns too took climbs and lifts from 3% of moves to none.
+
+**The world is emitted outward from the body, not upward from the bottom.**
+`Course.build_world` alternates out from a `y_from`, because the chunk mesher
+builds in the order cells were dirtied -- bottom-up means the first thing meshed
+is the world forty-six blocks *below* the camera, which is fog: 422 chunks still
+unmeshed after priming, three and a half seconds of a strip watching its own
+world assemble. The prime is bounded (`PRIME_CHUNKS`) for the opposite reason --
+`_begin_scene` runs when the strip becomes visible, and meshing the lot took
+construction from 1.1 s to 1.6 s. Likewise a run opens on `START_LEVEL = 4`, a
+fifth of the way in: the bottom of the tower has nothing under it to draw, and a
+run opening beside a chasm opens looking at sea and sky.
+
+**Dressing needs a margin around the running line.** `pathcells` is exactly
+body-width, so a cell merely *adjacent* to a jump passes that test -- and a
+block face half a metre from an eighty-degree lens is most of the frame. A fifth
+of a contact sheet was solid green before `_dressable`'s margin existed.
+
+**The camera is pure geometry, and it set a generation constant.** The body runs
+*outside* a convex core, so a camera looking along the trough looks down a
+tangent -- and a tangent to a circle you are outside of never meets it. At a
+13-block band the core wall sat 50-90 degrees off the direction of travel at
+every bearing against a 52-degree horizontal field: drawn correctly on every
+frame, visible on none. The fix is not aiming at it (that means running
+sideways) but *standing nearer to it* -- `BAND = 9.5`, `COURSE_OUT = 0.5` --
+plus blending the head's bearing toward the trough's tangent (`TANGENT_MIX`),
+because aiming only at the next few landings swings the view out over the rim.
+
+Two more numbers: `LIFT_MAX = 6` (seven to thirteen blocks of open air, two
+needed over the head, and a landing higher has the next turn's slab for a
+ceiling before it has anywhere to jump to), and `GAP_RAMP = 0.26`, applied
+centrally in `_node` because most features want a *fixed* shape and would sit
+out the ramp -- before it, mean hop was 2.62 m at the start of a run and 2.67 m
+two hundred landings in. The exit climb is exempt by name: stretch its arc and
+the last steps of the staircase hang over the chasm.
+
+**Platform furniture is models, not cells** (`assets/src/props_mc.py`,
+`props_flora.py`, `props_deco.py`, `props_climb.py`): crops, fences, torches,
+rails, bamboo, cacti, lily pads, mushroom caps, chorus plants, dripstone,
+ladders and vines are the parts of Minecraft that are *not* cubes, and as cells
+they all come out as the same coloured box. Fourteen per section
+(`PROP_BUDGET`), one draw call each, distance- and direction-culled.
+
+## The spiral's difficulty is per level, not per run (2026-08-12)
+
+One ramp over the first seventy landings makes every level past the seventieth
+the same level. A **level** is the natural unit instead -- a themed terrace
+with a beginning and an end, six to ten seconds of strip, one place to the eye
+-- so each draws its own pitch (`Section.hard`) and `Course.difficulty` is that
+times the opening ramp. The distribution's *top* opens out with altitude while
+its floor stays put (`HARD_FLOOR`, `HARD_TOP`, `HARD_SPAN`), which is the
+difference between a course that gets harder and one that gets more varied: a
+mild level can still turn up late. Measured over 630 levels, mean hop by pitch
+band: **2.80 / 2.93 / 3.07 m**.
+
+Two things ride on it, and one is the only lever there is on the move mix:
+
+- **A level is about something.** It picks a signature verb from its own theme
+  (`Section.signature`), weighted `SIGNATURE_WEIGHT` above the rest of the
+  pool, preferring one that is *not* a jump where the theme owns one
+  (`NON_HOP`). On identical worlds that is worth **+1.4 points of non-hop
+  share** (4.8% -> 6.2%). Nothing else moves that number: the exit climb is
+  half the course and can only ever be hops.
+- **"Harder" lives in what the pool is made of** (`HARDER`), not in gap length.
+  One jump impulse means the whole usable range is 2.0 to 4.3 m and a course
+  spends it by the second landing; a lid to stay under, a one-cell landing and
+  a hole with nothing in it are different *questions* and the pool can ask them
+  as often as it likes. A hard level also stops being offered the easy beat
+  (`flat`).
+
+**Do not read a stuck-rate change across this commit as a regression without
+the A/B.** Adding two draws to `Cone._extend_section` re-rolled every world, and
+the same generator reads 0.45% on the old stream and 0.59% on the new one.
+Flattening the difficulty back to a constant *on the new worlds* also reads
+0.59%, which is how it is known the variety costs nothing.
+
+`tools/spiral_probe.py` is the acceptance test in numbers and is self-contained.
+Current, over 24 runs x 296 landings, 6 runs x 40 s and 8 walk runs:
+
+| | |
+|---|---|
+| **climbable without the parkour** | **0 m at worst, 0.0 m mean** |
+| cells twice-claimed / off-lattice / soft in rock / orbs missed | **0** each |
+| unchecked emergency placements | **0.30%** (was 2.00%) |
+| body inside the world | 0.03% of frames, worst 0.50 m |
+| **landings on built terrain** | **94.1%** (terrace 6.3%, floating 5.9%) |
+| hop length min/mean/max | 1.48 / **2.90** / 5.95 m |
+| mean hop by landing index | 2.77 -> 2.87 -> 2.93 -> **2.94** (climbs, then holds) |
+| altitude gained | **0.74 m/s** mean |
+| revolutions per minute | **2.73** (4.9-10.5 s on one theme) |
+| moves per minute | **99.8**, median idle **0.52 s** |
+| dead air (idle over 3 s) / frozen | **0.3%** / **0.01%** |
+| clear lens ahead | median **8.00 m**; **1.24%** of frames inside 0.8 m |
+| move mix | hop 94%, slide 3%, climb 2%, bubble 1%, then web, walk, bounce |
+| feature mix | 38 kinds; all 15 themes seen; commonest after `ascent` are `headhitter` 4%, `spire` 4% |
+
+Three notes. **The lens figure halved** (2.41% -> 1.24%, measured against the
+same twelve runs) and it is still the worst row in the table: a contact sheet
+of twenty frames has three or four looking straight into a wall. That is the
+camera problem in "The camera is pure geometry" and not a course problem, and
+it is now the top outstanding item. The **body figure is not zero** -- the
+residue is a pedestal or a piece of dressing built after an arc was solved, and
+the probe's exemptions are the three the generator makes (the landing being
+left, the landing arrived on, and a slab, whose surface is halfway up its own
+cell). And the **38 feature kinds are the 35-feature vocabulary plus `ascent`,
+`start` and `stuck`** -- if `stuck` goes, emergency placements are at zero.
+
+**When it goes wrong, turn on `TRACE`.** It is a counter round `Course._attempt`
+recording *which* check refused each candidate, off by default because placement
+asks those questions a few thousand times a landing. Every reduction this format
+has had, 13% of nodes down to a third of one per cent, came from reading that
+table, and **not one was found by reading the code.** Rebuild it before changing
+anything here. Worth knowing about the last pass: the raw table names the check
+that refused most candidates, and for the exit climb it said `no move: hop`
+loudly and *was pointing at the wrong landing*. What paid was counting the
+**first** failure in a climb rather than the one that finally ran out of
+answers, and bucketing it by how much terrace was left and how far below the
+next level the body was -- two lines of context that turned one undifferentiated
+pile into four separate bugs.
+
+## The hand-built tower: `tower` (rebuilt 2026-08-12, second pass)
+
+**The scene the rotation plays**, rebuilt the same day it was first built,
+because the owner looked at the 24-level version and said what the probes
+could not: the parkour read as unnecessary (blocks on a walkable plaza),
+nothing was ever interior, no level had a landmark, and the camera did not
+look where it jumped. All four were true. The rebuild started from frame-level
+research of the real maps -- Parkour Spiral 1 and 3 walkthroughs plus the
+speedrun, 130-odd frames sampled and read -- and `docs/TOWER.md` is now the
+design doc that carries what the reference actually does, the acceptance
+criteria (frame criteria F1-F6 judged from contact sheets, probe criteria
+P1-P6), the 33-level roster, and the measured table. Read it before touching
+any of this.
+
+The design as data moved to **`scenes/handlevels.py`** (33 levels, ~345
+authored landings); `handplan.py` is the machinery that reads it. What the
+engine grew, each verified by render + probe the day it was written:
+
+- **Terrace profiles**: `ledge` (default -- shelf against the core, drop
+  outboard, apron swell for the landmark), `plaza`, `channel`. Paint and
+  collision decide by the same per-cell test, or the course grows invisible
+  walls.
+- **Shells**: `shell=tunnel|hall|cave|shaft` on any beat builds an interior
+  around the move at commit, through `write()`, whose refusal of reserved
+  cells cuts the doorways for free. The shaft tube stops a course below the
+  climb's top -- sealed to the top it walls off an exit that has no reserved
+  path yet, and the stuck rate doubles (measured 0.41% -> 0.22%).
+- **A weathered face**: `Cone.core_r` -- monotone-in-height overhang, so no
+  cell of the cliff ever has air above it and nothing can stand on the face.
+  The first draft used rock noise and the walkability probe caught it making
+  one-block stairs at the level seams. Plus soffit teeth, dark cliff
+  materials, and cloud shelves that keep out of the tower's radius (one
+  drifting through a terrace reads as a rendering fault).
+- **Landmarks**: 14 cell blueprints (windmill, watchtower, tree, bell, crane,
+  totem, comb, great cap, hoard, wool stripes, cabin, hoodoo, arch, amethyst
+  cluster) **reserved** the moment a section enters the horizon -- laid out
+  at the apron from a per-level stream, held against placement, arcs,
+  shells, pours and dressing, and merely redeemed at paint time. Accent
+  cells may be dropped alone, base cells move the whole structure.
+- **The camera locks onto the landing** through take-off and flight
+  (`_look`'s `lock` ramp); the corridor-tangent blend only steers early in a
+  run. This was the owner's "not looking where it jumps", and it was real.
+- **The quarry descends the outside of the tower** -- signed `step_y` hops
+  onto floating benches below the rim, the longest jumps in the tower
+  (7.55 m max) with the sea under them. A dug pit is not expressible:
+  terrain would have to be carved ahead of placement, and the chasm guard
+  rightly refuses landings below the far floor.
+- **Webs draw as crossed gauze sheets** (salted yaw per cell), never cubes:
+  the body wades *through* a web, and a translucent cube from inside is a
+  whole lens of speckle. Same fix in `_draw_course` for web-form landings
+  and the soft-cell path.
+- Eight new themes (honey, coral, gold, library, prismarine, snow, crimson,
+  quartz) and nine materials; `Level.exit_beats` lets a level author its way
+  out with the generated climb as fallback (mechanism live and tested, no
+  level uses it yet).
+
+Two features are **machinery inserted between script beats**, both tied to a
+world feature, both leaving the cursor untouched, and the pattern is the same
+one twice (`handplan.MACHINERY` names them, and they are kept out of the
+fidelity numbers because they are aimed rather than authored):
+
+- **Locks** (2026-08-12). Every level's first floor break is 5.5-6.7 wide --
+  unjumpable -- and `Course._lock_nodes` crosses it: approach at height, an
+  island floated over the hole, a landing on the far ground. Measured with
+  `tools/bypass_probe.py`, which walks the *built world* rather than the cone
+  alone: **47% of a level covered without a jump, 0 of 42 levels walkable end
+  to end**, against the real map's exactly-comparable 46% and 0 of 43.
+- **Gated landmarks** (2026-08-12, this pass). Twelve of the fourteen
+  structures have a bigger variant carrying a held-open passage
+  (`spiralplan.GATED`), and `Course._landmark_nodes` steers the course
+  through it. See below.
+
+Measured (full table in `docs/TOWER.md`): design 100% legal on paper,
+**93.5% placed as authored** over the design alone, unchecked **0.31%**,
+twice-claimed 0, walkability 0 m, body inside the world 0.00%, 634 tests +
+34 skips green, **frames mostly filled by a wall 1.8%** (down from 2.8%).
+The one criterion missed is the frame budget: **3.74 ms** against parkour's
+2.44 in the same process (ratio 1.53, against 1.30 with the gates switched
+off in the same process), where the criteria ask for 3.5. The gated
+structures are three to four times the cells of the ones they replace, and
+the cheap way back is fewer cells per blueprint -- hollow interiors, ring
+eaves -- rather than fewer gates.
+
+## The course runs *through* the landmarks (2026-08-12)
+
+The owner watched five minutes of live strip and remembered **one**
+structure, against a 97% placement rate. `tools/landmark_probe.py` is the
+number that says why -- a real run, frame by frame, through the real camera
+-- and it agreed with him: only **18%** of the levels that stood a landmark
+up ever held it at 25 degrees, unoccluded and in frame, for a second and a
+half, and **none** ever reached 40. Placement rate was never the question,
+and this is the standing lesson: *a metric that measures the thing you can
+build rather than the thing the viewer sees will read green forever.*
+
+So twelve of the fourteen blueprints have a bigger **gated** variant
+(`spiralplan.GATED`) carrying a passage that is held open from the moment
+the level enters the horizon, and `handplan.Course._landmark_nodes` steers
+the course through it exactly as `_lock_nodes` steers it across a break.
+Same worlds, gates off vs on: **20% -> 52%** of levels at 25 degrees, **0%
+-> 29%** at 40, **1.00 -> 2.75** structures a minute, for +0.05 points of
+unchecked placement and one point of fidelity.
+
+What had to be true, and none of it was guessable:
+
+- **A doorway is walked through, not jumped through.** One jump impulse
+  always rises 1.25 m, so the head sweeps three cells above the take-off:
+  an arc under a lintel low enough to read as a doorway is refused, every
+  time. Interiors are `walk` gates (three cells of clearance, crossed at a
+  run); arches, bell frames, canopies and the hole in the loom wall are
+  `hop` gates, five cells high.
+- **A passage is three cells wide or it is a graze.** A body is 0.6 m across
+  and straddles the next cell whenever it is not dead centre, and on a
+  circle the diagonal step is the normal case.
+- **The landings are cells, computed with the structure and stored.** The
+  same arithmetic re-run later against a bearing that has moved on misses
+  its own doorway by the cell it drifted.
+- **But the crossing's real work is handing the passage over, not aiming
+  it.** Six runs: 41 crossings offered, **18 landed inside the structure, 4
+  of them on the exact stored cell**. The leg onto the first stored cell is
+  an ordinary jump from wherever the approach finished and is refused about
+  half the time; what works every time is that the offer takes the doorway
+  out of the hold while the frontier is beside it, leaving it the only
+  clear ground on the lane. **Retrying a refused offer makes it worse** --
+  `_last_resort`'s recovery hop is three to five blocks in whatever
+  direction will take one, so the second attempt aims behind itself
+  (measured: retirements 18 -> 65, unchecked 0.34% -> 0.60%).
+- **Two inserted features cannot share ground.** The lock lays seventeen
+  blocks in one decision and was walking the frontier straight past
+  doorways. Breaks on a gate-capable level are now kept nine blocks clear
+  *and on the far side of the apron*, the lock defers to a nearer doorway,
+  and script beats are clipped short of one. This is the owner's rule --
+  when they collide, move the lock -- and `floor_breaks` is where a lock
+  moves.
+- **A gate the course never reaches must come down.** Holding the big
+  structures without crossing them measured **1.96%** unchecked against
+  0.30%; crossing them, 0.77%; retiring the missed ones and standing the
+  small landmark ahead of the body instead, **0.31%**. A gate is a good
+  trade only while the crossing is still to come.
+- **Do not gate only the wide levels.** Refusing narrow ones (band under
+  8.5, shelf under four) measured *worse on both counts* -- 0.56% against
+  0.47%, and two fewer structures seen -- because the fallback there is a
+  hold on the apron with the course squeezing past. The one exception is
+  `cluster`, whose two levels are the deep-dark pair, and it is out.
+- **Fidelity is counted over the design alone now** (`handplan.MACHINERY`).
+  The climb, the recoveries, the lock and the crossing are aimed at world
+  features, not written down landing by landing; with them inside the
+  numerator the same runs read 88% and nothing was wrong.
+
+Two hard-won harness facts. `tools/level_shot.py --level N --sheet` renders
+one level without waiting for the tower to reach it -- and it must patch
+`sp.Cone.__init__` (the base class), never `hp.Cone.__init__`, because
+handplan's own `__init__` draws the phase from the rng before delegating,
+and skipping that draw silently renders a *different world* from the one a
+normal run of the same seed builds. And the fidelity probe's per-beat table
+is the design feedback loop: every table row under 98% traced to a real
+authoring mistake, and half of them were at beat boundaries -- including the
+one class nobody looks for, the filler loop's last-landing-to-first seam.
+
+## Levels 1-20, rebuilt against measured research (2026-08-13)
+
+The design as data is now **one module per level** in
+`src/brainrot/scenes/levels/`; `handlevels.py` re-exports it. Two documents
+sit under `docs/TOWER.md` and are read first when the job is a level rather
+than the tower: **`docs/RULES.md`**, the constitution a level must satisfy,
+and **`docs/RESEARCH.md`**, what the real map and its footage measure as.
+`docs/reference/` holds the material -- 182 frames, the contact sheets, the
+checkpoint and palette data -- and `tools/mapdig/` the parsers that read the
+world save.
+
+**Three things `docs/TOWER.md` believed did not survive being measured**, and
+each had been load-bearing for a rebuild. The reference does *not* alternate
+interior and exposed (fully enclosed 6.1% of the way; what it always is, is a
+**groove** -- a wall within 4 m on one side 71% of the time and a rock lid a
+median 8 blocks overhead on 98% of samples). It does *not* put a landmark on
+each level (median biggest mass on a real terrace: 12 cells, 4 blocks tall);
+**identity comes from the floor**, a median 14 materials with the dominant one
+at 26%, against our two or three. And its levels are *not* monotonic climbs --
+36 of 43 descend somewhere and 22 dip below their own start, travelling 11
+blocks vertically to gain 4, by falling off edges rather than jumping down.
+Also: two of the three reference videos are **Parkour Volcano, not Parkour
+Spiral**, so TOWER.md's frame-level section has the wrong provenance.
+
+**And the exotic-physics premise was wrong in the other direction.** Across
+~2,900 s of footage there is no slime, honey, soul sand, bubble column or
+waded cobweb; cobweb appears **zero** times in the entire Spiral save. Lava
+and water are the mechanic (26 and 20 of 43 levels), slime is one 2x2 pad per
+level, and the one special block the reference leans on hard is the
+**ladder**. A hop-heavy tower is *matching* the reference, not falling short.
+
+`tools/level_review.py --level N --all` is the per-level tool: the game camera
+over the level and into the next, a **blueprint** (elevation and plan of the
+built world, the only view that shows ground running unbroken past your
+jumps), a Blender orthographic three-view, and that level's numbers.
+`tools/roster_sheet.py` tiles one frame per level, which is how "do the levels
+look like different places" gets answered. **One level per process** -- the
+phase pin is a class patch and the tool refuses a second.
+
+**The pin skewed three metrics before this was noticed**, and the pattern is
+worth knowing: a pinned run *opens* on the level a fifth of the way along it,
+so walkability read 0% where the walker simply had nowhere to seed, a
+structure was measured from beside it rather than from the run-up (0.6 s
+against a true 1.5), and fidelity read 88% where the tests read 100%. All
+three now run unpinned in their own process; the pin belongs to the camera.
+
+Measured after the rebuild: placed as authored **94.7%**, designed content
+42%, exit climb 37%, unchecked 0.35%, twice-claimed 0, cone-alone walkability
+0 m, **0 of 52 levels walkable end to end** (real map 0 of 43), non-hop share
+**6% -> 14.3%**, dead air 0.0%, seconds on one theme 10.7-13.0 (reference
+10-15), **frame empty 43-77% -> 44-56%**, and **2.65 ms/frame against the 3.5
+the criteria ask for** -- the one criterion the previous pass missed, met
+without optimising anything. 634 tests pass.
+
+**The generated exit ladder used to essentially never fire**, because
+`_ascent_climb` wrote its column at `pedestal=False` and a climb anchors on
+solid rock within one cell of the column at its middle index and at its top,
+which the core's lean never reaches. That is fixed (`pedestal=True`, and the
+note beside it records the measurement: 1 anchored column in 1,559 without a
+pedestal). Two things about it were still recorded here long after they stopped
+being true, and both mattered:
+
+- **All thirty-three levels write `exit_beats`.** The exit is designed, not
+  generated. `_ascent_climb` is now dead code in the tower and lives on only in
+  the generated `spiral`.
+- **Nobody could tell, because the label cannot say.** Every landing of the
+  climb is labelled `ascent` whether a level wrote it or the engine improvised
+  it, and that label is load-bearing in eight other places -- so a third of the
+  course sat outside every fidelity number the project had. Nodes carry
+  `origin` now, blocks keep it, and `tower_probe` prints **THE WAY OUT**.
+
+## What the exit climb is made of (first measured 2026-08-14)
+
+It is 29% of the course, and:
+
+| | |
+|---|---|
+| the level wrote it | **60%**, of which **98.5%** placed as authored |
+| the crossing | 23% |
+| a generated staircase finishing a climb the design did not top out | 17% |
+| the reliability chain (`_climb_on`, `_grab_the_wall`) | **0** -- it never fires |
+
+Two engine faults were hiding under the label and both put a staircase where a
+level had written an exit. **One refused landing threw the whole authored exit
+away** -- the recovery went straight to `_ascent_stair` from the first refusal,
+which alone was ECHO SHAFT and WINDMILL REACH losing twenty-four landings a
+sweep each; the rest of the design is tried first now. And **an authored exit
+climbs a fixed height while `need` is not fixed** -- it is the next level's
+floor minus wherever the level's own beats left the body, so six treads against
+a need of three climb three blocks past the thing being climbed to, and the
+crossing, offered from too high, is refused and re-plans as a staircase.
+`_drop_climbed_treads` stops an authored climb one block above the next floor,
+which is where the crossing wants to launch from because it descends by design.
+
+Together: exit landings 894 -> 867 a sweep, generated staircase 177 -> 141,
+authored exits placed as authored 98.1% -> 98.6%. What is left is per-level
+authoring, and the reject table names a different cause for each: WINDMILL
+REACH `no move: hop`, WART FIELDS `landing occupied`, THE WHITE STAIR
+`pedestal will not stand`, THE QUARRY `no move: bubble`, MARKET STREET
+`no move: climb`.
+
+## The course flies over its terrace (rebuilt 2026-08-16)
+
+**The owner's third and sharpest complaint about the tower's parkour**, and
+the one that changed the format: the jumps went from a block resting on the
+floor to another block resting on the floor -- "they're attached to the floor,
+but the player keeps jumping from one to the next" -- so missing one cost
+nothing. His own criterion, and it is better than "put it over the void":
+
+> if you fall, you should theoretically have to go back to the beginning of
+> that level to attempt the parkour again, and there should not be any point
+> in the level where you go down to a ground block and from there go up again.
+
+That is a **reachability** question, not a void question, and `docs/REHASH.md`
+is the whole record: the plan, what was built, what it measured, and the four
+things the probe itself had to get right before its number meant anything.
+`tools/reentry_probe.py` is the number. **87.9% of missed jumps walked back
+into the middle of the course; it is **1 in 8,484** now, on one level visit
+in eighty-five.**
+
+The shape, in one paragraph. A level is entered on its terrace, steps up off
+it once, and everything after that stands **at least two blocks over the
+ground** -- a body steps up one, so anything at one is a landing a fall walks
+back onto. The terrace is untouched, fully themed and fully dressed: it is the
+place the course flies over and the place a fall lands, and it is a dead end
+because the course left it at landing one. Falls therefore do not need void
+under them, which is what keeps the levels looking like places.
+
+Five numbers moved with it, and two of them are the *other* complaints this
+tower has had:
+
+| | before | after |
+|---|---|---|
+| missed jumps that re-enter the course | 87.9% | **1 in 8,484** |
+| landings resting on the terrace | 15.9 a level | **2.4 a level** |
+| a level walked end to end without jumping | 2 of 24 | **0 of 55** (34% mean) |
+| landmarks framed at 25 / 40 degrees | 55% / 30% | **68% / 63%** |
+| unchecked emergency placements | 0.31% | **0.41%** |
+
+**`Level.deck` is the new number every part of the machinery aims at**: how
+high over its own terrace a level's course cruises, computed in
+`levels/_base.py` from where the script and the filler leave the body. The
+exit climbs `rise + 1 - deck` and nothing more; a gated landmark stands on a
+plinth that tall; the design checker knows what the filler has to come back
+to. `tools/level_climb.py` prints it for one level or the whole roster and is
+the reading tool for all of this.
+
+Seven engine changes, each found by measuring and not one by reading the code
+(`docs/REHASH.md` section 5 has the full list and the numbers):
+
+- **pedestals are off by default on this tower** -- a stack down to the ground
+  is a staircase back up to the landing it holds;
+- **a fallback height may go up and never under the deck** -- `spread` was
+  quietly placing an authored landing three blocks up at one block up, and
+  that was the largest single source of re-entry after the designs;
+- **machinery keeps the body's height** (`_here_lift`, floored at two): the
+  lock's approach, the doorway's approach, every recovery hop and the one
+  unchecked emergency landing all asked for `lift=1`, which on a climbing
+  level is a staircase down to the terrace and back;
+- **the lock is skipped while the course is flying** -- it exists to cross a
+  hole in ground the body is running on, and three blocks up that hole is
+  scenery;
+- **a gated landmark stands on a plinth as tall as the deck**, and the plinth
+  stops short of its own passage so a fall through the doorway carries on down
+  rather than landing in it (4.5 points of re-entry and 1.6 of unchecked
+  placement on its own);
+- **`noclimb`**: nothing may be built in the ring beside a landing between the
+  terrace and that landing's height. Dressing was three quarters of what was
+  left once the designs were raised -- the landings were out of reach and the
+  scenery beside them was a staircase;
+- **the exit starts from the deck.** Eighteen levels opened theirs with an
+  absolute `lift`, which on a flying course is the whole level dropping back
+  down;
+- **a relative chain that lost a block gets it back.** ``step_y`` is measured
+  from the landing before, so one refused node in the middle of a beat leaves
+  everything after it a block low -- and a block low is one block over the
+  terrace, which is the whole defect. ``_targets`` nudges such a landing up to
+  the deck when that is still a jump the body has. Re-entry 3.4% -> **0.6%**,
+  and the levels showing any nine -> three.
+
+**`breaks=0` is gone from the roster and that is a consequence, not a taste.**
+Nineteen levels had chosen no floor breaks because any break forced the lock
+and the lock cost them landings. The lock is skipped now, so breaks are free
+obstacles again: everything is at three or four, and that alone took a no-jump
+walker from 70% of a level to 48% and from two levels walkable end to end to
+none.
+
+**All thirty-three level modules were re-authored by a source-level `ast`
+pass, not by hand and not by an agent each.** Each landing moves up by the
+least that clears the deck, *preserving the deltas* -- the shape of a level is
+its rises, so its arcs stay legal wherever they were legal -- and the filler is
+flattened to the deck because it repeats and anything it gains it gives back at
+the seam. `tower_probe --design-only` then named what broke, by level, beat and
+node: 170 complaints, then 57, then none, and every one of the 57 was a real
+authoring decision. Third time on this project that a mechanical AST pass plus
+an instant design checker has beaten hand-editing.
+
+**Two things on the plan turned out not to be needed**, and both are worth
+knowing before anybody re-derives them. `_walk_bridge` lays its ground at the
+walk's *own height*, so it is a platform rather than a ramp and creates no
+re-entry. And `LIFT_MAX = 6` is exactly right rather than conservative: open
+air over a level is the next three rises minus `FLOOR_T`, which the
+three-window rule holds at eight or more, and a landing at lift 6 needs exactly
+eight. What climbs past it is the exit, written on `step_y`, which is not
+clamped.
+
+## Linux (added 2026-08-09, verified on the owner's Ubuntu box)
+
+Runs on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200% scaling) with the same
+behaviour as Windows: appears while a Claude Code window that is working is in
+front, hides when you look elsewhere, hides on `Stop`, click-through, never
+focused, stands against the host window. Measured live, not inferred.
+
+The platform split is `overlay.native()`; the engine has no `os.name` tests
+left. Read `docs/ARCHITECTURE.md` § "Two platforms, one vocabulary" before
+touching any of it — the reasoning is there, this is the short list:
+
+- **The strip is an X11 (XWayland) window on a Wayland session.** A Wayland
+  client cannot place itself, raise itself, or shape its input region; an X11
+  one can, and mutter honours it. `x11.prepare()` sets `glfwInitHint(
+  GLFW_PLATFORM, X11)` before `InitWindow`. Clearing `WAYLAND_DISPLAY` does
+  **not** do this: libwayland defaults to the socket `wayland-0`.
+- **Everything about other windows comes from a gnome-shell extension**
+  (`src/brainrot/extension/`), pushed over the daemon's own UDP port.
+  `org.gnome.Shell.Introspect.GetWindows` is refused. It is optional; without
+  it the strip docks to the work area and stays up for the whole turn.
+- **The host is resolved from process ancestry, not a window handle.** There
+  is no handle to read on Wayland. The shim sends its `/proc` ancestry
+  nearest-first and `Snapshot.host_for` matches it against window pids.
+
+## The top-bar switch (2026-08-25)
+
+The strip is a nuisance while you are reading, and there was no way to put it
+away: it never takes focus, is off alt-tab and passes every click through, so
+there is nowhere *on* it a click could ever reach. The switch therefore lives
+where the shell is -- a panel indicator in the GNOME top bar
+(`extension.js`'s `BrainrotIndicator`), one press to toggle, dimmed when off.
+
+- **The state lives in gsettings** (`overlay-enabled`), not in the daemon's
+  config: the panel icon and the overlay can never disagree, and it survives a
+  daemon restart, a logout and an upgrade with nothing stored on our side.
+- **It rides on every snapshot** (`Snapshot.power`) rather than being sent as
+  an edge when it changes. The daemon restarts far more often than the shell
+  does, and an edge missed while it was down is an overlay that switches
+  itself back on. Costs a boolean a second.
+- **Absent means on.** An older extension sends no such field, `Snapshot()`
+  defaults it True, and `linux.power_state()` fails open on a stale snapshot
+  or no extension at all -- same rule as every other question at that
+  boundary.
+- **`Overlay._power_allows` gates `wants_visible` above `_focus_allows`**, so
+  it goes through the ordinary fade and the ordinary `_go_idle`: switched off
+  mid-turn, the world is released and the process goes back to costing
+  nothing. Windows has no `power_state` at all and `getattr` degrades to True.
+- **GNOME 49 moved the panel onto Clutter gestures.** `PanelMenu.Button` opens
+  its own menu from a `Clutter.ClickGesture` now, and a gesture that
+  recognises a press need not let the old `button-press-event` through
+  afterwards -- so the indicator adds its own `ClickGesture` where the class
+  exists and falls back to the event signals on shell 45-48, which have no
+  such class.
+- `brainrot doctor` says so when it is off, because "nothing appears" is
+  otherwise indistinguishable from a fault (`extinstall.overlay_switch`,
+  read from gsettings -- the daemon holds the UDP port, so doctor can never
+  hear the snapshot that carries it).
+
+**A changed `extension.js` cannot be loaded into the running shell at all**,
+and that is a gjs fact rather than a policy: `extensionSystem.js` does
+`await import(extensionJs.get_uri())` with the comment "Extensions can only be
+imported once", and the ESM cache is keyed by URI -- so `gnome-extensions
+disable && enable`, and `reloadExtension` itself, all re-run the *old* module.
+Measured here on GNOME 50.1: the cycle reported ACTIVE, logged nothing, and
+the panel had no new icon. `brainrot extension load` is for an extension the
+shell has never seen; **new code in an already-loaded one means logging out.**
+
+
+## The runner is a convoy, and it opens where it used to finish (2026-08-16)
+
+The owner's note on this scene: what makes Subway Surfers good is that the
+longer you last the faster it gets and the *more trains* there are -- trains to
+run on, trains to jump between -- and it is rare to be looking at "a bunch of
+mediocre speed barriers". He asked for research on what high-speed play
+actually looks like, a run that starts quick, and a much higher top speed.
+
+**The research is frame-level, and it is the same method the tower used.** Two
+slices of a real five-million-point run (archive.org, `SubwaySurf_5011279pts_
+noHoverboards`, 612x1000 at 24 fps) -- one a minute in, one forty-five minutes
+in -- pulled with `ffmpeg -ss` straight off the URL, tiled a frame a second,
+and read. Footage stays out of the repository; the findings are these:
+
+- **At full speed roughly a third of the frames have the player up on the
+  trains**, and the frames that do come in runs of five to ten seconds. What
+  keeps them up there is leaping from one roof to the next.
+- **Nearly every frame has a train in it**, usually two or three lanes' worth:
+  the picture is a canyon of trains with a trough between them, not a train.
+- **Barriers exist and are the least of it.** Coin arcs over the gaps are how
+  the game says "this is a jump and this is where it lands".
+- **The speed curve**: distance rate (score rate over the multiplier, coins
+  netted out) was 16.7 units/s a minute in and 27.5 at the top -- about 1.65x,
+  and it takes tens of minutes to get there. A strip on screen for fifteen
+  seconds cannot spend that, so it opens near the top instead.
+
+Against that, this scene was the other way round: 48 barriers a minute against
+7.8 trains, one train per roof set-piece, **2.7 seconds a minute on a roof**.
+
+What changed, and the numbers over the same probe (12 runs x 120 s):
+
+| | before | after |
+|---|---|---|
+| seconds on a roof per minute | 2.7 | **17.3** (4.6% of the run -> **29%**) |
+| mounts per minute | 1.71 | **4.46** |
+| parked trains per minute | 5.5 | **35.0** |
+| speed at 0 / 15 / 30 s | 10.5 / 13.3 / 16.1 | **15.0 / 19.8 / 24.0** |
+| actions per minute | 48.3 | **55.7** |
+| dead air (idle over 3 s) | 2.2% | **0.7%** |
+| commonest set-piece | hurdles | **roofrun** |
+| body inside an obstacle, 60 x 180 s | 0 | **0** |
+
+- **A roof run is a convoy.** `_seg_roofrun` lays three to five trains nose to
+  tail with a 2.8-4.0 m gap between each pair, and `_hop_reaches` checks every
+  gap against the leap at *both* ends of the speed range before a car goes
+  down. A chain that gets three trains in and finds the fourth blocked is a
+  roof that ends over a wall, so the whole thing is accepted or refused as one
+  -- and a chain too long for the track it was offered drops trains off its own
+  tail rather than declining.
+- **The leap between two roofs is a window, not an instant** (`mount_to`). A
+  ramp's lip passes under the feet once; a body already at roof height and
+  already going the right way can leave any time from far enough back to clear
+  the gap up to the moment the roof runs out. An instant that happens to be
+  busy is a mount dropped, and a mount dropped while the body is up there is a
+  fall rather than a lane change.
+- **A second line of trains stands alongside** where a lane can be spared
+  (`_flank_lane`) -- the canyon. Never on the side *between* the ride lane and
+  the bail lane: from an outside lane the only way across is through the
+  middle, so a convoy in lane 0 may only flank in lane 2.
+- **Hurdles fill the lanes the convoy is not in.** From the roof they cost
+  nothing; on the ground they are the whole of what a runner that did not get
+  on has to do. Measured, that is where this scene's dead air lived -- the
+  roof run owned 48 of the 81 idle seconds in twelve minutes.
+- **Everything that reserves track is read off the top of the speed range.**
+  `Kinematics.for_speed` clamps the air time at 0.34 s, so past about 19 m/s a
+  move stops shrinking and starts covering more *track*: a slide is 11 m at 24
+  m/s against the nominal 8.4. `ACTION_SPAN` and `TRAIN_PAD` are computed from
+  `TOP_KIN` rather than typed, and `tests/test_collision.py` holds them there.
+
+Four things had to be true and **not one was guessable from the code**:
+
+- **A chain of trains in one lane is a hundred metres of wall to the lane
+  search**, so it left that lane long before the ramp and the mount it was
+  routing around was never offered at all. Measured: twelve mounts over four
+  runs with one train per set-piece, **none at all** with two to four. A convoy
+  is one decision, so `Threat.ride_ahead` says "road, but nothing to book yet"
+  while the head is still mountable, and the whole chain is a wall when it is
+  not.
+- **The leap has to be solved against the *track*, not the live body.**
+  Requiring the body to already be riding meant the planner booked the ramp
+  mount, rolled forward, watched itself fall into the first gap and threw the
+  mount away in favour of never getting on -- 105 verifications failed on a
+  train and no mount happened in four runs.
+- **...and it has to be refused to a body that is not up there** (`ride_link`).
+  Booked from the rails it is an ordinary jump with a *mount's* launch speed,
+  landing ten metres later on whatever is there: 151 frames inside something
+  over sixty runs, every one of them a 2.35 m apex off flat ground.
+- **Running off the end of the second roof inside one planning horizon is not
+  a plan with no answer.** Only one leap fits in a schedule at a time and the
+  horizon holds two or three gaps, so `verify` legitimately reports a fall it
+  will never take; the re-solve a tenth of a second later books it from closer
+  up. Counting those was every one of the 3,288 "no answer" reports the scene
+  picked up when convoys arrived.
+
+Two things measured *worse* and are worth not re-deriving. Pinning the lane
+plan for the whole horizon while riding (4,310 no-answer reports against 3,288
+for not pinning at all) -- the tail of that horizon is the runner back on the
+rails with the next set-piece in front of it, which is an ordinary lane
+decision. And a longer `PLAN_HORIZON` of 3.4 s, which takes the no-answer
+count down to 1,152 and puts **six frames of the body inside a barrier**; 2.8
+stays.
+
+## The run never stops getting faster, and it can end (2026-08-16, later)
+
+The owner's second pass on this scene: it stalls at maximum speed after about
+a minute and needs to go much, much faster; oncoming trains are too rare and
+too slow; there are too many barriers and too many full-width ducks in a row;
+and there should be real power-ups. He also said, explicitly, that it is fine
+for the run to eventually outrun its own planner and fail -- "and then it
+starts again from scratch" -- as long as none of it costs more per frame.
+
+**The speed has no top.** ``TOP_SPEED`` is now the end of the *guaranteed*
+stretch rather than a ceiling: 15 -> 24 m/s in twenty-eight seconds, and then
+``CREEP`` adds 1.6 m/s per further minute without limit. Everything the
+collision model promises is promised up to 24; past it the track eventually
+cannot be laid fast enough to be crossed at the speed it is being crossed at,
+the body walks into something, and the run ends. Measured over twelve runs of
+five minutes, first wrecks land between one and four minutes -- past all but
+the longest thinking turns.
+
+- **A deep contact is a wreck, a shallow one is still a stumble**
+  (``CRASH_DEPTH``). Nothing else would work: a runner that teleports sideways
+  out of every train it walks into never fails and never looks like it might.
+- **A wreck restarts the run, not the scene.** ``_restart`` clears the course,
+  the ledgers and the body, and keeps the assets, the textures and the sky.
+  Two things it must also reset and did not at first: ``_first_row`` (the new
+  run starts hundreds of metres down the same track, so ``_lane_clear`` reads
+  a row that no longer exists) and the power in hand.
+- **The tests that say "nothing is ever inside anything" pin the creep off**
+  (``pinned_speed``). Otherwise they are statements about how long a run
+  happens to last.
+
+**Trains come at you, often and fast.** ``ONCOMING_RATIO`` is 1.0, so the pair
+close at twice the running speed against the old 1.55x combined, and there are
+two or three per express set-piece rather than one. What was stopping more of
+them was the *reservation*: a sweeper held every metre of lane it would cross,
+two hundred metres for a train twenty-five long, so the second never fitted.
+``_sweep_span`` is the fix and it is a visibility argument, not a spacing one:
+a train coming the other way passes a point ``d`` past the meeting while the
+runner is still ``d * (1 + v/w)`` short of it, so past ``FOG_FAR / (1 + v/w)``
+-- forty-four metres at equal speeds -- the pass happens inside the fog with
+nothing on screen to see it. Oncoming trains 1.7 -> 3.8 a minute.
+
+**Fewer barriers, and never a wall of them.** ``_add_barrier`` refuses to be
+the third lane of three, which is one guard in one place rather than a rule in
+every set-piece; the express staggers its rhythm by a third of a pitch per
+lane, because level with each other they are a wall with one hole in it and
+leaving a lane means arriving in another with a hurdle at the same distance.
+A tunnel lays at most two full-width hoardings and fills the rest with
+``lowbar`` -- the same board scaled to one lane, which is a thing to *dodge or
+duck* rather than a thing to obey, and which leaves the other two lanes free
+for a train. Barriers 58.5 -> 32.7 a minute; hoardings 3.3 -> 2.2.
+
+**Power-ups, and each one is a different verb.** ``POWERS``: a jetpack that
+takes the body off the track altogether for five and a half seconds, super
+sneakers that raise the arc of every jump, and a magnet that curves every coin
+in reach onto the body. About four a minute, and eight and a half seconds a
+minute are spent flying.
+
+- **The sneakers raise the apex and not the span**, and that is what makes
+  them safe rather than lucky: every reservation in the ledger is a stretch of
+  track a move commits the body to, laid down long before any power-up
+  existed, so a jump that suddenly covers a third more track is two obstacles
+  met inside one move.
+- **A gantry is scenery only if a jumping body clears it**, and the boots make
+  the body taller than the number that was derived from. ``GANTRY_Y`` comes
+  off the *boosted* apex now: four of the first five wrecks the crash mechanic
+  ever produced were a head through a sign bridge.
+- **A power-up that changes the physics has to throw away the schedule**
+  (``_repick``). A take-off booked under the boots and fired after they expire
+  is a jump a third shorter than the hurdle was measured against.
+- **The jetpack's timer running out is not the same as being able to come
+  down.** ``jet_wait`` holds it up until the lane below is clear for as long
+  as the fall takes; landing in the middle of a convoy is a run ended by
+  nobody's decision.
+- **Flying is not riding.** ``riding`` excludes it, and the probe counts the
+  two separately -- before that, every second of every flight was reported as
+  a second on a train roof and the roof figure read 23 a minute when it was 14.
+
+**And the body can cross from one roof to the one beside it.** The rule that
+freezes lateral movement while raised is what stops it stepping off a train,
+so the crossing is the exception it names: ``ground_to`` asks whether the far
+lane is a roof at this height *for the whole crossing*, and ``Motion.advance``
+allows it when the answer is yes. Three things had to be true, and the first
+two are one-line changes that each cost eight seconds of roof a minute when
+they were missing:
+
+- **A roof only holds up a body already on or above it** (``surface_at``'s
+  height gate). Without it a train is a surface to anything standing in its
+  lane, so a runner that walks into the side of one is lifted onto the roof.
+  A ramp is the exception, and the reason the rule is not simply "must be
+  above".
+- **The pin has to cover the mount's own flight.** It keyed on ``riding``,
+  which is false while the body is on the ramp's lip -- so for the length of
+  the leap the lane plan was free to point elsewhere and the first frame the
+  feet touched down the body slid off the side of the train it had just
+  landed on.
+- **The far roof needs a reason to be on it.** The crossing is decided by one
+  rule (``_roof_across``) rather than handed to the lane search, which wanders
+  onto a flank and back and into the gap between the two; and the flanking
+  trains carry their own coins, because a move with nothing on the other side
+  of it is one no player makes.
+
+Measured, 6 runs x 90 s: roof 14.3 s/min plus 8.4 s/min flying (38% of the run
+off the rails), 5.3 mounts a minute, dead air 2.7%, and **frame cost
+unchanged** -- runner 1.61 ms, 0.91 of parkour, the same as before any of this.
+
+## The power-ups are objects, and the jetpack flies (2026-08-16, third pass)
+
+The owner's note after watching it: most of the power-ups do not appear to do
+anything, the jetpack "teleports him up in the air a bit higher and then he
+keeps running on air", the pickups are boxes when the whole project is
+Blender-built, and the convoy still reads as one train he gets on and off.
+Plus a standing instruction that is now written into the dev loop: **look at
+the frames**. Every one of those is invisible to every probe this scene has,
+because they are all numbers about geometry and pacing.
+
+`tools/power_shot.py` is the answer to that instruction. It forces a power-up
+at a known moment, or waits for the body to get up on a roof, and renders
+every frame of what follows into a contact sheet. A power-up lasts six
+seconds and arrives every four minutes at a spot nobody chooses, so waiting
+for one in ordinary footage is hopeless.
+
+- **Five new Blender assets** (`assets/src/powers.py`): a jetpack, a winged
+  boot and a horseshoe magnet as pickups, the pack the body wears, and the
+  exhaust plume. The pickups are modelled to a common radius so one glow size
+  and one spin suit all three.
+- **A `fly` clip on the rig.** The jetpack had no pose to reach for, so the
+  draw kept the run cycle -- which is exactly what "running on air" was. The
+  clip hangs rather than strides: torso tipped back, legs trailing, arms up
+  to the straps, and a slow sway, because a rigid body under thrust reads as
+  a prop being carried.
+- **The pitch is about world X.** ``_draw_runner``'s ``lean`` is a *bank*,
+  applied about world Z, which is the track axis; reused for a jetpack's
+  nose-up it rolled the body onto its back with the pack across its chest.
+  That is what the first render showed, and no number would have.
+- **The camera climbs at half rate while flying.** A lens that rises with the
+  body is a lens in which the body never goes up.
+- **The magnet reaches sideways, not backwards.** It used to pull coins
+  *along the track* toward the runner, so coins ten metres ahead swam to meet
+  it; now the lane and the height come to the body, the distance is left
+  alone, and a coin is taken only once it has been run past.
+- **The sneakers raise the arc and light the feet.** A power-up whose only
+  expression is that the jumps got bigger is one a viewer attributes to the
+  course, so the shoes recolour, the feet glow, and every take-off throws
+  sparks.
+- **Alternating liveries down a convoy.** Three metres of daylight between two
+  twenty-metre trains is a sixth of a second at speed, so what says "four
+  trains" is the seam -- and a seam between two identical hulls is not a seam.
+  Widening the gaps instead was tried and measured: the leap's reach caps the
+  gap, and a wider one costs convoys (42 rides in twelve minutes down to 17)
+  before it costs contacts.
+
+Measured after it, 8 runs x 90 s: oncoming trains **1.7 -> 3.9 a minute**,
+12.5 s/min on a roof plus 9.4 flying, 4.75 mounts a minute, barriers 32.7,
+dead air under 3%. Safety inside the guaranteed range (creep pinned, 24 runs
+x 180 s): **no wrecks, worst contact 0.225 m** -- a shoulder clipped on the
+way out of a lane, which is why ``CRASH_DEPTH`` is 0.26 rather than 0.18.
+Widening the planner's horizon for trains, refusing the reflex that lands in
+front of one, and keeping hurdles out of the corridor during an express were
+each tried against that number and each left it exactly where it was.
+
+Three engine facts came out of it, and all three were found by rendering:
+
+- **The jetpack's landing has to wait for room, but not for perfection.**
+  Requiring a whole planning horizon of clear lane meant it never found
+  anywhere and stayed up: 21.7 seconds a minute of flying against the 5.6 it
+  lasts. Fourteen metres past the fall, with a two-second patience and then
+  the fall alone, gives 6-10 s/min.
+- **The climb passes through the height of a train.** Immunity means a train
+  would be *drawn through the body* rather than stopping it, so the climb is
+  eight per second rather than three and a half -- clear in a quarter second.
+- **A moving train alongside was built and reverted**, and the reason is
+  recorded in ``_seg_roofrun``: a train that moves leaves the stretch its
+  reservation covers, and the coins on its roof stay where they were laid. As
+  built it measured mean trains crossed per ride 4.12 -> 2.90, three contacts
+  where there had been none, and not one frame spent on a moving roof --
+  because the crossing is decided by coins and the coins had been left
+  behind. The ``drift`` argument on ``_add_train`` and the yaw that goes with
+  it are kept, because they are the correct half of it. (**Both halves are
+  built now** -- see the next section.)
+
+## The speed has no top, and the run ends when it outruns its sight (2026-08-17)
+
+The owner's fourth pass on this scene, and the sharpest: *it taps out at a
+certain speed pretty quickly while it's still quite easy; at the max speed you
+reach after about two minutes it's not that great; the trains coming at you
+should be moving and shouldn't just be standing still for a lot of them; you
+should be able to get on them if you're already on a train; and there should
+not really be a big cap on the speed -- it should keep going quicker and
+quicker until essentially the guy fails, and then it starts again.*
+
+**Every one of those was true, and the last pass's own notes were wrong about
+why.** Measured before touching anything, six runs of five minutes: 24.9 m/s at
+one minute, 26.5 at two, 27.4 at three, and **one wreck in thirty minutes of
+running**. The compounding was linear -- 1.6 m/s per further minute -- which is
+an acceleration that shrinks as a fraction of the run, so the curve flattens
+exactly where it is supposed to be getting frightening.
+
+`tools/speed_probe.py` is the new tool and it is the one that made this
+actionable: it buckets **every frame by the speed it was drawn at**, so the
+scene's behaviour at speed is a reading rather than a belief. Three beliefs
+this file held did not survive it:
+
+- **"The collision model starts producing wrecks at around 26 m/s"** -- no. The
+  32-36 m/s band had **zero** contacts over 276 seconds, and the 28-32 band was
+  cleaner per second than the 24-28 one the scene actually spent its life in.
+- **"The track cannot be laid fast enough to stay solvable"** was written here
+  as the reason a run ends and was not true of anything in the scene. Every
+  move is sized in metres and every reservation is derived from the move, so
+  the track simply *thins out* to match the speed. With the creep compounding
+  and every density dial at maximum, a run reached **143 m/s** and was still
+  solving.
+- **The reservations were sized off a fixed `TOP_KIN`**, so past that speed
+  they understate what a move costs. They come off `lead_speed` now -- the
+  speed the body will be doing when it reaches the far end of the spawn
+  horizon, which is where the track is actually being laid.
+
+The shape of the answer:
+
+| | before | after |
+|---|---|---|
+| speed at 15 / 30 / 60 / 90 s | 19.8 / 24.1 / 24.9 / 25.4 | **24.1 / 30.9 / 38.5 / 47.9** |
+| run life (median) | never | **328 s** (69-348) |
+| speed at the wreck | n/a | **33-56 m/s** |
+| oncoming trains a minute | 4.5 | **8.6** |
+| trains that are moving | 12% | **23%** (oncoming 8.6 + shunting 5.2 a minute) |
+| roof-to-roof crossings a minute | ~0.75 (estimated, never measured) | **3.62** |
+| mounts a minute | 3.9 | **5.0** |
+| seconds on a roof a minute | 8.9 | **10.9** |
+| actions a minute | 44.8 | **49.6** |
+| body inside an obstacle, pinned, 24 x 120 s | 1 frame, 0.034 m | **5 frames, 0.011 m** |
+
+**`TOP_SPEED` is 30 rather than 24, and that is a measurement rather than
+nerve** -- the guaranteed range was extended to where the frame data said the
+model was still clean. `CREEP` is a *fraction* now (0.55 of the current speed
+per further minute, compounding, no limit).
+
+**What ends a run is `blind`, and it is a derived number, not a speed cap.** A
+plan is followed for `COMMIT_WINDOW` before being re-solved, so a horizon
+shorter than that is a plan that cannot be checked as far as it is acted on.
+Past that the runner stops planning and stops reflexing: it holds its lane and
+runs, and hits whatever is there within a second or two. 64 m of planning reach
+against a 1.2 s commitment is 53 m/s. **That speed, and not the creep, is what
+sets how long a run lasts** -- so `CREEP` is solved backwards from it rather
+than chosen: 0.55 a minute put the wall at 108 seconds, the owner asked for
+five, and 0.12 gives five and a half. Raising the creep shortens runs and does
+not make the top faster, because the top is the wall. The frame shows exactly what the rule
+says: things arrive out of the fog and are not dodged, and then a train fills
+the screen.
+
+Five things had to be true, and none was guessable:
+
+- **The planner may only reason about what it can see** (`sight`, the fog). It
+  was routing around trains eighty metres away in fog that ends at
+  eighty-eight, which is not the game the viewer is watching -- and it is why
+  nothing ever beat it.
+- **The horizon has to be derived from the sight, not given a figure of its
+  own.** A reach of 64 m was picked as "what 2.8 seconds was at the old top
+  speed"; asked as a hard bound it is a *reduction* at every speed the old
+  scene ran at, and measured that alone was five frames inside an obstacle
+  against one. It is one of three bounds now and the loosest wins.
+- **Verify sampling is a distance, not a time.** At 0.03 s the grid is 0.72 m
+  at 24 m/s and 1.2 m at 40, against a barrier-plus-body overlap of 1.4 m --
+  one sample inside the thing being checked. Half a metre, and it is worth
+  what it costs: 0.70 m was tried and read twelve grazes over forty-eight
+  minutes against five.
+- **`JET_LAND_CLEAR` was fourteen metres and had to be a number of seconds.**
+  It buys the planner time to have an answer again after a flight it did no
+  planning during -- and fourteen metres is 0.58 s at the old top speed and
+  0.28 s at the new one. The one deep contact left inside the guaranteed range
+  was exactly this: a body put back on the rails with a hurdle thirteen metres
+  in front of it and the take-off window already gone.
+- **Difficulty past the guaranteed range has to be asked for** (`pressure`,
+  zero inside it so nothing the collision tests hold is touched): tighter
+  rhythms, more lanes closed at once, a second sweeper, and `action_span`
+  falling to three fifths of what a move really needs so obstacles begin
+  arriving inside each other's answers.
+
+**The moving trains, both kinds.** Oncoming ones now come from the yard and
+from a convoy's run-up as well as the express (`_sweeper`, which is the
+express's arithmetic split out), and `_may_spawn_train` is asked **per lane** at
+placement rather than per set-piece -- as a global gate it refused most of the
+set-pieces that lay trains at all. And the line alongside a convoy *shunts*:
+the two reasons it was reverted last time are fixed rather than lived with --
+its coins carry the train's velocity (any entity may, not just a train), and
+its reservation covers the stretch it sweeps (`_drift_span`), claimed once for
+the whole line because per train each one's swept stretch refuses the next.
+`DRIFT_SPEED` is a sixth of the running speed, not a half: faster than that and
+the line has slid a whole train's length forward before the body arrives.
+
+**The flank mirrors the convoy, train for train, and is chained.** That is the
+answer to "you should be able to get on them if you're already on a train", and
+two things fall out of it: the crossing window is a whole train long instead of
+whatever overlap two lines of different pitch happen to share, and the flank is
+a *road* -- linked `behind` each other, its trains offer the same forward leap
+the ride lane does. **And the coin trail changes lanes at every gap**, with the
+arc over the gap laid on the line it changes *to*. Without that the mirroring
+backfires: `_roof_across` crosses only when the lane alongside has coins this
+one has not, so two full trails are worth the same and the body correctly never
+moves.
+
+Three things measured worse and are recorded so they are not re-derived:
+
+- **Standing a yard's shunting train still when its swept stretch will not fit**
+  rather than not laying it. It is a denser yard than the corridor was written
+  for, and it put the body inside something at the top of the guaranteed range.
+- **Three sweepers abreast at one meeting, to end a run on purpose.** It reads
+  beautifully on paper and it never once fired -- 60 attempts, 0 successes: a
+  sweeper's reservation is a hundred and sixty metres of its own lane, so the
+  ordinary sweeper laid first guarantees the all-three test fails. Offered
+  *instead of* the ordinary one it still failed on the surrounding track. The
+  code is gone; `blind` does the job honestly.
+- **Planning the whole 84 m the fog allows.** Costs mounts (5.75 a minute down
+  to 3.81) and seconds on a roof (12.5 down to 7.0), because `verify` is more
+  likely to find *something* wrong two seconds out and a plan carrying a mount
+  is the one thrown away for it.
+
+The speed table it all comes down to, 12 runs x 240 s, unpinned, every frame
+bucketed by the speed it was drawn at: **0 contacts below 28 m/s**, one to four
+grazes in each band from 28 to 52, and **60 of the 73 contacts in the 52-56
+band**, which is the blind phase. That is the design stated as a measurement --
+the scene is clean everywhere the runner can see, and everything that goes
+wrong goes wrong in the three per cent of the run where it cannot.
+
+**The full-size sweep says something the small one cannot, and what it says is
+that the headline number in this file had lapsed again.** 60 runs x 180 s with
+the creep pinned reads **42 frames inside an obstacle, worst 0.534 m** -- and
+the same sweep on the commit before this one reads **303 frames, worst
+0.452 m**, against the "0, worst 0.000" recorded for it. So this pass roughly
+halves the count over 17% more track a run and a guaranteed range six metres a
+second wider, and it is *not* the clean sheet the 24 x 120 sweep suggests. Two
+things follow and both are worth keeping:
+
+- **24 x 120 is not a substitute for 60 x 180 on this scene.** The small sweep
+  read five grazes at 0.011 m for the same code. The file already warned about
+  this and it was still nearly missed.
+- **Two thirds of it was one bug, and it was not the one the aggregate named.**
+  The count read 135 and the shape looked like a roof-to-roof crossing gone
+  wrong. Traced frame by frame it is not a crossing at all: the body **falls
+  off the back of a convoy still carrying a lane change decided up on the
+  roof**. Two trains side by side are one step apart at roof height and a
+  solid wall on the ground, the fall freezes the body's x for its whole
+  duration, and the crossing then arrives after the world it was chosen in has
+  gone -- so the body lands beside the flanking line and walks into its side
+  for a second and a half while the push-out holds it there. `Motion.advance`
+  cancels the crossing when the body walks off an edge; nothing is lost,
+  because the planner re-solves a tenth of a second later. **135 -> 42
+  frames.** The lesson is the one this project keeps relearning: ninety
+  contacts in an aggregate can be one event, and only a per-frame dump says
+  which.
+- **What is left is 42 frames over three hours, worst 0.534 m**, and it is not
+  speed: held at 24 m/s the same code reads *284*, so this is orthogonal to
+  the curve. The deep one is the same shape again -- a body coming down off a
+  roof beside a train -- but with the contact happening while it is still in
+  the air, which the cancel above does not reach.
+
+**One trap in that probe, and it is the general shape of the thing.** Bucket a
+contact by the speed the *frame* is being drawn at and a handful of the deepest
+contacts in the scene file under the slowest band there is: a wreck is held for
+two seconds and the run that starts afterwards is back at `BASE_SPEED`. It
+reads as a scene that hurts itself at 16 m/s, which is the one speed it is most
+obviously fine at. Bucket by the speed the *contact* recorded.
+
+Frame cost went from 0.91 of the parkour scene to **1.32** (2.83 ms against
+parkour's 2.14, spiral 2.95, tower 3.15 in the same process). That is honest
+rather than a regression to chase: `frame_cost` settles for forty seconds, and
+forty seconds into a run is now 33 m/s rather than 24, with the entity count
+and the verify grid that go with it.
+
+## Running along train roofs, and why it works now
+
+The signature Subway Surfers move. It was written once before, in the history
+around this branch, and **reverted** — not because the riding did not work, it
+did, but because the lane search and the mount decision were made in separate
+stages: the search was pulled toward a rideable train, and when verification
+then rejected the mount the runner was already committed to a lane with a
+train across it. Contacts went from zero to thousands.
+
+They are one decision now, and the shape of it is worth keeping in mind before
+touching any of it:
+
+- **The set-piece commits or declines as a whole.** `_seg_roofrun` lays the
+  ramp, the train, the corridor onto it, the clear lane to bail into and the
+  clear sky over all of it together, and it solves the leap *at generation
+  time* — at both ends of the speed range, because gravity and launch speed
+  are rebuilt as the run accelerates. A ramp whose train is out of reach is
+  not a hard puzzle, it is a promise the track cannot keep, so it is never
+  laid.
+- **The train is one threat with one answer.** It carries `mount_at`: the one
+  moment a take-off can happen, which is when the ramp's lip is under the
+  feet. `classify` reads that and returns `"mount"`; `schedule_vertical` books
+  it; `plan.verify` rolls the lane path and the take-off forward *together*
+  over a world that includes the train. If that fails, the existing machinery
+  marks the threat hard, the search routes around it, and the bail lane is
+  empty by construction. Both outcomes are safe; that is the whole trick.
+  (Since the convoy rebuild, `mount_at` is the *start* of a window and
+  `mount_to` its end -- a ramp's lip is still one instant, a roof-to-roof leap
+  is not. See "The runner is a convoy" below.)
+- **The offer has a deadline.** `_mount_at` withdraws it as soon as the body
+  can no longer be squarely in the ramp's lane before the foot of the ramp —
+  while there is still track in which to leave that lane. Offering it right up
+  to the ramp is what the reverted version did.
+- **A run opens on one, 62% of the time.** Not a weight -- `_begin_segment`
+  *tries* roofrun first on the opening set-piece, because a heavier weight is
+  still a dice roll. The strip is on screen for one thinking turn, often
+  fifteen or twenty seconds, and on the ordinary weights the median time to a
+  first mount was 19.7 s: the owner watched several turns, saw no train to run
+  on, and reasonably reported the feature as missing. It is 3.0 s now, and 72%
+  of runner runs show one inside fifteen seconds against 30% before.
+- **Riding is free to the lane search.** `MOUNT_COST` is 0.0 and has to be:
+  the search already pays `preference` for every step spent outside the
+  guaranteed corridor, so *any* positive cost on the roof makes standing
+  beside the train cheaper than standing on it. At 0.4 against a preference of
+  0.22 the runner stepped one lane clear of every ramp in the scene — 33 ramps
+  laid down, 2 ever taken.
+
+Two motion rules hold it up, and both are in `Motion.advance` so the check and
+the execution cannot disagree: a body **holds its lateral position while it is
+off the rails** (stepping sideways off a roof puts the fall alongside the
+train with the box still overlapping the corner it left), and it is **held up
+while its centre is over a surface but until its back has left it** (a body is
+over a metre deep, and dropping it the moment its centre crosses the far edge
+leaves the rear half hanging over a roof it is no longer standing on). The
+ramp additionally only picks a body up within `RAMP_GRIP` of its lane centre:
+you get onto a ramp by running at it, not by sideswiping it.
+
+## The body stops clicking into every block it lands on (2026-08-16)
+
+The owner's report on the parkour scenes -- the flat void one chiefly, and the
+tower with it because they share a body: the movement is clean, the jumps come
+soon after the landings, and it still reads bot-like. "He sort of clicks into
+something and sticks to whatever block he's on, and then a quarter of a second
+later he jumps off again." Every probe this project owns reads green on that
+scene, because every one of them measures *geometry* and the complaint is
+about the derivative of the camera.
+
+**`tools/flow_probe.py` measures nothing else**, and it is the acceptance test
+for this. Three families: cadence (how long the feet are down, what fraction
+of frames that is), continuity (the size of the one-frame change in speed, eye
+height, field of view and yaw -- eye on its **second** difference, because a
+camera falling with the body moves a tenth of a metre a frame and is perfectly
+smooth while a camera *dropped* the same distance is a jolt), and shape (the
+apex of each hop against the 1.25 m every vanilla jump reaches).
+
+It found four square waves and a stall, all of them a value switched between
+two constants at a phase boundary:
+
+- **Speed.** The body arrived at the arc's 7.1 m/s, was set to sprint pace for
+  the length of the block and set back -- two steps of a metre and a half a
+  second, four times a second. `parkourkit.GroundRun` is the fix: the crossing
+  is a braking-cruising-accelerating profile whose two ends are *by
+  construction* the speeds of the moves either side, so there is no step at any
+  landing or take-off for any material or any move. On a one-cell landing --
+  most of them -- there is no room to slow at all, so the body runs over the
+  block, which is what a player chaining jumps does and what nothing in this
+  project's motion could previously express. A ladder is now decelerated into
+  rather than snapped to.
+- **Field of view** stepped two degrees at every phase change; it is hung off
+  the speed and eased, which says the same thing continuously.
+- **The landing** dropped the eye 0.17 m in a single frame -- ten metres a
+  second of camera. It is a damped spring the impact kicks (`DIP_W`,
+  `DIP_KEEP`). The stiffness is set by the frame clock and not by taste: at 20
+  rad/s the damping term is comparable to 1/dt and kills the velocity inside
+  one frame, which is the hard stop it replaced wearing a spring's clothes.
+  13 rad/s gives three or four frames of follow-through.
+- **The walk bob** appeared and vanished whole, and was `|sin|`, whose corner
+  reverses the eye's velocity in one frame six times a second. Faded, and
+  `sin^2`.
+- **And a frame that reached across a phase boundary threw its remainder
+  away**, so the body stalled for a fraction of a frame twice per landing.
+  Both scene families sub-step now.
+
+Then the shape, which is the other half of "bot-like". **There is one jump
+impulse in this game and a player spends all of it every time; what they
+choose is how fast they are running when they use it.** Holding the horizontal
+speed constant put that whole choice into the arc, so a two-metre hop apexed
+at 0.28 m against vanilla's 1.25 -- a skip, and a run of skips. `parkour.
+flight` picks the fastest approach that still lands the whole impulse, floored
+at a vanilla sprint (`APPROACH_MIN`). **This was tried once before and
+reverted for floating**; what makes it work now is that the ground run either
+side absorbs the change. The gap tables lean high for the same reason: a hop
+at the top of what its rise allows is the one that apexes where vanilla does,
+and it is *faster* as well, because a longer hop at the same speed covers more
+ground per landing.
+
+Measured over the same runs (3 x 20 s), flat scene:
+
+| | before | after |
+|---|---|---|
+| one-frame speed steps over 1.2 m/s | 8.72% of frames | **0.00%** |
+| field-of-view steps over 0.2 deg | 5.39% | **0.07%** |
+| eye jolts over 0.03 m/frame^2 | 9.42% | **3.28%** |
+| slowest frame | 0.078 m/s | **5.47 m/s** |
+| mean hop apex | 0.53 m (43% of vanilla) | **0.90 m (72%)** |
+
+Tower and spiral get the same continuity work and keep their arcs, because
+those are 33 hand-authored levels plus head-hitters and shells solved against
+them: eye 2.2%, speed 0.05%, fov 0.9%, apex 57% and 69% of vanilla.
+
+Three things fell out that are worth knowing:
+
+- **The corridor check sampled a path at nine points however long it was** --
+  0.6 m apart on a long hop, which is the width of the body it was checking.
+  Taller arcs grazed scenery immediately (0.155 m inside a lintel); sampled
+  every 0.2 m it is 0.031 m, better than the 0.039 this started at.
+- **A lone soul-sand block no longer slows the body**, and that is arithmetic
+  rather than an oversight: a body that must be at the arc's speed at the far
+  edge cannot brake and re-accelerate inside 0.68 m. Multi-cell runs still
+  sag to the material's pace. What it replaced was a 0.27 s stall followed by
+  a snap back to 7.1, which is the reported defect.
+- **The residue inside a `Move` is untouched.** A ladder's step-in, rise and
+  step-off are separate legs at different speeds, so the discontinuity moved
+  *inside* the move rather than away: 0.05% of tower frames and 0.43% of
+  spiral ones. Grabbing a ladder genuinely is a stop.
+
+## Every jump is the jump (2026-08-18)
+
+The owner on the flat sky-parkour scene: the jumping feels off -- "less like a
+Minecraft jump from the physics and more like a higher hop or bounce", not
+quick, not clean, no stakes. Every probe read green, because the two things
+wrong were a **motion model** and a **camera** and the probes measured
+geometry and pacing.
+
+**In vanilla there is one jump impulse, a player spends all of it every time,
+and they are at sprint pace when they do.** What varies is the gap: a short
+one is answered by taking off a little early and landing further onto the
+block, never by jumping more gently. This scene did the opposite. Measured
+before touching anything, over twelve runs: the **median hop was crossed at
+6.40 m/s** -- the approach floor, not the sprint -- and the mean hop apexed at
+**0.81 m against vanilla's 1.25**, with only 35% of hops spending the whole
+impulse. A run of two-thirds-height arcs at nine tenths of sprint pace is
+exactly "a higher hop or bounce".
+
+Four changes, and the first three are one idea:
+
+- **`hop_span`'s floor is now its ceiling with a smaller impulse in it**
+  (`IMPULSE_MIN = 0.90`, less what the geometry can give back). Every gap the
+  generator can ask for is one a real jump lands on; below that it is simply
+  not laid.
+- **`_hop_points` spends the shortfall on the geometry.** Land deeper into the
+  block first (bounded at its middle, so the landing stays on the near half of
+  its own footprint and the take-off -- which is in an unknown direction until
+  the next block exists -- is always still ahead of it), then leave earlier
+  along the run-up behind, down to `MIN_RUN`. Both ends stay inside the two
+  blocks the hop already joined, so nothing that reasons in whole cells
+  changes. The two points are *stored* (`blk["land"]`, `prev["launch"]`),
+  because the orbs, the clearance check, the run-up and the live take-off all
+  have to read the same pair the arc was solved between.
+- **`flight` is a sprint, always.** The `APPROACH_MIN` slow-approach branch is
+  gone -- it fixed the arc and cost the run.
+- **The camera stops pumping.** Three of them, all vanilla-facing: the landing
+  dip is measured from `DIP_FREE` (an ordinary hop lands at about the speed it
+  left at, so a dip taken off the raw speed fired on *every* landing, twice a
+  second, on a camera vanilla holds perfectly still -- now it only fires when
+  the body has fallen further than it jumped); the field of view comes off the
+  sprint *state* rather than the instantaneous speed, which was a two-degree
+  zoom in and out on the beat of the jumps; and the gaze's lean with `vy` went
+  from 0.030 to 0.012, because at 0.030 the view pitched twenty-seven degrees
+  over every hop on top of the body's own 1.25 m of rise.
+
+| flat scene | before | after |
+|---|---|---|
+| mean hop apex vs vanilla's 1.25 m | 65% | **94-96%** |
+| median hop apex | 0.87 m | **1.25 m** |
+| median ground speed | 6.40 m/s | **7.10 m/s** (sprint, every hop) |
+| hops spending the whole impulse | 35% | **74%** |
+| median hop | 3.62 m | **4.26 m** |
+| one-frame field-of-view steps | med 0.017 deg | **0.000** |
+| obstacles inside each other / body inside one / emergency hops | 0 | **0** |
+
+The same idea is in the kernel for the tower and the generated spiral
+(`parkourkit.spend_impulse`), where the levels are *authored* and their cells
+must not move -- so it moves only where the feet plant inside them, and
+`_attempt` solves each move **twice**: once spending the whole impulse, and if
+that arc will not fit under the level's lids and shells, once with the arc the
+two edges alone give. Insisting on it cost 2.3 points of design fidelity;
+falling back costs 0.3. Tower apex 62% -> **74%** of vanilla, spiral 74% ->
+**87%**, fidelity 94.8% -> **94.5%**, unchecked placements **0.17%**,
+walkability 0 m, no-jump run 47%, walk probe unchanged.
+
+**And then it read as jumping *too* high, which was the camera reporting the
+arc twice.** The owner watched the first version live: "it feels like the
+player is jumping even higher". He was right, and the arc was not the problem
+-- three things multiplied it:
+
+- **The view chased the landing mid-flight.** The aim point is a block four
+  metres away and the eye rises 1.25 m over it, so tracking that aim pitches
+  the view seventeen degrees *down* on the way up and back up on the way down
+  -- against the body, so the world pitches about twice as far as the jump
+  does. A player does not touch the mouse during a jump: the aim is committed
+  at take-off and held (`AIR_AIM`). Pitch swing per hop **10.1 deg -> 4.4**.
+- **The eye was rigidly bolted to the body.** A neck is not. A first-order lag
+  (`EYE_EASE = 12`, deliberately *not* a spring -- a spring stiff enough to
+  keep up sits at the 1.6 Hz a run of hops arrives at and would amplify what
+  it is meant to take off) keeps four fifths of the arc and loses the corners
+  at the apex and the landing. Eye swing **100% -> 79%** of the body's.
+- **The ground beat had vanished.** `MIN_RUN` was 0.12, so the feet were down
+  for two frames in thirty and the body was airborne 93% of the time: correct
+  arcs back to back with nothing between them are a pogo stick. At 0.35 a
+  landing that cannot buy its impulse inside what is left is refused and the
+  generator answers with a wider gap, which is the right trade twice -- a
+  longer hop is a slower rhythm as well as a fuller jump. Frames on the ground
+  **6.7% -> 10%**, eye jolts over the pop threshold **2.97% -> 1.31%**.
+
+The body's own arc is untouched by all three: apex still 96% of vanilla.
+
+**Two of those three were then reverted, watched live, for a reason worth
+keeping.** With the eye lagged and the aim held, the scene read as *"being
+transported along a set path and speed from one block to the next"* -- which
+is what it had become: a rigid parabola chain, a head that does not react, and
+no impact anywhere in the frame. So:
+
+- **The eye is rigid again.** Vanilla's is. Damping it takes the camera off
+  the body, and a camera that is not on the body is a dolly.
+- **The head tracks the next landing again**, at the ordinary rate. Freezing
+  it through the flight fixes the doubling and costs more than it buys.
+- **What actually fixes the doubling is measuring the wanted pitch from the
+  *surface the feet left* rather than from the body** (`self.stand[1]`, and
+  the tower's `land_y`). The aim is four metres away and the body rises 1.25 m
+  over it, so measured off the arc the pitch swings against the jump. Off the
+  block it does not swing at all, and the head is still free to turn. Pitch
+  swing per hop **10.1 deg -> 8.8**, eye swing back to **100%** of the body's.
+- **And every landing gets a small dip again** (`DIP_BASE`, about 2.5 cm of
+  eye against the 8 cm that read as bouncing). Zero was the other half of the
+  rail: with the feet down for a tenth of a second and no dip, *nothing in the
+  frame marks a landing*.
+
+The tower had its own note from the same watch -- the camera shifting to the
+next block on impact felt agitated -- and that is the flick: a landing there
+is a tenth of a second and the next move starts out of it, so at a rate of
+`5 + 22*flick^2` the head snapped onto the next block within four frames of
+touchdown, four times a second. `5 + 10*flick^2` decaying at 4.0: yaw p99 per
+frame **8.4 deg -> 7.4**, worst **46 -> 25.6**.
+
+**And the arc sits 14% under vanilla's, on purpose** (`parkour.ARC = 0.86`,
+flat scene only). Watched again with everything else right, the owner's note
+was that the arc was still "a tiny bit off"; this is the only place the scene
+knowingly leaves the game's numbers. It scales the impulse and gravity
+*together*, which is what makes it a safe knob: hang time is `2v/g` and reach
+is that time at sprint speed, so both are unchanged and every span, gap table
+and run-up in the generator stays exactly where it was -- only the apex, which
+is `v^2/2g`, comes down. A level hop apexes at 1.08 m rather than 1.26. The
+two obvious alternatives are both worse: dropping `JUMP_V` alone shortens the
+reach, which makes the four-block gap illegal and pulls the whole course back
+to threes, and raising `AIR_SPEED` alone flattens the arc by outrunning it,
+which changes the pace of everything.
+
+One consequence, and it is the good kind. A flatter arc means a descent needs
+even less of the impulse, so the floor stated as "ninety per cent of a jump"
+started refusing hops nobody would call short -- and at a five-block drop it
+emptied `hop_span`'s window entirely, because the lattice offers 6.24 m and
+7.24 m either side of a floor of 6.28. The floor is now clamped to the widest
+hop the lattice can actually offer at that rise, and both the generator and
+the test state it as a *distance* (`hop_span`'s ``lo``) rather than as an
+impulse fraction. Measured over 24 runs: mean impulse 97% of a jump, minimum
+72% -- and the minimum is a one-block descent, where a real player steps off
+rather than jumping at all.
+
+Four things worth not relearning:
+
+- **The ramp cannot live in hop length any more, and that is arithmetic.** One
+  impulse at one speed puts the ceiling 4.26 m away and the lattice offers a
+  level hop of exactly 3.24 or 4.24 m, so every "harder" gap is narrowed
+  straight back to the ceiling: the mean hop reads 4.11 m early and 4.13 m
+  late whatever the tables say. What ramps now is *which of the two* a run
+  gets (44% -> 73% at the full impulse) and which set-pieces it does them in
+  (41% -> 60% hard), and `test_parkour_gets_harder_as_a_run_goes_on` asserts
+  those instead.
+- **`flow_probe` was under-reading the apex by 0.08 m**, and the bug is the
+  general shape: it took the launch height off the *body* at the take-off
+  frame, and a frame that reaches across a take-off has the body already a
+  fraction of a jump up. Scenes now publish `land_y` and a monotonic
+  `landings` counter, and the probe reads both -- the counter because a
+  landing between two jumps is now routinely shorter than a frame, and
+  watching the phase flip merged the two hops either side into one.
+- **A lantern post stood 2.6 cells out from its platform on a diagonal
+  heading.** A three-by-three platform occupies cells -1..1 in *world* axes
+  whichever way the course runs through it, so a corner taken as "one across
+  plus one along" lands two cells out on a diagonal -- off the platform, and
+  2.6 m out once the corner bias is on it. Latent for months; wider gaps made
+  the next block land in that cell and it measured as two interpenetrations a
+  sweep.
+- **A run-up has to *be* one.** `spend_impulse` walks the take-off back toward
+  the previous landing, and not every move ends on the landing it is aimed at
+  -- a ladder tops out at its column. Unguarded, one such pair produced a
+  "hop" of 26.76 m across an eight-block climb, which the checks then let
+  through because it was the module's one unchecked emergency placement.
+
+## The climb stopped aiming at the wrong chasm (2026-08-20)
+
+The owner's report on the tower: on one level *"it starts at about zero on the
+height, gets all the way up to exactly height eleven, and then it jumps down
+again, and this keeps recurring -- it doesn't seem like it can get past it."*
+He named THE VAULT. **It is not a level bug and it is not the Vault**: it is
+the exit-climb machinery, and the level on the HUD during it is the *next* one
+along, because the strip labels the section the body is standing in.
+
+**Every part of the climb out re-derived which chasm it was crossing from
+where the body is standing right now.** That is correct while the body is on
+the level being left and catastrophic the moment it is not. One approach hop
+over a level boundary -- an ordinary, checked, legal hop, because a narrow
+chasm is jumpable -- and `_aim_crossing` re-measures the jump against the
+*next* level's far lip, most of a revolution away. Instrumented over eight
+runs: 293 crossings aimed, **median arc asked 6.4 m and worst 74.5**, against
+a level hop of 4.26 and 4.98 dropping one. It is refused forever;
+`_cross_approach` walks; the recovery lays another staircase; eleven to
+thirteen treads later the apparatus gives up and the level's own first beat
+starts on the terrace, four to eleven blocks below where the thrashing left
+the body. That drop is the thing on screen.
+
+Two changes, both in `spiralplan`. A crossing carries `from_level`, the level
+it was planned in, and `_aim_crossing`/`_cross_approach` use that rather than
+asking where the body is. And `_ascent_done` abandons a climb the moment the
+body is standing on the next level, however it got there -- a stair tread that
+crosses the boundary is not a fault, it has been through every check a
+crossing would have; what was faulty was carrying on climbing afterwards.
+
+| 12 runs x 320 landings | before | after |
+|---|---|---|
+| level visits that climb >=3 and give it back >=4 | 5.6% | **0.7%** |
+| worst mean exit-climb landings on a level | 13.0 (ROPE BRIDGE) | **5.9** |
+| the exit climb, as a share of the course | 27% | **23%** |
+| a generated staircase (the thrash) | 218 | **151** |
+| walking to the chasm lip | 273 | **164** |
+| designed content | 58% | **62%** |
+| placed as authored | 94.4% | **94.7%** |
+| longest "designed" jump | **26.76 m** | **5.63 m** |
+
+That last row is outstanding item 0a, which had never been attributed: a
+26.76 m teleport once a sweep, and it was this. Not proven gone -- the
+emergency hatch is still unchecked -- but it has not been seen since.
+
+Three things measured and worth not re-deriving. `from_level` on its own moves
+the aggregates by nothing (62% vs 63%, staircase 151 vs 135, inside noise);
+what it buys is that the crossing can no longer be aimed at a hole a level
+away, and it is kept for that. The remaining generated staircases are **not**
+a tread problem: instrumented, the median distance to the lip when one fires
+is 2.4 m and `need` is 0 or 1 on 36 of 65 -- the height is already won and the
+crossing is being refused on *placement*. And half of those refusals report
+`no move: hop` with a legal arc, which means the offered *cells* are further
+than the arc asked for; that is where to look next.
+
+## Nothing stands in the middle of a jump any more (2026-08-20)
+
+The owner's second report, same watch: *"many jumps look impossible because
+there are blocks in the way, but the player just passes through whatever is in
+its way and lands on the next block -- and they look off, they don't belong
+there at all."* Every probe this project owns read green, because they all ask
+about *arcs and cells* and the complaint is about **decoration, lids and
+ghosts** -- three classes nothing had ever counted.
+
+`tools/arc_probe.py` is the tool and `docs/PATH.md` is the write-up, including
+the whole course as a table (`--path`) and one full cycle's numbers. Five
+causes, none visible in the aggregate:
+
+- **`Move.points` sampled evenly in time at seventeen points, with a note
+  claiming 0.2 m spacing.** Measured over 1,950 committed moves: median gap
+  0.27 m, **worst 1.13 m -- wider than a cell**, so a whole block could sit
+  between two tests. A long descending hop is 0.44 m a sample, and a move whose
+  legs run at different speeds gives the slow leg nearly all seventeen. The
+  points are also what `_commit` reserves as `pathcells`, so an unsampled cell
+  is an unreserved one. `ARC_STEP = 0.3` with a per-leg closed-form count:
+  worst gap **0.300 m**, and free (30.2 s against 31.0 for the same sweep).
+- **A lamp was a lit 0.62 m cube at the centre of the landing's own walking
+  surface**, and `deco` is `solid=False` by design. The body ran through one on
+  **31.9% of all moves** and the camera was inside one on 2.6%. It hangs under
+  the landing's leading edge now -- where a lantern hangs in the reference, and
+  the face you see on the way in to a landing above you. **0.21% and 0.00%.**
+- **A `lintel` sat at the apex *of the feet* plus 0.35.** A body is 1.8 m
+  tall, and most lintels are written on a `walk` -- where the apex is the
+  walking surface, so the beam was at knee height. Over the head now.
+- **A head-hitter's clearance was the feet's too** (`_ceiling_cells`), and lids
+  were the largest single writer of cells inside the body: 17 moves at up to
+  0.543 m. Refusing them is not available -- since every jump spends the whole
+  impulse a hop apexes 1.25 m over its take-off, so "apex plus a body under a
+  lid at three" excludes every hop and 244 of the roster's 276 lids stop being
+  buildable. The lid **rises to clear the head** (`LID_MAX`) and refuses only
+  past the point where it stops reading as a beam. Fidelity unchanged.
+- **`_walk_bridge` laid full cubes around the shins** on a walk joining two
+  surfaces half a cell apart: `ifloor(y - 0.05)` is right only when the foot
+  height is a cell top, and on a ramp it never is. 5.4% of all walks and every
+  0.600 m reading in the table. Laying the shelf under the *lower* end instead
+  leaves the feet in mid-air and `test_a_walk_never_crosses_air` refuses it;
+  there is no third cell, because a ramp cannot be made of whole cubes.
+  Refusing half-block walks outright works and costs **two points of fidelity**
+  (94.7% -> 92.7%). What costs nothing is to stop the walk being a ramp: it is
+  **flat and then a step** (`STEP_UP`), with the rise confined to the last two
+  thirds of a cell, over the landing's own footprint. Which is what the game
+  does -- half a block is walked up, not jumped.
+- **A lid outlives the jump it was built for.** `advance` releases a landing's
+  cells from the occupancy map and the renderer never un-draws them. Right for
+  a pedestal -- built ground, and what the levels below you are made of. Wrong
+  for a head-hitter, which is a beam in mid-air with nothing left to justify
+  it, and which the next revolution's arcs fly straight through because
+  `blocked()` has correctly forgotten it. Fifteen of seventeen ghost cells were
+  lids and one was flown through twice running.
+
+| 8 runs x 300 landings, 2,408 moves | before | after |
+|---|---|---|
+| moves through something drawn | 1.83% | **0.96%** |
+| the body through furniture | **31.9%** | **0.21%** |
+| the camera inside furniture | **2.57%** | **0.00%** |
+| drawn but not solid ("ghosts") | 0.50% | 0.33% |
+| worst penetration | 0.600 m | 0.575 m |
+
+**91% of the offending cells were laid *before* the arc that hits them was
+solved**, and that one number is why the fix is never "delete afterwards": the
+three reservation ledgers are doing their job. Fix the writer.
+
+## The sea has things in it and so does the sky (2026-08-20)
+
+The tower stood in an empty ocean under an empty sky: one flat blue plane a
+hundred metres down, a few cloud sheets, nothing else in any direction. Every
+sense of *height* the format had came from the fog, which is a wash rather
+than a thing -- there was no object anywhere whose apparent size could say how
+far up you had got.
+
+`assets/src/props_world.py` is nine new baked-light models built for 40-300 m
+against sea and sky, where a model is its silhouette and nothing else:
+`startisle` (a beach, trees and a jetty), `seastack`, `seaarch`, `shipwreck`,
+`lighthouse`, `skyisland` (with a `waterfall` hung off its spout), `skyruin`
+and `airship`. 3,152 triangles for the set, one draw call each. `SCENERY` in
+`spiral.py` places them once per run from the run's own seed and they never
+move, because the piece on the horizon at the start of a run has to be the
+same one still on the horizon four minutes later; only the airships travel,
+and they orbit rather than cross, so the model's yaw and its heading stay in
+step for free. Frame cost: tower/parkour **1.56** against 1.46 recorded.
+
+Four things the assets themselves had to get right, all found by rendering and
+all recorded in the module: no two overlapping slabs may share a top face (the
+bake comes back with black rectangles that read as holes -- the same landmine
+as the cactus elbow); a cap must be wider than the mass it caps *including*
+`rocky`'s jitter; a linear taper is an upside-down wedding cake, so an
+underside needs a fat shoulder and then a thin tail; and `merge()` has to apply
+the joined object's transform into the mesh or glTF carries a second
+description of where the model is.
+
+**And two placement facts that cost renders.** The pieces are drawn *after*
+the haze band, not with the sea: that band is a screen-space wash at alpha 205
+over half the frame below the horizon, and everything drawn before it there
+comes out 80% fog colour -- which for an island four hundred metres out is not
+aerial perspective, it is deletion. They carry their own distance tint
+instead, which goes further than `FOG_FAR` because these are forty-metre
+objects and the whole point is that they are a long way off. And they are
+placed on an even spread of bearings with a jitter inside it rather than on
+free draws: a run covers about a revolution a minute, so four pieces that
+happen to land on one bearing are four pieces at once and then nothing for a
+minute.
+
+## The ride looks at the ladder (2026-08-20, later)
+
+The owner on the tower's climbs: *"when a player jumps into the water or onto a
+ladder to get further up, it looks very far to the outside -- essentially to
+the right. It would be better if it didn't just do a full ninety-degree switch
+all of a sudden but actually looked towards the ladder. And maybe the ladder
+can be made visually closer to the block so it looks like climbing a ladder in
+Minecraft. In the water the screen could go a bit bluer, because the player's
+head would be inside the water."*
+
+All four were real, and the first is a lesson about metrics. `RIDE_OUT` swung
+the aim fourteen metres radially *outward* the instant the body grabbed the
+column, held it for the whole ride, and snapped back. It was written to answer
+a jam metric -- 42% of climb frames were most-of-the-frame-one-near-surface --
+and it answered it by **turning the camera away from the move**. Nobody looked,
+because a ride is two seconds long, fires on a fraction of level exits, and
+arrives somewhere nobody chooses. `tools/ride_shot.py` is the tool that ends
+that: it rolls a scene on until a climb, a bubble ride or a web wade starts and
+renders every frame of it and the second either side. The first sheet it
+produced is eight blocks of blank wall on one side and empty sky on the other,
+with the ladder never once in shot.
+
+The metric was measuring the wrong thing. Climbing a ladder in the real game
+*is* a near surface filling most of the frame; what makes it read as climbing
+rather than as being stuck is that the rungs are there and moving.
+
+- **The head turns to the wall the column is bolted to** -- `_ride_face` reads
+  the face off the landing's soft cells, where `_climb_move` recorded it --
+  eased over about a quarter of a second (`RIDE_EASE`) and **driven by the
+  body's own vertical speed rather than by the phase**, so the turn arrives
+  with the grab and leaves with the step-off rather than at a boundary the
+  viewer cannot see.
+- **Not square at it** (`RIDE_SIDE`): aimed dead on, the plate is 0.4 m from
+  the eye and fills the frame with rungs, which is worse than what it replaced.
+  At 0.26 of a swing along the corridor it is a three-quarter view.
+- **And pitched up 36 degrees** (`RIDE_PITCH`), taken over outright rather than
+  nudged, and replacing `PITCH_BIAS` for the duration. The eye is half a metre
+  from a wall, so a level camera can frame nothing but that wall: measured off
+  the frames, two thirds of a ride was one flat untextured face with the rungs
+  off the top edge.
+- **The ladder is drawn on the wall's face** (`LADDER_HUG = 0.34`). It was at
+  the centre of its own cell, half a block clear of the block it is nailed to,
+  which is a lattice hanging in the air.
+- **The head goes under water** (`_draw_submerged`): a bubble column is a
+  column of *liquid* and the body rides up the inside of it. Tinted toward the
+  liquid's own colour, because the nether family's column is lava, and drawn
+  over the weather and under the HUD.
+
+Yaw per frame on the tower: p99 **7.4 -> 5.45 degrees**, worst **25.6 ->
+13.86** -- the ninety-degree switch was most of that worst case. Everything
+else in `flow_probe` is unchanged.
+
+Two things tried and reverted, both visible only in frames. **Culling the rung
+the eye is inside** sounds right -- one plate is always 0.4 m from the lens --
+and it leaves a bare wall with the ladder off the top edge; the near plate is
+the thing you are holding, and pitching up puts it along the bottom of the
+frame where a pair of hands would be. And **`LADDER_HUG` at 0.42** buries the
+plate: the model's own geometry sits 0.14 behind its origin, so anything past
+about 0.36 puts it inside the wall block and the ladder vanishes entirely.
+
+## One odd thing every other level (2026-08-20, later still)
+
+*"Create some smaller things or structures -- funny things, things that can be
+interacted with or not -- and place one per level or one every two levels, in
+cool places. Things a player could go through, check out, or jump on top of."*
+
+`assets/src/props_odd.py` is nineteen of them, in three flavours: six with a
+**verified-clear three-by-three passage** (torii, broken arch, doorframe,
+hollow log, pipe mouth, a bone rib cage), six with a **flat standable top**
+whose height is in the table (giant mushroom, crate stack, anvil on a plinth,
+upturned boat, tome stack, layer cake), and seven that are only there to be odd
+(a scarecrow wearing a bucket, a shrine, a stack of balanced blocks, a signpost
+pointing nowhere, a wizard's hat on a rock, a half-melted snowman with its
+bucket on the floor beside it, a chicken statue). The passages were proved
+empty with a triangle-vs-box check rather than by eye, which found six real
+intrusions -- including a rib cage whose arch is an *ellipse*, so its honest
+clear rectangle was 3.4 x 2.1 and not 3.4 x 3.4.
+
+`spiralplan.ODDITIES` and `Course._stand_oddity` place them, deterministic off
+the level's own index so a level is the same place every time you reach it.
+They are **models, not cell blueprints** -- drawn and never collided with --
+which makes where they go the whole of the problem: a four-metre rib cage
+standing in a jump is exactly the defect `tools/arc_probe.py` exists for, with
+the aggravation that the body would fly through it. Every cell of the footprint
+therefore goes through `_dressable`, which already refuses the running line
+with a margin, the head-room over it, the no-climb ring beside every landing
+and anything a landmark is holding.
+
+**43% of levels get one -- about one every other level, which is the ask** --
+and four numbers had to be found to get there, none of them guessable:
+
+- **A solid cylinder at full height fits nowhere.** Tested that way, 7% of
+  levels got anything at all and nothing bigger than a signpost. What has to
+  be clear to the sky is the *middle*; a torii is seven metres across the roof
+  and stands on two posts under three apart (`ODD_EAVE`, and the table's radius
+  is the footing rather than the bounding box).
+- **Unbroken floor is rarer than the prop is.** Every level cuts three or four
+  breaks through its paving, so ground is required under the foot only, capped
+  at two cells: that one requirement was 4,732 refusals against 3,480 for
+  everything about the course put together.
+- **Whichever family is tried first wins nearly every time.** Gates first took
+  27 of 36 placements and no joke ever appeared; gates last and they never
+  appeared at all. A gate on one level in three, the rest shuffled per level,
+  and the other family is always the fallback -- 13 of the 19 kinds now show up
+  in four runs.
+- **Nearest the running lane, not the first spot that fits** (`ODD_LANE`).
+  First-fit put them out at the rim, and a thing at the rim of a nine-block
+  terrace is somebody else's scenery.
+
+**What is not done, and it is the interesting half.** These are placed *beside*
+the course, not on it: the course flies two to four blocks above its terrace
+(see the rehash), so a prop standing on the terrace is below you and off to one
+side. Running *through* a gate needs the piece stood on a plinth at the level's
+deck height and the course steered through its passage, which is what
+`_landmark_nodes` already does for the gated landmarks -- and the plinth is the
+part with real risk, because a stack beside the course is a staircase back up
+to it, which is the whole thing `noclimb` exists to stop.
+
+## A landing has to go somewhere (2026-08-20, last)
+
+The owner, on THE VAULT: *"at the end it jumps back and forth a couple of
+times, from just before the end to almost the end, and then it jumps all the
+way down -- there's a bunch of glowstone blocks there and it doesn't really
+know where to jump."*
+
+**`arc` is a distance and nothing made a candidate spend it going forward.**
+`_targets` refused a landing at or behind the body and nothing else, so a
+landing three metres from the one before it could be a third of a metre
+further round the tower and the rest of the way *across* the band. Two of those
+in a row is two blocks a foot apart with the body hopping between them.
+Measured on the VAULT's exit at **0.35 m then 0.33 m** of corridor advance,
+and the same shape found on THE CRUCIBLE (0.03 m), DUST DEVILS (0.04) and
+PUMPKIN ROWS (0.06) -- so it was never a level bug.
+
+`MIN_ADVANCE = 1.0`, and the metre is a reading rather than a taste: over four
+simulated hours the first percentile of corridor advance is 1.91 m and only
+0.38% of landings came under one. Stalls **7 -> 0**, landings advancing under
+0.6 m **97 -> 0**, and it is *free* -- design fidelity 94.7% -> **95.0%**,
+authored exits placed as authored 95.8% -> **97.4%**, unchecked 0.18% ->
+0.17%. Refusing the stalled candidate makes placement pick a better one.
+
+## Left alone for an hour, does it keep climbing? (2026-08-20)
+
+`tools/endurance_probe.py`. Every other probe here measures a sample -- twelve
+runs of three hundred landings, four minutes of strip each -- which is the
+right size for "is this level built as designed" and the wrong size for the
+only question a viewer can ask by leaving it running. Three failure shapes it
+looks for and a short sweep cannot see: a **stall** (landings that go nowhere
+along the corridor), a **give-back** (a level climbed and then dropped), and a
+**wall** (a level the course cannot leave at all).
+
+**The answer is that it does keep climbing**: four simulated hours, 31,784
+landings, 895 level visits, **27 to 28 visits to every one of the 33 levels**,
+~800 blocks an hour, **0 stalls**, unchecked 0.17%, and the crossings come out
+at a median of **+6 blocks each**. An even visit count across the roster is the
+statement that there is no loop; a loop is one level at six times the rest,
+which is precisely what the three bad labellings below each produced.
+
+**Read this before trusting any per-level table on this course.** Three times
+in one session a probe reported one level being visited six times more often
+than every other, which is exactly what a loop looks like, and all three were
+the bucketing:
+
+- by **position** (`unwrap`): a landing out over the chasm is at a bearing
+  belonging to the next level but below that level's floor, so the last turn at
+  or below it is a level a whole *revolution* down. Correct arithmetic, useless
+  label. 4% of landings.
+- by **`author`**: set from the frontier's own position, so it inherits the
+  same ambiguity one layer along.
+- by **`author` with the segmentation fixed**: segmenting on crossings and
+  still *labelling* by author is the same mistake wearing the fix.
+
+- by **`to_level`**, a field added to the block for exactly this -- and
+  `from_level` is read from the frontier's position too, so it inherited the
+  same ambiguity a fourth time.
+
+The label that works is **how many crossings have happened**. A crossing
+advances exactly one level, so counting them cannot be ambiguous; if the run's
+first landing is one of the 4%, every name in the table is rotated by a
+constant and the distribution -- which is the finding -- is intact.
+`blk["to_level"]` is kept because it is still the right thing for a *crossing*
+to record, not because it settled this.
+
+**Still outstanding here, and it is the one number in the table that is not
+zero**: 24 give-backs in 895 visits (2.7%), and dumping one shows what they
+are. `('THE BELFRY', start 1135.0, peak 1139.0, lost 12.0, **114 landings**)`
+-- a stretch of *four levels' worth* of landings with **no crossing in it at
+all**, over which the course climbed four blocks and then sank twelve. Normal
+is 27 landings between crossings. So it is not a per-level fault and the level
+name on it is only where the counter had got to; it is a rare failure to cross
+that then wanders and loses height, about one every ten simulated minutes.
+
+Two things known about it already. It does **not** appear in half-hour runs (0
+in 7,932 landings) and does in hour-long ones, so it is something that
+degrades with altitude -- the tower flares to 1.7x its base width over
+fourteen revolutions, and `MIN_ADVANCE` is in metres while the radius grows.
+And the give-back is *gradual* -- twelve blocks over fifty seconds -- so it
+reads as the course wandering rather than as a fall, which is why no contact
+sheet has ever caught it. Start with `--show` on a run that has one and print
+the landings of that segment; the question is why no crossing fired.
+
+## The review pass (2026-08-22): the course's own progress coordinate lied
+
+A six-way code review (ledger: `FINDINGS.md`, one row per defect, statuses
+kept there) found and fixed, same day, the two bugs under most of the section
+above, plus a set of daemon-killers. `GENERATION_EPOCH` stays 4: bumping it
+was tried and reverted -- the bump re-rolls the *runner's* test worlds too,
+and two runner tests pin world-dependent facts (a graze threshold on seed 10,
+"on the ground two seconds into run 11") that fail on an unlucky re-roll.
+The u fix below re-shapes tower courses by itself, so nothing needed the
+bump. The two findings that change how this file is read:
+
+- **`spawn()` re-derived `self.u` through `unwrap`, height-resolved** -- so a
+  legal landing below the floor at its bearing (authored exit treads stop one
+  under the next floor; crossings descend by design) snapped the course's
+  progress back a full revolution, and the machinery re-laid levels it had
+  already climbed. One tower seed measured 696 full-revolution regressions in
+  4,000 landings; two seeds looped *permanently* over three levels, which is
+  the owner's THE VAULT report. `self.u` now advances by `_u_at` (bearing
+  delta from the angle already known) and cannot snap. A/B on identical
+  worlds: climb rate 809 -> **1,149 blocks/h**, backwards landings 199 ->
+  **26**. The "give-back" above is mostly this; what remains reads at 54
+  bucketed give-backs but over *honest* (fewer, longer) crossing segments.
+- **A recovery landing was committed with the failed node's metadata**, so
+  `label="recover"`/`origin="recover"` never reached a block: the reliability
+  chain read 0 forever (it actually fires ~21 landings a sweep), false
+  crossings inflated the endurance probe's visit count by exactly the 1-in-100
+  the labels leaked, and fidelity's denominator held ~170 landings the design
+  never described. tower_probe A/B: placed-as-authored 95.1% -> **99.8%**,
+  fallback placements 4.9% -> **0.2%**, stuck unchanged (17 = 17). **Read any
+  pre-2026-08-22 fidelity, crossing-rate or reliability-chain number in this
+  file with that correction in mind.**
+
+One number to keep watching: hour-scale endurance now reads **0.44-0.47%**
+unchecked (was 0.17%) -- at 42% more altitude per hour, which the buggy
+course never reached. Same-sweep stuck is unchanged. **Characterised
+2026-08-23** (94 events over 16,000 landings, instrumented `_emergency`): it
+is *not* altitude decay -- the per-band rate is flat from level 50 to 210 --
+and it is the known crossing class: 56% are `ascent`/stair with the height
+already won (`need` <= 3 on most) and the body mid-terrace, i.e. the
+crossing refused on placement, which is exactly the open thread at the end
+of "What the exit climb is made of". One lever, `_aim_crossing`'s
+distance, would move both numbers.
+
+Two more ledgers closed the same day: the write-side ledgers (`struct`,
+`carved`, terrain `solid`, `noclimb`, the mesher queue) are pruned below the
+`_rock` floor every `PRUNE_EVERY` dropped landings -- 6-8x smaller over
+4,000 landings, `stuck` identical, endurance profile unchanged -- and the
+runner's roof-gap sampling was *disproven* as a defect: sweeping it measured
+worse in every combination (see item 0000a and `_roof_across`).
+
+The daemon half, in one line each, all fixed: a malformed UDP datagram could
+kill the listener thread for good (`ipc.py`); `ThinkingState.tick()` raced
+itself across the IPC and render threads (now locked); host attachment now
+queues onto the render thread; scene *construction* errors are forgiven like
+draw errors; a draw that raises still closes its frame (`window.end()` in a
+finally); wrong-typed config.toml values degrade instead of crashing doctor;
+re-install now removes tool-event hooks it is no longer asked for; the Win32
+test suite was calling an API renamed in the Linux port and could not have
+passed on Windows -- renamed, fixture repaired, **needs one run on the
+Windows box to confirm**.
+
+## Known limit: how long a parkour jump can be
+
+There is one jump impulse and one horizontal speed, so the furthest a hop can
+reach is fixed, and `hop_span(rise)` computes it rather than anybody choosing
+it. Level, that is about 4.3 m stand point to stand point; reaching further is
+available only by *dropping*, because falling takes longer and the body does
+not slow down while it does. That is why `_seg_chasm` steps down — the extra
+hang time of a one- or two-block drop is what buys the last metre, exactly as a
+player clears a gap they cannot make level.
+
+The same arithmetic runs the other way and is why `fit_gap` exists: a hop that
+descends four blocks *cannot* also be short, because the arc covers close to
+four metres of ground before it arrives. Descents therefore leap out into the
+drop. And nothing can rise two blocks in one hop, because the discriminant has
+no solution — the same reason vanilla cannot.
+
+A chasm reads as a chasm because of the void under it and the two lit platforms
+either side, not because of another metre of distance. If you want genuinely
+long jumps you need a different motion model, not a bigger number.
+
