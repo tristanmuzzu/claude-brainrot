@@ -248,6 +248,11 @@ export default class BrainrotExtension extends Extension {
                  * loop: a dropped frame of brainrot costs nothing, a stalled
                  * shell costs the session. */
                 this._socket.set_blocking(false);
+                /* 2026-09-02: bind to loopback explicitly. Without a bind the
+                 * kernel autobinds 0.0.0.0 on first send, which showed up as
+                 * gnome-shell listening on a UDP port reachable from the LAN. */
+                this._socket.bind(Gio.InetSocketAddress.new(
+                    Gio.InetAddress.new_loopback(Gio.SocketFamily.IPV4), 0), true);
             }
             this._address = Gio.InetSocketAddress.new_from_string(
                 '127.0.0.1', this._settings.get_int('port'));
