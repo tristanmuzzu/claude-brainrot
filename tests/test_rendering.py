@@ -15,6 +15,11 @@ from brainrot.rng import Seed
 @pytest.fixture(scope="module", autouse=True)
 def _window():
     ensure_window()
+    # Start a new resource lifetime, as scene.build does, without replacing
+    # the process-wide shared window used by the rendering tests.
+    voxel.clear()
+    textures.end_scene()
+    assets.unload_all()
 
 
 # -- assets ---------------------------------------------------------------
@@ -24,9 +29,13 @@ def test_every_committed_asset_loads() -> None:
     names = assets.available()
     assert len(names) >= 10, f"asset kit shrank: {names}"
     for name in names:
-        asset = assets.load(name)
-        assert asset.model.meshCount > 0, name
-        assert asset.zones, f"{name} exports no named material zones"
+        try:
+            asset = assets.load(name)
+            assert asset.model.meshCount > 0, name
+            assert asset.zones, f"{name} exports no named material zones"
+        finally:
+            # This is a catalogue check, not a scene holding all 75 assets.
+            assets.unload_all()
 
 
 def test_character_is_rigged_with_all_clips() -> None:

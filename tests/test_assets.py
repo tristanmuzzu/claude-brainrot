@@ -34,6 +34,14 @@ def _window():
     ensure_window()
 
 
+@pytest.fixture(autouse=True)
+def _asset_lifetime():
+    # Each assertion owns the models it loads. Keeping the entire kit resident
+    # exceeds the software renderer's texture pool and poisons later scenes.
+    yield
+    assets.unload_all()
+
+
 def test_every_asset_has_recorded_metrics() -> None:
     recorded = set(assets.metrics()["assets"])
     assert recorded == set(assets.available())
