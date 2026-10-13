@@ -315,6 +315,19 @@ def instrument(base):
                 self.seq += 1
                 self.drawn[cell] = [self._tag[-1], self.seq, "air"]
 
+        def advance(self, index):
+            # Retiring a lid emits air directly, without calling carve/write.
+            # Track the cells, since advance can also trim the write queue.
+            lids = {cell for blk in self.blocks[:max(0, index - sp.TRAIL)]
+                    for cell in blk.get("ceiling", ())
+                    if self.struct.get(cell) not in (None, "air")}
+            result = super().advance(index)
+            for cell in lids:
+                if self.struct.get(cell) == "air":
+                    self.seq += 1
+                    self.drawn[cell] = ["retired", self.seq, "air"]
+            return result
+
         # -- the writers ---------------------------------------------------
 
         def _commit(self, prev: dict, node: dict, got: dict) -> dict:

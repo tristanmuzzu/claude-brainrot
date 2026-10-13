@@ -23,6 +23,40 @@ table.
 
 Both need no window and no renderer; a full sweep is about two minutes.
 
+## Current safety checks — 2026-10-07
+
+The historical residuals below are superseded by continuous collision checks.
+Each jump and its actual run-up reserve the swept body volume, including the
+exact apex and corners between samples. Landing blocks and optional trim are
+checked too. Bridges stay collidable for as long as they stay drawn. The arc
+probe now replays the air writes that retire old lids, avoiding stale ghosts.
+
+Each landing carries its own unwrapped bearing instead of re-deriving its turn
+from height. Exit landings reserve enough remaining corridor to climb before
+the gap. Recovery can walk around an obstruction or make a checked ascending
+turn within the same level; it cannot fabricate an impossible jump.
+
+Verification on the revised course:
+
+- Five seeded courses, 3,000 generated landings each: 15,005 played moves
+  sampled every 0.10 m, with zero body/camera intersections through drawn
+  blocks, zero furniture intersections, and zero prop intersections.
+- Eight seeded courses, 38,224 landings: every one of the 33 levels traversed
+  repeatedly, with zero climb give-backs, solver failures or unchecked moves. A rare ascending
+  detour turns less than three metres back within the same terrace.
+- A real rendered seed 7 run passed 494 m and continued beyond 520 m, with
+  2,465 landings and no solver failures. `brainrot shoot` frames and the
+  high-altitude captures were inspected on the GPU renderer.
+- The full suite returned 709 passed, 34 platform skips, and one unrelated
+  X11 stacking failure on bare Xvfb: that test needs a window manager to
+  handle the `_NET_WM_STATE` request. Final focused checks passed all 77
+  tower, spiral and course-safety tests. The measured outputs are in
+  `docs/reference/course_safety_2026-10-07.json`.
+
+The tower is infinite; these are finite seeded checks, not proof of every
+possible future world. If no safe continuation exists, the generator raises
+with its landing index instead of committing a path through a wall.
+
 ---
 
 ## 1. The path
@@ -35,7 +69,7 @@ landings, every level of the cycle. One row per landing --
 
 `level` is where the landing physically *is*; `author` is the level whose plan
 emitted it, and the two differ wherever a level's exit spills over a boundary
-(`CLAUDE.md` explains why both are kept). `lift` is height over that level's
+(`docs/HISTORY.md`, "Left alone for an hour", explains why both are kept). `lift` is height over that level's
 own terrace, which is the number the whole design is written in.
 
 **The tower does not end -- it loops**, and the numbers for one full cycle are:
@@ -194,6 +228,6 @@ was flown through twice running. `advance` writes air for them now.
   ingly `cone:core` -- the body running close to the wall, which is what
   `hug` asks for. Reported, not gated.
 - **One unchecked emergency placement produced a 26.76 m "hop"** through 118
-  cone cells. That is `CLAUDE.md`'s outstanding item 0a; the probe now
+  cone cells. That is `docs/OUTSTANDING.md` item 00000a; the probe now
   attributes it rather than guessing. It has not been seen since the exit
   climb stopped aiming at the wrong chasm, but it is not proven gone.

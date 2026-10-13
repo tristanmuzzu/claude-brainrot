@@ -24,7 +24,6 @@ would be inside the runner's back, and the worn one needs nozzles that point
 somewhere the flame can come out of.
 """
 
-import math
 import sys
 from pathlib import Path
 

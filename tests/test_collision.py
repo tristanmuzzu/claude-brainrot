@@ -26,8 +26,7 @@ from brainrot.palette import generate as generate_palette
 from brainrot.rng import Seed
 from brainrot.scenes import runnerplan as plan
 from brainrot.scenes.runner import (
-    BASE_SPEED, MOUNT_GAP, RAIL_TOP, RAMP_SECONDS, ROW, SOLID_KINDS,
-    TOP_SPEED,
+    BASE_SPEED, MOUNT_GAP, RAIL_TOP, RAMP_SECONDS, ROW, TOP_SPEED,
 )
 
 DT = 1 / 60

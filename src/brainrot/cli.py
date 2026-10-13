@@ -148,15 +148,25 @@ def cmd_shoot(args: argparse.Namespace) -> int:
 
 
 def cmd_install(args: argparse.Namespace) -> int:
-    from .hookinstall import hook_command, install, write_shim
+    from .hookinstall import canonical_agent, hook_command, install, shim_name
 
     cfg = _config_from(args)
-    path, events = install(cfg, scope=args.scope, with_tool_events=args.with_tool_events)
-    shim = write_shim(cfg)
+    try:
+        path, events = install(cfg, scope=args.scope, with_tool_events=args.with_tool_events,
+                               agent=args.agent)
+    except (OSError, ValueError) as exc:
+        print(f"Cannot install hooks: {exc}", file=sys.stderr)
+        return 1
+    shim = state_dir() / shim_name(args.agent)
     print(f"hooks installed in {path}")
     print(f"  events: {', '.join(events)}")
     print(f"  shim:   {shim}")
     print(f"  command: {hook_command(shim)}")
+    if canonical_agent(args.agent) == "codex":
+        print("\nFor local Codex and ChatGPT Work desktop chats.")
+        print("Restart the app, then review and trust these hooks in its hook settings")
+        print("(or /hooks in Codex CLI). Enable features.hooks if disabled.")
+        print("Ordinary ChatGPT and cloud chats do not run these local command hooks.")
 
     if sys.platform.startswith("linux") and not args.no_extension:
         from . import extinstall
@@ -262,7 +272,11 @@ def _load_extension_now(extinstall, time) -> int:
 def cmd_uninstall(args: argparse.Namespace) -> int:
     from .hookinstall import uninstall
 
-    path = uninstall(scope=args.scope)
+    try:
+        path = uninstall(scope=args.scope, agent=args.agent)
+    except (OSError, ValueError) as exc:
+        print(f"Cannot remove hooks: {exc}", file=sys.stderr)
+        return 1
     print(f"hooks removed from {path}")
     return 0
 
@@ -316,7 +330,7 @@ def _ancestry(limit: int = 12) -> tuple[int, ...]:
 def cmd_doctor(args: argparse.Namespace) -> int:
     from . import doctor
 
-    return doctor.run(_config_from(args))
+    return doctor.run(_config_from(args), agent=args.agent, scope=args.scope)
 
 
 def cmd_hotkey(args: argparse.Namespace) -> int:
@@ -431,8 +445,10 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common(hotkey)
     hotkey.set_defaults(func=cmd_hotkey)
 
-    install = sub.add_parser("install", help="register Claude Code hooks")
+    install = sub.add_parser("install", help="register Claude Code or Codex/ChatGPT desktop hooks")
     _add_common(install)
+    install.add_argument("--agent", choices=("claude", "codex", "chatgpt"), default="claude",
+                         help="chatgpt uses the same local hooks as codex; default: claude")
     install.add_argument("--scope", choices=("user", "project"), default="user")
     install.add_argument(
         "--with-tool-events",
@@ -455,7 +471,8 @@ def build_parser() -> argparse.ArgumentParser:
                      choices=("status", "install", "load", "remove"))
     ext.set_defaults(func=cmd_extension)
 
-    remove = sub.add_parser("uninstall", help="remove Claude Code hooks")
+    remove = sub.add_parser("uninstall", help="remove hooks for the selected agent")
+    remove.add_argument("--agent", choices=("claude", "codex", "chatgpt"), default="claude")
     remove.add_argument("--scope", choices=("user", "project"), default="user")
     remove.set_defaults(func=cmd_uninstall)
 
@@ -468,6 +485,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     check = sub.add_parser("doctor", help="diagnose the install and the overlay backend")
     _add_common(check)
+    check.add_argument("--agent", choices=("claude", "codex", "chatgpt"), default="claude")
+    check.add_argument("--scope", choices=("user", "project"), default="user")
     check.set_defaults(func=cmd_doctor)
 
     listing = sub.add_parser("scenes", help="list registered scenes")

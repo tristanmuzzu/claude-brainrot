@@ -21,7 +21,6 @@ import math
 import sys
 from pathlib import Path
 
-import bpy
 
 sys.path.insert(0, str(Path(__file__).parent))
 from common import (  # noqa: E402

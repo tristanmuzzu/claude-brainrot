@@ -7,13 +7,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "claude-brainrot"
 version = "0.3.0"
-description = "Subway Surfers while Claude Code is thinking: a generated 3D gameplay strip beside your terminal"
+description = "Generated 3D gameplay beside Claude Code, Codex, or local ChatGPT Work while your agent is thinking"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 keywords = [
-    "claude-code", "overlay", "raylib", "procedural-generation",
+    "claude-code", "codex", "chatgpt", "overlay", "raylib", "procedural-generation",
     "parkour", "brainrot", "gamedev", "hooks",
 ]
 classifiers = [

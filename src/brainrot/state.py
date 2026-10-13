@@ -44,7 +44,7 @@ _START_EVENTS = frozenset({"UserPromptSubmit"})
 _END_EVENTS = frozenset({"Stop"})
 _ACTIVITY_EVENTS = frozenset({"PreToolUse", "PostToolUse"})
 _SUPPRESS_EVENTS = frozenset({"Notification"})
-_TEARDOWN_EVENTS = frozenset({"SessionEnd"})
+_TEARDOWN_EVENTS = frozenset({"SessionEnd", "Interrupt"})
 
 
 class Visibility(Enum):
@@ -178,12 +178,25 @@ class ThinkingState:
             # Tool traffic without a preceding prompt happens when the daemon
             # starts mid-turn; treat it as evidence the session is working.
             self._begin(session)
+        elif kind in ("CodexActivity", "PermissionRequest"):
+            # Codex subagents share the parent's session id. A late tool
+            # result must not resurrect a parent turn that already stopped.
+            # PermissionRequest also fires for automatically approved work;
+            # it does not establish that the agent is waiting for the user.
+            # Keep the current turn visible rather than hiding until the
+            # corresponding PostToolUse (possibly seconds or minutes later).
+            if session in self._thinking:
+                self._suppressed = False
+                if kind == "CodexActivity" and tool:
+                    self.caption = tool
+                self._begin(session)
         elif kind in _SUPPRESS_EVENTS:
             if self.hide_on_notification:
                 self._suppressed = True
         elif kind in _TEARDOWN_EVENTS:
             self._hosts.pop(session, None)
             self._end(session)
+            self._suppressed = False
 
         self.tick()
 

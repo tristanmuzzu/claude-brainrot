@@ -124,8 +124,8 @@ the tower being empty.
 
 Over 8 runs: 173 levels wanted a gate, 135 got the reservation, 107 were
 offered, 62 put a landing in the passage. **The fix the last handoff
-recommended has been tried and is worse** — see the note under CLAUDE.md's
-outstanding item 0b. Doing it properly means `_reserve_landmark` holding the
+recommended has been tried and is worse** — see the note under `docs/OUTSTANDING.md`
+item 00000b. Doing it properly means `_reserve_landmark` holding the
 approach cells as well as the passage.
 
 ### 5. The roster still wants assets

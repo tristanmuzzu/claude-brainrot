@@ -119,6 +119,28 @@ def test_notification_hides_mid_turn(daemon: Overlay) -> None:
     assert wait_for(lambda: not daemon.state.on_screen), "did not yield for a prompt"
 
 
+def test_codex_automatic_approval_keeps_playing_the_same_world(daemon: Overlay) -> None:
+    session = "codex:automatic-approval"
+    send("127.0.0.1", PORT, "UserPromptSubmit", session=session)
+    assert wait_for(lambda: daemon.scene is not None and daemon.alpha > 0.9)
+    scene = daemon.scene
+
+    # Automatic review fires this hook even when no person needs to decide.
+    # Hold completion long enough for the old hide/fade/idle path to run.
+    send("127.0.0.1", PORT, "PermissionRequest", session=session, tool="Bash")
+    for _ in range(5):
+        time.sleep(0.1)
+        assert daemon.state.on_screen, "automatic approval hid the overlay"
+        assert daemon.scene is scene, "approval released or regenerated the world"
+        assert daemon.alpha > 0.9, "approval faded out the current run"
+
+    send("127.0.0.1", PORT, "CodexActivity", session=session)
+    time.sleep(0.1)
+    assert daemon.scene is scene
+    send("127.0.0.1", PORT, "Stop", session=session)
+    assert wait_for(lambda: daemon.scene is None), "finished turn did not release its world"
+
+
 def test_unknown_events_are_ignored(daemon: Overlay) -> None:
     send("127.0.0.1", PORT, "SomeFutureHook", session="s1")
     time.sleep(0.6)

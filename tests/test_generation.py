@@ -27,7 +27,7 @@ from brainrot.scenes.runner import ROW as RUNNER_ROW
 from brainrot.scenes.runner import SEGMENT_TABLE as RUNNER_SEGMENTS
 from brainrot.scenes.parkour import (
     AIR_MAX, AIR_MIN, AIR_SPEED, BAND, COURSE_ALT, EDGE, FORMS, GRAVITY,
-    HEADROOM, IMPULSE_MIN, MIN_HOP, RAMP_BLOCKS, SEGMENT_TABLE, VY_MAX,
+    HEADROOM, MIN_HOP, RAMP_BLOCKS, SEGMENT_TABLE, VY_MAX,
     VY_MIN, fit_gap, flight, hop_span, max_gap)
 
 

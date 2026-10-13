@@ -13,24 +13,17 @@ design backlog. Background for every item is in `docs/HISTORY.md`.
    is zero and this is the one number that went the wrong way. `--only "ROPE
    BRIDGE"` plus the throwaway path-printer described under item 0a is the way
    in.
-00000a. ~~One unchecked emergency placed a 26.76 m "hop".~~ **Attributed and
-   very probably gone.** `tools/arc_probe.py --dump` traced it: a 26.76 m,
-   +8.00 m, 3.77 s "hop" from THE SILENCE to THE BELFRY through 118 cone cells,
-   landing beat `stuck`, and it was the exit climb aiming at the wrong chasm
-   (see "The climb stopped aiming at the wrong chasm"). The designed-jump
-   maximum reads **5.63 m** now over the same sweep, against 26.76 before. Not
-   *proven* gone -- `_emergency` is still the module's one unchecked placement
-   and nothing stops it -- so if the maximum ever reads over about 8 again,
-   this is what it is.
-00000b. **0.96% of tower moves still pass through something drawn**, worst
-   0.575 m, and the biggest remaining writer is `landmark` -- 5 moves and 21
-   cells over 2,408, which is the gated structure the course is deliberately
-   steered *through*. Worth asking whether the held passage is wide enough at
-   the shoulders; the crossing's landings are cells and the body is 0.6 m wide
-   and straddles the next one whenever it is not dead centre. `lid` also still
-   ghosts on 9 cells that `advance`'s un-draw does not reach, and the mechanism
-   for those is not yet known. `python tools/arc_probe.py --runs 8 --blocks
-   300` is the number; `docs/PATH.md` is the write-up.
+00000a. ~~An unchecked emergency could create an impossible hop.~~ **Fixed
+   2026-10-07.** Recovery now uses checked local hops/walks and ascending
+   turns. Exit landings preserve their unwrapped bearing and leave room to
+   gain the next terrace's height. The unchecked fallback has been removed.
+   Eight seeds completed 38,224 landings across every level without a solver
+   failure. See `docs/PATH.md` for the current verification record.
+00000b. ~~Tower moves pass through drawn structures.~~ **Fixed 2026-10-07.**
+   Continuous swept-body clearance covers the landing, structures, departure
+   run and furniture. Drawn bridges/pedestals retain collision after retirement;
+   glass, leaves and scaffolds cannot be crossed as air. The final sweep checked
+   15,005 played moves with no body, camera, furniture or prop penetration.
 
 0000. ~~The sideways hop between two roofs happens 0.75 times a minute~~
    **Done, and the guess in this entry was half right.** Laying the flank

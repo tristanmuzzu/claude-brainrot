@@ -434,7 +434,7 @@ def report(saf: dict, pac: dict, frm: dict) -> str:
 
     out.append(f"== pacing ({pac['runs']} runs x {pac['seconds']:.0f}s) ==")
     a = pac["actions"]
-    out.append(f"  actions: " + ", ".join(f"{k}={v}" for k, v in sorted(a.items()))
+    out.append("  actions: " + ", ".join(f"{k}={v}" for k, v in sorted(a.items()))
                + f"  (total {sum(a.values())})")
     s = pac["actions_per_minute"]
     out.append(f"  actions per minute     : min={s['min']:.1f} "
@@ -448,7 +448,7 @@ def report(saf: dict, pac: dict, frm: dict) -> str:
                f"{pac['dead_air_fraction'] * 100:.1f}% of the run")
     out.append("  speed:  " + "  ".join(
         f"{k}={v['mean']:.2f}" for k, v in pac["speed_at"].items()))
-    out.append(f"  obstacle mix           : " + ", ".join(
+    out.append("  obstacle mix           : " + ", ".join(
         f"{k}={v}" for k, v in pac["variety"].items()) + f"  (+{pac['coins']} coins)")
     out.append("  per minute             : " + ", ".join(
         f"{k}={v:.1f}" for k, v in sorted(pac["obstacles_per_minute"].items(),
@@ -460,7 +460,7 @@ def report(saf: dict, pac: dict, frm: dict) -> str:
     out.append("  set-pieces / minute    : " + ", ".join(
         f"{k}={v:.1f}" for k, v in sorted(pac["segments_per_minute"].items(),
                                           key=lambda kv: -kv[1])))
-    out.append(f"== riding a train roof ==")
+    out.append("== riding a train roof ==")
     out.append(f"  mounts per minute      : {pac['mounts_per_minute']:.2f}")
     out.append("  roof-to-roof crossings : "
                f"{pac['crossings_per_minute']:.2f} / min")

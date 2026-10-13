@@ -1911,7 +1911,6 @@ class RunnerScene(Scene):
         which the collision test asserts -- but it is close to the camera and
         regular, and that is what the eye actually uses to read speed.
         """
-        d0 = row * ROW - self.travel
         if row % 2 == 0:
             side = 1 if (row // 2) % 2 == 0 else -1
             self._add({"kind": "lamp", "x": side * 5.25,

@@ -3,8 +3,8 @@
 ## Shape
 
 ```
-Claude Code
-    │  hook fires (UserPromptSubmit, Stop, Notification, SessionEnd)
+Claude Code / local Codex / local ChatGPT Work desktop
+    │  native lifecycle hook fires
     ▼
 brainrot_hook.py            ~30ms, one UDP datagram, cannot block or raise
     │                       (on Windows: carries the foreground window handle)
@@ -30,6 +30,20 @@ format that is not a public interface.
 Only `UserPromptSubmit` and `Stop` are needed, and both fire **once per turn**.
 `PreToolUse`/`PostToolUse` fire on every tool call and are therefore left
 opt-in (`--with-tool-events`); they buy nothing but a live tool-name caption.
+
+Codex/ChatGPT is an explicit installer target (`--agent codex`, with `chatgpt`
+as an alias), while the default remains Claude. It uses the same renderer,
+daemon, transport, and host resolution, with an independent shim and
+`hooks.json` registrations. Codex registers PermissionRequest and Interrupt.
+PermissionRequest also fires for automatic review, so it refreshes activity
+without hiding the strip; only Claude's Notification establishes a wait on the
+user. Codex's PostToolUse registration refreshes long turns even without captions.
+The shim translates tool
+events to CodexActivity, which cannot start a session: Codex subagents share the
+parent's session id, so late child results must not resurrect a finished turn.
+Codex ids are namespaced before reaching the daemon. Hook trust stays with the
+runtime's review flow; the installer never grants trust. Local command hooks
+cover local Codex and ChatGPT Work, not ordinary or cloud-orchestrated chats.
 
 ### 2. UDP, because hooks block Claude Code
 
@@ -855,39 +869,35 @@ loop.
     no block of its own. Without it a pond dug during dressing takes the floor
     out from under a landing already committed.
 
-  Placement then separates *correctness* from *comfort*, and the split is
-  load-bearing. A landing must be empty, have head-room, sit on something, be
-  reachable by a move the physics has, and have a clear path — those never
-  relax. That the body also fits comfortably where it lands and all the way
-  across it is **comfort**, relaxed by the last resort, because a course that
-  cannot satisfy those anywhere is better off grazing a bank than falling
-  through to the one answer nothing checked. That last answer is counted in
-  `Course.stuck`: **2.00%** of landings over 16 runs of 240 blocks, against
-  zero cells claimed twice, zero landings off the lattice, zero ladders or
-  water inside rock and zero orbs laid but not collected.
+  Every placement, including recovery, now clears the body's continuous
+  swept volume. The checker clips time against each voxel's horizontal bounds
+  and evaluates the ballistic height extrema within that interval. The same
+  swept cells reserve the incoming jump and the actual run to its launch
+  point. Transparent structural blocks remain solid; optional furniture is
+  checked as a box, both when placed and when later jumps are planned.
+  Retiring a bridge or pedestal releases its reservation but preserves its
+  collision while it remains drawn. Retiring a lid removes both.
 
-  **That 2.00% is an honest regression** — it was 0.46% before the trough
-  became a stack of levels and 2.98% immediately after, and it is recorded
-  rather than smoothed over. The reason is structural: a *mandatory* move is a
-  far harder guarantee than a free one. The old course could wander when a
-  landing would not fit; this one must leave every level, over a chasm, onto
-  ground four to six blocks up, and that climb is 44% of all landings.
-  `tests/test_spiral.py` holds the ceiling at 4% and says in its docstring that
-  the number is worse than the 0.5% this scene used to make. The failure is
-  concentrated in the ascent, and both reductions since have come from making
-  the ascent itself easier to satisfy — standing the ladder back off the wall,
-  and giving the ice level's stair a move that reaches further.
+  Each landing stores its unwrapped bearing, so a low tread cannot select a
+  previous revolution by height. Landings must meet their local floor and
+  leave enough corridor to gain the remaining height before the exit chasm.
+  Fixed-height beats cannot introduce an unplanned drop of more than three
+  blocks after a structure; explicitly authored descending steps keep their
+  specified drop.
+  If an authored route cannot fit, recovery searches checked hops and walks
+  around the obstruction. A last ascending turn can move up to three metres
+  back within the same level; it must gain height. Unbuilt landmark promises
+  may be withdrawn if they seal the route. There is no unchecked emergency
+  arc: a solver failure raises with the landing index instead of flying
+  through the building. `Course.stuck` counts those failures.
 
-  When it does go wrong, the way to find out why is `TRACE` — a counter around
-  `Course._attempt` recording *which* check refused each candidate. It is off
-  by default because placement asks those questions a few thousand times a
-  landing. Every reduction this format has had, from 13% of nodes down to a few
-  per cent, came out of reading that table, and **not one of them was found by
-  reading the code**. Rebuild it before changing anything here — the 2.00% is
-  the next one to go after.
+  Use `TRACE` to count candidate refusals, `tools/arc_probe.py` to check the
+  drawn world, and `tools/endurance_probe.py` for repeated full climbs. The
+  latter groups visits by the stored bearing; counting only explicitly named
+  crossings misses ordinary ascent hops that already reached the next level.
 
 All of these are asserted directly in `tests/test_generation.py` and
-`tests/test_spiral.py` across many runs, rather than being left as comments.
+`tests/test_spiral.py` and `tests/test_course_safety.py` across many runs.
 
 ## Cost while idle
 

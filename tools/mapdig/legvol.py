@@ -6,7 +6,6 @@ standing on the terrace is inside its own leg.
 
 Output: r1/legvol.pkl -> {leg_index: {(x, y, z): name}} plus the spines.
 """
-import math
 import pickle
 import time
 

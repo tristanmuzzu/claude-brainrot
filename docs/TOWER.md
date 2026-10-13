@@ -161,7 +161,7 @@ all held at or better than the 24-level tower:
 this list asks for, and what closed it was raising eight levels' decks rather
 than anything in the recovery chain -- a level cruising two blocks up with a
 rise of eight spends seven landings on a staircase against the wall, and that
-staircase is where the stuck landings were. It is an open item in CLAUDE.md
+staircase is where the stuck landings were. It is an open item in `docs/OUTSTANDING.md`
 rather than an accepted number. P5 is *met* — 3.00 ms and a tower/parkour
 ratio of 1.389 over nine rounds on a quiet machine, better than the 1.46 on
 record, and a run writes 10% fewer cells than before the rehash because the

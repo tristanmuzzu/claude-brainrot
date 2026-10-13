@@ -326,7 +326,7 @@ class Overlay:
                   "sits in the ordinary stacking band rather than above "
                   "everything. Fix: brainrot extension load", flush=True)
         else:
-            print("[brainrot] following the Claude Code window: on screen only "
+            print("[brainrot] following the agent window: on screen only "
                   "while you are looking at it", flush=True)
 
     def _power_allows(self) -> bool:
@@ -380,7 +380,7 @@ class Overlay:
             allowed = now - self._focus_left_at < FOCUS_GRACE
 
         if self.verbose and allowed != self._focus_ok:
-            print(f"[brainrot] focus: {'on Claude Code' if allowed else 'elsewhere'}"
+            print(f"[brainrot] focus: {'on agent window' if allowed else 'elsewhere'}"
                   f" (hosts: {sorted(self.state.hosts)})")
         self._focus_ok = allowed
         return allowed

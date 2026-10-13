@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import Config
-from .hookinstall import SHIM_NAME, settings_path
+from .hookinstall import canonical_agent, events_for, settings_path, shim_name
 from .rng import RunCounter, state_dir
 
 OK = "ok"
@@ -325,29 +325,31 @@ def _check_pythonw() -> Check:
     )
 
 
-def _check_hooks(cfg: Config) -> list[Check]:
+def _check_hooks(cfg: Config, agent: str = "claude", scope: str = "user") -> list[Check]:
     checks: list[Check] = []
-    shim = state_dir() / SHIM_NAME
+    name = shim_name(agent)
+    install_hint = f"Run: brainrot install --agent {agent} --scope {scope}"
+    shim = state_dir() / name
     if shim.exists():
         checks.append(Check("shim", OK, str(shim)))
     else:
-        checks.append(Check("shim", FAIL, "not written", "Run: brainrot install"))
+        checks.append(Check("shim", FAIL, "not written", install_hint))
 
-    path = settings_path("user")
+    path = settings_path(scope, agent)
     try:
         settings = json.loads(path.read_text(encoding="utf-8"))
         hooks = settings.get("hooks", {})
         if not isinstance(hooks, dict):
             hooks = {}
     except (OSError, json.JSONDecodeError, AttributeError):
-        checks.append(Check("hooks", FAIL, f"cannot read {path}", "Run: brainrot install"))
+        checks.append(Check("hooks", FAIL, f"cannot read {path}", install_hint))
         return checks
 
     def _has_shim(entries) -> bool:
         # Hand-edited settings are exactly this check's audience, so a
         # malformed entry is a "no", never an AttributeError out of doctor.
         return any(
-            isinstance(h, dict) and SHIM_NAME in str(h.get("command", ""))
+            isinstance(h, dict) and name in str(h.get("command", ""))
             for e in entries if isinstance(e, dict)
             for h in (e.get("hooks") if isinstance(e.get("hooks"), list) else [])
         )
@@ -357,12 +359,34 @@ def _check_hooks(cfg: Config) -> list[Check]:
         for event, entries in hooks.items()
         if isinstance(entries, list) and _has_shim(entries)
     ]
-    if registered:
-        checks.append(Check("hooks", OK, ", ".join(sorted(registered))))
+    missing = set(events_for(agent)) - set(registered)
+    if not missing:
+        checks.append(Check("hooks", OK, f"{path}: {', '.join(sorted(registered))}"))
     else:
         checks.append(
-            Check("hooks", FAIL, f"none registered in {path}", "Run: brainrot install")
+            Check("hooks", FAIL, f"{path}: missing {', '.join(sorted(missing))}", install_hint)
         )
+    if canonical_agent(agent) == "codex":
+        import tomllib
+
+        try:
+            config = tomllib.loads(path.with_name("config.toml").read_text(encoding="utf-8"))
+            features = config.get("features", {})
+            enabled = features.get("hooks", features.get("codex_hooks", True))
+        except FileNotFoundError:
+            enabled = True
+        except (OSError, ValueError, AttributeError):
+            enabled = None
+        if enabled is False:
+            checks.append(Check("hooks-on", FAIL, "hooks disabled in config.toml",
+                                "Enable features.hooks in the active Codex config."))
+        elif enabled is None:
+            checks.append(Check("hooks-on", WARN, "cannot read hook feature configuration",
+                                "Check the active Codex config.toml for parsing errors."))
+        checks.append(Check("trust", WARN, "runtime hook trust not verified",
+                            "Review and trust the hooks in the desktop hook settings or "
+                            "/hooks in Codex CLI, then restart the app. Local Codex and "
+                            "ChatGPT Work chats support these hooks; cloud chats do not."))
     return checks
 
 
@@ -581,7 +605,7 @@ def _check_render(cfg: Config) -> Check:
     return Check("render", FAIL, detail, "This is a bug; please report it.")
 
 
-def run(cfg: Config | None = None) -> int:
+def run(cfg: Config | None = None, agent: str = "claude", scope: str = "user") -> int:
     cfg = cfg or Config.load()
     checks: list[Check] = [_check_python()]
     checks += _check_deps()
@@ -589,7 +613,7 @@ def run(cfg: Config | None = None) -> int:
     checks += _check_backend(cfg)
     checks.append(_check_pythonw())
     checks.append(_check_config())
-    checks += _check_hooks(cfg)
+    checks += _check_hooks(cfg, agent, scope)
     checks.append(_check_daemon(cfg))
     instances = _check_one_daemon()
     if instances is not None:

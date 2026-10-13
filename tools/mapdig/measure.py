@@ -237,7 +237,6 @@ def q_gaps():
             best = None
             for n in members:
                 x, fy, z, i = nodes[n]
-                tan = None
                 p, q = pts[min(i, len(pts) - 2)], pts[min(i + 1, len(pts) - 1)]
                 tx, tz = q[0] - p[0], q[2] - p[2]
                 tl = math.hypot(tx, tz) or 1.0

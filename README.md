@@ -1,420 +1,142 @@
 # claude-brainrot
 
-*Subway Surfers while CC is thinking.*
+Subway Surfers while your coding agent is thinking.
 
-[![PyPI](https://img.shields.io/pypi/v/claude-brainrot)](https://pypi.org/project/claude-brainrot/)
 [![tests](https://github.com/tristanmuzzu/claude-brainrot/actions/workflows/ci.yml/badge.svg)](https://github.com/tristanmuzzu/claude-brainrot/actions/workflows/ci.yml)
-[![python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
-[![platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows-informational)](#platform-support)
-[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/claude-brainrot)](https://pypi.org/project/claude-brainrot/)
+[![MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-A narrow strip of generated gameplay that appears beside your Claude Code
-window while it is thinking, and gets out of the way when it stops.
-
-<p align="center">
-  <img src="docs/media/tower.gif" width="240" alt="the hand-built tower" />
-  <img src="docs/media/runner.gif" width="240" alt="the runner scene" />
-  <img src="docs/media/parkour.gif" width="240" alt="the parkour scene" />
-</p>
-
-No footage, no downloads. Every world is generated at runtime from a seed that
-has never been used before and never will be again, rendered in real 3D from
-models built by the Blender scripts in this repository. Those three clips are
-`brainrot shoot` output at 15 fps, not a screen recording of something else.
-
-```
-  you hit enter
-        │
-        ▼
-  UserPromptSubmit hook ──UDP──► daemon ──► new seed ──► new world ──► fade in
-        ...
-  Stop hook ────────────────────► daemon ──────────────────────────► fade out
-```
-
-## The tower
-
-The default scene, and where most of the work has gone. It is the Parkour
-Spiral format, where the course winds up the outside of a tower that keeps
-going out of the top of the frame, except that the course is hand-designed:
-thirty-three levels, 385 authored landings.
+A small gameplay strip beside your terminal or agent window. It appears while
+the agent works and fades away when the turn ends. Every run is rendered locally
+in 3D. No video feed, account, or downloaded game assets.
 
 <p align="center">
-  <img src="docs/media/levels.png" width="640" alt="eight of the thirty-three levels" />
+  <img src="docs/media/tower.gif" width="240" alt="First-person parkour climbing a tower" />
+  <img src="docs/media/runner.gif" width="240" alt="A runner jumping between trains" />
+  <img src="docs/media/parkour.gif" width="240" alt="First-person parkour over islands" />
 </p>
 
-Eight of the thirty-three. A level is a themed terrace with a landmark on it,
-a windmill or a watchtower or a bell frame or a crane or a great mushroom cap,
-and three things about that are load-bearing.
+These clips come from the renderer's `brainrot shoot` command.
 
-The course goes through the landmark, not past it. Counting how often a
-structure got placed says nothing useful. The first version stood one
-up on 97% of levels, and someone watching five minutes of live strip remembered
-exactly one of them. What matters is how long a structure holds 25 degrees of
-your view without something in front of it, so twelve of the fourteen
-blueprints now carry a passage that the course is steered through.
+## Try it
 
-The course also flies. After the first step up off the terrace, every landing
-stands at least two blocks above the ground. Miss a jump and you land on that
-terrace, which is a dead end, because the course left it at landing one. You
-walk back to the start of the level instead of rejoining halfway. Missed jumps
-used to rejoin 88% of the time; now it is 1 in 8,484.
-
-And every jump is checked against the physics before it is placed. Gravity,
-jump impulse and sprint speed are Minecraft's own numbers converted from ticks,
-so the furthest a hop can reach is computed rather than chosen. A designed
-landing that no jump can reach is refused at build time, not discovered
-mid-run.
-
-Each level is also its own place, and the lever for that turned out to be the
-floor, not the skyline. A level runs a median of six materials underfoot
-where a generated one uses two or three. (The real Parkour Spiral map measures
-fourteen, so there is room left.) Ten to thirteen seconds of strip each, with
-its own signature move and its own way out.
-
-## What else plays
-
-Four scenes, chosen per run from the run's seed. `runner`, `parkour` and
-`tower` are the default rotation, and `spiral` is one line of config away.
-
-| Scene | What it is |
-|---|---|
-| `runner` | The classic. Three locked lanes, a chase camera, subway cars with per-run liveries, hazard barriers, gantries, coin arcs, and a city canyon whose windows light up at night. The runner rides train roofs: the ramp, the train, the corridor onto it and the clear lane to bail into are laid down as one decision, and the leap is solved at generation time at both ends of the speed range, so a ramp whose train is out of reach never gets built. It runs a convoy of them, leaps roof to roof, and crosses sideways onto the line standing alongside. **The speed has no top** — it compounds for as long as the run survives, and a run ends when the fog is closer than the plan it is committed to, at about 53 m/s some five minutes in, whereupon it starts again. An autopilot follows a corridor that is guaranteed reachable by construction, and live-dodges oncoming trains, which come at it at twice its own speed. |
-| `parkour` | First-person infinite parkour, the way the actual background reels do it. One flawless sprint-jump per beat, high over an ocean of wooded islands, reef shallows and drifting cloud shelves. The course arrives in set-pieces: a staircase, a plank causeway, a gate you run through, a long fall onto a lantern-lit platform, each built from one family of materials. Orbs hang on the exact arc of the jump that reaches them, which is why every orb laid down is collected. Something is always in your hand, a block or a sword or a pickaxe or a torch. |
-| `tower` | The thirty-three designed levels above. |
-| `spiral` | The same tower format with the course generated instead of authored. One solid inverted cone fluted with vertical ribs, fifteen themes drawn from a shuffled bag several to a revolution with hard seams between them, and the parkour built into each theme's own ground: lily pads across the desert's pond, a mine's ladders, an ice slide, a nether lava channel, a soul-sand bubble column. Still registered and still tested. `tower` simply reads better. |
-
-Every run also generates its own palette, time of day, weather and sky. A sun
-or a crescent moon with a real glow, parallax clouds, a starfield that thins
-toward the horizon, rain or snow. The same scene twice in a row does not look
-the same.
-
-<p align="center">
-  <img src="docs/media/variety.png" width="640" alt="sixteen consecutive runs" />
-</p>
-
-Sixteen consecutive runs, one frame each, nothing hand-picked. Whatever the
-seed chose.
-
-## Install
-
-Python 3.11 or newer. There is nothing to compile and no GPU requirement, since
-`pip` pulls two wheels (raylib at about 2 MB, and Pillow) and that is the whole
-dependency list. It is a long-running background tool rather than a library, so
-[pipx](https://pipx.pypa.io/) or [uv](https://docs.astral.sh/uv/) is the
-tidiest way in:
+Python 3.11+, Windows 10/11 or Linux with a graphical desktop.
 
 ```bash
-pipx install claude-brainrot     # or: uv tool install claude-brainrot
+pipx install claude-brainrot
+brainrot demo --scene runner
 ```
 
-<details open>
-<summary><b>Linux (GNOME/Wayland: Ubuntu, Fedora, …)</b></summary>
+`uv tool install claude-brainrot` works too. The demo needs no hooks or running
+agent. Arrow keys or WASD let you play the runner; leave it alone and autopilot
+takes over.
+
+**GitHub source is ahead of PyPI 0.3.0.** Install from source below for Codex
+hooks and the latest tower fixes. The PyPI release supports Claude Code.
+
+## Set up the overlay
+
+With the source version installed:
 
 ```bash
-pipx install claude-brainrot     # or: pip install claude-brainrot
-
-brainrot install        # hooks, plus the gnome-shell extension
-brainrot extension load # load it into the running shell (or just log out and in)
-brainrot run            # long-lived; leave it running
+brainrot install --agent claude
+brainrot doctor --agent claude
+brainrot run
 ```
 
-Verified on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200% scaling), where
-`brainrot doctor` reports 14 checks passing.
-</details>
+For **local Codex Desktop or CLI**, use `--agent codex` for install and doctor.
+Local ChatGPT Work uses the same integration (`--agent chatgpt` is an alias).
+Review and trust the registered hooks in your agent, then restart it. Cloud
+chats and ordinary ChatGPT conversations do not run these local hooks.
 
-<details open>
-<summary><b>Windows 10/11</b></summary>
+On **GNOME/Wayland**, installation also copies a small shell extension. Run
+`brainrot extension load` and follow its instructions, or log out and back in.
+The extension lets the strip follow the focused agent window. Without it,
+the strip uses the desktop's work area instead. Other Linux desktops use that
+fallback too.
 
-```powershell
-pipx install claude-brainrot     # or: pip install claude-brainrot
+Keep one `brainrot run` process open. It handles both agents. Use `brainrot
+doctor` before starting another copy. Full setup, checks and removal:
+[INSTALL.md](INSTALL.md).
 
-brainrot install        # writes hooks into ~/.claude/settings.json
-brainrot run            # long-lived; leave it running
-```
+## Send your agent here
 
-That is the whole setup. No pywin32, because the window work is ctypes on
-`user32`.
+Paste this into Claude Code, Codex, Cursor, or another local agent:
 
-**Do not use a Microsoft Store Python.** The Store redirects `%APPDATA%` into
-the package's own `LocalCache` for reads as well as writes, so the config file
-you can see in Explorer is one the daemon cannot open at all, and every setting
-silently reverts to its default. Install from
-[python.org](https://www.python.org/downloads/) instead. `brainrot doctor`
-prints the config path it is genuinely reading.
-</details>
+> Install https://github.com/tristanmuzzu/claude-brainrot on this computer.
+> Read AGENTS.md and INSTALL.md. Use the source version, preserve my existing
+> hooks, and verify a demo before enabling the overlay for my coding agent.
 
-<details>
-<summary><b>From source</b>, to change something</summary>
+## What plays
 
-```bash
-git clone https://github.com/tristanmuzzu/claude-brainrot
-cd claude-brainrot
-python3 -m venv .venv && source .venv/bin/activate   # Windows: py -m venv .venv
-pip install -e ".[dev]"
-```
-</details>
+| Scene | What you get |
+| --- | --- |
+| `runner` | Three lanes, coins, trains, roof jumps and an autopilot. |
+| `parkour` | First-person jumps over islands and clouds. |
+| `tower` | A climbing course with 33 authored levels and 385 landings. |
+| `spiral` | A generated course wrapped around a tower. Optional rotation. |
 
-The hooks are written with the absolute path of the interpreter you installed
-into, so the daemon and the hooks work whether or not any venv is activated.
-Move or remove that interpreter and you have to run `brainrot install` again.
+The default rotation includes runner, parkour and tower. Seeds vary the course,
+palette, weather and time of day. Replay one with
+`brainrot demo --scene tower --seed 4712`.
 
-<details>
-<summary>Why Linux needs that extra <code>extension</code> step</summary>
-
-`brainrot install` copies a small gnome-shell extension into
-`~/.local/share/gnome-shell/extensions` and switches it on. gnome-shell only
-looks for new extensions when it *starts*, though, and on Wayland that means
-the session. So it needs one of:
-
-```bash
-brainrot extension load    # loads it into the running shell, no logout
-```
-
-which walks you through a one-time fifteen-second toggle in Looking Glass
-(`Alt+F2`, then `lg`) and puts the setting back afterwards. Or simply log out
-and back in, which does the same job with no steps to follow.
-
-The extension exists because a Wayland client is not allowed to know which
-window is in front, where any window is, or where the pointer is. The strip
-needs all three: to appear only while you are looking at Claude Code, to stand
-beside that window, and to be draggable. It sends window geometry, window
-classes, process ids and the pointer to the daemon on loopback. No titles, no
-contents, no keystrokes.
-
-It works without the extension too (`brainrot install --no-extension`, or
-before you have loaded it). The strip docks to the work area, stays up for the
-whole turn, and cannot be dragged. It also stays deliberately *out* of the
-always-above band in that state, because a window that floats over everything
-and cannot hide itself is a window that sits on top of your browser. Instead it
-comes up over the Claude Code window you were just typing into, and gets buried
-the moment you click anything else.
-
-`brainrot run` says which of the two modes it is in, and says so again if that
-changes underneath it. `brainrot doctor` and `brainrot extension status` both
-report on it too.
-
-Wayland-only distributions are the reason this is not simpler. GNOME 49 dropped
-the X11 session, so Ubuntu 25.10 and later have no X11 session to fall back to.
-The strip is therefore an XWayland window. X11 is still a first-class protocol
-on that desktop, and it is the one that lets a window place itself, stay above,
-shape its input region and be shown without taking focus.
-</details>
-
-Open Claude Code and give it something slow to do. Check any machine with
-`brainrot doctor`. Remove it with `brainrot uninstall`.
-
-## It belongs to Claude Code, not to your screen
-
-The overlay is not on screen just because Claude is busy. The hook tells the
-daemon which window your prompt came from, and that window *is* your Claude
-Code. From then on:
-
-**It only appears while you are looking at that window.** Switch to your
-browser and it fades out; switch back and it returns. If nothing is known about
-where Claude Code is, it stays hidden instead of floating over everything. Set
-`follow_focus = false` for the always-on behaviour, which is what demos and
-screen recordings want.
-
-**It stands beside that window, not on your screen edge.** A screen edge is
-wherever the app keeps its sidebar. The strip goes into the empty gutter on the
-`dock` side of the Claude Code window instead, and outside that window entirely
-when the desktop has room. It follows the window if you move it.
-
-**It rides one z-level above it.** On Windows the strip is an owned window of
-the Claude Code window, so raising your terminal raises the strip with it, and
-anything else you focus covers both. mutter has no notion of an X11 window
-owned by a Wayland one, so on Linux the strip sits in the always-above band and
-the focus rule above is what keeps it off your other applications, not the
-z-order. `attach = "topmost"` restores float-over-all on Windows.
-
-**You can move it.** Hold `ctrl+alt` and drag it wherever you like. Where you
-drop it is remembered, and still follows the window. Double-click while holding
-the chord to go back to automatic placement. Clicks are caught only while that
-chord is held over the strip; otherwise the mouse falls straight through, and
-focus is never taken either way. On Linux this needs the extension, which is
-where the pointer position comes from.
-
-**You can switch it off.** On GNOME the extension puts a game-controller icon
-in the top bar; one click puts the strip away for as long as you want to read
-in peace, and the icon dims to say so. Everything else is unchanged when it is
-back on -- it still only appears while a Claude Code window that is working is
-the one in front. The switch is remembered across restarts and logins
-(gsettings `overlay-enabled`), and `brainrot doctor` says when it is off.
-
-**It is the size you asked for.** On a HiDPI display the strip is drawn at the
-configured size and scaled to the display, so `width = 360` means 360 points
-and not 360 device pixels, and the scenes keep their own pixel geometry
-instead of rendering a HUD at half size.
-
-## Why it does not annoy you
-
-The gap between "Claude is busy" and "put something on screen" is where all the
-work is.
-
-* Short turns never show anything. Nothing appears until Claude has been busy
-  for 1.5s, so quick answers do not make the strip strobe.
-* Nothing flashes. Once it has appeared it stays for at least 3s, even if
-  Claude finishes immediately afterwards.
-* It never takes focus or eats clicks. The window is click-through and cannot
-  be activated, so it does not interrupt typing.
-* It hides when Claude needs you. A permission prompt means your attention
-  belongs on the terminal.
-* It costs nothing while hidden. No scene is held, nothing renders, and the
-  loop parks on a long sleep.
-
-## Try it without Claude Code
-
-```bash
-brainrot demo --scene tower                # a normal window, always on
-brainrot demo --scene runner --seed 4712   # replay one specific run
-brainrot shoot --scene tower --frames 300 --out shots/   # frames to PNG
-brainrot scenes                            # what is registered, and your run count
-```
-
-`runner` and `parkour` are playable: arrows or WASD, up or space to jump, down
-to duck, eight idle seconds to hand control back. `brainrot demo` needs no
-chord for it. The overlay never reads a key until you deliberately hand it
-focus, and there is no global key hook, on purpose.
-
-`brainrot ping UserPromptSubmit` and `brainrot ping Stop` drive the real daemon
-by hand, which is the fastest way to check show and hide behaviour without
-waiting on a real turn.
+The strip waits 1.5 seconds before appearing, never takes keyboard focus, and
+lets clicks through. With the GNOME extension or Windows backend, it follows
+your agent window and hides when you switch away. Hold Ctrl+Alt to drag it.
+On GNOME, the game-controller button in the top bar switches it off.
 
 ## Configuration
 
-Optional `config.toml`, next to the run-counter state:
-
-* Linux/macOS: `~/.local/state/claude-brainrot/config.toml`
-* Windows: `%APPDATA%\claude-brainrot\config.toml`
-
-Run `brainrot doctor` for the path it is actually reading. On a Microsoft Store
-Python that is not the path above: the Store redirects `%APPDATA%` into the
-package's `LocalCache`, and the copy you can see in Explorer is one the daemon
-cannot open at all. The `config` check prints the real one.
+Run `brainrot doctor` to find your `config.toml`. Common settings:
 
 ```toml
 [window]
 width = 360
 height = 640
-dock = "right"     # which side of the Claude Code window to stand on
-margin_x = 12      # gap from that side
-margin_y = 20      # gap from the top and bottom of that window
-anchor_y = 0.0     # 0 = top of it, 1 = bottom of it
-monitor = 0        # only used when no host window is known
-opacity = 0.88
-fps = 60
-attach = "host"    # "host" = one level above Claude Code, "topmost" = above all
-
-[behaviour]
-grace_seconds = 1.5
-min_visible_seconds = 3.0
-hide_on_notification = true
-max_thinking_seconds = 900   # give up on a session that stops saying anything
-follow_focus = true      # on screen only while you are looking at Claude Code
-drag_chord = "ctrl+alt"  # hold to drag the strip; "" to disable
 
 [content]
-scenes = ["runner", "parkour", "tower"]   # "spiral" is the fourth
+scenes = ["runner", "parkour", "tower"]
 quality = "high"
 ```
 
-Any field can also be set with an environment variable: `BRAINROT_WIDTH`,
-`BRAINROT_GRACE_SECONDS`, `BRAINROT_SCENES`, and so on.
+See [the full example](config.example.toml) for timing, placement and focus
+settings. Windows needs Python from python.org rather than Microsoft Store
+Python, whose redirected config paths can cause settings to be missed.
 
-## Platform support
-
-| | Overlay | Click-through | Never focused | Follows Claude Code | Notes |
-|---|---|---|---|---|---|
-| Windows 10/11 | yes | yes | yes | yes, as an owned window | ctypes on `user32`, no extra deps |
-| Linux, GNOME/Wayland | yes | yes | yes | yes, via the shell extension | XWayland window; extension needs one log-out to load |
-| Linux, GNOME/Wayland, no extension | yes | yes | yes | docks to the work area, stays up for the turn | still useful; `brainrot doctor` says so |
-| Linux, other desktops | yes | yes | yes | work-area docking only | the X11 half is generic EWMH; only the compositor half is GNOME-specific |
-| macOS | plain window | no | no | no | scenes, hooks and `shoot` all work; no overlay backend |
-| Headless / CI | offscreen | n/a | n/a | n/a | software rasteriser, no display needed |
-
-Verified on Windows 11 and on Ubuntu 26.04 / GNOME Shell 50.1 (Wayland, 200%
-scaling). Both by measurement on the machine, not by inspection.
-
-## How it looks like that
-
-The renderer is [raylib](https://www.raylib.com/), a 2 MB wheel. The models are
-glTF files built by scripts committed to this repo (`assets/src/*.py`) and
-executed under headless Blender. Each asset bakes its lighting (sun, sky
-bounce, ambient occlusion) into a grayscale texture, and keeps its colours in
-flat named material zones. At runtime every pixel is just
-
-    baked light map  ×  zone colour  ×  distance fog
-
-which is why the daemon can recolour a hoodie or a train livery per seed
-without any lighting maths, and why CI screenshots rendered on a software
-rasteriser match what your GPU shows.
-
-The character is skin-rigged with run, jump and roll clips authored in the same
-scripts. The parkour blocks use vanilla Minecraft's face-shading constants (top
-1.0, sides 0.8 and 0.6, bottom 0.5) baked into 16×16 pixel-art atlases. Those
-multiply a light level instead of standing on their own, a distinction that
-cost this project a whole set of frames half again too dark.
-
-Rebuilding the kit after editing a script needs `pip install bpy` and is
-dev-only:
+## Build or contribute
 
 ```bash
-python assets/build.py            # everything
-python assets/build.py character  # one asset
-python assets/preview.py character  # render it for your eyeballs
-python assets/measure.py          # always, after any rebuild
+git clone https://github.com/tristanmuzzu/claude-brainrot.git
+cd claude-brainrot
+python3 -m venv .venv
+# Linux:
+source .venv/bin/activate
+# Windows PowerShell instead: .\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+python -m pytest tests/
 ```
 
-## Development
+Tests need a renderer appropriate to the environment. Keep the GPU wheel on a
+real desktop. For headless CI, use an isolated environment with
+`raylib-software`; do not replace your live installation's renderer.
+Platform-specific skips do not establish overlay behavior on that platform.
 
-```bash
-pip install -e ".[dev]"
-pip install raylib-software --force-reinstall --no-deps  # headless machines/CI
-pytest
-```
+[Architecture](docs/ARCHITECTURE.md) · [Hooks](docs/HOOKS.md) ·
+[Tower design](docs/TOWER.md) · [Probes](docs/PROBES.md) ·
+[Known issues](FINDINGS.md)
 
-641 tests cover the show/hide state machine, the seeding guarantees, hook
-install and uninstall, the real shim end to end, a full daemon driven over UDP,
-pixel-identical determinism per seed, the real overlay window driven against a
-real X server, the compositor bridge's parsing and host resolution, and the
-generation invariants: the corridor that can never strand the runner, the
-single-oncoming-train rule and the live dodge, zero interpenetration over hours
-of simulated running, no parkour hop the flight solver cannot fly, self-overlap
-refusal, the altitude band, and every orb the parkour generator hangs being
-collected.
+The models ship with their editable Blender scripts in `assets/src/`. Blender
+is only needed to rebuild assets, not to install or run the app.
 
-The 34 skips are platform suites. `tests/test_overlay_win32.py` only runs where
-`os.name` is `nt`, and `tests/test_overlay_x11.py` only where there is a
-display, so a green run on one platform means less than the count suggests.
-That is why CI runs the whole suite on both, 632 passing on each, and then
-renders a frame of every scene on each and keeps them as artifacts. Same seed,
-same software rasteriser, and the frames come back pixel-identical across the
-two platforms.
+## Platforms and privacy
 
-What CI does not cover is the overlay window surgery itself. Both platform
-suites need a real desktop: the Win32 one skips on a runner as soon as raylib
-reports no native window handle, and the X11 one needs a display. Those are
-verified by hand on real machines.
+Windows and GNOME/Wayland have the full overlay integration. Other Linux
+desktops use work-area docking. macOS can run scenes in a plain window, but
+has no overlay backend.
 
-Beyond the suite, each scene has a probe that turns "it feels wrong" into
-numbers, and those numbers are the acceptance criteria:
+Hooks send lifecycle events and process/window identifiers over loopback.
+They do not forward prompts, file contents or keystrokes. The GNOME extension
+shares window geometry and pointer position locally. No telemetry.
 
-```bash
-python tools/tower_probe.py --runs 16 --blocks 340    # the design, and what survived placement
-python tools/reentry_probe.py --runs 6 --blocks 260   # can a missed jump rejoin the course
-python tools/landmark_probe.py --runs 6 --seconds 40  # is the landmark ever actually seen
-python tools/bypass_probe.py --runs 6 --blocks 240    # can a level be walked without jumping
-python tools/runner_probe.py --runs 12 --seconds 120  # safety, pacing, riding
-python tools/parkour_probe.py --runs 24               # interpenetration, hops, dead air
-python tools/frame_cost.py                            # every scene, one process, vsync off
-```
-
-Docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how the pieces fit and
-why, [`docs/TOWER.md`](docs/TOWER.md) for the tower's design and acceptance
-criteria, [`docs/RULES.md`](docs/RULES.md) for what a level must satisfy, and
-[`docs/HOOKS.md`](docs/HOOKS.md) for the hook layer.
-
-## License
-
-MIT. Every model ships as the output of a script in `assets/src/`, so no
-third-party assets are included or fetched.
+MIT. Not affiliated with Anthropic, OpenAI, Mojang or the Subway Surfers team.
+If you try it, an issue with your platform and `brainrot doctor` output helps.

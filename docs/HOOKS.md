@@ -1,5 +1,41 @@
 # Hooks
 
+## Codex and local ChatGPT Work desktop
+
+`brainrot install --agent codex` (or `--agent chatgpt`) writes
+`brainrot_codex_hook.py` and merges registrations into
+`$CODEX_HOME/hooks.json`, defaulting to `~/.codex/hooks.json`.
+`--scope project` instead selects the current repository's `.codex/hooks.json`.
+`install`, `uninstall`, and `doctor` all accept the same agent and scope options;
+the default remains Claude Code.
+
+The registered events are UserPromptSubmit, Stop, Interrupt, PermissionRequest,
+PostToolUse, and SessionEnd. PermissionRequest keeps the current run visible:
+it fires for automatic review as well as manual approvals, and cannot establish
+that the agent is waiting for a person. PostToolUse refreshes the turn's activity
+timeout. This one tool hook is required even
+without captions. `--with-tool-events` also registers PreToolUse and enables
+captions. Both tool events become CodexActivity inside the shim, which refreshes
+only an already-working session: subagent tool results sharing the parent's
+session id cannot bring a stopped parent turn back to life.
+
+Codex session ids are prefixed with `codex:` on the wire so they cannot collide
+with Claude sessions. Prompts, transcripts, tool arguments, and tool results
+are never forwarded. Window discovery uses the existing foreground handle on
+Windows and process ancestry on Linux; no new desktop watcher is added.
+
+Codex requires review and trust of the current hook definition. Restart the
+desktop app, review the hooks in its hook settings (or `/hooks` in Codex CLI),
+and enable `features.hooks` if disabled. Project hooks require a trusted project.
+The installer does not grant trust or edit unrelated Codex configuration.
+This works for local Codex and local ChatGPT Work chats, not ordinary ChatGPT
+or cloud-orchestrated Work chats. See
+[OpenAI's lifecycle hook reference](https://learn.chatgpt.com/docs/hooks).
+
+Reinstalling either provider updates only that provider's shim and handlers.
+Mixed matcher groups retain other tools' handlers. Invalid JSON or invalid
+registration containers are refused without overwriting the original file.
+
 ## What gets installed
 
 `brainrot install` does two things:

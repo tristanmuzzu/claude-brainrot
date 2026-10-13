@@ -85,9 +85,7 @@ def walk(cone, course, seen):
             "visits": 0, "landings": 0, "stalls": 0, "give_backs": 0,
             "seconds": 0.0, "worst_give": 0.0, "min_arc": 99.0}),
     }
-    prev_u = prev_xz = None
-    #: ``[crossings so far, the level the run started on]``.
-    seq = [0, cone.level_index(course.u_of(seen[0]))]
+    prev_u = None
     run_stall = 0
     cur_idx = None
     cur = None
@@ -114,45 +112,15 @@ def walk(cone, course, seen):
     for blk in seen:
         u = course.u_of(blk)
         here = cone.level_index(u)
-        # **Bucketed by the level whose plan emitted the landing, not by where
-        # the landing physically is.** A landing laid out over the chasm sits
-        # at a bearing that belongs to the *next* level, at a height below that
-        # level's floor -- so ``unwrap``, which answers "the last turn at or
-        # below this height", correctly names a level a revolution down, and
-        # the position tells you nothing. Bucketed that way, an hour of tower
-        # read 169 visits to THE CRUCIBLE against 18 to everything else, which
-        # looks exactly like the loop this probe is for and is the probe's own
-        # doing. ``author`` is not ambiguous.
-        idx = blk.get("author", here)
-        if idx < 0:
-            idx = here
-        if idx != here:
+        # Each landing now keeps its unwrapped bearing. Ordinary ascent
+        # hops can cross a level boundary too, so counting only nodes labelled
+        # "crossing" merges visits and reports designed drops on a later level
+        # as giving back the previous level's climb.
+        author = blk.get("author", here)
+        if author >= 0 and author != here:
             out["adrift"] += 1
-        # ...and a *visit* is segmented by the crossing, which is the one
-        # landing per genuine level transition and the only unambiguous mark
-        # there is. ``author`` is set from the frontier's own position, so it
-        # flickers over a chasm exactly as ``unwrap`` does: bucketed by it, an
-        # hour of tower read 119 visits to THE CRUCIBLE against 16 to
-        # everything else, which is the same artefact one layer along. Counted
-        # by crossings the same run reads 126 transitions with a median rise of
-        # six blocks, which is the tower working.
-        crossed = blk.get("origin") == "crossing"
-        # ...and labelled by **how many crossings have happened**, which is
-        # the only label on this course that is not derived from a position.
-        #
-        # Four things were tried before this and three of them produced a
-        # false alarm that looked exactly like a loop -- one level reported
-        # six times more often than every other. ``unwrap`` names a level a
-        # revolution down for any landing out over the chasm; ``author`` is
-        # set from the frontier's position and inherits it; ``to_level`` is
-        # ``from_level + 1`` and ``from_level`` was read the same way. A
-        # crossing advances exactly one level, so counting them cannot be
-        # ambiguous. If the run's *first* landing is one of the 4% whose
-        # position lies, every name in the table is rotated by a constant --
-        # which leaves the distribution, and therefore the finding, intact.
-        if crossed:
-            seq[0] += 1
-        idx = seq[1] + seq[0]
+        idx = here
+        crossed = cur_idx is not None and idx != cur_idx
         lv = cone.level(idx)
         surf = course.surface(blk)
         move = blk.get("move")
@@ -191,7 +159,7 @@ def walk(cone, course, seen):
                                                   blk["z"]), round(arc, 2)))
             else:
                 run_stall = 0
-        prev_u, prev_xz = u, (blk["x"], blk["z"])
+        prev_u = u
     close(cur, cur_idx)
     return out
 
@@ -272,13 +240,13 @@ def main() -> int:
     if arcs:
         def pc(f):
             return arcs[min(len(arcs) - 1, int(len(arcs) * f))]
-        print(f"\n  HOW FAR A LANDING CARRIES THE BODY ALONG THE CORRIDOR")
+        print("\n  HOW FAR A LANDING CARRIES THE BODY ALONG THE CORRIDOR")
         print(f"    min {arcs[0]:.2f}   1% {pc(0.01):.2f}   5% {pc(0.05):.2f}"
               f"   median {pc(0.5):.2f}   95% {pc(0.95):.2f}   max {arcs[-1]:.2f} m")
         for edge in (0.3, 0.6, 1.0, 1.5):
             k = sum(1 for a in arcs if a < edge)
             print(f"    under {edge:.1f} m   {k:>6}  ({100 * k / len(arcs):.2f}%)")
-    print(f"\n  reported, not gated")
+    print("\n  reported, not gated")
     print(f"    landings whose position names a different level than their"
           f" plan does   {totals['adrift']}"
           f"  ({100 * totals['adrift'] / max(1, totals['landings']):.2f}%)")

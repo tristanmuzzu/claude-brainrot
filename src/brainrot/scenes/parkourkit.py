@@ -239,6 +239,76 @@ class Move:
     def rise(self) -> float:
         return self.to[1] - self.frm[1]
 
+    def swept_cells(self) -> set:
+        """Voxel cells touched by the whole body anywhere along each leg.
+
+        Clip the leg's time interval against each cell's expanded horizontal
+        bounds, then evaluate the vertical extrema on that interval. This
+        catches a shoulder clipping a corner between samples and the exact
+        apex of a jump under a beam.
+        """
+        out = set()
+        eps = 1e-7
+        for leg in self.legs:
+            a, b = leg["frm"], leg["to"]
+            dur = leg["dur"]
+            for cx in range(math.floor(min(a[0], b[0]) - BODY_HALF_W + .5),
+                            math.floor(max(a[0], b[0]) + BODY_HALF_W + .5) + 1):
+                for cz in range(math.floor(min(a[2], b[2]) - BODY_HALF_W + .5),
+                                math.floor(max(a[2], b[2]) + BODY_HALF_W + .5) + 1):
+                    lo, hi = 0.0, 1.0
+                    for axis, centre in ((0, cx), (2, cz)):
+                        low = centre - .5 - BODY_HALF_W + eps
+                        high = centre + .5 + BODY_HALF_W - eps
+                        delta = b[axis] - a[axis]
+                        if abs(delta) < eps:
+                            if not low < a[axis] < high:
+                                hi = -1.0
+                                break
+                        else:
+                            t0, t1 = (low - a[axis]) / delta, (high - a[axis]) / delta
+                            lo, hi = max(lo, min(t0, t1)), min(hi, max(t0, t1))
+                    if hi < lo:
+                        continue
+                    ys = [_leg_at(leg, lo * dur)[1], _leg_at(leg, hi * dur)[1]]
+                    if leg["kind"] == "arc":
+                        peak = leg["vy0"] / GRAVITY
+                        if lo * dur < peak < hi * dur:
+                            ys.append(_leg_at(leg, peak)[1])
+                    for cy in range(math.floor(min(ys) + eps),
+                                    math.floor(max(ys) + BODY_H - eps) + 1):
+                        out.add((cx, cy, cz))
+        return out
+
+    def intersects_box(self, low, high) -> bool:
+        """Whether the swept body intersects an axis-aligned decoration."""
+        eps = 1e-7
+        for leg in self.legs:
+            a, b = leg["frm"], leg["to"]
+            lo, hi = 0.0, 1.0
+            for axis in (0, 2):
+                lower = low[axis] - BODY_HALF_W + eps
+                upper = high[axis] + BODY_HALF_W - eps
+                delta = b[axis] - a[axis]
+                if abs(delta) < eps:
+                    if not lower < a[axis] < upper:
+                        hi = -1.0
+                        break
+                else:
+                    t0, t1 = (lower - a[axis]) / delta, (upper - a[axis]) / delta
+                    lo, hi = max(lo, min(t0, t1)), min(hi, max(t0, t1))
+            if hi < lo:
+                continue
+            dur = leg["dur"]
+            ys = [_leg_at(leg, lo * dur)[1], _leg_at(leg, hi * dur)[1]]
+            if leg["kind"] == "arc":
+                peak = leg["vy0"] / GRAVITY
+                if lo * dur < peak < hi * dur:
+                    ys.append(_leg_at(leg, peak)[1])
+            if min(ys) < high[1] - eps and max(ys) + BODY_H > low[1] + eps:
+                return True
+        return False
+
     def speed_in(self) -> float:
         """Ground speed the body enters this move at."""
         return _leg_speed(self.legs[0])

@@ -2546,8 +2546,7 @@ class Course:
         #: jumps back down again, over and over".
         self.overruns = 0
         self.laid = 0
-        #: Landings that fell through to the one unchecked answer. Held near
-        #: zero by the probe; it is the only hop in the module nothing verified.
+        #: Solver failures. No unchecked move is committed when this rises.
         self.stuck = 0
         self.orbs_missed = 0
         #: :meth:`Cone.rock` is six transcendental operations and placement asks
@@ -2578,10 +2577,12 @@ class Course:
         cone.built_from = y - BUILD_BELOW
         r = sum(cone.floor_range(start_u)) / 2
         th = start_u * cone.wind
+        self.u = start_u
         first = self._block(iround(math.cos(th) * r), y - 1,
                             iround(math.sin(th) * r),
                             style=cone.section_at(start_u).theme.ground,
                             form="floor", step=(1, 0), segment="start")
+        first["land"] = (first["x"], float(y), first["z"])
         self.u = start_u
         self.blocks.append(first)
         self.headroom.update((first["x"], y + h, first["z"])
@@ -2710,6 +2711,7 @@ class Course:
         if not theme:
             theme = self.cone.theme_at(y + 1, x, z).name
         return {"x": x, "y": y, "z": z, "style": style, "form": form,
+                "u": self._u_at(self.u, x, z),
                 "step": step, "out": None, "segment": segment, "theme": theme,
                 "yaw": math.atan2(step[0], -step[1]), "laid": self.laid,
                 "lift": lift, "born": -1e9,
@@ -2744,7 +2746,11 @@ class Course:
         return math.hypot(blk["x"], blk["z"])
 
     def u_of(self, blk: dict) -> float:
-        return self.cone.unwrap(blk["x"], blk["z"], blk["y"] + 1)
+        # A tread can be below the next floor at its bearing. Resolving its
+        # height then chooses the previous revolution and sends recovery back
+        # down the tower. Keep the turn selected when the landing was laid.
+        return blk["u"] if "u" in blk else self._u_at(
+            self.u, blk["x"], blk["z"])
 
     def _no(self, why: str):
         """Refuse a candidate, and say why if anyone is listening."""
@@ -2889,9 +2895,14 @@ class Course:
             if got is not None:
                 node = recovered
         if got is None:
+            # At a tight corner, one ascending side-step may point slightly
+            # back along this terrace. It still gains height and clears the
+            # whole body; never invent a ballistic arc through the building.
+            node, got = self._local_escape(
+                prev, self.cone.section_at(self.u).theme, allow_turn=True)
+        if got is None:
             self.stuck += 1
-            got = self._emergency(prev, node)
-            node = dict(node, label="stuck")
+            raise RuntimeError(f"No safe tower continuation at landing {self.laid}")
         blk = self._commit(prev, node, got)
         # Resolved against the angle already known, never through ``unwrap``:
         # height-resolved, a legal landing below the floor at its bearing
@@ -3040,13 +3051,6 @@ class Course:
                                 # in the design. See ``tools/tower_probe.py``.
                                 got["exact"] = trial is node
                                 return got
-        # Nothing at any height. Relax the comfort rules -- never the
-        # correctness ones -- before giving up on the feature entirely.
-        for cell in self._targets(prev, node):
-            got = self._place(prev, node, cell, strict=False)
-            if got is not None:
-                got["exact"] = False
-                return got
         return None
 
     def _aim_crossing(self, prev: dict, node: dict) -> dict:
@@ -3122,15 +3126,15 @@ class Course:
                                confine=True, ramp=False, label="ascent",
                                origin="approach")
             for cell in self._targets(prev, trial):
-                got = self._attempt(prev, trial, cell, strict=True)
+                got = self._attempt(prev, trial, cell)
                 if got is not None:
                     self._cross_walks += 1
                     self._pending.insert(0, node)
                     return trial, got
         return None, None
 
-    def _place(self, prev: dict, node: dict, cell, strict: bool = True):
-        return self._attempt(prev, node, cell, strict=strict)
+    def _place(self, prev: dict, node: dict, cell):
+        return self._attempt(prev, node, cell)
 
     def _last_resort(self, prev: dict):
         """A plain hop along the trough, at whatever height will take it.
@@ -3155,7 +3159,7 @@ class Course:
                                       form="floor" if lift == 0 else "full",
                                       label="recover")
                     for cell in self._targets(prev, node):
-                        got = self._attempt(prev, node, cell, strict=False)
+                        got = self._attempt(prev, node, cell)
                         if got is not None:
                             return node, got
         # Still nothing, which over a chasm is the normal case: everything
@@ -3174,7 +3178,7 @@ class Course:
             node = self._node(nxt.theme.ground, arc=arc, lift=0, form="floor",
                               label="recover")
             for cell in self._targets(prev, node):
-                got = self._attempt(prev, node, cell, strict=False)
+                got = self._attempt(prev, node, cell)
                 if got is not None:
                     return node, got
         # ...and only then a block in the air, and only ever *upward*.
@@ -3183,9 +3187,87 @@ class Course:
                 node = self._node(theme.rock, arc=arc, step_y=step,
                                   pedestal=False, spread=0, label="recover")
                 for cell in self._targets(prev, node):
-                    got = self._attempt(prev, node, cell, strict=False)
+                    got = self._attempt(prev, node, cell)
                     if got is not None:
                         return node, got
+        node, got = self._local_escape(prev, theme)
+        if got is not None:
+            return node, got
+        # A blueprint is only a promise, not an existing building. If it
+        # seals the frontier, withdraw it before painting rather than flying
+        # through the structure or dropping to a previous terrace.
+        released = False
+        for idx, (placed, _props) in list(self.landmark_hold.items()):
+            if not any(abs(c[0] - prev["x"]) <= 6 and
+                       abs(c[2] - prev["z"]) <= 6 and
+                       abs(c[1] - prev["y"]) <= 5 for c, _ in placed):
+                continue
+            del self.landmark_hold[idx]
+            self._hold_cells.difference_update(c for c, _ in placed)
+            cross = self.landmark_cross.pop(idx, None)
+            if cross is not None:
+                self._hold_cells.difference_update(cross[1])
+            released = True
+        if released:
+            return self._local_escape(prev, theme)
+        return None, None
+
+    def _local_escape(self, prev: dict, theme, check_exit: bool = True,
+                      allow_turn: bool = False):
+        """Search nearby cells without the authored lane's targeting bias.
+
+        A low beam may leave room to walk but not jump, and a structure may
+        require stepping around its outer corner. Both still use the ordinary
+        placement, support and path checks; neither invents an unchecked arc.
+        """
+        pu = self.u_of(prev)
+        candidates = []
+        for dx in range(-5, 6):
+            for dz in range(-5, 6):
+                x, z = prev["x"] + dx, prev["z"] + dz
+                distance = math.hypot(dx, dz)
+                if not 1 <= distance <= 5.5:
+                    continue
+                u = self._u_at(pu, x, z)
+                progress = (u - pu) * max(6.0, self.radius_of(prev))
+                if progress <= 1e-6 and not (
+                        allow_turn and progress >= -3.0 and
+                        self.cone.level_index(u) == self.cone.level_index(pu)):
+                    continue
+                lo, hi = self.band(u)
+                if not lo - 1 <= math.hypot(x, z) <= hi + 3:
+                    continue
+                candidates.append((abs(distance - 3) - progress * 0.1, x, z))
+        candidates.sort()
+        next_floor = self.cone.level(self.cone.level_index(pu) + 1).y
+        steps = (1, 0, -1) if self.surface(prev) < next_floor else (0, 1, -1)
+        if allow_turn:
+            steps = (1,)  # an escape turn gains height; it cannot loop on a shelf
+        for step in steps:
+            y = ifloor(self.surface(prev) + step - 1 + 1e-6)
+            for kind in ("walk", "hop"):
+                node = self._node(theme.rock, step_y=step, kind=kind,
+                                  pedestal=False, label="recover", origin="recover")
+                for _, x, z in candidates:
+                    u = self._u_at(pu, x, z)
+                    if not self.cone.has_floor(u) and y + 1 < self._far_floor(u):
+                        continue
+                    form = "floor" if self.blocked((x, y, z)) else "full"
+                    trial = dict(node, form=form)
+                    got = self._attempt(prev, trial, (x, y, z))
+                    if got is not None:
+                        if check_exit and not allow_turn:
+                            landing = self._block(x, y, z, theme.rock, form,
+                                                  got["step"], "recover")
+                            landing["land"] = got["move"].to
+                            # A walk around a corner must not finish in a
+                            # pocket with no way onward. Check the next local
+                            # move too, before committing this detour.
+                            _, exit_move = self._local_escape(
+                                landing, theme, check_exit=False)
+                            if exit_move is None:
+                                continue
+                        return trial, got
         return None, None
 
     def _recover_lifts(self):
@@ -3252,13 +3334,13 @@ class Course:
                                           label="ascent",
                                           origin="recover")
                         for cell in self._targets(prev, node):
-                            got = self._attempt(prev, node, cell, strict=False)
+                            got = self._attempt(prev, node, cell)
                             if got is not None:
                                 return node, got
         return self._grab_the_wall(prev, theme)
 
     def _grab_the_wall(self, prev: dict, theme) -> "tuple[dict | None, dict | None]":
-        """The last thing to try before the unchecked hop: climb the far wall.
+        """Try climbing the far wall before searching for a local detour.
 
         What is left when everything above has failed is always the same
         picture -- the body on the level's own ground at the chasm lip, two to
@@ -3290,66 +3372,10 @@ class Course:
                                   label="ascent", orbs=2,
                                   origin="recover")
                 for cell in self._targets(prev, node):
-                    got = self._attempt(prev, node, cell, strict=False)
+                    got = self._attempt(prev, node, cell)
                     if got is not None:
                         return node, got
         return None, None
-
-    def _emergency(self, prev: dict, node: dict):
-        """The one unchecked answer in the module.
-
-        Clamped into the band and onto the trough's own ground, so that even
-        unchecked it is somewhere a body could stand. ``stuck`` counts these
-        and the probe holds it near zero.
-        """
-        pu = self.u_of(prev)
-        cone = self.cone
-        lv = cone.level(cone.level_index(pu))
-        if not cone.has_floor(pu):
-            # Stranded out over a chasm. Aim for the far side rather than for
-            # another three and a half blocks of nothing: a body left in the
-            # hole re-triggers the exit climb from inside it, and the climb
-            # then lays its staircase through the one it laid a moment ago.
-            # Measured, that cascade was every stuck landing in the module --
-            # the first failure cost one, and the loop cost the other nine.
-            u = lv.u1 + 2.0 / max(6.0, cone.rim_at(lv.y))
-        else:
-            u = pu + 3.5 / max(6.0, self.radius_of(prev))
-        lo, hi = self.band(u)
-        r = min(max(self.radius_of(prev), lo), hi)
-        th = u * cone.wind
-        cx, cz = iround(math.cos(th) * r), iround(math.sin(th) * r)
-        cy = self.floor_at_cell(u, cx, cz)
-        if self.lift_floor:
-            # Level with the body rather than back down on the terrace. This
-            # is the one unchecked landing in the module, so it is also the one
-            # that cannot be argued with later -- and dropping the body to the
-            # floor here undoes a level's whole climb and leaves a landing a
-            # fall walks back onto. A flat hop is no less safe than a drop.
-            #
-            # ...unless up there is inside something. Unchecked does not mean
-            # unchecked *twice*: a cell in the ceiling slab or in the core is a
-            # landing the next node cannot leave either, and that is how one
-            # emergency becomes a run of three. Measured, allowing the drop
-            # back to the floor in exactly that case is the difference between
-            # a cascade and a single landing.
-            high = max(cy, ifloor(self.surface(prev)) - 1)
-            if not any(self.blocked((cx, high + h, cz)) for h in (0, 1, 2)):
-                cy = high
-        # A tuple is truthy whether or not it is (0, 0), so this cannot be
-        # written as ``step or (1, 0)`` -- which is what it said until ruff
-        # pointed out that the fallback was unreachable. A zero step gives a
-        # direction of no length, and the take-off point then lands exactly on
-        # the landing point.
-        step = (cx - prev["x"], cz - prev["z"])
-        if step == (0, 0):
-            step = (self.cone.wind, 0)
-        frm = takeoff_point(prev["x"], self.surface(prev), prev["z"],
-                            prev["form"], step)
-        to = land_point(cx, cy + 1.0, cz, "full", step)
-        return {"cell": (cx, cy, cz), "step": step, "form": "full",
-                "move": Move("hop", [arc_leg(frm, to)]), "soft": (),
-                "pedestal": (), "footing": (), "ceiling": ()}
 
     def _targets(self, prev: dict, node: dict):
         """Candidate landing cells, nearest first to where the helix wants one.
@@ -3526,19 +3552,32 @@ class Course:
         scored.sort()
         return [(x, y, z) for _, x, y, z in scored[:24]]
 
-    def _attempt(self, prev: dict, node: dict, cell, strict: bool = True):
-        """Everything that has to be true, in the order that rejects soonest.
+    def _attempt(self, prev: dict, node: dict, cell):
+        """Validate support, reach and continuous body clearance for every move.
 
-        ``strict`` separates the two kinds of requirement, and the split is
-        load-bearing. Without it a landing must be empty, have head-room, sit
-        on something, be reachable by a move the physics has, and have a clear
-        path -- those are **correctness** and they never relax. With it the
-        body must also fit comfortably where it lands and all the way across
-        it -- those are **comfort**, and a course that cannot satisfy them
-        anywhere is better off grazing a bank than falling through to the one
-        answer nothing checked.
+        Recovery uses exactly the same checks as authored landings.
         """
         cx, cy, cz = cell
+        drop = self.surface(prev) - (cy + FORMS[node["form"]])
+        if (node["kind"] in BALLISTIC and drop > 3.0 and
+                (node["step_y"] is None or node["step_y"] >= 0)):
+            # An inserted gate can finish above the next beat's fixed lift.
+            # Rejoining that beat must not undo the whole climb. Explicitly
+            # authored descending steps keep their intended drop.
+            return self._no("unplanned drop")
+        u = self._u_at(self.u_of(prev), cx, cz)
+        floor = (self.cone.floor_at(u) if self.cone.has_floor(u)
+                 else self._far_floor(u))
+        if cy + FORMS[node["form"]] < floor:
+            return self._no("below exit floor")
+        # Do not spend the last launch cells while still too low to leave.
+        # A legal landing at the lip can otherwise be a dead end: every
+        # forward cell is in the chasm and requires several metres of rise.
+        lv = self.cone.level(self.cone.level_index(u))
+        need = self.cone.level(lv.index + 1).y - (cy + FORMS[node["form"]])
+        left = (lv.u_edge - u) * max(6.0, math.hypot(cx, cz))
+        if need > 0 and left < need * 2.0:
+            return self._no("no room left to climb")
         step = (cx - prev["x"], cz - prev["z"])
         if step == (0, 0) and node["kind"] not in ("climb", "bubble"):
             return self._no("same cell")
@@ -3570,24 +3609,6 @@ class Course:
         if got_pedestal is None:
             return self._no("pedestal will not stand")
         pedestal, footing = got_pedestal
-        surface = cy + FORMS[form]
-        if strict and not self._body_fits(
-                land_point(cx, surface, cz, form, step), cells):
-            return self._no("body does not fit on landing")
-        if strict:
-            # The same question about the block being *left*. Which edge the
-            # feet leave from is not known until the next landing is chosen --
-            # it is chosen here -- and the run across a block toward that edge
-            # is a stretch of walking nothing else checks.
-            here = self.land_point(prev)
-            own = set(footprint(prev["x"], prev["y"], prev["z"], prev["form"]))
-            own |= set(body_cells(*here))
-            gone = takeoff_point(prev["x"], self.surface(prev), prev["z"],
-                                 prev["form"], step)
-            for f in (0.34, 0.67, 1.0):
-                at = tuple(here[i] + (gone[i] - here[i]) * f for i in range(3))
-                if not self._body_fits(at, own):
-                    return self._no("body does not fit leaving")
         # The move is solved twice at most: once spending the whole jump
         # impulse (:func:`spend_impulse`, which lands deeper and leaves
         # earlier so a short gap is still a real jump), and if the arc that
@@ -3604,18 +3625,27 @@ class Course:
             if built is None:
                 return self._no("no move: " + node["kind"])
             move, soft = built
+            # Slabs share a voxel with the feet, but their actual half-height
+            # box is still an obstacle. A descending arrival must clear its
+            # side before touching the top, just like a full block.
+            if form == "slab" and move.kind in BALLISTIC and move.intersects_box(
+                    (cx - .5, cy, cz - .5), (cx + .5, cy + .5, cz + .5)):
+                why = "landing side blocked"
+                continue
             lid = self._ceiling_cells(prev, node, move)
             if lid is None:
                 why = "head-hitter will not fit"
                 continue
             exempt = standing_cells(prev) | standing_cells(
                 {"x": cx, "y": cy, "z": cz, "form": form})
-            exempt |= set(soft)
+            exempt |= {c for c, _style, _face in soft}
             if not self._path_clear(
-                    move, exempt,
-                    footprint(prev["x"], prev["y"], prev["z"], prev["form"]),
-                    tuple(pedestal) + lid):
+                    move, exempt, extra=tuple(pedestal) + lid + tuple(cells)):
                 why = "path blocked"
+                continue
+            run = Move("walk", [line_leg(self.land_point(prev), move.frm, RUN_SPEED)])
+            if not self._path_clear(run, standing_cells(prev)):
+                why = "body does not fit leaving"
                 continue
             why = None
             break
@@ -3750,17 +3780,6 @@ class Course:
             out.append(cell)
         return tuple(out)
 
-    def _body_fits(self, at, own) -> bool:
-        """Can a body stand at ``at`` without being inside anything?"""
-        floor = ifloor(at[1] + 0.05)
-        own = set(own)
-        for cell in body_cells(*at):
-            if cell[1] < floor or cell in own:
-                continue
-            if self.blocked(cell):
-                return False
-        return True
-
     def _walk_bridge(self, prev: dict, move: Move, cells, pedestal):
         """The ground a walk crosses, laid wherever there is none.
 
@@ -3831,36 +3850,22 @@ class Course:
                     return None
         return tuple(out)
 
-    def _path_clear(self, move: Move, exempt, leaving=(), extra=()) -> bool:
-        """Nothing solid along the path, except what the body is already in.
+    def _path_clear(self, move: Move, exempt, extra=()) -> bool:
+        """Clear the continuous body volume, including structures and trim.
 
-        That last clause is the difference between a check that works and one
-        that deadlocks: a body is 0.6 m wide and takes off from a block's far
-        edge, so on the lattice it routinely straddles the cell next door, and
-        which edge it leaves from is not known when the block it stands on is
-        placed. The exemption is bounded to the first third of the path, so a
-        move that arcs back into what it started beside is still refused.
-
-        ``extra`` is the pedestal this landing is *about* to build. It is not
-        in the occupancy map yet and it must still be checked, because a column
-        driven down from the block you are jumping to is a column built through
-        the arc that gets you there.
+        ``extra`` includes the landing, pedestal and lid about to be built.
+        Slab standing cells and the move's own climbable cells are exempt.
         """
         extra = set(extra)
-        leaving = set(leaving)
-        points = move.points(ARC_SAMPLES)
-        early = len(points) // 3
         hold = self._hold_cells
-        for i, (x, y, z) in enumerate(points):
-            for cell in body_cells(x, y, z):
-                if cell in exempt:
-                    continue
-                if cell not in extra and cell not in hold \
-                        and not self.blocked(cell):
-                    continue
-                if i <= early and cell in leaving:
-                    continue
+        for cell in move.swept_cells() - set(exempt):
+            if cell in extra or cell in hold or self.blocked(cell):
                 return False
+        for blk in self.blocks:
+            for decoration in blk["deco"]:
+                if move.intersects_box(*self._deco_bounds(blk, decoration)):
+                    return False
+        for x, y, z in move.points(ARC_SAMPLES):
             # The cell test cannot see the core's *fractional* face: the
             # browed wall leans by tenths of a block, so a cell whose centre
             # rounds outside it can still hold a body shoulder that is
@@ -3976,6 +3981,8 @@ class Course:
             # The flat leg gets an honest shelf and the step gets the block it
             # is stepping onto, which is also what the game does: half a block
             # is walked up, not jumped.
+            to = (float(cx), to[1], float(cz))
+            dist = math.dist((frm[0], frm[2]), (to[0], to[2]))
             f = max(0.0, 1.0 - STEP_UP / dist)
             mid = (frm[0] + (to[0] - frm[0]) * f, frm[1],
                    frm[2] + (to[2] - frm[2]) * f)
@@ -4070,7 +4077,7 @@ class Course:
             return
         self.struct[cell] = style
         self.writes.append((cell, style))
-        if style not in SEE_THROUGH:
+        if style not in SEE_THROUGH or style in ("glass", "leaves", "scaffold"):
             self.solid.add(cell)
         self._rock.pop(cell, None)
 
@@ -4103,15 +4110,12 @@ class Course:
         # against.
         prev["launch"] = got["move"].frm
         blk["land"] = got["move"].to
-        # A move belongs to the block it *leaves*, so the emergency answer's
-        # label has to be written back one block.
-        prev["unchecked"] = node.get("label") == "stuck"
+        # Kept for probes and old replay consumers; every committed move is checked.
+        prev["unchecked"] = False
         # The run *across* prev as well as the jump off it. Both are only known
         # now -- which edge the feet leave from is decided by where the course
         # goes next -- and both are corridors terrain must not be painted into.
         run = self.land_point(prev), self.takeoff_point(prev)
-        walk = [tuple(run[0][i] + (run[1][i] - run[0][i]) * f
-                      for i in range(3)) for f in (0.0, 0.25, 0.5, 0.75, 1.0)]
         # ...minus the shelf a walk laid for itself, and the exclusion is
         # load-bearing rather than tidy. ``write`` refuses a cell in
         # ``pathcells``, so a bridge cell that is also a path cell is a block
@@ -4119,9 +4123,9 @@ class Course:
         # coincide whenever the walk is between two surfaces at different
         # fractions of a cell -- a slab to a full block -- because the body's
         # lowest cell partway up that transition *is* the cell holding it up.
-        prev["path"] = tuple({
-            c for x, y, z in list(got["move"].points(ARC_SAMPLES)) + walk
-            for c in body_cells(x, y, z)} - set(got.get("bridge") or ()))
+        ground_run = Move("walk", [line_leg(run[0], run[1], RUN_SPEED)])
+        prev["path"] = tuple((got["move"].swept_cells() | ground_run.swept_cells())
+                             - set(got.get("bridge") or ()))
         self.pathcells.update(prev["path"])
         last = got["move"].legs[-1]
         blk["impact"] = (abs(last["vy0"] - GRAVITY * last["dur"])
@@ -4243,6 +4247,20 @@ class Course:
             blk["deco"].append(deco(-fx * 0.42 + fz * 0.42, 1.0,
                                     -fz * 0.42 - fx * 0.42,
                                     0.22, 1.0, 0.22, theme.accent))
+        # Trim is optional; already-solved routes are not. Include earlier
+        # moves, since a new lintel can reach back over a neighbouring jump.
+        paths = [b["move"] for b in self.blocks if b["move"] is not None]
+        paths += [Move("walk", [line_leg(self.land_point(b),
+                                         self.takeoff_point(b), RUN_SPEED)])
+                  for b in self.blocks]
+        blk["deco"] = [d for d in blk["deco"] if not any(
+            path.intersects_box(*self._deco_bounds(blk, d)) for path in paths)]
+
+    @staticmethod
+    def _deco_bounds(blk, d):
+        x, y, z = blk["x"] + d["dx"], blk["y"] + d["dy"], blk["z"] + d["dz"]
+        return ((x - d["sx"] / 2, y, z - d["sz"] / 2),
+                (x + d["sx"] / 2, y + d["sy"], z + d["sz"] / 2))
 
     def _hang_orbs(self, prev: dict, blk: dict, count: int) -> None:
         """Strung *on* the path that is about to be flown, at chest height,
@@ -4293,9 +4311,11 @@ class Course:
                 if self.struct.get(cell) not in (None, "air"):
                     self.struct[cell] = "air"
                     self.writes.append((cell, "air"))
+                self.solid.discard(cell)
             for cell in (blk["pedestal"] + blk.get("footing", ())
                          + blk.get("ceiling", ())):
-                self.solid.discard(cell)
+                # Pedestals and bridges remain drawn terrain. Only their
+                # reservation retires, not their collision geometry.
                 self.ground.discard(cell)
             for x, y, z in footprint(blk["x"], blk["y"], blk["z"],
                                      blk["form"]) or ((blk["x"], blk["y"],
@@ -5071,7 +5091,6 @@ class Course:
             f = i / steps
             u = section.u0 + span * f
             yf = cone.floor_at(u)
-            out = cone.outer_at(u)
             th = u * cone.wind
             ct, st = math.cos(th), math.sin(th)
             r0f, r1f = cone.floor_range(u)
@@ -5469,7 +5488,6 @@ class Course:
         # a sealed tube is three seconds of bare wall. Louvre slits on the
         # outboard side -- every other course, like a belfry -- put slivers
         # of sky in the climb without opening a way in.
-        r = math.hypot(lx, lz)
         ox_out = 1 if lx > 0 else -1
         oz_out = 1 if lz > 0 else -1
         out_axis = 0 if abs(lx) >= abs(lz) else 1
@@ -5538,7 +5556,7 @@ class Course:
         was mostly hopping up cubes over a hole and barely saw the places it
         was climbing past.
         """
-        nxt = self.cone.level(lv.index + 1)
+        self.cone.level(lv.index + 1)   # generated on demand; keep the next section built
         style, climb = ASCENT_STYLE[kind]
         return [
             # A block against the wall to launch from, still over solid ground.

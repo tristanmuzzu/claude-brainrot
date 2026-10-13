@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-07",
+  "endurance": {
+    "command": ".venv/bin/python tools/endurance_probe.py --hours 0.6 --runs 8 --levels",
+    "output": "ENDURANCE -- tower, 8 runs x 0.6 h asked, 4.85 h simulated\n  landings                    38224\n  level visits                1166  (15.0 s each)\n  distinct levels seen        33 of 33\n  climbed                     6701 blocks (1382 an hour)\n\n  THE THREE WAYS IT COULD STOP\n    stalls (>=2 landings under 0.6 m of arc)   1   0.001 a visit\n    give-backs (climbed 3+, lost 4+)             0   0.000 a visit\n    landings that went backwards along the corridor  1\n    unchecked emergency placements                   0  (0.00%)\n\n  HOW FAR A LANDING CARRIES THE BODY ALONG THE CORRIDOR\n    min -2.92   1% 1.85   5% 2.22   median 3.14   95% 4.79   max 6.09 m\n    under 0.3 m        5  (0.01%)\n    under 0.6 m       12  (0.03%)\n    under 1.0 m       24  (0.06%)\n    under 1.5 m      149  (0.39%)\n\n  reported, not gated\n    landings whose position names a different level than their plan does   1158  (3.03%)\n\n  level              visits   land  s/visit  stalls  giveback  worst  min arc\n  THE SEA GATE           35   1144     14.6       1         0    0.0     0.09\n  BASALT FLUES           34   1154     15.2       0         0    0.0     1.07\n  THE PILLARS            34   1063     14.4       0         0    0.0     1.04\n  SPORE HOLLOW           34   1089     14.8       0         0    0.0     1.09\n  THE ARCHIVE            34   1197     15.5       0         0    0.0     0.12\n  PUMPKIN ROWS           35   1177     14.6       0         0    0.0     0.08\n  THE GROVE              35   1145     14.7       0         0    0.0     1.34\n  DUST DEVILS            35   1151     14.9       0         0    0.0     0.96\n  THE CORNICE            35   1123     13.9       0         0    0.0     1.43\n  WART FIELDS            35   1126     14.6       0         0    0.0     1.15\n  ECHO SHAFT             35   1176     14.8       0         0    0.0     2.09\n  THE WHITE STAIR        35   1171     14.9       0         0    0.0    -2.92\n  THE GATE               35   1178     15.0       0         0    0.0     0.86\n  THE GATEHOUSE          35   1149     15.1       0         0    0.0     0.94\n  WINDMILL REACH         35   1150     16.4       0         0    0.0     0.28\n  MARKET STREET          35   1102     15.8       0         0    0.0     1.32\n  THE TIMBERWORKS        36   1169     15.7       0         0    0.0     1.56\n  SUNKEN TEMPLE          36   1233     15.2       0         0    0.0     1.31\n  THE BALCONIES          36   1183     15.4       0         0    0.0     0.95\n  CANOPY WALK            37   1288     15.8       0         0    0.0     1.02\n  THE CISTERN            37   1213     15.3       0         0    0.0     1.54\n  GLACIER SHELF          37   1141     13.3       0         0    0.0     0.54\n  THE APIARY             36   1192     15.0       0         0    0.0     0.38\n  THE CRUCIBLE           36   1195     15.8       0         0    0.0     1.19\n  REEF GARDEN            36   1090     14.9       0         0    0.0     0.40\n  THE SILENCE            36   1228     14.8       0         0    0.0     1.00\n  THE BELFRY             36   1150     15.8       0         0    0.0     1.36\n  WOOLWORKS              35   1116     15.4       0         0    0.0     1.38\n  THE VAULT              36   1284     15.3       0         0    0.0     1.06\n  THE WEIR               36   1141     14.5       0         0    0.0     1.24\n  BLUE RUN               35    997     13.2       0         0    0.0     1.90\n  THE QUARRY             35   1144     14.6       0         0    0.0     0.54\n  ROPE BRIDGE            34   1165     14.9       0         0    0.0     1.11\n"
+  },
+  "drawn_world": {
+    "method": "arc_probe.grow(hp, run, 3000) for runs 0..4; GRAZE=0; inspect played-move records for non-floorish solid hits, soft, furniture, eye/eye_furn and props. Sampling interval 0.10 m. Retrospective final-world intersections are excluded because expired paths may be built over after playback.",
+    "runs": [
+      {
+        "run": 0,
+        "moves": 3001,
+        "stuck": 0,
+        "solid": 0,
+        "soft": 0,
+        "furniture": 0,
+        "eye": 0,
+        "props": 0
+      },
+      {
+        "run": 1,
+        "moves": 3001,
+        "stuck": 0,
+        "solid": 0,
+        "soft": 0,
+        "furniture": 0,
+        "eye": 0,
+        "props": 0
+      },
+      {
+        "run": 2,
+        "moves": 3001,
+        "stuck": 0,
+        "solid": 0,
+        "soft": 0,
+        "furniture": 0,
+        "eye": 0,
+        "props": 0
+      },
+      {
+        "run": 3,
+        "moves": 3001,
+        "stuck": 0,
+        "solid": 0,
+        "soft": 0,
+        "furniture": 0,
+        "eye": 0,
+        "props": 0
+      },
+      {
+        "run": 4,
+        "moves": 3001,
+        "stuck": 0,
+        "solid": 0,
+        "soft": 0,
+        "furniture": 0,
+        "eye": 0,
+        "props": 0
+      }
+    ]
+  },
+  "tests": {
+    "final_gameplay": "67 passed (tests/test_tower.py tests/test_spiral.py), 10 passed (tests/test_course_safety.py)",
+    "full_suite": "709 passed, 34 skipped, 1 failed: tests/test_overlay_x11.py::test_it_is_not_always_above_when_it_cannot_hide_itself; bare Xvfb has no EWMH window manager. Full suite preceded the final unplanned-drop guard; focused tests were rerun afterward."
+  },
+  "rendered": {
+    "seed": 7,
+    "frames_per_second": 60,
+    "highest_m": 520.05,
+    "landings": 2465,
+    "solver_failures": 0,
+    "method": "Real scene updates under private Xvfb, periodic GPU draws and inspected captures at 480, 494, 500 and 520 m; brainrot shoot additionally rendered 1200 frames."
+  }
+}
